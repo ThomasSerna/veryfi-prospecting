@@ -2,7 +2,8 @@
 
 Prototipo académico local para investigar posibles clientes de Veryfi en
 Latinoamérica. Incluye una pantalla inicial, contratos Pydantic, configuración
-versionada y persistencia SQLite. Todavía no
+versionada, persistencia SQLite, reserva/conciliación de presupuesto y un cliente
+HTTP JSON compartido. Todavía no
 descubre empresas, califica prospectos ni busca contactos. No necesita claves,
 no consume APIs de proveedores y no muestra resultados comerciales simulados.
 
@@ -48,7 +49,9 @@ git check-ignore -v .env .env.local .venv/pyvenv.cfg data/prospecting.sqlite3 .s
 
 Las pruebas bloquean conexiones externas y usan datos explícitamente sintéticos
 y bases temporales. Comprueban contratos, procedencia, relaciones, transacciones,
-historial, consumo decimal exacto y recuperación al reabrir SQLite. También
+historial, consumo decimal exacto y recuperación al reabrir SQLite. Comprueban
+reservas concurrentes, cupos de créditos y autorizaciones acumuladas, duplicados,
+conciliación y timeouts mediante transportes sintéticos. También
 ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se importen
 sin cargar Streamlit. Estas pruebas no demuestran acceso a proveedores ni
 validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
@@ -112,15 +115,88 @@ un error, sin recrear tablas. No hay funciones de borrado ni migraciones
 automáticas. Conserva la base y sus archivos auxiliares al cerrar la aplicación;
 contienen resultados y consumo que no deben descartarse.
 
-La capa de datos no calcula puntuaciones, no determina si un prospecto está listo
-y no aplica reservas, conciliación ni autorización de gasto. Mantener dos bases
-distintas no coordina el presupuesto global.
+La persistencia no calcula puntuaciones ni determina si un prospecto está listo.
+El control de gasto corresponde a `Budget`. Mantener dos bases distintas no
+coordina el presupuesto global.
+
+## Presupuesto y cliente de proveedores
+
+`Budget(db, global_limits, account_allowances)` reutiliza la misma base SQLite y
+los límites de la configuración. Sus métodos `reserve`, `claim`, `record_result`
+y `reconcile` ejecutan transacciones breves propias; no deben llamarse dentro de
+`db.transaction()`. `snapshot` muestra importes confirmados, estimados, reservados,
+pendientes y disponibles, distinguiendo desconocidos y excesos.
+
+El máximo global es USD 20 y las llamadas automáticas se limitan a USD 15. El
+margen de USD 5 no habilita llamadas adicionales. El límite por campaña es USD 2
+y el de USD 0,25 por empresa acumula todas sus campañas. Las reducciones guardadas
+en una campaña se respetan. La distribución IA/web/contactos es orientativa.
+
+Los cupos se proporcionan como objetos `AccountAllowance` validados, con
+`provider`, `account_ref`, `funding_source`, `credit_limit`, `cost_limit_usd`,
+`source_reference` y `observed_at`. Guarda esa configuración local bajo `data/`,
+fuera de Git: los módulos no crean ni cargan automáticamente ese archivo.
+Los cupos representan el saldo inicial asignado al registro completo del sprint;
+siempre se resta todo el historial, sin renovar cuota por fecha o reinicio.
+Una consulta posterior de saldo restante no sustituye ese saldo inicial.
+
+El crédito gratuito acreditado cuenta como USD 0, pero consume su cupo de créditos.
+El prepago cuenta por su costo económico y no vuelve a contar como desembolso.
+Los cobros nuevos se registran aparte sin duplicarlos en el acumulado. Cada
+llamada utiliza un solo origen; no hay recargas ni mezcla automática de saldos.
+Los valores necesarios desconocidos bloquean el envío.
+
+Cada reserva y reclamación exige `SpendingAuthorization`: proveedor, operación,
+cuenta, topes de dinero/créditos, responsable, referencia y fecha del permiso.
+Los topes se aplican al consumo acumulado desde la autorización. Construir este
+objeto no sustituye la aprobación humana del responsable para esa sesión.
+
+`claim` cambia una reserva a `in_flight` de manera exclusiva, antes de la red.
+`record_result` guarda el resultado técnico y consumo observado. Un timeout o
+interrupción conserva la reserva; al reabrir, una solicitud `in_flight` no se
+reenvía. `reconcile` recibe una `Confirmation` con consumo confirmado, referencia
+y fecha: libera únicamente la diferencia acreditada y conserva el importe de la
+reserva original. Un cargo inesperado se registra y bloquea nuevas llamadas.
+
+El contrato persistido conserva cuenta, importes y fechas, pero no el texto de la
+referencia del comprobante de conciliación. El responsable debe conservar los
+comprobantes y la configuración financiera bajo `data/`; el módulo no los archiva
+automáticamente. No borres la base ni sus archivos auxiliares para liberar saldo.
+
+`ProviderClient` recibe descriptores `OperationSpec` definidos por código para
+operaciones explícitas y un transporte opcional para pruebas.
+`fingerprint` calcula una huella SHA-256 sin autenticación.
+`request_json` exige reserva persistida y autorización, ejecuta un solo intento y
+devuelve `ProviderResult` con un modelo Pydantic validado. Devuelve errores tipados
+para fallos locales, HTTP, transporte, timeout, formato y tamaño; las claves y
+entradas sensibles se omiten de los mensajes. No interpreta permisos o cuota con
+una tabla HTTP universal ni reintenta automáticamente.
+
+El transporte estándar utiliza HTTPS verificado, un opener privado sin proxies
+heredados ni redirecciones, timeout de 10 segundos como máximo por operación
+bloqueante y respuesta máxima de 1 MiB. Descuenta del tiempo restante el empleado
+en la preparación y reclamación. Ese timeout no garantiza un plazo absoluto para
+DNS o toda la llamada. El cliente no descarga páginas arbitrarias ni implementa
+integraciones comerciales: la pantalla no tiene operaciones externas habilitadas.
+
+Las claves se leen únicamente de variables de entorno al ejecutar una operación:
+`TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `APOLLO_API_KEY` y `HUNTER_API_KEY`.
+No se carga `.env` automáticamente. Una clave presente no autoriza gasto.
+No hay envío comercial, recargas, waterfall ni enriquecimiento móvil de pago.
+
+`Usage` identifica y contabiliza solicitudes, pero no almacena cuerpos HTTP.
+Los éxitos repetidos se bloquean para recuperar su resultado guardado; si falta
+ese resultado, requieren revisión. Un segundo intento necesita conciliación,
+fallo transitorio identificado por el adaptador y otra reserva; después de un
+reinicio no se deduce transitoriedad del mensaje guardado.
 
 ## Estructura y responsabilidades
 
 - `app.py`: pantalla inicial de Streamlit, sin lógica de negocio.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
+- `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
+- `prospecting/providers.py`: cliente JSON acotado y errores de proveedor.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
 - `tests/`: pruebas de inicialización, contratos y persistencia con datos sintéticos.
 - `.streamlit/config.toml`: acceso local y telemetría desactivada.
