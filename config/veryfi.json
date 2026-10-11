@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "catalog": {
+    "version": "catalog_v1",
+    "validation_status": "pending",
+    "source_reference": "docs/IDEA.md §3 y §5",
+    "source_date": "2026-10-11",
+    "products": [
+      {
+        "id": "document_ocr_api",
+        "name": "OCR y API documental",
+        "capabilities": ["Captura documental", "Extracción de datos de recibos y facturas mediante OCR/API"],
+        "source_reference": "docs/IDEA.md §3 y §5",
+        "validation_status": "pending"
+      },
+      {
+        "id": "lens",
+        "name": "Lens",
+        "capabilities": ["Captura de comprobantes para flujos de gastos y validación de compras"],
+        "source_reference": "docs/IDEA.md §5",
+        "validation_status": "pending"
+      },
+      {
+        "id": "antifraud",
+        "name": "Antifraude",
+        "capabilities": ["Antifraude en flujos documentales y validación de compras"],
+        "source_reference": "docs/IDEA.md §3 y §5",
+        "validation_status": "pending"
+      },
+      {
+        "id": "validation_enrichment",
+        "name": "Validación y enriquecimiento",
+        "capabilities": ["Validación documental y de compras", "Enriquecimiento de datos documentales y de productos"],
+        "source_reference": "docs/IDEA.md §3 y §5",
+        "validation_status": "pending"
+      },
+      {
+        "id": "loyalty_whatsapp",
+        "name": "Soluciones de fidelización y WhatsApp",
+        "capabilities": ["Soluciones de campañas y programas de fidelización", "WhatsApp en programas de validación de compras"],
+        "source_reference": "docs/IDEA.md §3 y §5",
+        "validation_status": "pending"
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "id": "expense_reimbursement",
+      "segment": "fintech_software",
+      "name": "FinTech de gastos y reembolsos",
+      "signals": ["Usuarios suben recibos", "Gestión de gastos", "Conciliación con tarjetas"],
+      "products": ["document_ocr_api", "lens", "antifraud"],
+      "target_roles": ["Product Manager", "Gerente de Producto", "Head of Product", "Responsable de Producto", "VP of Product", "Vicepresidente de Producto", "Engineering Manager", "Gerente de Ingeniería", "Engineering Director", "Director de Ingeniería", "CTO", "Director de Tecnología"],
+      "candidate": false,
+      "source_reference": "docs/IDEA.md §5"
+    },
+    {
+      "id": "payments_ap_erp",
+      "segment": "fintech_software",
+      "name": "Software de pagos, cuentas por pagar y ERP",
+      "signals": ["Recepción de facturas", "Captura de documentos", "Conciliación", "Cuentas por pagar"],
+      "products": ["document_ocr_api", "validation_enrichment"],
+      "target_roles": ["Producto", "Product", "Ingeniería", "Engineering", "Responsable de Cuentas por Pagar", "Accounts Payable Lead", "Responsable de Operaciones Financieras", "Financial Operations Lead"],
+      "candidate": false,
+      "source_reference": "docs/IDEA.md §5"
+    },
+    {
+      "id": "cpg_brands",
+      "segment": "cpg_loyalty",
+      "name": "CPG y marcas",
+      "signals": ["Promociones que piden tickets, códigos o comprobantes", "Recompensas por compra"],
+      "products": ["validation_enrichment", "antifraud", "lens", "loyalty_whatsapp"],
+      "target_roles": ["Marketing Director", "Director de Marketing", "Brand Manager", "Gerente de Marca", "Loyalty Manager", "Responsable de Fidelización", "CRM Manager", "Responsable de CRM", "Trade Marketing", "Marketing de Canal", "Consumer Insights", "Investigación del Consumidor"],
+      "candidate": false,
+      "source_reference": "docs/IDEA.md §5"
+    },
+    {
+      "id": "loyalty_platforms_agencies",
+      "segment": "cpg_loyalty",
+      "name": "Plataformas y agencias de fidelización",
+      "signals": ["Implementan campañas o programas para marcas", "Necesitan validar compras"],
+      "products": ["document_ocr_api", "validation_enrichment", "loyalty_whatsapp"],
+      "target_roles": ["Producto", "Product", "Tecnología", "Technology", "Responsable de Fidelización", "Loyalty Lead", "Director de Cuentas", "Account Director"],
+      "candidate": true,
+      "source_reference": "docs/IDEA.md §5"
+    }
+  ],
+  "rubrics": {
+    "rubric_v1": {
+      "validation_status": "proposed",
+      "allowed_values": [0, 0.5, 1, null],
+      "criteria": {
+        "document_need": {
+          "name": "Necesidad documental/validación",
+          "weight": 35,
+          "strong_signal": "Producto o programa explícitamente recibe/procesa comprobantes relevantes",
+          "partial_signal": "Flujo documental compatible, sin detalle completo"
+        },
+        "offer_match": {
+          "name": "Correspondencia con una oferta",
+          "weight": 25,
+          "strong_signal": "Relación concreta entre problema y capacidad validada de Veryfi",
+          "partial_signal": "Relación plausible con una capacidad, requiere confirmación"
+        },
+        "scale_potential": {
+          "name": "Escala/potencial",
+          "weight": 20,
+          "strong_signal": "Operación amplia o volumen relevante documentado",
+          "partial_signal": "Empresa mediana o despliegue limitado con evidencia"
+        },
+        "adoption_capacity": {
+          "name": "Capacidad de adoptar la solución",
+          "weight": 10,
+          "strong_signal": "Producto digital, integración o canal apropiado comprobado",
+          "partial_signal": "Infraestructura parcial compatible"
+        },
+        "opportunity_timing": {
+          "name": "Momento de oportunidad",
+          "weight": 10,
+          "strong_signal": "Lanzamiento, expansión o campaña vigente relevante",
+          "partial_signal": "Iniciativa reciente, sin calendario claro"
+        }
+      },
+      "priority_order": ["excluded", "insufficient_evidence", "high", "medium", "low", "insufficient_evidence"],
+      "preconditions": {
+        "confirmed_exclusion": "excluded",
+        "unknown_identity": "insufficient_evidence",
+        "unknown_criteria": ["document_need", "offer_match"],
+        "material_contradiction": "insufficient_evidence"
+      },
+      "thresholds": {
+        "high": {
+          "fit_score_min": 75,
+          "coverage_min": 0.75,
+          "document_need": 1,
+          "offer_match_min": 0.5,
+          "primary_source_required": true
+        },
+        "medium": {
+          "fit_score_min": 50,
+          "coverage_min": 0.60,
+          "document_need_min": 0.5,
+          "offer_match_min": 0.5
+        },
+        "low": {"coverage_min": 0.60}
+      },
+      "zero_meaning": "Evidencia explícita incompatible con el criterio; requiere evidencia y justificación.",
+      "unknown_meaning": "No se pudo determinar; ausencia de información no equivale a cero."
+    }
+  },
+  "defaults": {
+    "countries": ["CO", "MX"],
+    "segments": ["fintech_software", "cpg_loyalty"],
+    "max_companies": 20,
+    "discovery": {"web_queries": 8, "results_per_query": 10, "raw_candidates": 60, "target_per_country_segment": 5},
+    "effort": {
+      "initial": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 90},
+      "insufficient_evidence": {"web_queries": 1, "pages": 2, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 45},
+      "medium": {"web_queries": 2, "pages": 2, "people": 1, "enrichments_per_provider": 1, "people_queries": 1, "active_seconds": 90},
+      "high": {"web_queries": 4, "pages": 4, "people": 3, "enrichments_per_provider": 3, "people_queries": 2, "active_seconds": 180},
+      "low": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0},
+      "excluded": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0}
+    },
+    "email_verifications_per_channel": 1,
+    "evidence_expansions_per_company": 1,
+    "active_seconds": 2700,
+    "cache": {"web_days": 7, "contact_days": 30},
+    "freshness": {"email_days": 30, "employment_days": 180},
+    "employee_ranges": {
+      "small": {"employee_min": 0, "employee_max": 49},
+      "medium": {"employee_min": 50, "employee_max": 249},
+      "large": {"employee_min": 250, "employee_max": null}
+    },
+    "budget": {
+      "global_usd": "20",
+      "operating_usd": "15",
+      "uncertainty_usd": "5",
+      "campaign_usd": "2",
+      "company_usd": "0.25",
+      "allocation": {"llm_usd": "3", "web_usd": "2", "contacts_usd": "10", "uncertainty_usd": "5"},
+      "automatic_topups": false,
+      "variable_cost_waterfall": false,
+      "paid_phone_enrichment": false
+    },
+    "llm": {"max_input_tokens": 6000, "max_output_tokens": 1000}
+  }
+}
