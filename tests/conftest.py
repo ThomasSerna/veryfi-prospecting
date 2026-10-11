@@ -78,10 +78,10 @@ def make_company():
         provenance = {}
         evidence = []
         for field in (
-            "name", "domain", "aliases", "operating_countries", "segments",
+            "name", "domain", "entity_name", "entity_type", "aliases", "operating_countries", "segments",
             "parent_company_id", "size",
         ):
-            if fields.get(field) is not None and fields.get(field) != []:
+            if fields.get(field) is not None:
                 fact = Evidence(
                     company_id=company_id,
                     claim=f"Dato sintético de {field}: {fields[field]}",
@@ -114,8 +114,8 @@ def make_contact():
             "name_complete": True, "current_employment": True,
         }
         fields.update(overrides)
-        for field in ("name", "title"):
-            if fields[field] is not None:
+        for field in ("name", "title", "relevant_function"):
+            if fields.get(field) is not None:
                 fact = Evidence(
                     company_id=company_id,
                     contact_id=contact_id,

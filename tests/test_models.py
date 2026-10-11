@@ -159,9 +159,13 @@ def test_company_requires_provenance_even_for_literal_unknown():
     assert company.aliases is None
     assert company.operating_countries is None
     assert company.segments is None
-    for field, value in (("domain", "example.com"), ("aliases", ["Marca sintética"]), ("operating_countries", ["CO"])):
+    for field, value in (("domain", "example.com"), ("aliases", ["Marca sintética"]), ("aliases", []), ("operating_countries", ["CO"])):
         with pytest.raises(ValidationError):
             Company.model_validate(company.model_dump() | {field: value})
+    empty_aliases = Company.model_validate(company.model_dump() | {
+        "aliases": [], "provenance": company.provenance | {"aliases": [evidence_id]}
+    })
+    assert empty_aliases.aliases == []
 
 
 def test_identity_is_not_inferred_from_a_shared_domain(make_company):

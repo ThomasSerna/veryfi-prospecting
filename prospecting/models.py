@@ -482,7 +482,7 @@ def _require_provenance(model: BaseModel, fields: tuple[str, ...]) -> None:
     for name in fields:
         value = getattr(model, name)
         unknown_enum = name in ("entity_type", "buying_role") and value == "unknown"
-        if value is not None and value != [] and not unknown_enum and name not in model.provenance:
+        if value is not None and not unknown_enum and name not in model.provenance:
             raise ValueError(f"El campo {name} necesita procedencia.")
 
 
