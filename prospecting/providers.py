@@ -24,7 +24,7 @@ from pydantic import (
     field_validator, model_validator,
 )
 
-from prospecting.budget import Budget, Observation, SpendingAuthorization
+from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.models import Contract, Text
 
 
@@ -144,6 +144,7 @@ class ProviderError(Exception):
         self.http_status = http_status
         self.retry_after_seconds = retry_after_seconds
         self.retryable = False
+        self.no_send = False
 
 
 def _header(headers, name):
@@ -304,7 +305,13 @@ class ProviderClient:
         if remaining_seconds is not None:
             timeout = min(timeout, remaining_seconds - (time.monotonic() - started_at))
             if timeout <= 0:
-                self._fail(ProviderError("local", "El plazo venció antes de invocar el transporte.", **context), "failed")
+                self._fail(ProviderError("local", "El plazo venció antes de invocar el transporte.", **context), "failed", no_send=True)
+        try:
+            self.budget.begin_send(request_id, deadline=None if remaining_seconds is None else started_at + remaining_seconds)
+        except BudgetError as error:
+            if error.code != "deadline_unsent":
+                raise
+            self._fail(ProviderError("local", "El plazo venció antes de invocar el transporte.", **context), "failed", no_send=True)
         try:
             response = HttpResponse.model_validate(self._transport(prepared, timeout, MAX_RESPONSE_BYTES))
         except (TimeoutError, socket.timeout):
@@ -351,6 +358,7 @@ class ProviderClient:
         self.budget.record_result(request_id, observation)
         return ProviderResult(request_id=request_id, data=data, observation=observation)
 
-    def _fail(self, error, outcome):
-        self.budget.record_result(error.request_id, Observation(outcome=outcome, error_message=error.message))
+    def _fail(self, error, outcome, *, no_send=False):
+        self.budget.record_result(error.request_id, Observation(outcome=outcome, error_message=error.message), no_send=no_send)
+        error.no_send = no_send
         raise error from None

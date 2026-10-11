@@ -1,6 +1,8 @@
 """Reserva local conservadora; ninguna función realiza llamadas de red."""
 
 from decimal import Decimal, localcontext
+import math
+import time
 from typing import Literal
 from uuid import UUID
 
@@ -17,6 +19,14 @@ FundingSource = Literal["free_credit", "prepaid", "new_outlay"]
 Outcome = Literal["succeeded", "failed", "unknown"]
 
 
+class CreditValuation(Contract):
+    """Valor de referencia fijo del sprint; no es un cargo ni habilita gasto."""
+
+    unit_value_usd: Money
+    source_reference: Text
+    observed_at: UtcDatetime
+
+
 class AccountAllowance(Contract):
     """Cupo inicial fijo del sprint, no saldo restante ni cuota que se reinicia.
 
@@ -30,10 +40,11 @@ class AccountAllowance(Contract):
     cost_limit_usd: Money | None = None
     source_reference: Text
     observed_at: UtcDatetime
+    credit_valuation: CreditValuation | None = None
 
 
 class SpendingAuthorization(Contract):
-    """Tope total autorizado desde su fecha, compartido entre las solicitudes."""
+    """Tope de sesión compartido entre las solicitudes vinculadas al permiso."""
 
     provider: Text
     operation: Text
@@ -109,6 +120,7 @@ class BudgetSnapshot(Contract):
     reservation_overrun: StrictBool
     confirmed_cost_usd: Money | None
     outlay_usd: Money | None
+    free_credit_equivalent: BudgetAmount
 
 
 def _sum(values) -> Decimal:
@@ -145,21 +157,36 @@ def _credits(usage: Usage) -> Decimal | None:
     return max(usage.reserved_credits, usage.credits or Decimal(0))
 
 
-def _amount(rows: list[Usage], limit: Decimal | None, *, credits=False) -> BudgetAmount:
-    value = _credits if credits else _cost
+def _amount(rows: list[Usage], limit: Decimal | None, *, credits=False,
+            credit_valuations: dict[tuple, CreditValuation] | None = None) -> BudgetAmount:
+    credits = credits or credit_valuations is not None
+
+    def convert(row, quantity):
+        if credit_valuations is None:
+            return quantity
+        valuation = credit_valuations.get((row.provider, row.account_ref))
+        if quantity is None or valuation is None or row.funding_source != "free_credit":
+            return None
+        with localcontext() as context:
+            context.prec = max(28, len(quantity.as_tuple().digits) + len(valuation.unit_value_usd.as_tuple().digits))
+            return quantity * valuation.unit_value_usd
+
+    def value(row):
+        return convert(row, _credits(row) if credits else _cost(row))
+
     confirmed = _sum(value(row) for row in rows if row.status == UsageStatus.RECONCILED and value(row) is not None)
     pending = _sum(value(row) for row in rows if row.status != UsageStatus.RECONCILED and value(row) is not None)
     unknown = any(value(row) is None for row in rows)
     exposure = None if unknown else _sum([confirmed, pending])
     reserved = _sum(
-        getattr(row, "reserved_credits" if credits else "reserved_cost_usd")
+        convert(row, getattr(row, "reserved_credits" if credits else "reserved_cost_usd"))
         for row in rows if row.status != UsageStatus.RECONCILED
-        and getattr(row, "reserved_credits" if credits else "reserved_cost_usd") is not None
+        and convert(row, getattr(row, "reserved_credits" if credits else "reserved_cost_usd")) is not None
     )
     estimated = _sum(
-        getattr(row, "credits" if credits else "estimated_cost_usd")
+        convert(row, getattr(row, "credits" if credits else "estimated_cost_usd"))
         for row in rows if row.status != UsageStatus.RECONCILED
-        and getattr(row, "credits" if credits else "estimated_cost_usd") is not None
+        and convert(row, getattr(row, "credits" if credits else "estimated_cost_usd")) is not None
     )
     return BudgetAmount(
         confirmed=confirmed, estimated=estimated, reserved=reserved, pending=pending,
@@ -173,6 +200,13 @@ def _context(usage: Usage):
     return (
         usage.campaign_id, usage.company_id, usage.provider, usage.account_ref,
         usage.operation, usage.request_fingerprint,
+    )
+
+
+def _grant_key(authorization: SpendingAuthorization):
+    return (
+        authorization.provider, authorization.operation, authorization.account_ref,
+        authorization.responsible, authorization.source_reference, authorization.authorized_at,
     )
 
 
@@ -210,14 +244,48 @@ class Budget:
     """Control de una base local; bases independientes no comparten presupuesto."""
 
     def __init__(self, db: Database, global_limits: BudgetLimits, account_allowances: list[AccountAllowance]):
+        self._session_started_at = utc_now()
         self.db = db
         self.global_limits = BudgetLimits.model_validate_json(global_limits.model_dump_json())
         self.account_allowances = [AccountAllowance.model_validate_json(item.model_dump_json()) for item in account_allowances]
-        keys = [(item.provider, item.account_ref, item.funding_source) for item in self.account_allowances]
+        keys = [(item.provider, item.account_ref) for item in self.account_allowances]
         if len(keys) != len(set(keys)):
-            raise BudgetError("account_conflict", "El cupo de cada cuenta y origen debe ser único.")
+            raise BudgetError("account_conflict", "Cada saldo real necesita un único cupo y referencia de cuenta.")
         self._retryable: set[UUID] = set()
         self._grants: dict[tuple, SpendingAuthorization] = {}
+        self._grant_requests: dict[tuple, set[UUID]] = {}
+        self._request_grants: dict[UUID, tuple] = {}
+        self._claimed_unsent: set[UUID] = set()
+        self._proved_unsent: set[UUID] = set()
+
+    def authorize(self, authorization: SpendingAuthorization) -> SpendingAuthorization:
+        """Registra un permiso fresco después de la aprobación humana explícita."""
+        authorization = SpendingAuthorization.model_validate_json(authorization.model_dump_json())
+        if not self._session_started_at < authorization.authorized_at <= utc_now():
+            raise BudgetError("authorization_date", "El permiso debe proceder de esta sesión, después de su inicio.")
+        key = _grant_key(authorization)
+        previous = self._grants.get(key)
+        if previous is not None and previous != authorization:
+            raise BudgetError("authorization_conflict", "El mismo permiso no puede cambiar sus topes.")
+        self._grants[key] = authorization
+        self._grant_requests.setdefault(key, set())
+        return SpendingAuthorization.model_validate_json(authorization.model_dump_json())
+
+    def _registered_grant(self, authorization, request_id):
+        if authorization is None:
+            raise BudgetError("authorization_required", "La llamada necesita autorización explícita de gasto.", request_id)
+        authorization = SpendingAuthorization.model_validate_json(authorization.model_dump_json())
+        key = _grant_key(authorization)
+        registered = self._grants.get(key)
+        if registered is None:
+            raise BudgetError("authorization_unregistered", "El permiso no está registrado en esta sesión.", request_id)
+        if registered != authorization:
+            raise BudgetError("authorization_conflict", "El mismo permiso no puede cambiar sus topes.", request_id)
+        return authorization, key
+
+    def _bind(self, request_id, key):
+        self._request_grants[request_id] = key
+        self._grant_requests[key].add(request_id)
 
     def _get(self, request_id: UUID) -> Usage:
         usage = self.db.get_usage(request_id)
@@ -233,8 +301,7 @@ class Budget:
         accounts = []
         for allowance in self.account_allowances:
             matches = [row for row in rows if row.provider == allowance.provider
-                       and row.account_ref in (None, allowance.account_ref)
-                       and row.funding_source in (None, allowance.funding_source)]
+                       and row.account_ref in (None, allowance.account_ref)]
             accounts.append(AccountSnapshot(
                 provider=allowance.provider, account_ref=allowance.account_ref,
                 funding_source=allowance.funding_source,
@@ -254,6 +321,13 @@ class Budget:
             else _sum(row.final_cost_usd for row in rows if row.status == UsageStatus.RECONCILED),
             outlay_usd=None if any(row.outlay_usd is None for row in rows)
             else _sum(row.outlay_usd for row in rows),
+            free_credit_equivalent=_amount(
+                [row for row in rows if row.funding_source in (None, "free_credit")], None,
+                credit_valuations={
+                    (item.provider, item.account_ref): item.credit_valuation
+                    for item in self.account_allowances if item.credit_valuation is not None
+                },
+            ),
         )
 
     def snapshot(self, campaign_id: UUID, company_id: UUID | None = None) -> BudgetSnapshot:
@@ -262,18 +336,14 @@ class Budget:
             return self._snapshot(self.db.list_usage(), campaign_id, company_id)
 
     def _check(self, usage: Usage, authorization: SpendingAuthorization | None, rows: list[Usage]):
-        if authorization is None:
-            raise BudgetError("authorization_required", "La llamada necesita autorización explícita de gasto.", usage.request_id)
-        authorization = SpendingAuthorization.model_validate_json(authorization.model_dump_json())
+        authorization, key = self._registered_grant(authorization, usage.request_id)
         if (authorization.provider, authorization.operation, authorization.account_ref) != (usage.provider, usage.operation, usage.account_ref):
             raise BudgetError("authorization_mismatch", "La autorización corresponde a otro proveedor, operación o cuenta.", usage.request_id)
-        if authorization.authorized_at > utc_now() or usage.created_at < authorization.authorized_at or usage.created_at > utc_now():
-            raise BudgetError("authorization_date", "La reserva debe estar cubierta por la fecha de autorización.", usage.request_id)
-        key = (authorization.provider, authorization.operation, authorization.account_ref,
-               authorization.responsible, authorization.source_reference, authorization.authorized_at)
-        previous = self._grants.get(key)
-        if previous is not None and previous != authorization:
-            raise BudgetError("authorization_conflict", "El mismo permiso no puede cambiar sus topes.", usage.request_id)
+        if usage.created_at > utc_now():
+            raise BudgetError("authorization_date", "La reserva no puede tener una fecha futura.", usage.request_id)
+        previous = self._request_grants.get(usage.request_id)
+        if previous is not None and previous != key:
+            raise BudgetError("authorization_conflict", "La solicitud ya pertenece a otro permiso de esta sesión.", usage.request_id)
         account = next((item for item in self.account_allowances if
                         (item.provider, item.account_ref, item.funding_source) ==
                         (usage.provider, usage.account_ref, usage.funding_source)), None)
@@ -303,17 +373,15 @@ class Budget:
             raise BudgetError("budget_unknown", "Hay consumo o reservas sin acotar; concílialos antes de llamar.", usage.request_id)
         if any(bound.exceeded for bound in bounds):
             raise BudgetError("budget_exceeded", "La reserva supera el presupuesto o los créditos disponibles.", usage.request_id)
-        authorized = [row for row in rows if
-                      (row.provider, row.operation, row.account_ref) ==
-                      (usage.provider, usage.operation, usage.account_ref)
-                      and row.created_at >= authorization.authorized_at]
+        request_ids = self._grant_requests[key] | {usage.request_id}
+        authorized = [row for row in rows if row.request_id in request_ids]
         costs = _amount(authorized, authorization.max_cost_usd)
         credits = _amount(authorized, authorization.max_credits, credits=True)
         if costs.unknown or credits.unknown:
             raise BudgetError("authorization_unknown", "El consumo del permiso tiene importes desconocidos.", usage.request_id)
         if costs.exceeded or credits.exceeded:
             raise BudgetError("authorization_exceeded", "Las solicitudes acumulan más consumo que el permiso otorgado.", usage.request_id)
-        self._grants[key] = authorization
+        return key
 
     def reserve(self, proposal: Usage, authorization: SpendingAuthorization | None, retry_of: UUID | None = None) -> Usage:
         proposal = Usage.model_validate_json(proposal.model_dump_json())
@@ -326,6 +394,7 @@ class Budget:
             raise BudgetError("invalid_reservation", "La propuesta debe contener una reserva nueva y completamente acotada.", proposal.request_id)
         if proposal.funding_source == "free_credit" and proposal.reserved_cost_usd != 0:
             raise BudgetError("invalid_funding", "El crédito gratuito confirmado debe reservar cero USD.", proposal.request_id)
+        self._registered_grant(authorization, proposal.request_id)
         with self.db.transaction():
             rows = self.db.list_usage()
             existing = self.db.get_usage(proposal.request_id)
@@ -335,24 +404,31 @@ class Budget:
                             "reserved_tokens", "funding_source", "created_at")
                 if any(getattr(existing, name) != getattr(proposal, name) for name in identity):
                     raise BudgetError("request_conflict", "El identificador ya representa otra solicitud o reserva.", proposal.request_id)
-                return existing
-            group = [row for row in rows if _context(row) == _context(proposal)]
-            reserved = [row for row in group if row.status == UsageStatus.RESERVED]
-            if len(reserved) == 1 and len(group) == 1 and retry_of is None:
-                current = reserved[0]
-                if any(getattr(current, name) != getattr(proposal, name) for name in
-                       ("reserved_cost_usd", "reserved_credits", "reserved_tokens", "funding_source")):
-                    raise BudgetError("request_conflict", "La solicitud duplicada tiene otra cota de consumo.", current.request_id)
-                return current
-            if group:
-                if (retry_of is None or len(group) != 1 or group[0].request_id != retry_of
-                        or group[0].status != UsageStatus.RECONCILED
-                        or group[0].outcome != "failed" or retry_of not in self._retryable):
-                    raise BudgetError("duplicate_request", "La huella ya tiene una solicitud; recupera o concilia antes de repetir.", group[-1].request_id)
-            elif retry_of is not None:
-                raise BudgetError("invalid_retry", "El reintento no corresponde a una solicitud previa del grupo.", proposal.request_id)
-            self._check(proposal, authorization, rows + [proposal])
-            return self.db.save_usage(proposal)
+                if existing.status != UsageStatus.RESERVED:
+                    return existing
+                result = existing
+                key = self._check(existing, authorization, rows)
+            else:
+                group = [row for row in rows if _context(row) == _context(proposal)]
+                reserved = [row for row in group if row.status == UsageStatus.RESERVED]
+                if len(reserved) == 1 and len(group) == 1 and retry_of is None:
+                    result = reserved[0]
+                    if any(getattr(result, name) != getattr(proposal, name) for name in
+                           ("reserved_cost_usd", "reserved_credits", "reserved_tokens", "funding_source")):
+                        raise BudgetError("request_conflict", "La solicitud duplicada tiene otra cota de consumo.", result.request_id)
+                    key = self._check(result, authorization, rows)
+                else:
+                    if group:
+                        if (retry_of is None or len(group) != 1 or group[0].request_id != retry_of
+                                or group[0].status != UsageStatus.RECONCILED
+                                or group[0].outcome != "failed" or retry_of not in self._retryable):
+                            raise BudgetError("duplicate_request", "La huella ya tiene una solicitud; recupera o concilia antes de repetir.", group[-1].request_id)
+                    elif retry_of is not None:
+                        raise BudgetError("invalid_retry", "El reintento no corresponde a una solicitud previa del grupo.", proposal.request_id)
+                    key = self._check(proposal, authorization, rows + [proposal])
+                    result = self.db.save_usage(proposal)
+        self._bind(result.request_id, key)
+        return result
 
     def claim(self, request_id: UUID, expected_fingerprint: str, authorization: SpendingAuthorization | None) -> Usage:
         with self.db.transaction():
@@ -371,13 +447,46 @@ class Budget:
                 raise BudgetError("duplicate_request", "Otra solicitud del grupo impide un envío duplicado.", request_id)
             if len(others) > 1 or any(row.request_id not in self._retryable for row in others):
                 raise BudgetError("invalid_retry", "El segundo intento necesita un fallo transitorio comprobado en esta ejecución.", request_id)
-            self._check(usage, authorization, rows)
-            return self.db.save_usage(usage.model_copy(update={"status": UsageStatus.IN_FLIGHT}))
+            key = self._check(usage, authorization, rows)
+            result = self.db.save_usage(usage.model_copy(update={"status": UsageStatus.IN_FLIGHT}))
+        self._bind(request_id, key)
+        self._claimed_unsent.add(request_id)
+        return result
 
-    def record_result(self, request_id: UUID, observation: Observation) -> Usage:
-        observation = Observation.model_validate_json(observation.model_dump_json())
+    def begin_send(self, request_id: UUID, *, deadline: float | None = None) -> None:
+        """Consume la prueba de no envío inmediatamente antes del transporte."""
+        if deadline is not None and (type(deadline) not in (int, float) or not math.isfinite(deadline)):
+            raise BudgetError("invalid_deadline", "El plazo del transporte debe ser finito.", request_id)
         with self.db.transaction():
             usage = self._get(request_id)
+            if usage.status != UsageStatus.IN_FLIGHT or request_id not in self._claimed_unsent:
+                raise BudgetError("send_not_claimed", "El transporte necesita una reclamación no usada de esta sesión.", request_id)
+            self._check(usage, self._grants[self._request_grants[request_id]], self.db.list_usage())
+        if deadline is not None and time.monotonic() >= deadline:
+            raise BudgetError("deadline_unsent", "El plazo venció sin iniciar el transporte.", request_id)
+        self._claimed_unsent.remove(request_id)
+
+    def record_result(self, request_id: UUID, observation: Observation, *, no_send: bool = False) -> Usage:
+        observation = Observation.model_validate_json(observation.model_dump_json())
+        if type(no_send) is not bool:
+            raise BudgetError("invalid_no_send", "La prueba de no envío requiere un booleano explícito.", request_id)
+        with self.db.transaction():
+            usage = self._get(request_id)
+            if no_send:
+                if (request_id not in self._claimed_unsent or usage.status != UsageStatus.IN_FLIGHT
+                        or observation.outcome != "failed" or usage.outcome is not None
+                        or any(getattr(usage, name) is not None for name in (
+                            "tokens", "credits", "estimated_cost_usd", "final_cost_usd", "outlay_usd", "error_message"))
+                        or observation.credits not in (None, 0)
+                        or observation.estimated_cost_usd not in (None, 0)
+                        or observation.tokens is not None and any(observation.tokens.model_dump().values())):
+                    raise BudgetError("invalid_no_send", "No hay prueba local de una operación sin transporte ni consumo.", request_id)
+                observation = observation.model_copy(update={
+                    "credits": Decimal(0), "estimated_cost_usd": Decimal(0),
+                    "tokens": None if usage.reserved_tokens is None else TokenUsage(**{
+                        name: 0 for name in TokenUsage.model_fields
+                    }),
+                })
             if usage.status in (UsageStatus.RESERVED, UsageStatus.RECONCILED):
                 raise BudgetError("invalid_state", "La solicitud no admite observaciones en su estado actual.", request_id)
             if usage.outcome not in (None, "unknown", observation.outcome):
@@ -400,9 +509,12 @@ class Budget:
                 finished_at=usage.finished_at or observation.observed_at,
             )
             result = self.db.save_usage(usage.model_copy(update=updates))
-            if observation.outcome == "failed" and observation.retryable:
-                self._retryable.add(request_id)
-            return result
+        self._claimed_unsent.discard(request_id)
+        if no_send:
+            self._proved_unsent.add(request_id)
+        if observation.outcome == "failed" and observation.retryable:
+            self._retryable.add(request_id)
+        return result
 
     def reconcile(self, request_id: UUID, confirmation: Confirmation) -> Usage:
         confirmation = Confirmation.model_validate_json(confirmation.model_dump_json())
@@ -411,9 +523,13 @@ class Budget:
             if confirmation.observed_at < usage.created_at:
                 raise BudgetError("confirmation_date", "La confirmación es anterior a la solicitud.", request_id)
             if confirmation.no_send:
-                if (usage.status not in (UsageStatus.RESERVED, UsageStatus.RECONCILED)
+                unsent = usage.status in (UsageStatus.RESERVED, UsageStatus.RECONCILED) or (
+                    usage.status == UsageStatus.FAILED and request_id in self._proved_unsent
+                )
+                if (not unsent
                         or confirmation.outcome != "failed"
-                        or any((confirmation.final_cost_usd, confirmation.credits, confirmation.outlay_usd))):
+                        or any((confirmation.final_cost_usd, confirmation.credits, confirmation.outlay_usd))
+                        or confirmation.tokens is not None and any(confirmation.tokens.model_dump().values())):
                     raise BudgetError("invalid_no_send", "Solo una reserva no enviada se cancela sin consumo.", request_id)
             elif usage.status == UsageStatus.RESERVED:
                 raise BudgetError("invalid_state", "Una reserva no enviada necesita confirmación explícita de no envío.", request_id)

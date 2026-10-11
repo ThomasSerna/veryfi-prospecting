@@ -17,7 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from prospecting.budget import (
-    AccountAllowance, Budget, BudgetError, SpendingAuthorization,
+    AccountAllowance, Budget, BudgetError, Confirmation, SpendingAuthorization,
 )
 from prospecting.db import Database
 from prospecting.models import Contract, Usage, UsageStatus, utc_now
@@ -45,13 +45,14 @@ def provider_case(database, config, make_campaign, monkeypatch, tmp_path):
         credit_limit="10", cost_limit_usd="1",
         source_reference="Saldo sintético para pruebas", observed_at=OBSERVED_AT,
     )
+    budget = Budget(database, config.defaults.budget, [allowance])
     grant = SpendingAuthorization(
         provider="tavily", operation="synthetic_lookup", account_ref="cuenta-sintetica",
         max_cost_usd="1", max_credits="10", responsible="Responsable sintético",
         source_reference="Autorización sintética para transporte sin red",
-        authorized_at=OBSERVED_AT,
+        authorized_at=utc_now(),
     )
-    budget = Budget(database, config.defaults.budget, [allowance])
+    budget.authorize(grant)
     spec = OperationSpec(
         provider="tavily", operation="synthetic_lookup",
         endpoint="https://example.com/api/synthetic", api_key_env="TAVILY_API_KEY",
@@ -144,6 +145,7 @@ def test_no_balance_cannot_reach_transport(provider_case, config):
         "cost_limit_usd": Decimal("0"), "credit_limit": Decimal("0"),
     })
     budget = Budget(case.db, config.defaults.budget, [empty])
+    active = budget.authorize(case.grant.model_copy(update={"authorized_at": utc_now()}))
     client = ProviderClient(budget, [case.spec], transport=case.transport)
     usage = Usage(
         campaign_id=case.campaign.id, provider=case.request.provider,
@@ -152,8 +154,9 @@ def test_no_balance_cannot_reach_transport(provider_case, config):
         reserved_cost_usd="0.10", reserved_credits="1",
         funding_source="prepaid", status=UsageStatus.RESERVED,
     )
-    with pytest.raises(BudgetError):
-        budget.reserve(usage, authorization=case.grant)
+    with pytest.raises(BudgetError) as error:
+        budget.reserve(usage, authorization=active)
+    assert error.value.code == "budget_exceeded"
     assert case.calls == []
     assert case.db.get_usage(usage.request_id) is None
 
@@ -207,14 +210,16 @@ def test_default_timeout_does_not_grow_with_remaining_time(provider_case):
     assert case.calls[0][1] == 10
 
 
-def test_expired_deadline_after_claim_cannot_invoke_transport(provider_case, monkeypatch):
+@pytest.mark.parametrize("ticks", [[0.0, 3.0], [0.0, 1.0, 3.0]])
+def test_expired_deadline_after_claim_cannot_invoke_transport(provider_case, monkeypatch, ticks):
     case = provider_case
     usage = case.reserve()
-    ticks = iter([0.0, 3.0])
+    ticks = iter(ticks)
     monkeypatch.setattr(providers.time, "monotonic", lambda: next(ticks))
     with pytest.raises(ProviderError) as error:
         call(case, usage, remaining_seconds=2.5)
     assert error.value.kind == "local"
+    assert error.value.no_send is True
     assert case.calls == []
     saved = case.db.get_usage(usage.request_id)
     assert saved.status == UsageStatus.FAILED
@@ -222,6 +227,23 @@ def test_expired_deadline_after_claim_cannot_invoke_transport(provider_case, mon
     assert saved.final_cost_usd is None
     assert saved.reserved_cost_usd == Decimal("0.10")
     assert saved.reserved_credits == Decimal("1")
+    assert saved.credits == 0
+    assert saved.estimated_cost_usd == 0
+    assert case.budget.snapshot(case.campaign.id).campaign.pending == Decimal("0.10")
+    done = case.budget.reconcile(usage.request_id, Confirmation(
+        outcome="failed", final_cost_usd="0", credits="0", outlay_usd="0",
+        no_send=True, source_reference="Plazo sintético vencido sin invocar transporte",
+        observed_at=utc_now(),
+    ))
+    assert done.status == UsageStatus.RECONCILED
+    assert done.error_message == saved.error_message
+    assert done.reserved_cost_usd == Decimal("0.10")
+    assert done.reserved_credits == Decimal("1")
+    assert case.budget.snapshot(case.campaign.id).campaign.exposure == 0
+    assert case.budget.snapshot(case.campaign.id).accounts[0].credits.exposure == 0
+    with Database(case.db_path) as reopened:
+        assert reopened.get_usage(usage.request_id).status == UsageStatus.RECONCILED
+        assert reopened.get_usage(usage.request_id).final_cost_usd == 0
 
 
 def test_duplicate_request_id_never_sends_twice(provider_case):
@@ -256,8 +278,16 @@ def test_uncertain_send_survives_reopen_and_is_not_retried(provider_case, failur
     with pytest.raises(ProviderError) as error:
         call(case, usage)
     assert error.value.kind in {"timeout", "transport"}
+    assert error.value.no_send is False
     assert error.value.retryable is False
     assert len(case.calls) == 1
+    with pytest.raises(BudgetError) as denied:
+        case.budget.reconcile(usage.request_id, Confirmation(
+            outcome="failed", final_cost_usd="0", credits="0", outlay_usd="0",
+            no_send=True, source_reference="No envío sintético sin prueba",
+            observed_at=utc_now(),
+        ))
+    assert denied.value.code == "invalid_no_send"
     with Database(case.db_path) as reopened:
         saved = reopened.get_usage(usage.request_id)
         assert saved.status == UsageStatus.UNCERTAIN
@@ -284,6 +314,13 @@ def test_http_error_keeps_reservation_without_generic_permission_mapping(provide
     assert error.value.kind == "http"
     assert error.value.http_status == status
     assert error.value.retryable is False
+    assert error.value.no_send is False
+    with pytest.raises(BudgetError) as denied:
+        case.budget.reconcile(usage.request_id, Confirmation(
+            outcome="failed", final_cost_usd="0", credits="0", outlay_usd="0",
+            no_send=True, source_reference="No envío sintético sin prueba", observed_at=utc_now(),
+        ))
+    assert denied.value.code == "invalid_no_send"
     saved = case.db.get_usage(usage.request_id)
     assert saved.outcome == "failed"
     assert saved.final_cost_usd is None
