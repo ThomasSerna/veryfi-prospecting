@@ -305,6 +305,39 @@ Probar una muestra mínima y registrar para cada proveedor: cuenta disponible, e
 
 Si Apollo no permite enriquecer, usar web + Hunter. Si tampoco hay datos accesibles por esa vía, continuar con evidencia pública y alternativas, registrando la carencia. No comprar un plan que supere el presupuesto ni sustituir contactos reales por datos inventados. La obtención automática de canales directos debe demostrarse con resultados reales para considerarla validada.
 
+### 11.2 Extensión futura: X-Ray Search para descubrimiento de contactos
+
+Se propone incorporar una estrategia de **X-Ray Search** que permita descubrir posibles contactos profesionales mediante motores de búsqueda tradicionales, utilizando consultas restringidas a perfiles públicos indexados de LinkedIn.
+
+El objetivo es reducir la dependencia de proveedores de enriquecimiento comercial para la identificación inicial de personas y ampliar las fuentes disponibles.
+
+**Flujo propuesto:**
+
+1. Identificar los cargos relevantes para una empresa previamente calificada.
+2. Generar consultas de búsqueda combinando empresa, cargo, país y términos equivalentes en español e inglés.
+3. Restringir los resultados a perfiles públicos de LinkedIn mediante operadores como `site:linkedin.com/in/`.
+4. Extraer de los resultados autorizados del buscador el nombre aparente, cargo, URL y fragmento disponible.
+5. Contrastar la identidad y vigencia del cargo con fuentes adicionales cuando sea necesario.
+6. Utilizar Apollo, Hunter u otras fuentes autorizadas para obtener y verificar canales de contacto profesional.
+7. Registrar los candidatos junto con sus fuentes, fechas y estados de verificación.
+
+**Ejemplo de consulta:**
+
+`site:linkedin.com/in/ "Trade Marketing Manager" "Nombre Empresa" Colombia`
+
+**Restricciones:**
+
+- No automatizar la descarga de perfiles completos desde LinkedIn.
+- No utilizar scraping de LinkedIn ni herramientas de navegación automatizada no autorizadas.
+- Respetar las condiciones de acceso y reutilización de información de los buscadores y fuentes.
+- No considerar un fragmento indexado como prueba suficiente de empleo actual.
+- Una URL de LinkedIn no constituye por sí sola un canal de contacto utilizable.
+- Mantener los criterios de verificación y contactabilidad establecidos en la sección 10.
+
+**Evaluación futura:**
+
+Antes de integrar esta funcionalidad, comparar su cobertura, precisión, costo y actualidad de los perfiles frente a Apollo y las búsquedas web convencionales.
+
 ## 12. Uso de IA y protección de decisiones
 
 ### 12.1 Haiku

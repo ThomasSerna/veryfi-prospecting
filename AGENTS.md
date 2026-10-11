@@ -82,4 +82,4 @@ Lee estas secciones cuando la tarea toque el tema:
 - El encargo nombra la tarea Txx; si no la nombra y el cambio toca código compartido, pregunta antes de editar.
 - Edita libremente lo de tu tarea. Si necesitas cambiar un contrato compartido (§13.2) o un archivo de otra área (§16.1), detente y propón el cambio (qué y por qué) en lugar de aplicarlo.
 - Edita `docs/IDEA.md` solo si te lo piden expresamente: ante una discrepancia o una decisión nueva, repórtala con el texto propuesto.
-- Actualiza `README.md` (en un commit `docs:` aparte) cuando cambie la instalación o la ejecución.
+- Actualiza `README.md` (en un commit `docs:` aparte) cuando cambie la instalación o la ejecución. Pero, cuando hagas los cambios en el readme, procura que el readme sea realmente un archivo de información general del repositorio, para su instalación y funcionamiento, no incluyas información donde se hable directamente sobre los planes posteriores del proyecto o el uso futuro de los Txx.
