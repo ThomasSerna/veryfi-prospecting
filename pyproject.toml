@@ -1,0 +1,7 @@
+[project]
+name = "veryfi-prospecting"
+version = "0.1.0"
+description = "Prototipo académico local de prospección para Veryfi."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = []
