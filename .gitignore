@@ -1,6 +1,35 @@
+# Credenciales y datos locales
 .env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+/data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Entornos y cachés de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.uv-cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+*.log
 
 # IDEs
 .idea/
 .vscode/
-
