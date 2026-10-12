@@ -65,3 +65,32 @@ go* desactivado evita cargos fuera del crédito gratuito (§14).
   respuestas sintéticas.
 - Los créditos se observaron en la respuesta; el saldo del panel después de las llamadas no
   se volvió a consultar, ni siquiera para la conciliación.
+
+## Anthropic (Claude Haiku 5.5)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-11 (America/Bogota) |
+| Cuenta | `anthropic-equipo-prepago`; saldo prepago; cupo asignado por el responsable: USD 3 (partida de IA, §14) |
+| Autorización | Responsable del cupo, en la sesión: 1 llamada `messages` a `claude-haiku-5-5`, ≤ USD 0,005 |
+| Cliente | SDK oficial `anthropic==1.11.0`, `max_retries=0`, timeout ≤ 30 s |
+| Parámetros | `thinking={"type": "disabled"}`, `output_config.effort="low"`, salida JSON con esquema (`output_config.format`), `max_tokens=1000`, prompt `haiku_assessment_v1` |
+| Documentación | Referencia oficial de la API de Claude (modelos, precios y parámetros), consultada el 2026-10-11 |
+
+| Llamadas | Tokens de entrada | Tokens de salida | Costo reservado | Costo estimado | Latencia | Resultado |
+|---:|---:|---:|---:|---:|---|---|
+| 1 | 5.288 | 939 | USD 0,0011 | USD 0,000998 | 9,6 s | Respuesta válida; todas las referencias existen; evaluación `medium` (encaje 55,6, cobertura 90 %) de la empresa confirmada de la campaña de prueba |
+
+El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Queda
+pendiente conciliarlo con la consola de Anthropic.
+
+### Observaciones y limitaciones
+
+- El API aceptó el esquema (con `enum` que incluye `null` y `format: uuid`), el *thinking*
+  desactivado y el *effort* `low`.
+- La salida usó 939 de 1.000 tokens. Con más evidencia o justificaciones más largas, la
+  respuesta podría truncarse (`max_tokens`). En ese caso la evaluación queda pendiente; no
+  se inventa.
+- La entrada usó 5.288 de los 6.000 tokens reservados, con unos 3,4 caracteres por token.
+  El presupuesto de caracteres (3 por token) deja margen, aunque estrecho.
+- Es una sola llamada: no mide calidad ni calibración de la calificación (T10).
