@@ -10,9 +10,9 @@ from urllib.parse import urlsplit
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
-from prospecting.discovery import TAVILY_OPERATIONS, build_search_queries
+from prospecting.discovery import TAVILY_OPERATIONS, ExclusionList, build_search_queries
 from prospecting.models import CampaignLimits, UsageStatus, utc_now
-from prospecting.pipeline import extract_company_pages, run_discovery
+from prospecting.pipeline import extract_company_pages, resolve_company_identity, run_discovery
 from prospecting.providers import HttpResponse, ProviderClient
 
 
@@ -56,7 +56,8 @@ def extract_data(payload):
 @pytest.fixture
 def tavily(database, config, make_campaign, monkeypatch):
     """Cuenta gratuita ficticia; el transporte registra solicitudes y nunca sale a la red."""
-    case = SimpleNamespace(db=database, calls=[], search=search_data, extract=extract_data, failure=None)
+    case = SimpleNamespace(db=database, calls=[], search=search_data, extract=extract_data, failure=None,
+                           make_campaign=make_campaign)
 
     def transport(prepared, timeout_seconds, max_bytes):
         assert not database._connection.in_transaction
@@ -308,3 +309,179 @@ def test_extract_failed_urls_create_no_evidence(tavily):
     assert report.evidence_ids == []
     assert [(item.url, item.reason) for item in report.failed_urls] == [(url, "Fallo sintético")]
     assert case.db.list_usage(company_id=company_id)[0].credits == Decimal(0)
+
+
+# Identidad, duplicados y exclusiones (T04), con listas y respuestas exclusivamente sintéticas.
+
+FIXED_HOSTS = ("cliente-actual.example", "nueva-uno.example", "nueva-dos.example")
+
+
+def fixed_search(payload):
+    return {
+        "query": payload["query"], "answer": None, "images": [], "response_time": 0.1,
+        "results": [
+            {"url": f"https://{host}/producto",
+             "title": f"Producto | {host.split('.')[0].replace('-', ' ').title()}",
+             "content": "Resumen exclusivamente sintético.", "score": 0.5}
+            for host in FIXED_HOSTS
+        ],
+        "usage": {"credits": 1}, "request_id": "busqueda-fija-sintetica",
+    }
+
+
+def exclusion_list(*entries, status="validated"):
+    return ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": status,
+        "source_reference": "Lista sintética para pruebas", "observed_at": "2026-10-11T12:00:00Z",
+        "entries": [
+            {"source_reference": "Entrada sintética", "reason": "current_customer", "scope": "entity"} | entry
+            for entry in entries
+        ],
+    })
+
+
+def company_by_domain(case, company_ids, domain):
+    return next(item for item in company_ids if case.db.get_company(item).domain == domain)
+
+
+def extract_confirming_page(case, company_id):
+    company = case.db.get_company(company_id)
+    case.extract = lambda payload: {
+        "results": [{"url": url, "raw_content": f"{company.name} ayuda a empresas en Colombia a digitalizar recibos."}
+                    for url in payload["urls"]],
+        "failed_results": [], "usage": {"credits": 1},
+    }
+    return extract(case, company_id, [f"https://{company.domain}/producto"])
+
+
+def resolve(case, company_id, campaign_id=None, **kwargs):
+    return resolve_company_identity(case.db, campaign_id or case.campaign.id, company_id, **kwargs)
+
+
+def test_listed_domain_is_dropped_before_selection(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    listed = exclusion_list({"id": "c1", "name": "Cliente Actual", "domains": ["cliente-actual.example"]})
+    report = discover(case, exclusions=listed)
+    assert report.exclusions_status == "validated"
+    assert [item.host for item in report.excluded] == ["cliente-actual.example"]
+    assert report.excluded[0].exclusion.reason == "current_customer"
+    assert report.discarded["excluded_account"] == 1
+    assert {case.db.get_company(item).domain for item in report.selected_company_ids} == {
+        "nueva-uno.example", "nueva-dos.example",
+    }
+
+
+def test_name_only_match_is_saved_for_review(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    listed = exclusion_list({"id": "h1", "name": "Nueva Uno", "domains": ["otra-empresa.example"]})
+    report = discover(case, exclusions=listed)
+    assert len(report.selected_company_ids) == 3 and report.excluded == []
+    company_id = company_by_domain(case, report.selected_company_ids, "nueva-uno.example")
+    assert case.db.get_run_item(case.campaign.id, company_id).stop_reason == "exclusion_review"
+    manual = [fact for fact in case.db.list_evidence(company_id) if fact.source_type == "manual"]
+    assert len(manual) == 1 and manual[0].kind == "inference"
+    assert manual[0].external_reference == "exclusiones-sinteticas-v1:h1"
+
+
+def test_missing_or_pending_list_is_reported_as_not_validated(tavily):
+    case = tavily.setup()
+    assert discover(case).exclusions_status == "missing"
+    assert discover(case, exclusions=exclusion_list(status="pending")).exclusions_status == "pending"
+
+
+def test_resolution_confirms_identity_without_calling_providers(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    company_id = company_by_domain(case, discover(case).selected_company_ids, "nueva-uno.example")
+    extract_confirming_page(case, company_id)
+    calls = len(case.calls)
+    report = resolve(case, company_id)
+    assert len(case.calls) == calls
+    assert report.decision.status == "confirmed" and report.exclusions_status == "missing"
+    company = case.db.get_company(company_id)
+    assert company.identity_status == "confirmed" and company.operating_countries == ["CO"]
+    assert company.identity_key == "nueva-uno.example|nuevauno|CO"
+    stored = {fact.id for fact in case.db.list_evidence(company_id)}
+    assert set(company.provenance["operating_countries"]) <= stored
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.stage == "identity_resolved" and item.stop_reason is None and item.business_status is None
+
+
+def test_resolution_without_primary_source_stays_pending(tavily):
+    case = tavily.setup()
+    company_id = discover(case).selected_company_ids[0]
+    report = resolve(case, company_id)
+    assert report.decision.stop_reason == "identity_unverified"
+    assert case.db.get_company(company_id).identity_status == "pending"
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.stage == "discovered" and item.stop_reason == "identity_unverified"
+
+
+def test_resolution_excludes_listed_account_idempotently(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    company_id = company_by_domain(case, discover(case).selected_company_ids, "cliente-actual.example")
+    listed = exclusion_list({"id": "c1", "name": "Cliente Actual", "domains": ["cliente-actual.example"]})
+    first = resolve(case, company_id, exclusions=listed)
+    count = len(case.db.list_evidence(company_id))
+    second = resolve(case, company_id, exclusions=listed)
+    assert first.decision == second.decision and first.decision.status == "excluded"
+    assert len(case.db.list_evidence(company_id)) == count
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.business_status == "excluded" and item.stage == "identity_resolved"
+    assert item.stop_reason == "excluded_account"
+    manual = [fact for fact in case.db.list_evidence(company_id) if fact.source_type == "manual"]
+    assert len(manual) == 1 and manual[0].kind == "observed"
+
+
+def test_observed_name_replaces_inferred_one_which_stays_as_alias(tavily):
+    case = tavily.setup()
+    case.search = lambda payload: fixed_search(payload) | {"results": [{
+        "url": "https://nueva-uno.example/producto", "title": "Nueva Uno Software | Inicio",
+        "content": "Resumen exclusivamente sintético.", "score": 0.5,
+    }]}
+    company_id = discover(case).selected_company_ids[0]
+    assert case.db.get_company(company_id).name == "Nueva Uno Software"
+    case.extract = lambda payload: {
+        "results": [{"url": url, "raw_content": "Nueva Uno ayuda a empresas en Colombia con sus recibos."}
+                    for url in payload["urls"]],
+        "failed_results": [], "usage": {"credits": 1},
+    }
+    extract(case, company_id, ["https://nueva-uno.example/producto"])
+    report = resolve(case, company_id)
+    company = case.db.get_company(company_id)
+    assert report.decision.status == "confirmed"
+    assert company.name == "Nueva Uno" and company.aliases == ["Nueva Uno Software"]
+    primary = {fact.id for fact in case.db.list_evidence(company_id) if fact.source_type == "primary"}
+    assert set(company.provenance["name"]) <= primary
+    assert company.provenance["aliases"]
+    later = case.make_campaign()
+    case.db.save_campaign(later)
+    again = run_discovery(case.db, case.budget, case.client, later.id, account_ref=ACCOUNT,
+                          authorization=case.grants["search"])
+    assert again.reused_company_ids == [company_id]
+
+
+def test_confirmed_company_is_reused_but_pending_ones_are_not(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    first = discover(case)
+    company_id = company_by_domain(case, first.selected_company_ids, "nueva-uno.example")
+    extract_confirming_page(case, company_id)
+    resolve(case, company_id)
+    key = case.db.get_company(company_id).identity_key
+    before = len(case.db.list_evidence(company_id))
+    later = case.make_campaign()
+    case.db.save_campaign(later)
+    report = run_discovery(case.db, case.budget, case.client, later.id, account_ref=ACCOUNT,
+                           authorization=case.grants["search"])
+    assert report.reused_company_ids == [company_id] and company_id in report.selected_company_ids
+    assert case.db.get_run_item(later.id, company_id) is not None
+    assert len(case.db.list_evidence(company_id)) > before
+    others = [item for item in report.selected_company_ids if item != company_id]
+    assert len(others) == 2 and not set(others) & set(first.selected_company_ids)
+    again = resolve(case, company_id, campaign_id=later.id)
+    assert again.decision.status == "confirmed"
+    assert case.db.get_company(company_id).identity_key == key

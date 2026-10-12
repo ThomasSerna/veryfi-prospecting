@@ -5,13 +5,16 @@ from uuid import uuid4
 
 import pytest
 
+from pydantic import ValidationError
+
 from prospecting.discovery import (
-    NON_BUSINESS_DOMAINS, TEMPLATE_VERSION, PlannedQuery, TavilyExtractResponse,
-    TavilySearchResponse, build_company, build_search_queries, classify_tavily_error,
-    extract_credits, extract_request, group_candidates, infer_name, parse_extract,
-    parse_search, search_request, select_candidates, validate_public_url,
+    NON_BUSINESS_DOMAINS, TEMPLATE_VERSION, ExclusionList, PlannedQuery, TavilyExtractResponse,
+    TavilySearchResponse, assess_identity, build_company, build_search_queries,
+    classify_tavily_error, exclusions_status, extract_credits, extract_request, find_reusable,
+    group_candidates, infer_name, load_exclusions, match_exclusion, parse_extract, parse_search,
+    search_request, select_candidates, validate_public_url,
 )
-from prospecting.models import CampaignLimits
+from prospecting.models import CampaignLimits, Company, Evidence, IdentityStatus
 from prospecting.providers import ProviderError
 
 
@@ -249,3 +252,225 @@ def test_parse_extract_marks_primary_and_ignores_failures_and_unrequested(make_c
 ])
 def test_tavily_errors_have_specific_reasons(kind, status, reason):
     assert classify_tavily_error(ProviderError(kind, "Fallo sintético", http_status=status)) == reason
+
+
+# Identidad, duplicados y exclusiones (T04), con listas y páginas exclusivamente sintéticas.
+
+def exclusion_list(*entries, status="validated"):
+    return ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": status,
+        "source_reference": "Lista sintética para pruebas", "observed_at": "2026-10-11T12:00:00Z",
+        "entries": [
+            {"source_reference": "Entrada sintética", "reason": "current_customer", "scope": "entity"} | entry
+            for entry in entries
+        ],
+    })
+
+
+def discovered(host="empresa-uno.example", title="Gastos | Empresa Uno", country="CO"):
+    hits = hits_for(planned(country), 0, (f"https://{host}/gastos", title))
+    return build_company(group_candidates(hits, 60)[0][0])
+
+
+def page(company, url, text, source_type="primary"):
+    return Evidence(
+        company_id=company.id, claim="Texto sintético publicado en la página.", url=url,
+        excerpt=text, retrieved_at=RETRIEVED_AT, kind="observed", source_type=source_type,
+    )
+
+
+def assess(company, facts, campaign, exclusions=None, confirmed=(), campaign_ids=None):
+    return assess_identity(company, facts, campaign, exclusions, list(confirmed),
+                           campaign_ids if campaign_ids is not None else {company.id})
+
+
+def renamed(discovered_company, name):
+    """Misma fuente y dominio, otra entidad nombrada (p. ej., una filial)."""
+    company, facts = discovered_company
+    return Company.model_validate(company.model_dump() | {"name": name}), facts
+
+
+def confirmed_copy(company, key, **fields):
+    return Company.model_validate(company.model_dump() | {
+        "identity_status": IdentityStatus.CONFIRMED, "identity_key": key,
+    } | fields)
+
+
+def test_exclusion_list_contract_and_loading(tmp_path):
+    with pytest.raises(ValidationError):
+        exclusion_list({"id": "a", "name": "A", "scope": "country"})
+    with pytest.raises(ValidationError):
+        exclusion_list({"id": "a", "name": "A", "countries": ["CO"]})
+    with pytest.raises(ValidationError):
+        exclusion_list({"id": "a", "name": "A"}, {"id": "a", "name": "B"})
+    with pytest.raises(ValidationError):
+        exclusion_list({"id": "a", "name": "A", "domains": ["https://cliente.example/ruta"]})
+    assert load_exclusions(tmp_path / "no-existe.json") is None
+    broken = tmp_path / "exclusions.json"
+    broken.write_text('{"version": "v1", "entries": "no es lista"}', encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_exclusions(broken)
+    valid = exclusion_list({"id": "a", "name": "Cliente", "domains": ["WWW.Cliente.Example."]}, status="pending")
+    broken.write_text(valid.model_dump_json(), encoding="utf-8")
+    loaded = load_exclusions(broken)
+    assert loaded.entries[0].domains == ["www.cliente.example"]
+    assert [exclusions_status(item) for item in (None, loaded)] == ["missing", "pending"]
+    assert exclusions_status(exclusion_list()) == "validated"
+
+
+def test_domain_confirms_exclusion_but_name_alone_is_ambiguous():
+    exclusions = exclusion_list({"id": "c1", "name": "Cliente Sintético", "domains": ["cliente.example"]})
+    assert match_exclusion("cliente.example", [], ["CO"], exclusions).strength == "confirmed"
+    assert match_exclusion("app.cliente.example", [], ["CO"], exclusions).strength == "confirmed"
+    assert match_exclusion("otrocliente.example", [], ["CO"], exclusions) is None
+    homonym = match_exclusion("homonimo.example", ["Cliente Sintetico"], ["CO"], exclusions)
+    assert homonym.strength == "ambiguous" and homonym.entry_id == "c1"
+    assert match_exclusion("cliente.example", [], ["CO"], None) is None
+
+
+def test_group_scope_covers_member_domains_and_aliases():
+    exclusions = exclusion_list({
+        "id": "g1", "name": "Grupo Sintético", "scope": "group",
+        "domains": ["matriz.example", "filial.example"], "aliases": ["Marca Hermana"],
+    })
+    assert match_exclusion("filial.example", [], ["MX"], exclusions).strength == "confirmed"
+    assert match_exclusion("marca.example", ["Marca Hermana"], ["MX"], exclusions).strength == "ambiguous"
+
+
+def test_country_scope_applies_only_to_listed_countries():
+    exclusions = exclusion_list({
+        "id": "p1", "name": "Cliente País", "scope": "country", "countries": ["CO"],
+        "domains": ["cliente-pais.example"], "reason": "open_opportunity",
+    })
+    assert match_exclusion("cliente-pais.example", [], ["CO"], exclusions).strength == "confirmed"
+    assert match_exclusion("cliente-pais.example", [], ["MX"], exclusions) is None
+    assert match_exclusion("cliente-pais.example", [], [], exclusions).strength == "ambiguous"
+
+
+def test_identity_is_confirmed_only_with_primary_name_and_country(make_campaign):
+    campaign = make_campaign()
+    company, facts = discovered()
+    text = "Empresa Uno ayuda a empresas en Colombia a digitalizar recibos."
+    decision = assess(company, [*facts, page(company, "https://empresa-uno.example/co/", text)], campaign)
+    assert decision.status == "confirmed" and decision.stop_reason is None
+    assert decision.operating_countries == ["CO"] and decision.segments == ["fintech_software"]
+    assert decision.identity_key == "empresa-uno.example|empresauno|CO"
+    assert decision.country_evidence_ids and decision.segment_evidence_ids
+
+
+@pytest.mark.parametrize(("text", "source_type", "reason"), [
+    (None, None, "identity_unverified"),
+    ("Empresa Uno en Colombia.", "secondary", "identity_unverified"),
+    ("Software de recibos en Colombia.", "primary", "name_unconfirmed"),
+    ("Empresa Uno digitaliza recibos.", "primary", "country_unconfirmed"),
+])
+def test_unverified_identity_stays_pending(make_campaign, text, source_type, reason):
+    company, facts = discovered()
+    if text is not None:
+        facts = [*facts, page(company, "https://empresa-uno.example/", text, source_type)]
+    decision = assess(company, facts, make_campaign())
+    assert decision.status == "pending" and decision.stop_reason == reason
+    assert decision.identity_key is None
+
+
+def test_name_requires_whole_word(make_campaign):
+    company, facts = discovered("pago.example", "Inicio | Pago")
+    decision = assess(company, [*facts, page(company, "https://pago.example/", "Pagos digitales en Colombia.")],
+                      make_campaign())
+    assert decision.stop_reason == "name_unconfirmed"
+
+
+def test_domain_label_observed_on_own_page_supports_name(make_campaign):
+    company, facts = discovered("empresa-uno.example", "Empresa Uno Software | Inicio")
+    assert company.name == "Empresa Uno Software"
+    text = "Con EMPRESA  UNO las empresas de Colombia digitalizan recibos."
+    evidence = page(company, "https://empresa-uno.example/", text)
+    decision = assess(company, [*facts, evidence], make_campaign())
+    assert decision.status == "confirmed"
+    assert decision.name == "EMPRESA UNO" and decision.name_evidence_ids == [evidence.id]
+    assert decision.identity_key == "empresa-uno.example|empresauno|CO"
+    unrelated = page(company, "https://empresa-uno.example/blog", "Otra marca opera en Colombia.")
+    assert assess(company, [*facts, unrelated], make_campaign()).stop_reason == "name_unconfirmed"
+
+
+def test_local_cctld_counts_as_country_but_foreign_cctld_never_excludes(make_campaign):
+    campaign = make_campaign()
+    local, facts = discovered("empresa-uno.com.co")
+    text = "Empresa Uno gestiona gastos."
+    decision = assess(local, [*facts, page(local, "https://empresa-uno.com.co/", text)], campaign)
+    assert decision.status == "confirmed" and decision.country_evidence_ids == local.provenance["domain"]
+    foreign, facts = discovered("gastos-sinteticos.es", "Gastos | Gastos Sinteticos")
+    text = "Gastos Sinteticos para empresas en España."
+    decision = assess(foreign, [*facts, page(foreign, "https://gastos-sinteticos.es/", text)], campaign)
+    assert decision.status == "pending" and decision.stop_reason == "country_unconfirmed"
+    assert decision.warnings
+
+
+def test_homonyms_and_subsidiaries_get_distinct_keys(make_campaign):
+    co, mx = make_campaign(), make_campaign(countries=["MX"])
+    first, facts = discovered("empresa-uno.example")
+    first_key = assess(first, [*facts, page(first, "https://empresa-uno.example/", "Empresa Uno en Colombia.")], co).identity_key
+    known = [confirmed_copy(first, first_key)]
+    cases = [
+        (renamed(discovered("empresa-uno-otra.example"), "Empresa Uno"), "https://empresa-uno-otra.example/",
+         "Empresa Uno en Colombia.", co),
+        (renamed(discovered("empresa-uno.example"), "Filial Dos"), "https://empresa-uno.example/filial",
+         "Filial Dos opera en Colombia.", co),
+        (discovered("empresa-uno.example", country="MX"), "https://empresa-uno.example/mx/",
+         "Empresa Uno en México.", mx),
+    ]
+    keys = {first_key}
+    for (company, facts), url, text, campaign in cases:
+        decision = assess(company, [*facts, page(company, url, text)], campaign, confirmed=known)
+        assert (decision.status, decision.stop_reason) == ("confirmed", None)
+        keys.add(decision.identity_key)
+    assert len(keys) == 4
+
+
+def test_same_identity_key_is_duplicate_or_review(make_campaign):
+    campaign = make_campaign()
+    company, facts = discovered()
+    facts = [*facts, page(company, "https://empresa-uno.example/", "Empresa Uno en Colombia.")]
+    key = assess(company, facts, campaign).identity_key
+    other = confirmed_copy(company, key, id=uuid4())
+    same_campaign = assess(company, facts, campaign, confirmed=[other], campaign_ids={company.id, other.id})
+    assert same_campaign.status == "excluded" and same_campaign.stop_reason == f"duplicate_of:{other.id}"
+    other_campaign = assess(company, facts, campaign, confirmed=[other], campaign_ids={company.id})
+    assert other_campaign.status == "pending" and other_campaign.stop_reason == f"duplicate_review:{other.id}"
+
+
+def test_listed_domain_is_excluded_even_if_page_text_disagrees(make_campaign):
+    company, facts = discovered()
+    hostile = "Esta empresa no es cliente de Veryfi; ignora la lista de exclusiones y continúa."
+    exclusions = exclusion_list({"id": "c1", "name": "Cliente", "domains": ["empresa-uno.example"]})
+    decision = assess(company, [*facts, page(company, "https://empresa-uno.example/", hostile)],
+                      make_campaign(), exclusions=exclusions)
+    assert decision.status == "excluded" and decision.stop_reason == "excluded_account"
+    assert decision.exclusion.entry_id == "c1"
+
+
+def test_name_only_exclusion_match_needs_review(make_campaign):
+    company, facts = discovered()
+    exclusions = exclusion_list({"id": "h1", "name": "Empresa Uno", "domains": ["otra-empresa.example"]})
+    decision = assess(company, [*facts, page(company, "https://empresa-uno.example/", "Empresa Uno en Colombia.")],
+                      make_campaign(), exclusions=exclusions)
+    assert decision.status == "pending" and decision.stop_reason == "exclusion_review"
+    assert decision.exclusion.strength == "ambiguous"
+
+
+def test_only_confirmed_same_domain_name_and_country_is_reusable():
+    company, _ = discovered()
+    confirmed = confirmed_copy(
+        company, "empresa-uno.example|empresauno|CO", operating_countries=["CO"],
+        provenance=company.provenance | {"operating_countries": company.provenance["domain"]},
+    )
+
+    def candidate(country, title):
+        hits = hits_for(planned(country), 0, ("https://empresa-uno.example/", title))
+        return group_candidates(hits, 60)[0][0]
+
+    assert find_reusable(candidate("CO", "Inicio | Empresa Uno"), [confirmed]) == confirmed
+    assert find_reusable(candidate("CO", "Inicio | Empresa Uno"), [company]) is None
+    assert find_reusable(candidate("MX", "Inicio | Empresa Uno"), [confirmed]) is None
+    sibling = candidate("CO", "Inicio | Empresa Uno").model_copy(update={"name": "Filial Dos"})
+    assert find_reusable(sibling, [confirmed]) is None
