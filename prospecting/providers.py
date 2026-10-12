@@ -336,6 +336,9 @@ class ProviderClient:
                     detail = raw.get("error", raw)
                     if isinstance(detail, dict):
                         detail = detail.get("message", detail.get("detail"))
+                    # Tavily responde {"detail": {"error": "..."}}.
+                    if isinstance(detail, dict):
+                        detail = detail.get("error", detail.get("message"))
                     if isinstance(detail, str):
                         message += " " + _safe_message(detail, key, request)
             except (ValueError, UnicodeError, RecursionError):

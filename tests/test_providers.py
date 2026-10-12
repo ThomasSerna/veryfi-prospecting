@@ -443,6 +443,26 @@ def test_error_body_does_not_leak_key_or_personal_payload(provider_case):
     assert "Fallo sintético literal" in visible
 
 
+@pytest.mark.parametrize("detail", [
+    {"error": "Límite sintético del plan; clave " + SYNTHETIC_KEY},
+    {"message": "Límite sintético del plan; clave " + SYNTHETIC_KEY},
+    "Límite sintético del plan; clave " + SYNTHETIC_KEY,
+])
+def test_nested_detail_error_is_kept_literal_without_secrets(provider_case, detail):
+    case = provider_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=432, headers={"Content-Type": "application/json"},
+        body=json.dumps({"detail": detail}).encode("utf-8"),
+    )
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    saved = case.db.get_usage(usage.request_id)
+    assert error.value.message.startswith("HTTP 432. Límite sintético del plan")
+    assert saved.error_message == error.value.message
+    assert SYNTHETIC_KEY not in saved.error_message
+
+
 def test_schema_error_does_not_persist_sensitive_input_values(provider_case):
     case = provider_case
     usage = case.reserve()
