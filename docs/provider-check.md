@@ -22,8 +22,17 @@ personales ni listas de empresas; los resultados quedan en la base local bajo `d
 | Extract | `extract_depth=basic`, `format=text`, `query`, `chunks_per_source=3`, `timeout=6`, `include_usage=true` | 2 (1 URL cada una) | 2 | 0 | 0,4 s cada una | 3 fragmentos por URL, de 500 a 800 caracteres; sin `failed_results` |
 
 Campaña de prueba: Colombia, `fintech_software`, `web_queries=2` y `max_companies=5`.
-Consumo registrado: 4 créditos reservados y 2 observados, pendientes de conciliar con el
-panel de Tavily mediante `Budget.reconcile`. El costo económico es USD 0.
+Consumo registrado: 4 créditos reservados y 2 observados. El costo económico es USD 0.
+
+### Conciliación y cierre de la cuenta
+
+El 2026-10-11, a petición del responsable del cupo, las 4 solicitudes se conciliaron con
+`Budget.reconcile` usando los `usage.credits` de las respuestas: 1 crédito por búsqueda y 0 por
+extracción, es decir, 2 créditos confirmados y USD 0. El uso **no se verificó en el panel
+de Tavily**. El comprobante local queda en `data/conciliaciones/`, fuera de Git.
+
+Después de la conciliación, el proyecto deja de usar esta cuenta. Su consumo se conserva
+en el registro con su referencia propia y no se mezcla con el de otra cuenta.
 
 ### Observaciones y limitaciones
 
@@ -37,4 +46,4 @@ panel de Tavily mediante `Budget.reconcile`. El costo económico es USD 0.
 - Las pruebas no observaron errores 401, 429 ni 432/433; esos casos solo se verifican con
   respuestas sintéticas.
 - Los créditos se observaron en la respuesta; el saldo del panel después de las llamadas no
-  se volvió a consultar.
+  se volvió a consultar, ni siquiera para la conciliación.
