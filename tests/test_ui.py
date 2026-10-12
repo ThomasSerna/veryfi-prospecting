@@ -1,9 +1,13 @@
 """Flujo Streamlit con bases temporales y datos exclusivamente sintéticos, sin tráfico real."""
 
+import csv
+from datetime import timedelta
+from io import StringIO
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from streamlit.delta_generator import DeltaGenerator
 from streamlit.testing.v1 import AppTest
 
 import app
@@ -264,6 +268,28 @@ def test_live_execution_disables_human_writes_close_and_download(ui_results):
         assert widget(at.button, "Cerrar campaña conservando resultados").disabled
         assert widget(at.button, "Guardar confirmación manual").disabled
         assert not at.get("download_button")
+
+
+def test_download_rechecks_freshness_when_data_callback_runs(ui_results, monkeypatch):
+    captured = []
+    bridge.confirm_alternative_channel(ui_results.paths.db, ui_results.campaign.id, ui_results.contact.id,
+                                       "linkedin", ui_results.contact.channels[0].value,
+                                       reason="Acceso profesional exclusivamente sintético comprobado sin envío.",
+                                       confirmed=True)
+
+    def capture(self, label, data, **kwargs):
+        captured.append((label, data))
+
+    monkeypatch.setattr(DeltaGenerator, "download_button", capture)
+    at = open_company(screen(), ui_results.companies[0])
+    assert not at.exception
+    ready_data = next(data for label, data in captured if label == "Descargar prospectos listos")
+    assert callable(ready_data)
+    fresh_rows = list(csv.DictReader(StringIO(ready_data().decode("utf-8-sig"))))
+    assert len(fresh_rows) == 1 and fresh_rows[0]["contact_id"] == str(ui_results.contact.id)
+    monkeypatch.setattr(bridge, "utc_now", lambda: ui_results.now + timedelta(days=31))
+    rows = list(csv.DictReader(StringIO(ready_data().decode("utf-8-sig"))))
+    assert rows == []
 
 
 def test_validated_exclusions_do_not_display_missing_list_warning(ui_results):

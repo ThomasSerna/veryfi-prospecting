@@ -1,6 +1,9 @@
 """Interfaz local de campañas, revisión humana y exportación segura."""
 
+import csv
 from decimal import Decimal
+from io import StringIO
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -11,7 +14,7 @@ import streamlit as st
 
 from prospecting.models import Campaign, CampaignFilters, VeryfiConfig
 from prospecting.pipeline import (
-    AuthorizationInput, confirm_alternative_channel, execute_campaign,
+    AuthorizationInput, CampaignView, confirm_alternative_channel, execute_campaign,
     finish_campaign, list_saved_campaigns, load_provider_access, prepare_campaign,
     provider_operations, read_campaign, review_company,
 )
@@ -46,6 +49,7 @@ LABELS = {
     "scale_potential": "Potencial de escala", "adoption_capacity": "Capacidad de adopción",
     "opportunity_timing": "Momento de la oportunidad",
 }
+READY = {"ready_preferred", "ready_alternative"}
 STOP_MESSAGES = {
     "budget_exceeded": "Se agotó el presupuesto disponible. Revisa el consumo y concilia antes de reanudar.",
     "company_budget_exceeded": "Se alcanzó el tope de esta empresa. La campaña puede continuar con las demás.",
@@ -89,6 +93,74 @@ def stop_message(reason):
 def show_stop(reason):
     st.text(stop_message(reason))
     st.text(f"Motivo registrado: {reason}")
+
+
+def csv_text(value):
+    """Prefijo de texto y tabulación: impide fórmulas al abrir el CSV en hojas de cálculo."""
+    if value is None:
+        return ""
+    text = str(value)
+    stripped = text.lstrip()
+    prefix = text[:len(text) - len(stripped)]
+    if (any(ord(char) < 32 for char in prefix) or stripped and (ord(stripped[0]) < 32 or ord(stripped[0]) == 127)
+            or stripped.startswith(("=", "+", "-", "@", "＝", "＋", "－", "＠", "\ufeff"))):
+        return "'\t" + text
+    return text
+
+
+CSV_FIELDS = (
+    "campaign_id", "company_id", "contact_id", "company_name", "domain", "entity_name",
+    "countries", "segments", "stage", "business_status", "stored_business_status", "stop_reason", "error_message",
+    "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
+    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready",
+    "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
+    "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
+)
+
+
+def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
+    """Una fila por persona; recibe una lectura reciente del pipeline, nunca respuestas crudas."""
+    output = StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=CSV_FIELDS, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
+    writer.writeheader()
+    for result in view.companies:
+        if not include_all and result.business_status not in READY:
+            continue
+        people = result.contacts if include_all else [person for person in result.contacts if person.eligible and person.usable_channels]
+        for person in people or ([None] if include_all else []):
+            company, item, assessment = result.company, result.run_item, result.assessment
+            contact = None if person is None else person.contact
+            channels = [] if person is None else contact.channels if include_all else person.usable_channels
+            sources = [fact.model_dump(mode="json") for fact in result.evidence
+                       if fact.contact_id is None or contact is not None and fact.contact_id == contact.id]
+            row = {
+                "campaign_id": view.campaign.id, "company_id": company.id, "contact_id": None if contact is None else contact.id,
+                "company_name": company.name, "domain": company.domain, "entity_name": company.entity_name,
+                "countries": " | ".join(company.operating_countries or []), "segments": " | ".join(company.segments or []),
+                "stage": item.stage, "business_status": result.business_status, "stored_business_status": item.business_status,
+                "stop_reason": item.stop_reason, "error_message": item.error_message,
+                "fit_score": None if assessment is None else assessment.fit_score,
+                "coverage": None if assessment is None else assessment.coverage,
+                "priority": None if assessment is None else assessment.priority,
+                "products": " | ".join([] if assessment is None else assessment.products),
+                "assessment_id": None if assessment is None else assessment.id, "rubric_version": view.campaign.rubric_version,
+                "criteria": json.dumps({} if assessment is None else assessment.model_dump(mode="json")["criteria"], ensure_ascii=False),
+                "contact_name": None if contact is None else contact.name, "title": None if contact is None else contact.title,
+                "buying_role": None if contact is None else contact.buying_role,
+                "contact_eligible": None if person is None else person.eligible,
+                "contact_ready": None if person is None else person.eligible and bool(person.usable_channels),
+                "channels": json.dumps([channel.model_dump(mode="json") for channel in channels], ensure_ascii=False),
+                "sources": json.dumps(sources, ensure_ascii=False),
+                "company_provenance": json.dumps(company.model_dump(mode="json")["provenance"], ensure_ascii=False),
+                "contact_provenance": json.dumps({} if contact is None else contact.model_dump(mode="json")["provenance"], ensure_ascii=False),
+                "review_status": item.review_status, "review_reason": item.review_reason,
+                "reviewed_at": None if item.reviewed_at is None else item.reviewed_at.isoformat(),
+                "warnings": " | ".join(warning for channel in channels for warning in channel.warnings),
+            }
+            row.update({kind: " | ".join(channel.value for channel in channels if channel.type == kind)
+                        for kind in ("email", "phone", "whatsapp", "linkedin", "other")})
+            writer.writerow({key: csv_text(value) if isinstance(value, str) or value is None else value for key, value in row.items()})
+    return output.getvalue().encode("utf-8-sig")
 
 
 def show_error(error):
@@ -330,6 +402,31 @@ def results_panel(view):
         st.info("Ninguna empresa coincide con estos filtros.")
 
 
+def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None):
+    """Se ejecuta al descargar, en su propio hilo y con una conexión nueva, sin llamadas Streamlit."""
+    current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path)
+    if current.is_executing:
+        raise ValueError("La campaña está ejecutándose; espera antes de exportar.")
+    return export_csv(current, include_all=include_all)
+
+
+def downloads(view, access):
+    st.subheader("Exportar campaña")
+    st.caption("La descarga incluye la campaña completa, sin limitarse a los filtros de la tabla. La revisión humana se conserva en el CSV.")
+    if view.is_executing:
+        st.info("La exportación estará disponible cuando termine o se interrumpa la investigación.")
+        return
+    path, campaign_id = DB_PATH, view.campaign.id
+    accounts = None if access is None else access.account_allowances
+    exclusions_path = EXCLUSIONS_PATH
+    left, right = st.columns(2)
+    left.download_button("Descargar prospectos listos", lambda: download_csv(path, campaign_id, account_allowances=accounts, exclusions_path=exclusions_path), file_name=f"prospectos-listos-{view.campaign.id}.csv",
+                         mime="text/csv", on_click="ignore", disabled=not any(person.eligible and person.usable_channels
+                         for result in view.companies if result.business_status in READY for person in result.contacts))
+    right.download_button("Descargar todos los resultados", lambda: download_csv(path, campaign_id, include_all=True, account_allowances=accounts, exclusions_path=exclusions_path), file_name=f"resultados-{view.campaign.id}.csv",
+                          mime="text/csv", on_click="ignore", disabled=not view.companies)
+
+
 def main():
     st.set_page_config(page_title="Veryfi Prospecting", page_icon=":material/travel_explore:", layout="wide")
     st.title("Veryfi Prospecting")
@@ -381,6 +478,7 @@ def main():
             finish_campaign(DB_PATH, selected)
             st.rerun()
         results_panel(view)
+        downloads(view, access)
     except Exception as error:
         show_error(error)
 
