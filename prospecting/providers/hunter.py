@@ -5,7 +5,6 @@ con procedencia de proveedor; las reglas de listo están en `prospecting.contact
 """
 
 from datetime import datetime
-from decimal import Decimal
 import re
 from typing import Annotated, Literal
 from uuid import UUID, uuid4, uuid5
@@ -174,11 +173,8 @@ def _confirmed_domain(company: Company) -> str:
 
 
 def domain_search_request(company: Company, roles: list[str], account_ref: str, *,
-                          departments: list[str] | None = None, limit: int = 10) -> ProviderRequest:
-    """Hunter cobra 1 crédito por correo encontrado: `limit` acota el consumo de la consulta."""
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10:
-        raise ContactError("invalid_limit", "Domain Search admite entre 1 y 10 resultados por consulta.")
-    params = {"domain": _confirmed_domain(company), "type": "personal", "limit": limit, "offset": 0}
+                          departments: list[str] | None = None) -> ProviderRequest:
+    params = {"domain": _confirmed_domain(company), "type": "personal", "limit": 10, "offset": 0}
     if departments:
         params["department"] = ",".join(dict.fromkeys(departments))
     elif roles:
@@ -197,25 +193,6 @@ def verifier_request(email: str, account_ref: str) -> ProviderRequest:
     if not re.fullmatch(r"[^@\s<>(),;:\"]+@[^@\s]+\.[^@\s]+", email):
         raise ContactError("invalid_email", "Verifier requiere un correo observado con formato válido.")
     return ProviderRequest(provider=PROVIDER, operation="email_verifier", account_ref=account_ref, params={"email": email})
-
-
-# Precios publicados por Hunter (hunter.io/pricing, consultados el 2026-10-12): 1 crédito por correo
-# encontrado en Domain Search y Finder y 0,5 por verificación; sin resultado, `unknown` o desechable no cobra.
-VERIFICATION_CREDITS = Decimal("0.5")
-
-
-def observed_hunter_credits(operation: str, data) -> Decimal | None:
-    """Consumo estimado a partir de la respuesta; la conciliación final usa el panel de Hunter."""
-    record = getattr(data, "data", None)
-    if operation == "domain_search":
-        return Decimal(0) if record is None else Decimal(len(record.emails))
-    if operation == "email_finder":
-        return Decimal(1 if record is not None and record.email else 0)
-    if operation == "email_verifier":
-        if record is None or record.status is None:
-            return None
-        return Decimal(0) if record.status in ("unknown", "disposable") else VERIFICATION_CREDITS
-    return None
 
 
 def classify_hunter_error(error: ProviderError) -> str:
