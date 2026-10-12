@@ -22,8 +22,25 @@ ALLOWED = {
         "prospecting.discovery", "prospecting.models", "prospecting.providers", "prospecting.qualification",
     },
     "prospecting.pipeline": {
+        "prospecting.pipeline.contacts", "prospecting.pipeline.discovery", "prospecting.pipeline.qualification",
+        "prospecting.pipeline.research",
+    },
+    "prospecting.pipeline.calls": {"prospecting.budget", "prospecting.models", "prospecting.providers"},
+    "prospecting.pipeline.discovery": {
+        "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.models",
+        "prospecting.pipeline.calls", "prospecting.providers",
+    },
+    "prospecting.pipeline.research": {
+        "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.models",
+        "prospecting.pipeline.calls", "prospecting.providers",
+    },
+    "prospecting.pipeline.qualification": {
+        "prospecting.budget", "prospecting.db", "prospecting.models", "prospecting.pipeline.calls",
+        "prospecting.providers", "prospecting.qualification",
+    },
+    "prospecting.pipeline.contacts": {
         "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery",
-        "prospecting.models", "prospecting.providers", "prospecting.qualification",
+        "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
     },
 }
 # Interfaz, envío de mensajes y automatización de navegador quedan fuera del paquete (§1, §15).
