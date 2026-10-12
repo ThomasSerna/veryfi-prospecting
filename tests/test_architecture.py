@@ -2,9 +2,12 @@
 
 import ast
 import importlib
+from importlib.util import resolve_name
 from pathlib import Path
 import subprocess
 import sys
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = PROJECT_ROOT / "prospecting"
@@ -81,35 +84,38 @@ def trees() -> dict[str, ast.Module]:
     return {name: ast.parse(path.read_text(encoding="utf-8")) for name, path in modules().items()}
 
 
-def imported(tree: ast.Module) -> set[str]:
+def imported(tree: ast.Module, module: str, known: dict[str, Path]) -> set[str]:
+    """Módulos que importa `tree`. `module` y `known` (el mapa de `modules()`) fijan el paquete de origen."""
+    package = module if known[module].name == "__init__.py" else module.rpartition(".")[0]
     names = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            names.add(node.module)
-            names.update(f"{node.module}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            try:
+                base = resolve_name("." * node.level + (node.module or ""), package)
+            except ImportError as error:
+                raise ImportError(f"{module}:{node.lineno}: {error}") from error
+            # Un nombre importado es el submódulo si existe en `known`; si no, un símbolo exportado por `base`.
+            names.update(f"{base}.{alias.name}" if f"{base}.{alias.name}" in known else base
+                         for alias in node.names)
     return names
 
 
-def internal(tree: ast.Module, known: set[str]) -> set[str]:
-    return {name for name in imported(tree) if name in known}
+def internal(tree: ast.Module, module: str, known: dict[str, Path]) -> set[str]:
+    return {name for name in imported(tree, module, known) if name in known}
 
 
-def test_every_module_declares_its_allowed_dependencies():
-    assert set(modules()) == set(ALLOWED)
+def undeclared(parsed: dict[str, ast.Module], known: dict[str, Path]) -> dict[str, list[str]]:
+    """Importaciones internas de cada módulo que `ALLOWED` no declara."""
+    violations = {name: sorted(internal(tree, name, known) - ALLOWED[name] - {name})
+                  for name, tree in parsed.items()}
+    return {name: found for name, found in violations.items() if found}
 
 
-def test_internal_imports_follow_the_declared_direction():
-    known = set(modules())
-    violations = {name: sorted(internal(tree, known) - ALLOWED[name] - {name})
-                  for name, tree in trees().items()}
-    assert {name: found for name, found in violations.items() if found} == {}
-
-
-def test_internal_imports_have_no_cycles():
-    known = set(modules())
-    graph = {name: internal(tree, known) - {name} for name, tree in trees().items()}
+def assert_acyclic(parsed: dict[str, ast.Module], known: dict[str, Path]) -> None:
+    """Falla con la cadena de importaciones si las dependencias internas forman un ciclo."""
+    graph = {name: internal(tree, name, known) - {name} for name, tree in parsed.items()}
     visiting, done = [], set()
 
     def visit(name):
@@ -125,6 +131,25 @@ def test_internal_imports_have_no_cycles():
 
     for name in sorted(graph):
         visit(name)
+
+
+def prohibited(parsed: dict[str, ast.Module], known: dict[str, Path]) -> dict[str, list[str]]:
+    """Módulos de `FORBIDDEN` que importa cada módulo, sea cual sea la forma de la importación."""
+    used = {name: sorted({item.split(".")[0] for item in imported(tree, name, known)} & FORBIDDEN)
+            for name, tree in parsed.items()}
+    return {name: found for name, found in used.items() if found}
+
+
+def test_every_module_declares_its_allowed_dependencies():
+    assert set(modules()) == set(ALLOWED)
+
+
+def test_internal_imports_follow_the_declared_direction():
+    assert undeclared(trees(), modules()) == {}
+
+
+def test_internal_imports_have_no_cycles():
+    assert_acyclic(trees(), modules())
 
 
 def test_documented_structure_matches_the_package():
@@ -145,9 +170,7 @@ def test_documented_structure_matches_the_package():
 
 
 def test_package_has_no_interface_messaging_or_browser_automation():
-    used = {name: sorted({item.split(".")[0] for item in imported(tree)} & FORBIDDEN)
-            for name, tree in trees().items()}
-    assert {name: found for name, found in used.items() if found} == {}
+    assert prohibited(trees(), modules()) == {}
 
 
 def test_only_the_pipeline_reserves_spending():
@@ -205,3 +228,114 @@ assert list(Path.cwd().iterdir()) == []
     )
     assert process.returncode == 0, process.stderr
     assert list(tmp_path.iterdir()) == []
+
+
+# El analizador se prueba con árboles AST en memoria: no lee el paquete real y solo comparte con él
+# las reglas de `ALLOWED` y `FORBIDDEN`. Como en `modules()`, los paquetes se reconocen por `__init__.py`.
+KNOWN = {
+    "prospecting": Path("prospecting/__init__.py"),
+    "prospecting.models": Path("prospecting/models.py"),
+    "prospecting.db": Path("prospecting/db.py"),
+    "prospecting.discovery": Path("prospecting/discovery.py"),
+    "prospecting.identity": Path("prospecting/identity.py"),
+    "prospecting.contacts": Path("prospecting/contacts.py"),
+    "prospecting.contact_extraction": Path("prospecting/contact_extraction.py"),
+    "prospecting.pipeline": Path("prospecting/pipeline/__init__.py"),
+    "prospecting.pipeline.calls": Path("prospecting/pipeline/calls.py"),
+    "prospecting.pipeline.discovery": Path("prospecting/pipeline/discovery.py"),
+    "prospecting.pipeline.stage": Path("prospecting/pipeline/stage/__init__.py"),
+    "prospecting.pipeline.stage.step": Path("prospecting/pipeline/stage/step.py"),
+}
+
+
+@pytest.mark.parametrize("source", [
+    "import prospecting.models",
+    "import prospecting.models as m",
+    "from prospecting import models",
+    "from prospecting import models as m",
+    "from prospecting.models import Campaign",
+    "from prospecting.models import Campaign as C",
+    "from . import models",
+    "from . import models as m",
+    "from .models import Campaign",
+    "from .models import Campaign as C",
+])
+def test_absolute_and_relative_imports_give_the_same_dependency(source):
+    """Ninguna forma añade además una dependencia artificial al paquete raíz."""
+    assert internal(ast.parse(source), "prospecting.db", KNOWN) == {"prospecting.models"}
+
+
+def test_each_imported_name_is_a_submodule_or_a_symbol_of_its_module():
+    tree = ast.parse("from . import models, VERSION")
+    assert internal(tree, "prospecting.db", KNOWN) == {"prospecting.models", "prospecting"}
+
+
+@pytest.mark.parametrize("name, source, target", [
+    ("prospecting.discovery", "from .db import Database", "prospecting.db"),
+    ("prospecting.discovery", "from . import db", "prospecting.db"),
+    ("prospecting.discovery", "from prospecting.db import Database", "prospecting.db"),
+    # Las dos dependencias entre módulos de negocio que se permiten no valen en sentido contrario.
+    ("prospecting.discovery", "from .identity import Candidate", "prospecting.identity"),
+    ("prospecting.contacts", "from . import contact_extraction", "prospecting.contact_extraction"),
+])
+def test_undeclared_dependencies_are_rejected_in_any_import_form(name, source, target):
+    assert undeclared({name: ast.parse(source)}, KNOWN) == {name: [target]}
+
+
+@pytest.mark.parametrize("name, source, target", [
+    ("prospecting.db", "from . import models", "prospecting.models"),
+    ("prospecting.db", "from .models import Campaign", "prospecting.models"),
+    ("prospecting.identity", "from .discovery import Candidate", "prospecting.discovery"),
+    ("prospecting.contact_extraction", "from . import contacts", "prospecting.contacts"),
+])
+def test_declared_dependencies_are_seen_and_accepted_in_any_import_form(name, source, target):
+    tree = ast.parse(source)
+    assert internal(tree, name, KNOWN) == {target}
+    assert undeclared({name: tree}, KNOWN) == {}
+
+
+@pytest.mark.parametrize("name, source, target", [
+    # Módulo anidado: su paquete es el contenedor, así que `.` es `prospecting.pipeline`.
+    ("prospecting.pipeline.calls", "from . import discovery", "prospecting.pipeline.discovery"),
+    ("prospecting.pipeline.calls", "from .discovery import Candidate", "prospecting.pipeline.discovery"),
+    ("prospecting.pipeline.calls", "from .. import discovery", "prospecting.discovery"),
+    ("prospecting.pipeline.calls", "from ..models import Usage", "prospecting.models"),
+    ("prospecting.pipeline.stage.step", "from ... import models", "prospecting.models"),
+    ("prospecting.pipeline.stage.step", "from ...discovery import Candidate", "prospecting.discovery"),
+    # `__init__.py`: su paquete es el propio módulo, así que `.` es `prospecting.pipeline`.
+    ("prospecting.pipeline", "from . import calls", "prospecting.pipeline.calls"),
+    ("prospecting.pipeline", "from .calls import reserve", "prospecting.pipeline.calls"),
+    ("prospecting.pipeline", "from .. import models", "prospecting.models"),
+    ("prospecting.pipeline.stage", "from . import step", "prospecting.pipeline.stage.step"),
+    ("prospecting.pipeline.stage", "from .. import calls", "prospecting.pipeline.calls"),
+    ("prospecting", "from . import models", "prospecting.models"),
+])
+def test_relative_imports_resolve_from_nested_modules_and_init_files(name, source, target):
+    assert internal(ast.parse(source), name, KNOWN) == {target}
+
+
+def test_a_cycle_made_only_of_relative_imports_is_detected():
+    parsed = {
+        "prospecting.discovery": ast.parse("from .pipeline import calls"),
+        "prospecting.pipeline.calls": ast.parse("from .. import discovery"),
+    }
+    cycle = "prospecting.discovery -> prospecting.pipeline.calls -> prospecting.discovery"
+    with pytest.raises(AssertionError, match=f"Importación circular: {cycle}"):
+        assert_acyclic(parsed, KNOWN)
+
+
+@pytest.mark.parametrize("name, source", [
+    ("prospecting.models", "from .. import db"),
+    ("prospecting", "from .. import models"),
+    ("prospecting.pipeline.calls", "from ... import models"),
+    ("prospecting.pipeline", "from ...models import Usage"),
+])
+def test_a_relative_import_beyond_the_package_fails_explicitly(name, source):
+    with pytest.raises(ImportError) as error:
+        internal(ast.parse(source), name, KNOWN)
+    assert str(error.value).startswith(f"{name}:1:")
+
+
+def test_forbidden_modules_are_detected_next_to_relative_imports():
+    tree = ast.parse("import selenium.webdriver as driver\nfrom smtplib import SMTP\nfrom . import models")
+    assert prohibited({"prospecting.db": tree}, KNOWN) == {"prospecting.db": ["selenium", "smtplib"]}
