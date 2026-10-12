@@ -17,7 +17,7 @@ from prospecting.models import (
 
 
 MODEL_ID = "claude-haiku-5-5"
-PROMPT_VERSION = "haiku_assessment_v1"
+PROMPT_VERSION = "haiku_assessment_v2"
 CHARS_PER_TOKEN = 3
 CLAIM_CHARS = 300
 EXCERPT_CHARS = 600
@@ -195,9 +195,10 @@ de campañas y validación de compras. No exijas equipo de desarrollo propio a u
 solución gestionada.
 7. products: solo ids del catálogo (pendiente de validación comercial). target_roles: solo cargos de la lista \
 permitida, elegidos por el problema detectado y no por jerarquía.
-8. contradiction_evidence_ids: evidencia que contradice de forma material a otra. uncertainties: datos que \
-faltan o dudas, en frases breves.
-9. explanation: dos o tres frases en español, sin prometer compra, presupuesto ni intención.
+8. contradiction_evidence_ids: evidencia que contradice de forma material a otra. uncertainties: como \
+máximo {MAX_UNCERTAINTIES} datos que faltan, de 12 palabras como máximo cada uno.
+9. justification: 25 palabras como máximo; nombra el hecho concreto de la evidencia, sin repetir el criterio.
+10. explanation: dos frases como máximo, en español, sin prometer compra, presupuesto ni intención.
 
 Rúbrica {campaign.rubric_version}:
 {criteria}

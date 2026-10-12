@@ -164,6 +164,16 @@ def test_request_is_bounded_and_keeps_external_text_as_data(scenario):
     assert size <= scenario.campaign.limits.llm.max_input_tokens * 3
 
 
+def test_prompt_v2_bounds_response_length_without_raising_output_limit(scenario):
+    payload, _ = build_haiku_request(scenario.company, scenario.db.list_evidence(scenario.company.id),
+                                     scenario.campaign)
+    assert PROMPT_VERSION == "haiku_assessment_v2"
+    assert "25 palabras como máximo" in payload["system"]
+    assert "como máximo 3 datos que faltan" in payload["system"]
+    assert "dos frases como máximo" in payload["system"]
+    assert payload["max_tokens"] == scenario.campaign.limits.llm.max_output_tokens == 1000
+
+
 def test_evidence_selection_respects_character_budget(scenario):
     long = [Evidence(company_id=scenario.company.id, claim=f"Texto sintético {index}.",
                      url=f"https://empresa-uno.example/p{index}", excerpt="x" * 2000,
