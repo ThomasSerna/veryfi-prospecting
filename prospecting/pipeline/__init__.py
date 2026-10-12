@@ -5,6 +5,9 @@ crédito gratuito y Haiku con su precio publicado: sin un precio acotado no hay 
 Cada etapa vive en su módulo y guarda su propio checkpoint.
 """
 
+from prospecting.pipeline.campaign import (
+    CampaignReport, CompanyProgress, close_campaign, run_campaign, start_campaign,
+)
 from prospecting.pipeline.contacts import ContactReport, find_contacts
 from prospecting.pipeline.discovery import (
     DiscoveryReport, ExcludedCandidate, IdentityReport, QueryOutcome, resolve_company_identity, run_discovery,
@@ -15,7 +18,8 @@ from prospecting.pipeline.research import (
 )
 
 __all__ = [
-    "ContactReport", "DiscoveryReport", "ExcludedCandidate", "ExtractReport", "IdentityReport",
-    "QualificationReport", "QueryOutcome", "ResearchReport", "UrlFailure", "extract_company_pages",
-    "find_contacts", "qualify_company", "research_company", "resolve_company_identity", "run_discovery",
+    "CampaignReport", "CompanyProgress", "ContactReport", "DiscoveryReport", "ExcludedCandidate", "ExtractReport",
+    "IdentityReport", "QualificationReport", "QueryOutcome", "ResearchReport", "UrlFailure", "close_campaign",
+    "extract_company_pages", "find_contacts", "qualify_company", "research_company", "resolve_company_identity",
+    "run_campaign", "run_discovery", "start_campaign",
 ]

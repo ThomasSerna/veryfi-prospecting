@@ -411,6 +411,7 @@ prospecting/
     research.py                Extracción y ampliación de evidencia
     qualification.py           Calificación
     contacts.py                Personas y canales
+    campaign.py                Orquestación de campaña, parada y reanudación
 config/
   veryfi.json                  Catálogo, perfiles, cargos y rúbrica versionada
 tests/                         Pruebas sin red; fixtures sintéticas

@@ -39,8 +39,15 @@ ALLOWED = {
         "prospecting.contacts", "prospecting.models", "prospecting.providers.http", "prospecting.sources",
     },
     "prospecting.pipeline": {
-        "prospecting.pipeline.contacts", "prospecting.pipeline.discovery", "prospecting.pipeline.qualification",
-        "prospecting.pipeline.research",
+        "prospecting.pipeline.campaign", "prospecting.pipeline.contacts", "prospecting.pipeline.discovery",
+        "prospecting.pipeline.qualification", "prospecting.pipeline.research",
+    },
+    "prospecting.pipeline.campaign": {
+        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery",
+        "prospecting.identity", "prospecting.models", "prospecting.pipeline.calls", "prospecting.pipeline.contacts",
+        "prospecting.pipeline.discovery", "prospecting.pipeline.qualification", "prospecting.pipeline.research",
+        "prospecting.providers", "prospecting.providers.hunter", "prospecting.providers.tavily",
+        "prospecting.sources",
     },
     "prospecting.pipeline.calls": {
         "prospecting.budget", "prospecting.haiku", "prospecting.models", "prospecting.providers",
