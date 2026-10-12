@@ -371,7 +371,11 @@ class Budget:
             bounds.append(account_state.credits)
         if any(bound.unknown for bound in bounds):
             raise BudgetError("budget_unknown", "Hay consumo o reservas sin acotar; concílialos antes de llamar.", usage.request_id)
-        if any(bound.exceeded for bound in bounds):
+        exceeded = [bound for bound in bounds if bound.exceeded]
+        if exceeded and all(bound is state.company for bound in exceeded):
+            # Solo el tope de la empresa: el resto de la campaña aún tiene presupuesto.
+            raise BudgetError("company_budget_exceeded", "La reserva supera el tope de gasto de esta empresa.", usage.request_id)
+        if exceeded:
             raise BudgetError("budget_exceeded", "La reserva supera el presupuesto o los créditos disponibles.", usage.request_id)
         request_ids = self._grant_requests[key] | {usage.request_id}
         authorized = [row for row in rows if row.request_id in request_ids]

@@ -271,14 +271,15 @@ def test_budget_pause_stops_without_traffic_and_resumes_with_a_new_session(world
 
 
 def test_exhausted_company_cap_closes_that_company_without_pausing_the_campaign(world):
-    # El tope por empresa solo cubre una reserva de Haiku: la extracción de contactos ya no cabe.
-    case = world.setup(budget__company_usd="0.0011")
+    # El tope por empresa cubre la reserva de calificación, pero no la de extracción de contactos;
+    # al fallar aún queda saldo de la empresa, menor que la reserva.
+    case = world.setup(budget__company_usd="0.0015")
     start(case)
     report = case.run()
     assert report.status == CampaignStatus.COMPLETED and report.stop_reason is None
     qualified = [item for domain, item in case.by_domain().items() if domain != "baja-tres.example"]
     assert {(item.stage, item.business_status, item.stop_reason) for item in qualified} == {
-        (RunStage.COMPLETED, "qualified_no_contact", "budget_exceeded")}
+        (RunStage.COMPLETED, "qualified_no_contact", "company_budget_exceeded")}
     assert not any(operation == "haiku:contacts" for operation, _ in case.events)
     searched = {json.loads(payload)["query"].split('"')[1] for operation, payload in case.events
                 if operation == "search" and "country" not in payload and "include_domains" not in payload}
@@ -293,7 +294,7 @@ def test_company_without_cap_for_qualification_stays_pending_while_others_contin
     assert not any(operation.startswith("haiku") for operation, _ in case.events)
     assert sum(operation == "extract" for operation, _ in case.events) == 5  # Cuatro iniciales y una ampliación.
     stops = {item.stop_reason for domain, item in case.by_domain().items() if domain != "dudosa-cuatro.example"}
-    assert stops == {"assessment_pending:budget_exceeded"}
+    assert stops == {"assessment_pending:company_budget_exceeded"}
 
 
 def test_company_and_campaign_time_limits_make_no_calls(world):
@@ -430,4 +431,5 @@ def test_stop_classification_separates_budget_from_provider_failures():
     assert {"budget_exceeded", "authorization_required", "authorization_exceeded"} <= BUDGET_STOPS
     assert {"permission_denied", "quota_exceeded", "rate_limited", "http_429"} <= PROVIDER_STOPS
     assert not BUDGET_STOPS & PROVIDER_STOPS
+    assert "company_budget_exceeded" not in BUDGET_STOPS | PROVIDER_STOPS
     assert not {"timeout", "time_limit", "invalid_output", "duplicate_request"} & (BUDGET_STOPS | PROVIDER_STOPS)

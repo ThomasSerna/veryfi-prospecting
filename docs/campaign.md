@@ -87,9 +87,9 @@ tiempo del descubrimiento solo cuenta dentro de la sesión que lo ejecuta.
 - **Presupuesto o autorización** (`budget_exceeded`, `authorization_required`,
   `authorization_exceeded`, `price_unbounded`, `account_*`…): la campaña pasa a
   `paused_budget` y se detiene sin más tráfico. Reanudar exige otra sesión de `Budget` con
-  cupo o permisos nuevos. Si solo se agotó el tope de una empresa, esa empresa se detiene y
-  las demás continúan; en contactos se cierra con el resultado comercial derivado (por
-  ejemplo, `qualified_no_contact`).
+  cupo o permisos nuevos. Si la reserva solo supera el tope de una empresa, `Budget` lo
+  informa como `company_budget_exceeded`: esa empresa se detiene y las demás continúan; en
+  contactos se cierra con el resultado comercial derivado (por ejemplo, `qualified_no_contact`).
 - **Proveedor no disponible** (`permission_denied`, `quota_exceeded`, `rate_limited`, error
   local, HTTP 401/403/429 de Haiku): se detiene la pasada en curso. La empresa conserva su
   etapa, `stop_reason` y el mensaje literal del error.

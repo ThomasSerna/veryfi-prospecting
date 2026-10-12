@@ -217,8 +217,15 @@ def test_each_bound_blocks_the_reservation(prepared, bound):
         budget.account_allowances[0].cost_limit_usd = Decimal("0.05")
     with pytest.raises(BudgetError) as error:
         budget.reserve(proposal, grant)
-    assert error.value.code == "budget_exceeded"
+    assert error.value.code == ("company_budget_exceeded" if bound == "company" else "budget_exceeded")
     assert budget.db.list_usage() == []
+
+
+def test_company_and_campaign_bounds_exceeded_together_are_not_company_only(prepared):
+    budget, proposal, grant = prepared
+    with pytest.raises(BudgetError) as error:
+        budget.reserve(proposal.model_copy(update={"reserved_cost_usd": Decimal("2.01")}), grant)
+    assert error.value.code == "budget_exceeded"
 
 
 def test_completed_campaign_spend_blocks_operating_limit_before_global_limit(prepared, make_campaign):
@@ -292,7 +299,7 @@ def test_company_cap_accumulates_across_campaigns(prepared, make_campaign):
     })
     with pytest.raises(BudgetError) as error:
         budget.reserve(second, grant)
-    assert error.value.code == "budget_exceeded"
+    assert error.value.code == "company_budget_exceeded"
     assert budget.snapshot(other.id, proposal.company_id).company.exposure == Decimal("0.20")
 
 
@@ -730,6 +737,7 @@ def test_two_connections_cannot_reserve_the_same_remaining_balance(prepared, tmp
         futures = [executor.submit(reserve_one, fingerprint) for fingerprint in ("b" * 64, "c" * 64)]
         results = [future.result(timeout=15) for future in futures]
     assert results.count(UsageStatus.RESERVED) == 1
-    assert results.count("budget_exceeded") == 1
+    # Dos reservas de USD 0,20 de la misma empresa solo superan su tope de USD 0,25.
+    assert results.count("company_budget_exceeded" if bound == "cost" else "budget_exceeded") == 1
     with Database(path) as restored:
         assert len(restored.list_usage()) == (2 if bound == "shared_credit" else 1)

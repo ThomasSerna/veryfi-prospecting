@@ -40,6 +40,8 @@ BUDGET_STOPS = {
     "account_cost_unknown", "account_credits_unknown", "budget_unknown", "budget_exceeded",
     "reservation_overrun", "price_unbounded",
 }
+# Solo se agotó el tope de una empresa: esa empresa se detiene y la campaña sigue.
+COMPANY_BUDGET_STOP = "company_budget_exceeded"
 # Proveedor no disponible para todas las empresas: se detiene la pasada, no la campaña.
 PROVIDER_STOPS = {
     "permission_denied", "quota_exceeded", "rate_limited", "local_error", "local", "http_401", "http_403", "http_429",
@@ -164,16 +166,13 @@ class _Run:
                     "active_seconds": item.consumed_limits.active_seconds + elapsed})
                 self.db.save_run_item(item.model_copy(update={"consumed_limits": consumed}))
 
-    def company_capped(self, company_id: UUID) -> bool:
-        """El tope por empresa acumula todas sus campañas (§14.6): agotado, no vuelve a tener saldo."""
-        company = self.budget.snapshot(self.campaign.id, company_id).company
-        return company.exceeded or company.available == 0
-
     def halt(self, reason: str | None, company_id: UUID | None) -> bool:
-        """True si la pasada se detiene; el presupuesto agotado pausa además la campaña."""
+        """True si la pasada se detiene; el presupuesto agotado pausa además la campaña.
+
+        `company_budget_exceeded` (solo el tope de esa empresa) no detiene nada: la campaña
+        sigue con las demás.
+        """
         if reason in BUDGET_STOPS:
-            if company_id is not None and self.company_capped(company_id):
-                return False  # Solo se agotó el tope de esta empresa: la campaña sigue con las demás.
             self.paused = reason
             return True
         if reason in PROVIDER_STOPS:
@@ -316,8 +315,8 @@ class _Run:
                 authorizations=self.authorizations, tavily_account_ref=self.tavily_account_ref, claude=self.claude,
                 claude_account_ref=self.claude_account_ref, claude_funding_source=self.claude_funding_source,
                 deadline=self.deadline)
-            capped = (report.status == "pending" and report.stop_reason in BUDGET_STOPS
-                      and self.company_capped(company_id))
+            # El tope por empresa acumula todas sus campañas (§14.6): agotado, no vuelve a tener saldo.
+            capped = report.status == "pending" and report.stop_reason == COMPANY_BUDGET_STOP
             exhausted = capped or (report.stop_reason == "time_limit" and seconds_left(self.deadline) > 0)
             if report.status in ("checked", "already_checked") or exhausted:
                 # Agotar el tiempo o el tope de la empresa es parar por cupo (§9, §10.3), no un fallo técnico.
