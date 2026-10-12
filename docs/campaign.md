@@ -40,6 +40,8 @@ report = run_campaign(
   ejecutó en esa llamada) y un `CompanyProgress` por empresa, con etapa, prioridad, resultado
   comercial, `stop_reason` y error. Si otra campaña está activa, no hace nada y devuelve
   `stop_reason="another_campaign_active"`. Una campaña `completed` no se vuelve a ejecutar.
+  Mientras otra ejecución sigue en curso en el mismo proceso (por ejemplo, otra sesión de
+  Streamlit), tampoco hace nada y devuelve `stop_reason="campaign_already_running"`.
 - `close_campaign(db, campaign_id)` pasa una campaña `running` o `paused_budget` a `partial`.
   Conserva todos los datos y libera el lugar de campaña activa.
 - `progress`, si se suministra, recibe un `CompanyProgress` después de que cada paso de una
@@ -110,5 +112,9 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
   ([Presupuesto y proveedores](budget-providers.md)).
 - El procesamiento es secuencial e interactivo; no continúa en segundo plano al cerrar la
   aplicación.
-- Las pruebas usan proveedores simulados; la orquestación no se ha ejecutado con llamadas
-  reales.
+- La guarda de ejecución única es por proceso: dos procesos distintos sobre la misma base
+  no se coordinan entre sí.
+- El descubrimiento guarda las empresas al terminar. Si se interrumpe a mitad, las búsquedas
+  ya enviadas no se repiten ni se recuperan: la campaña termina `failed` y hay que crear otra.
+- Las pruebas usan proveedores simulados; la orquestación y la búsqueda de ampliación con
+  `include_domains` no se han ejecutado con llamadas reales.
