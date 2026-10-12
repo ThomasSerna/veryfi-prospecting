@@ -48,8 +48,9 @@ en el registro con su referencia propia y no se mezcla con el de otra cuenta.
 | Search | Los mismos de la tabla anterior | 1 | 1 | 1 | 2,2 s | 10 resultados, 10 hosts candidatos y 5 seleccionados, uno reutilizado de una campaña anterior |
 
 Campaña de comprobación: Colombia, `fintech_software`, `web_queries=1` y `max_companies=5`.
-Consumo pendiente de conciliar: 1 crédito, USD 0. Mantener *pay as you go* desactivado
-evita cargos fuera del crédito gratuito (§14).
+Conciliado el 2026-10-11 con el panel de Tavily, verificado por el responsable: 1 / 1.000
+créditos, USD 0. El comprobante local queda en `data/conciliaciones/`. Mantener *pay as you
+go* desactivado evita cargos fuera del crédito gratuito (§14).
 
 ### Observaciones y limitaciones
 
