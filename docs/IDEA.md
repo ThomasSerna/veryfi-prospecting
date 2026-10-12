@@ -1,6 +1,6 @@
 # Veryfi Prospecting: descubrimiento y calificación de clientes potenciales
 
-Versión 1.3 — 12 de octubre de 2026. Fechas en America/Bogota.
+Versión 1.4 — 12 de octubre de 2026. Fechas en America/Bogota.
 
 Documento de producto, plan de implementación y guía para agentes de código del proyecto de Sistemas de Información para Veryfi. Recoge las decisiones tomadas con el equipo. Las reglas numéricas de calificación, las metas de evaluación y la arquitectura son propuestas iniciales para implementar y validar; no representan criterios comerciales ya certificados por Veryfi.
 
@@ -370,6 +370,8 @@ Con un conjunto separado de validación, medir errores, latencia y costo total d
 
 «Agente investigador», «evaluador» y «buscador de contactos» son responsabilidades del flujo. No requieren tres procesos autónomos, conversaciones entre agentes ni un framework específico. Para este plazo, funciones Python con estado persistido y herramientas acotadas son suficientes.
 
+En el código, el «agente investigador» son `discovery.py`, `identity.py` y las etapas `pipeline/discovery.py` y `pipeline/research.py`; el «evaluador», `qualification.py` y `pipeline/qualification.py`; el «buscador de contactos», `contacts.py`, `contact_extraction.py`, `providers/hunter.py` y `pipeline/contacts.py`. Cada prompt de Haiku vive junto a su validador en el módulo que lo usa; `haiku.py` fija el modelo y la forma común de la solicitud, y solo `pipeline` invoca `ClaudeClient`.
+
 Todo contenido de páginas, PDFs y respuestas de proveedores es dato no confiable. Nunca puede cambiar el presupuesto, las fuentes permitidas, las instrucciones de búsqueda o habilitar mensajes. Haiku no recibe llaves, acceso de shell, acceso a archivos arbitrarios ni herramientas de comunicación.
 
 ## 13. Arquitectura mínima
@@ -380,6 +382,8 @@ Usar Pydantic para contratos en límites externos y validación de respuestas; `
 
 No introducir FastAPI, React, Redis, Celery, una base vectorial o un ORM en el MVP. Si el piloto exige sesiones simultáneas y trabajos remotos, evaluar entonces API, trabajador y base multiusuario con evidencia de necesidad.
 
+Las importaciones van en una sola dirección: `models` ← `text`, `sources`, `haiku` ← módulos de negocio (`discovery`, `identity`, `qualification`, `contacts`, `contact_extraction`) ← `providers/` ← `pipeline/` ← `app.py`. `db` y `budget` solo se usan desde `providers/` y `pipeline/`. Los módulos de negocio no hacen red, no guardan datos ni reservan gasto; cada adaptador de `providers/` traduce entre el formato de un proveedor y los contratos de §13.2; `pipeline/` los combina con presupuesto y persistencia. `tests/test_architecture.py` comprueba esta dirección y que no haya ciclos.
+
 ### 13.1 Estructura orientativa
 
 ```text
@@ -387,12 +391,26 @@ app.py                         Interfaz, revisión y exportación
 prospecting/
   models.py                    Contratos, enumeraciones y validación
   db.py                        SQLite, transacciones y consultas
-  pipeline.py                  Etapas, recuperación y límites
-  discovery.py                 Consultas, identidad y evidencia
-  qualification.py             Rúbrica y mapeo a productos/cargos
-  contacts.py                  Personas, canales y condición de listo
-  providers.py                 Llamadas pequeñas a proveedores habilitados
   budget.py                    Reserva y conciliación de consumo
+  text.py                      Recorte y normalización de texto externo
+  sources.py                   URLs públicas, dominios no empresariales y resultados de buscador
+  haiku.py                     Modelo único y forma común de las solicitudes a Haiku
+  discovery.py                 Consultas, candidatos y selección
+  identity.py                  Identidad, duplicados y exclusiones
+  qualification.py             Rúbrica, puntuación y mapeo a productos/cargos
+  contacts.py                  Reglas de personas, canales y condición de listo
+  contact_extraction.py        Extracción de contactos públicos con Haiku
+  providers/
+    http.py                    Cliente HTTP acotado, errores y protocolo de envío
+    claude.py                  Cliente de Claude, precios y tope de reserva
+    tavily.py                  Operaciones, respuestas, créditos y errores de Tavily
+    hunter.py                  Operaciones, respuestas, créditos y errores de Hunter
+  pipeline/
+    calls.py                   Reservar, llamar y registrar consumo; plazos
+    discovery.py               Descubrimiento e identidad
+    research.py                Extracción y ampliación de evidencia
+    qualification.py           Calificación
+    contacts.py                Personas y canales
 config/
   veryfi.json                  Catálogo, perfiles, cargos y rúbrica versionada
 tests/                         Pruebas sin red; fixtures sintéticas
@@ -403,7 +421,7 @@ pyproject.toml                 Dependencias y configuración de pruebas
 README.md                      Instalación, ejecución y demostración
 ```
 
-Es una orientación, no un requisito de crear archivos vacíos. Reutilizar estructura existente si la implementación ya tiene una equivalente. No añadir capas de repositorios/factorías de proveedores sin necesidad concreta.
+Es una orientación y el objetivo de la migración incremental R01–R10 (§17.2): el árbol del repositorio manda. Una fuente nueva de empresas, evidencia o personas añade `providers/<proveedor>.py` y una fase en la etapa correspondiente, y entrega los contratos y reglas existentes. No añadir capas de repositorios, factorías ni interfaces genéricas de conectores sin necesidad concreta.
 
 ### 13.2 Contratos compartidos
 
@@ -420,17 +438,18 @@ Es una orientación, no un requisito de crear archivos vacíos. Reutilizar estru
 
 No es necesario crear una tabla por cada clase. Opción concreta: tablas `campaigns`, `companies`, `evidence`, `assessments`, `contacts`, `run_items`, `usage` y `exclusions`; canales como JSON validado dentro de `contacts`. Claves foráneas e índices para campaña/empresa y restricciones únicas sobre identidades confirmadas. Campos consultados se mantienen como columnas; desgloses y configuración pueden ser JSON.
 
-Contrato funcional orientativo:
+Contrato funcional:
 
 ```text
-discover_companies(campaign, limits) -> candidatos con evidencia de identidad
-research_company(company, campaign, limits) -> evidence
-qualify_company(company, evidence, rubric) -> assessment
-find_contacts(company, assessment, limits) -> contacts + channels + stop_reason
-derive_readiness(assessment, contacts, evidence, review) -> resultado comercial
+run_discovery(db, budget, client, campaign_id, …) -> DiscoveryReport
+resolve_company_identity(db, campaign_id, company_id, …) -> IdentityReport
+extract_company_pages(db, budget, client, campaign_id, company_id, urls, …) -> ExtractReport
+qualify_company(db, budget, claude, campaign_id, company_id, …) -> QualificationReport
+find_contacts(db, budget, client, campaign_id, company_id, …) -> ContactReport
+derive_readiness(assessment, contacts, evidence, limits, now, company) -> BusinessStatus
 ```
 
-Cada función devuelve datos y errores tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` y el cálculo de score son código determinista. Solo `pipeline` decide avanzar y reserva gasto antes de llamar proveedores. Las fuentes presentes o futuras de personas deben desembocar en los mismos contratos y reglas de verificación, sin crear capas de abstracción especulativas.
+Las cinco primeras están en `prospecting.pipeline`: son las únicas que reservan gasto (mediante `pipeline/calls.py`), llaman a proveedores y guardan checkpoints, y devuelven informes tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` (`contacts.py`) y el cálculo de score (`qualification.py`) son código determinista. Toda fuente de personas, presente o futura, entrega `Contact`, `Channel` y `Evidence` y pasa por las mismas reglas de `contacts.py`, sin capas de abstracción especulativas. La ampliación de evidencia de T07 (`research_company`) irá en `pipeline/research.py`; hoy solo existe la extracción de URLs dadas.
 
 ### 13.3 Ejecución y recuperación
 
@@ -443,6 +462,8 @@ Un clic duplicado o un rerun de Streamlit debe reutilizar la campaña activa, no
 Aplicar timeout por proveedor, como máximo dos intentos para errores transitorios y respeto a `Retry-After` dentro del tiempo restante. Diferenciar falta de permisos, cuota agotada, entrada inválida y resultado vacío. No usar una tabla genérica de HTTP para todos los proveedores sin revisar sus semánticas.
 
 Guardar huella de entrada y request_id. Reutilizar respuestas confirmadas, pero no asumir que una API de terceros es idempotente. Ante timeout de una llamada facturable, conservar reserva y conciliar antes de repetir; no liberar dinero por no haber recibido respuesta. Una reserva incierta nunca se vuelve cero silenciosamente.
+
+Los valores con los que se reanuda sin repetir trabajo ni gasto se guardan en SQLite y no cambian al reorganizar código: huellas de solicitud, claves de `RunItem.attempts`, `identity_key`, ids deterministas, textos que marcan resultados de buscador, nombres de clases de los esquemas de Haiku y versiones de prompt (lista en `docs/persistence.md`). La orquestación de campaña vive en `pipeline/` y llama a las etapas; cada etapa guarda su propio checkpoint.
 
 ## 14. Presupuesto y control de gasto
 
@@ -509,7 +530,15 @@ Distribución para tres desarrolladores:
 | Dev 3 | Contactos e interfaz | Proveedor de personas/canal, estados de contacto, Streamlit y CSV; empezar por una ruta viable |
 | Documentación | Informe y evaluación | Trazabilidad con análisis de negocio, decisiones, métricas, validación y capturas sin datos personales |
 
-Repartir código por archivos/responsabilidad después de acordar contratos. Un responsable por cada archivo compartido. Integrar diariamente, no dejar UI, gasto y contratos para el último día. Si la carga de Dev 2/3 crece, redistribuir tareas terminadas manteniendo dueño del contrato.
+Repartir código por módulo después de acordar contratos; un responsable por módulo compartido:
+
+| Responsable | Módulos |
+|---|---|
+| Dev 1 | `discovery.py`, `identity.py`, `sources.py`, `text.py`, `providers/tavily.py`, `pipeline/discovery.py`, `pipeline/research.py` |
+| Dev 2 (contratos e integración) | `models.py`, `db.py`, `budget.py`, `haiku.py`, `qualification.py`, `providers/http.py`, `providers/claude.py`, `pipeline/__init__.py`, `pipeline/calls.py`, `pipeline/qualification.py` |
+| Dev 3 | `contacts.py`, `contact_extraction.py`, `providers/hunter.py`, `pipeline/contacts.py`, `app.py` |
+
+Integrar diariamente, no dejar UI, gasto y contratos para el último día. Si la carga de Dev 2/3 crece, redistribuir tareas terminadas manteniendo dueño del contrato.
 
 ### 16.2 Siguientes hitos
 
@@ -529,6 +558,8 @@ Los sprints posteriores no presuponen gasto nuevo. Usar evidencia cacheada y fix
 Usar este documento como referencia del producto y sus criterios de aceptación. Revisar contratos, dependencias y código existente antes de implementar cada tarea, y coordinar los cambios compartidos con los otros desarrolladores.
 
 Implementar el siguiente bloque completo más pequeño y su verificación, sin añadir herramientas o funciones de alcance posterior. Usar Haiku para interpretación y clasificación, y mantener la rúbrica y los prompts versionados; no construir una plataforma de agentes genérica.
+
+Cada cambio va al módulo de su responsabilidad (§13.1): una regla de negocio, al módulo de negocio; el formato, los errores o el consumo de un proveedor, a `providers/<proveedor>.py`; una reserva, llamada, checkpoint o recuperación, a `pipeline/`. Un commit `refactor:` conserva la conducta: las pruebas existentes pasan con sus aserciones intactas y solo cambian rutas de importación.
 
 Para cada tarea, entregar: archivos modificados, conducta añadida, prueba ejecutada, resultado y limitación pendiente. Una API simulada no demuestra acceso real. Los datos sintéticos deben ser visibles como tales y nunca mezclarse en una demo de resultados reales.
 
@@ -561,6 +592,21 @@ Posibles tareas adicionales para el proyecto final (propuestas, **aún no issues
 
 T12 y T13 son independientes y opcionales; pueden limitarse a evaluación documentada si la evidencia no justifica implementarlas. No se añaden como dependencias de T11 ni habilitan consumo nuevo.
 
+Refactorización modular (aprobada el 12 de octubre de 2026). Conserva la conducta; cada tarea es un commit `refactor:` verificable que lleva el código hacia §13.1:
+
+| ID | Encargo al agente | Dependencias | Criterio de aceptación |
+|---|---|---|---|
+| R01 | Fijar identificadores persistidos y reglas de dependencia | Ninguna | Huellas, ids deterministas, marcadores, esquema y ledger fijados; cambiar un carácter de un payload o del esquema hace fallar las pruebas |
+| R02 | Dividir `pipeline` en un paquete por etapas | R01 | Mismas importaciones desde `prospecting.pipeline`; el diff solo mueve bloques |
+| R03 | Crear `text`, `sources` y `haiku` | R02 | Los módulos de negocio no se importan entre sí; huellas iguales |
+| R04 | Convertir `providers` en un paquete (`http`, `claude`) | R01 | Mismas importaciones desde `prospecting.providers`; en las pruebas solo cambian rutas de parcheo |
+| R05 | Separar `identity` y el adaptador de Tavily | R03–R04 | `discovery` sin tipos de proveedor; `identity_key` y huellas iguales |
+| R06 | Separar el adaptador de Hunter y la extracción pública | R03–R04 | `contacts` sin Hunter ni Haiku; ids y huellas iguales |
+| R07 | Unificar reservas en `pipeline/calls.py` | R02, R04, R06 | Solo `pipeline/calls.py` reserva; ledger igual |
+| R08 | Estructurar la etapa de contactos por fases | R06–R07 | Claves de intentos y ledger iguales; pruebas de contactos sin editar |
+| R09 | Unificar el protocolo de envío de los proveedores | R04, R06 | `providers/http.py` sin nombres de proveedor; pruebas de proveedores sin editar |
+| R10 | Completar reglas de dependencia y documentación | R01–R09 | Ningún documento cita rutas inexistentes; la prueba de arquitectura cubre §13 |
+
 ### 17.3 Plantilla para asignar una tarea
 
 > Implementa la tarea Txx de IDEA.md y reutiliza el código existente. Respeta contratos, fuentes, presupuesto y prohibición de contacto. Implementa la conducta completa de la tarea y pruebas que comprueben fallos relevantes, usando datos sintéticos por defecto. No amplíes el alcance ni introduzcas dependencias para funciones triviales. Al terminar informa qué cambió, qué verificaste y qué queda sin validar. Si falla una API, registra el fallo y no lo disimules con resultados ficticios.
@@ -584,6 +630,8 @@ Pruebas unitarias/integración sin red por defecto; llamadas reales separadas y 
 | Entrada hostil | Texto de página que pide enviar datos, subir presupuesto o cambiar reglas no altera el flujo |
 | Salida/URL insegura | CSV no ejecuta fórmulas; rutas privadas/redirects y HTML arbitrario son rechazados |
 | Trazabilidad | Referencias de modelo inexistentes se rechazan; la ficha conserva evidencia al exportar |
+| Reorganización altera datos guardados | Huellas, claves de `attempts`, `identity_key`, ids deterministas, textos de resultado de buscador y esquema SQLite no cambian al mover código |
+| Dependencias invertidas | Los módulos de negocio no importan `db`, `budget`, `providers` ni `pipeline`; las importaciones no forman ciclos |
 
 ### 18.2 Revisión comercial
 

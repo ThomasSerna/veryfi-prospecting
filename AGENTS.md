@@ -46,7 +46,7 @@ Lee estas secciones cuando la tarea toque el tema:
 - Personas, canales y estado "listo": §10 completo, antes de marcar algo como listo.
 - Proveedores (Tavily, Apollo, Hunter): §11. Verifica parámetros y respuestas en su documentación oficial (§21) antes de implementar; integra otros proveedores solo si una evaluación lo justifica.
 - IA (Haiku, prompts, validación): §12. Verifica el ID y los parámetros vigentes del modelo en W4 (§21) en vez de recordarlos. Haiku propone, Python decide (score, presupuesto, exclusión, parada, listo); Haiku es el único modelo, sin escalar automáticamente a uno más caro.
-- Contratos, SQLite, pipeline y recuperación: §13. Dueños de archivos compartidos: §16.1.
+- Ubicación del código, dependencias, contratos, SQLite, pipeline y recuperación: §13. Dueños de cada módulo: §16.1.
 - Presupuesto, reservas y llamadas facturables: §14.
 - UI, revisión y CSV: §6. Seguridad de URLs, escape de contenido y exportación: §15.
 - Pruebas: §18.1.
@@ -54,7 +54,7 @@ Lee estas secciones cuando la tarea toque el tema:
 ## Git y commits
 
 - Formato: `tipo: descripción breve` en español, con tildes, en una sola línea sin cuerpo ni trailers; el asunto dice qué cambia y dónde. Ejemplos: `feat: implementar descubrimiento de empresas con Tavily`, `fix: corregir cálculo de puntuación`.
-- Tipos permitidos: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`. Usa `feat` para añadir comportamiento, `fix` para corregirlo y `test` solo cuando el commit modifique exclusivamente pruebas. Una funcionalidad grande puede dividirse en varios commits `feat` o `fix`. Una dependencia nueva va en un `build:` previo.
+- Tipos permitidos: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`. Usa `feat` para añadir comportamiento, `fix` para corregirlo, `refactor` para reorganizar sin cambiar la conducta (las aserciones de las pruebas quedan intactas) y `test` solo cuando el commit modifique exclusivamente pruebas. Una funcionalidad grande puede dividirse en varios commits `feat` o `fix`. Una dependencia nueva va en un `build:` previo.
 - Cada commit debe representar la unidad de cambio coherente más pequeña que pueda verificarse de forma independiente, incluyendo sus pruebas correspondientes. No esperes a completar una funcionalidad grande o una historia de usuario si puede dividirse en cambios funcionales menores. Realiza commits progresivos a medida que completes y verifiques cada unidad, manteniendo el proyecto en un estado válido. Evita agrupar responsabilidades independientes en un mismo commit. Commitea con rutas explícitas (`git add <archivos>` y `git commit -m "…" -- <archivos>`) para no arrastrar cambios ajenos del índice.
 - Al cerrar cada unidad verificada (pasos 6 y 7), haz commit local sin pedir aprobación. Después `git log -1 --format=%s` debe mostrar las tildes intactas; si salieron corruptas, repórtalo (corregirlo exige amend).
 - Se trabaja directo en `main`. `git push`, `--force`, `--amend`, `rebase` y todo `reset` de commits requieren autorización explícita del desarrollador que dirige la sesión.
@@ -72,14 +72,15 @@ Lee estas secciones cuando la tarea toque el tema:
 ## Código y pruebas
 
 - Idioma: identificadores (variables, funciones, columnas, enumeraciones, claves JSON) en inglés, con los nombres que IDEA.md ya define (`fit_score`, `stop_reason`, `ready_preferred`; §8, §10.3, §13.2). Comentarios, docstrings, texto de UI, documentación y commits en español.
-- Estructura: la de §13.1 es orientativa. Crea cada módulo cuando una tarea lo necesite, con el nombre que allí figura; reutiliza lo existente y no añadas capas sin necesidad concreta.
-- Límites externos: valida con Pydantic las respuestas de proveedores y de Haiku. La UI no interpreta respuestas crudas, y solo el orquestador (`pipeline`, §13.1) avanza etapas y reserva gasto antes de llamar a un proveedor (§13.2).
+- Estructura: cada responsabilidad vive en el módulo que le asigna §13.1, y las importaciones siguen la dirección de §13, que comprueba `tests/test_architecture.py`. Crea un módulo cuando una tarea lo necesite, con ese nombre, y reutiliza lo existente.
+- Límites externos: valida con Pydantic las respuestas de proveedores y de Haiku. La UI no interpreta respuestas crudas, y solo `prospecting.pipeline` avanza etapas y reserva gasto antes de llamar a un proveedor (§13.2).
+- Identificadores persistidos: al mover o reorganizar código, conserva exactamente los valores de la lista de `docs/persistence.md`; `tests/test_persisted_identifiers.py` los fija. Cambiar uno es un cambio de conducta, con su propia versión y aprobación.
 - Las pruebas corren sin red, con fixtures sintéticos y una base temporal. Las que llaman a proveedores reales van aparte, explícitas y bajo la autorización de "Gasto".
 - Una integración "funciona" solo tras una llamada real autorizada; lo demás se informa como simulado. Ante un fallo de API (permiso, cuota, timeout, JSON inválido) conserva etapa y motivo y reporta el fallo literal, en vez de disimularlo con resultados ficticios (§17.3).
 
 ## Archivos compartidos y documentos
 
 - El encargo nombra la tarea Txx; si no la nombra y el cambio toca código compartido, pregunta antes de editar.
-- Edita libremente lo de tu tarea. Si necesitas cambiar un contrato compartido (§13.2) o un archivo de otra área (§16.1), detente y propón el cambio (qué y por qué) en lugar de aplicarlo.
+- Edita libremente lo de tu tarea. Si necesitas cambiar un contrato compartido (§13.2) o un módulo de otra área (§16.1), detente y propón el cambio (qué y por qué) en lugar de aplicarlo.
 - Edita `docs/IDEA.md` solo si te lo piden expresamente: ante una discrepancia o una decisión nueva, repórtala con el texto propuesto.
 - Actualiza `README.md` (en un commit `docs:` aparte) cuando cambie la instalación o la ejecución. Pero, cuando hagas los cambios en el readme, procura que el readme sea realmente un archivo de información general del repositorio, para su instalación y funcionamiento, no incluyas información donde se hable directamente sobre los planes posteriores del proyecto o el uso futuro de los Txx.

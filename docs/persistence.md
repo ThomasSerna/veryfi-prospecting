@@ -83,3 +83,26 @@ contienen resultados y consumo que no deben descartarse.
 La persistencia no calcula puntuaciones ni determina si un prospecto está listo.
 El control de gasto corresponde a `Budget`. Mantener dos bases distintas no
 coordina el presupuesto global.
+
+## Identificadores persistidos
+
+La reanudación y la deduplicación comparan valores ya guardados en SQLite.
+Reorganizar código los conserva exactamente; cambiar uno es un cambio de
+conducta, con su propia versión y aprobación. `tests/test_persisted_identifiers.py`
+y las instantáneas de las pruebas del pipeline los fijan:
+
+- `Usage.request_fingerprint`: SHA-256 de proveedor, operación, cuenta, query o
+  payload, método, endpoint y cabeceras. El payload de Haiku incluye el esquema
+  JSON; el de contactos contiene los nombres de las clases `HaikuContacts`,
+  `HaikuContactCandidate` y `CitedContactFact`.
+- Claves de `RunItem.attempts`: `tavily_extract` y las de contactos
+  (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,
+  `verify:`, `domain_search`, `web_queries`, `pages`, `extract`, `hunter_enrichments`).
+- `Company.identity_key` (`dominio|nombre|países`), con índice único.
+- Ids `uuid5` de contactos de Hunter (`hunter:<id>`), de contactos públicos
+  (`public:<canal>`) y de la evidencia de exclusión.
+- Marcadores de resultados de buscador, que nunca prueban un hecho: `claim` que
+  empieza por `Tavily devolvió esta página` y `external_reference` que empieza
+  por `contacts_search:`.
+- Versiones: `discovery_queries_v1`, `haiku_assessment_v3`, `contacts_extraction_v1`,
+  `rubric_v1` y el esquema SQLite `user_version=1`.
