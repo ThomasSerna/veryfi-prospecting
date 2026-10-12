@@ -6,7 +6,7 @@ import time
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
@@ -15,7 +15,10 @@ from prospecting.contacts import (
     validate_contact,
 )
 from prospecting.db import Database
-from prospecting.models import BusinessStatus, Contract, IdentityStatus, Priority, RunStage, Text, UsageStatus, utc_now
+from prospecting.models import (
+    BusinessStatus, ChannelStatus, ChannelType, Contact, Contract, Evidence, IdentityStatus, Priority,
+    RunItem, RunStage, Text, UsageStatus, utc_now,
+)
 from prospecting.pipeline.calls import observed_credits, reserve_claude, reserve_credits, seconds_left
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.hunter import (
@@ -41,6 +44,54 @@ class ContactReport(Contract):
     stop_reason: Text | None = None
     error_message: Text | None = None
     warnings: list[Text] = Field(default_factory=list)
+
+
+def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUID,
+                                channel_type: ChannelType, channel_value: str, *, reason: str,
+                                confirmed: bool) -> RunItem:
+    """Registra acceso profesional nominal comprobado manualmente, sin enviar nada."""
+    if confirmed is not True:
+        raise ValueError("La confirmación requiere una declaración explícita de acceso directo profesional sin envío.")
+    channel_type = ChannelType(channel_type)
+    if channel_type not in (ChannelType.LINKEDIN, ChannelType.OTHER):
+        raise ValueError("Solo se pueden confirmar manualmente canales alternativos existentes.")
+    reason = TypeAdapter(Text).validate_python(reason)
+    channel_value = TypeAdapter(Text).validate_python(channel_value)
+    with db.transaction():
+        campaign, contact = db.get_campaign(campaign_id), db.get_contact(contact_id)
+        run = None if contact is None else db.get_run_item(campaign_id, contact.company_id)
+        if campaign is None or contact is None or run is None:
+            raise ValueError("El contacto no pertenece a la campaña.")
+        company = db.get_company(contact.company_id)
+        assessment = None if run.last_assessment_id is None else db.get_assessment(run.last_assessment_id)
+        evidence = db.list_evidence(contact.company_id)
+        now = utc_now()
+        if (assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED
+                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now)):
+            raise ValueError("La persona necesita identidad, cargo y empleo pertinente vigentes antes de confirmar un canal.")
+        channel = next((item for item in contact.channels
+                        if (item.type, item.value) == (channel_type, channel_value)), None)
+        if channel is None:
+            raise ValueError("El canal debe existir y pertenecer a esta persona.")
+        if channel.normalized_status == ChannelStatus.INVALID:
+            raise ValueError("La confirmación manual no elimina una verificación negativa.")
+        fact = Evidence(company_id=company.id, contact_id=contact.id, kind="observed", source_type="manual",
+                        provider="manual_review", external_reference=f"manual-channel:{campaign_id}:{contact.id}:{now.isoformat()}",
+                        retrieved_at=now, claim=f"Acceso directo profesional nominal a {contact.name} por {channel.type}: {channel.value}.",
+                        excerpt=f"Confirmado manualmente sin enviar mensajes ni notificaciones. Motivo: {reason}")
+        updated_channel = channel.model_copy(update={
+            "normalized_status": ChannelStatus.MANUAL_CONFIRMED, "manual_confirmed_at": now,
+            "manual_confirmation_reason": reason, "professional": True, "direct": True,
+            "evidence_ids": channel.evidence_ids + [fact.id],
+        })
+        updated = Contact.model_validate(contact.model_copy(update={"channels": [
+            updated_channel if item == channel else item for item in contact.channels]}))
+        if not channel_is_usable(updated_channel, updated, evidence + [fact], campaign.limits, now, company):
+            raise ValueError("El canal conserva evidencia contradictoria o con fecha futura; no se puede confirmar.")
+        db.save_contact(updated, evidence=[fact])
+        readiness = derive_readiness(assessment, db.list_contacts(company.id), db.list_evidence(company.id),
+                                     campaign.limits, now, company)
+        return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 
 def _contact_error_reason(error) -> str:
