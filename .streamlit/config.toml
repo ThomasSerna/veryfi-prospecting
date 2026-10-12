@@ -4,3 +4,11 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+disableDataExport = true
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#176B87"

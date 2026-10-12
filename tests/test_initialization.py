@@ -12,7 +12,7 @@ from streamlit.testing.v1 import AppTest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_initial_screen_without_external_network(monkeypatch):
+def test_initial_screen_without_external_network(monkeypatch, tmp_path):
     """La pantalla funciona y el bloqueo impide conexiones externas."""
     original_connect = socket.socket.connect
 
@@ -33,11 +33,17 @@ def test_initial_screen_without_external_network(monkeypatch):
     with socket.socket() as connection, pytest.raises(AssertionError):
         connection.connect(("203.0.113.1", 443))
 
-    app = AppTest.from_file(PROJECT_ROOT / "app.py").run()
+    import app as screen
+
+    monkeypatch.setattr(screen, "DB_PATH", tmp_path / "synthetic.sqlite3")
+    monkeypatch.setattr(screen, "ACCESS_PATH", tmp_path / "access.json")
+    monkeypatch.setattr(screen, "EXCLUSIONS_PATH", tmp_path / "exclusions.json")
+    app = AppTest.from_string("import app; app.main()").run()
 
     assert not app.exception
     assert app.title[0].value == "Veryfi Prospecting"
-    assert app.success[0].value == "Aplicación inicial funcionando"
+    assert app.subheader[0].value == "Preparar una campaña"
+    assert not screen.DB_PATH.exists()
 
 
 def test_streamlit_is_local_without_telemetry():
@@ -48,6 +54,7 @@ def test_streamlit_is_local_without_telemetry():
     assert config["server"]["address"] == "127.0.0.1"
     assert config["server"]["headless"] is True
     assert config["browser"]["gatherUsageStats"] is False
+    assert config["client"]["disableDataExport"] is True
 
 
 def test_prospecting_import_does_not_load_streamlit():
