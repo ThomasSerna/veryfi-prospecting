@@ -9,12 +9,10 @@ from uuid import UUID
 from pydantic import Field
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
+from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
-    apply_target_roles, build_contacts_request, channel_is_usable, classify_hunter_error,
-    derive_readiness, domain_search_request, finder_request, merge_contact, parse_contacts_output,
-    parse_domain_search, parse_finder, parse_verifier, target_departments, target_roles, validate_contact,
-    verifier_request,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, target_roles,
+    validate_contact,
 )
 from prospecting.db import Database
 from prospecting.haiku import MODEL_ID
@@ -24,6 +22,11 @@ from prospecting.models import (
 from prospecting.pipeline.calls import observed_credits, seconds_left
 from prospecting.providers import (
     CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, reservation_cost,
+)
+from prospecting.providers.hunter import (
+    HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
+    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
+    verifier_request,
 )
 from prospecting.providers.tavily import (
     SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,

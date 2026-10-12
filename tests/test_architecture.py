@@ -28,7 +28,13 @@ ALLOWED = {
     "prospecting.discovery": {"prospecting.models", "prospecting.sources", "prospecting.text"},
     "prospecting.identity": {"prospecting.discovery", "prospecting.models", "prospecting.sources", "prospecting.text"},
     "prospecting.qualification": {"prospecting.haiku", "prospecting.models", "prospecting.sources", "prospecting.text"},
-    "prospecting.contacts": {"prospecting.haiku", "prospecting.models", "prospecting.providers", "prospecting.sources"},
+    "prospecting.contacts": {"prospecting.models", "prospecting.sources"},
+    "prospecting.contact_extraction": {
+        "prospecting.contacts", "prospecting.haiku", "prospecting.models", "prospecting.sources",
+    },
+    "prospecting.providers.hunter": {
+        "prospecting.contacts", "prospecting.models", "prospecting.providers.http", "prospecting.sources",
+    },
     "prospecting.pipeline": {
         "prospecting.pipeline.contacts", "prospecting.pipeline.discovery", "prospecting.pipeline.qualification",
         "prospecting.pipeline.research",
@@ -47,8 +53,9 @@ ALLOWED = {
         "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
     },
     "prospecting.pipeline.contacts": {
-        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.haiku", "prospecting.models",
-        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily", "prospecting.sources",
+        "prospecting.budget", "prospecting.contact_extraction", "prospecting.contacts", "prospecting.db",
+        "prospecting.haiku", "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers",
+        "prospecting.providers.hunter", "prospecting.providers.tavily", "prospecting.sources",
     },
 }
 # Interfaz, envío de mensajes y automatización de navegador quedan fuera del paquete (§1, §15).

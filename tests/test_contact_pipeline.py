@@ -11,10 +11,10 @@ from uuid import uuid4
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, CreditValuation, SpendingAuthorization
-from prospecting.contacts import HUNTER_OPERATIONS, HunterAccess
 from prospecting.models import BusinessStatus, Channel, Contact, Evidence, IdentityStatus, Priority, RunItem, Usage, utc_now
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, HttpResponse
+from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 
@@ -278,7 +278,7 @@ def test_automatic_lead_saving_blocks_finder_and_verifier(contact_case):
 
 def test_missing_persisted_result_never_repeats_sent_operation(contact_case):
     case = contact_case
-    from prospecting.contacts import domain_search_request
+    from prospecting.providers.hunter import domain_search_request
     request = domain_search_request(case.company, ["Product Manager"], case.access.search_account_ref)
     usage = Usage(campaign_id=case.campaign.id, company_id=case.company.id, provider="hunter", operation="domain_search",
                   account_ref=case.access.search_account_ref, request_fingerprint=case.client.fingerprint(request),

@@ -13,16 +13,17 @@ import json
 import sqlite3
 from uuid import UUID
 
-from prospecting.contacts import (
-    HUNTER_OPERATIONS, HunterDomainSearchResponse, build_contacts_request, domain_search_request,
-    finder_request, parse_contacts_output, parse_domain_search, target_departments, verifier_request,
-)
+from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.db import Database
 from prospecting.discovery import build_search_queries, extract_query
 from prospecting.haiku import MODEL_ID
 from prospecting.identity import ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
 from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ClaudeClient, ProviderClient
+from prospecting.providers.hunter import (
+    HUNTER_OPERATIONS, HunterDomainSearchResponse, domain_search_request, finder_request, parse_domain_search,
+    target_departments, verifier_request,
+)
 from prospecting.providers.tavily import TAVILY_OPERATIONS, extract_request, search_request
 from prospecting.qualification import build_haiku_request, unknown_criteria
 from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit

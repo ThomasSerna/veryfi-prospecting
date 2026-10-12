@@ -7,15 +7,19 @@ from uuid import uuid4
 from pydantic import ValidationError
 import pytest
 
+from prospecting.contact_extraction import (
+    CONTACTS_PROMPT_VERSION, HaikuContacts, build_contacts_request, parse_contacts_output,
+)
 from prospecting.contacts import (
-    CONTACTS_PROMPT_VERSION, HUNTER_OPERATIONS, ContactError, HunterAccess,
-    HaikuContacts, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
-    apply_target_roles, build_contacts_request, channel_is_usable, derive_readiness,
-    domain_search_request, finder_request, merge_contact, parse_contacts_output,
-    parse_domain_search, parse_finder, parse_verifier, target_departments, target_roles,
-    validate_contact, verifier_request,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, target_roles,
+    validate_contact,
 )
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
+from prospecting.providers.hunter import (
+    HUNTER_OPERATIONS, HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
+    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
+    verifier_request,
+)
 
 
 NOW = datetime(2026, 10, 12, 12, tzinfo=UTC)
