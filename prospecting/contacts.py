@@ -178,15 +178,17 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
 
 
 def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidence],
-                      limits: CampaignLimits, now: datetime) -> bool:
-    if (channel.contact_id != contact.id or channel.normalized_status == ChannelStatus.INVALID or
+                      limits: CampaignLimits, now: datetime, company: Company) -> bool:
+    if (channel.contact_id != contact.id or contact.company_id != company.id or
+            channel.normalized_status == ChannelStatus.INVALID or
             channel.professional is not True or channel.direct is not True):
         return False
     facts = _valid_refs(channel.evidence_ids, contact, evidence)
     if not facts or any(item.retrieved_at > now for item in facts):
         return False
     if channel.type == ChannelType.EMAIL:
-        if not professional_email(channel.value, channel.value.rsplit("@", 1)[-1].lower()):
+        # El correo laboral pertenece al dominio confirmado de la empresa; sin dominio no hay canal (§10.2).
+        if not professional_email(channel.value, company.domain):
             return False
         if channel.normalized_status == ChannelStatus.VERIFIED:
             if _fresh(channel.verified_at, limits.freshness.email_days, now) and any(
@@ -223,7 +225,7 @@ def derive_readiness(assessment: Assessment, contacts: list[Contact], evidence: 
         return BusinessStatus.INSUFFICIENT_EVIDENCE
     eligible = [contact for contact in contacts if validate_contact(contact, company, assessment, evidence, limits, now)]
     usable = [channel for contact in eligible for channel in contact.channels
-              if channel_is_usable(channel, contact, evidence, limits, now)]
+              if channel_is_usable(channel, contact, evidence, limits, now, company)]
     if any(channel.type in (ChannelType.EMAIL, ChannelType.PHONE, ChannelType.WHATSAPP) for channel in usable):
         return BusinessStatus.READY_PREFERRED
     if usable:

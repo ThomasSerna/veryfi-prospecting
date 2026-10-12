@@ -396,7 +396,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
                 checkpoint(attempts={f"contacts:person:{contact.id}": 1})
             if not validate_contact(contact, company, assessment, db.list_evidence(company_id), campaign.limits, utc_now()):
                 continue
-            if any(channel_is_usable(channel, contact, db.list_evidence(company_id), campaign.limits, utc_now())
+            if any(channel_is_usable(channel, contact, db.list_evidence(company_id), campaign.limits, utc_now(), company)
                    and channel.type in ("email", "phone", "whatsapp") for channel in contact.channels):
                 return finish("preferred_channel_found")
             if hunter_access is None or degraded_error is not None:
@@ -417,7 +417,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
             for channel in contact.channels:
                 if channel.type != "email" or channel.professional is not True or channel.direct is not True:
                     continue
-                if channel_is_usable(channel, contact, db.list_evidence(company_id), campaign.limits, utc_now()):
+                if channel_is_usable(channel, contact, db.list_evidence(company_id), campaign.limits, utc_now(), company):
                     continue
                 request = verifier_request(channel.value, hunter_access.verification_account_ref or hunter_access.search_account_ref)
                 channel_key = f"contacts:verify:{client.fingerprint(request)}"

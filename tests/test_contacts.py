@@ -207,9 +207,22 @@ def test_readiness_requires_full_identity_current_relevant_employment(eligible, 
 
 @pytest.mark.parametrize("age,expected", [(30, True), (31, False), (-1, False)])
 def test_verification_freshness_does_not_use_retrieval_date(eligible, age, expected):
-    _, campaign, _, contact, evidence = eligible
+    company, campaign, _, contact, evidence = eligible
     channel = contact.channels[0].model_copy(update={"verified_at": NOW - timedelta(days=age)})
-    assert channel_is_usable(channel, contact, evidence, campaign.limits, NOW) is expected
+    assert channel_is_usable(channel, contact, evidence, campaign.limits, NOW, company) is expected
+
+
+def test_email_outside_the_company_domain_is_never_ready(eligible):
+    """El dominio laboral es el de la empresa, no el del propio correo (§10.2)."""
+    company, campaign, assessment, contact, evidence = eligible
+    other = "persona-sintetica@otro-dominio.example"
+    fact = evidence[1].model_copy(update={"claim": f"Hunter informa email {other}; estado=valid."})
+    channel = contact.channels[0].model_copy(update={"value": other})
+    foreign = contact.model_copy(update={"channels": [channel]})
+    facts = [evidence[0], fact]
+    assert not channel_is_usable(channel, foreign, facts, campaign.limits, NOW, company)
+    assert derive_readiness(assessment, [foreign], facts, campaign.limits, NOW, company) == "needs_channel_confirmation"
+    assert channel_is_usable(contact.channels[0], contact, evidence, campaign.limits, NOW, company)
 
 
 def test_primary_publication_can_support_accept_all_but_never_invalid(eligible):
@@ -218,9 +231,9 @@ def test_primary_publication_can_support_accept_all_but_never_invalid(eligible):
     for status, expected in (("accept_all", True), ("unknown", True), ("invalid", False)):
         channel = original.model_copy(update={"normalized_status": status, "published_evidence_ids": [evidence[0].id],
                                               "evidence_ids": [item.id for item in evidence]})
-        assert channel_is_usable(channel, contact, evidence, campaign.limits, NOW) is expected
+        assert channel_is_usable(channel, contact, evidence, campaign.limits, NOW, company) is expected
     channel = original.model_copy(update={"normalized_status": "accept_all"})
-    assert not channel_is_usable(channel, contact, evidence, campaign.limits, NOW)
+    assert not channel_is_usable(channel, contact, evidence, campaign.limits, NOW, company)
     assert derive_readiness(assessment, [contact], evidence, campaign.limits, NOW, company) == "ready_preferred"
 
 
@@ -241,12 +254,12 @@ def test_linkedin_requires_persisted_manual_confirmation_and_no_send(eligible):
 
 
 def test_generic_phone_and_unannounced_whatsapp_are_not_usable(eligible):
-    _, campaign, _, contact, evidence = eligible
+    company, campaign, _, contact, evidence = eligible
     phone = Channel(contact_id=contact.id, type="phone", value="+573005550001", phone_country="CO", evidence_ids=[evidence[0].id],
                     retrieved_at=NOW, professional=True, direct=False)
-    assert not channel_is_usable(phone, contact, evidence, campaign.limits, NOW)
+    assert not channel_is_usable(phone, contact, evidence, campaign.limits, NOW, company)
     whatsapp = phone.model_copy(update={"type": "whatsapp", "direct": True})
-    assert not channel_is_usable(whatsapp, contact, evidence, campaign.limits, NOW)
+    assert not channel_is_usable(whatsapp, contact, evidence, campaign.limits, NOW, company)
 
 
 def test_employment_dates_and_contradictions_block_readiness(eligible):
@@ -389,10 +402,10 @@ def test_initials_remain_partial_and_arbitrary_output_fields_are_rejected(eligib
 
 
 def test_generic_email_does_not_pass_even_when_a_caller_marks_it_verified(eligible):
-    _, campaign, _, contact, evidence = eligible
+    company, campaign, _, contact, evidence = eligible
     channel = contact.channels[0].model_copy(update={"value": "info@example.com"})
     source = evidence[1].model_copy(update={"claim": "Hunter informa info@example.com; estado valid."})
-    assert not channel_is_usable(channel, contact, [evidence[0], source], campaign.limits, NOW)
+    assert not channel_is_usable(channel, contact, [evidence[0], source], campaign.limits, NOW, company)
 
 
 def test_public_nominal_phone_keeps_country_without_assuming_whatsapp(eligible):
@@ -402,12 +415,12 @@ def test_public_nominal_phone_keeps_country_without_assuming_whatsapp(eligible):
     output["candidates"][0]["facts"].append({"field": "phone", "value": "+573005550001", "quote": source.excerpt, "evidence_id": str(source.id)})
     [(contact, facts)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment, campaign, [source], NOW, uuid4())
     assert contact.channels[0].phone_country == "CO"
-    assert channel_is_usable(contact.channels[0], contact, facts, campaign.limits, NOW)
+    assert channel_is_usable(contact.channels[0], contact, facts, campaign.limits, NOW, company)
     assert not any(item.type == "whatsapp" for item in contact.channels)
 
 
 def test_merging_keeps_provider_status_and_publication_and_rejects_recycled_email(eligible):
-    _, campaign, _, contact, evidence = eligible
+    company, campaign, _, contact, evidence = eligible
     published = contact.model_copy(update={"channels": [contact.channels[0].model_copy(update={
         "normalized_status": "published_professional", "provider_status": None,
         "published_evidence_ids": [evidence[0].id], "verified_at": None})]})
@@ -416,10 +429,10 @@ def test_merging_keeps_provider_status_and_publication_and_rejects_recycled_emai
         merged = merge_contact(previous, published, evidence)
         assert merged.channels[0].provider_status == "valid"
         assert merged.channels[0].normalized_status == status and merged.channels[0].published_evidence_ids
-        assert channel_is_usable(merged.channels[0], merged, evidence, campaign.limits, NOW)
+        assert channel_is_usable(merged.channels[0], merged, evidence, campaign.limits, NOW, company)
     stale = contact.model_copy(update={"channels": [contact.channels[0].model_copy(update={"verified_at": NOW - timedelta(days=31)})]})
     merged = merge_contact(stale, published, evidence)
-    assert channel_is_usable(merged.channels[0], merged, evidence, campaign.limits, NOW)
+    assert channel_is_usable(merged.channels[0], merged, evidence, campaign.limits, NOW, company)
     with pytest.raises(ContactError, match="nombres completos"):
         merge_contact(contact, contact.model_copy(update={"name": "Otra Persona Sintética"}), evidence)
 
@@ -438,9 +451,9 @@ def test_source_date_cannot_refresh_employment_from_another_page(eligible):
 
 
 def test_future_retrieval_does_not_confirm_verified_email(eligible):
-    _, campaign, _, contact, evidence = eligible
+    company, campaign, _, contact, evidence = eligible
     future = evidence[1].model_copy(update={"retrieved_at": NOW + timedelta(days=1)})
-    assert not channel_is_usable(contact.channels[0], contact, [evidence[0], future], campaign.limits, NOW)
+    assert not channel_is_usable(contact.channels[0], contact, [evidence[0], future], campaign.limits, NOW, company)
 
 
 @pytest.mark.parametrize("organization", [None, "Otra filial sintética"])
@@ -455,7 +468,7 @@ def test_wrong_or_unknown_entity_cannot_lend_channels_after_public_completion(el
     [(completed, public_facts)] = parse_contacts_output(public_output(source, candidate.id, email=None), "end_turn",
                                                        company, assessment, campaign, [source], NOW, uuid4(), contacts=[candidate])
     assert completed.identity_status == "confirmed" and completed.current_employment is True
-    assert all(not channel_is_usable(channel, completed, facts + public_facts, campaign.limits, NOW)
+    assert all(not channel_is_usable(channel, completed, facts + public_facts, campaign.limits, NOW, company)
                for channel in completed.channels)
     assert derive_readiness(assessment, [completed], facts + public_facts, campaign.limits, NOW, company) != "ready_preferred"
 
