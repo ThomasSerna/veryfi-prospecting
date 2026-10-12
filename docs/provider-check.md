@@ -52,8 +52,8 @@ Campaña de comprobación: Colombia, `fintech_software`, `web_queries=1` y `max_
 La búsqueda se concilió el 2026-10-11 con el panel de Tavily, verificado por el responsable:
 1 / 1.000 créditos, USD 0. El comprobante local queda en `data/conciliaciones/`.
 
-Las extracciones (autorización en la sesión: ≤ 7 créditos, USD 0) están pendientes de
-conciliar con el panel; según `usage`, sumaron 1 crédito. Después de extraer, la resolución
+Las extracciones (autorización en la sesión: ≤ 7 créditos, USD 0) sumaron 1 crédito según
+`usage`; se conciliaron el 2026-10-12 con el panel (véase «Orquestación de campaña»). Después de extraer, la resolución
 local de identidad confirmó 1 empresa más. El resto quedó pendiente por país o nombre no
 confirmados. Mantener *pay as you go* desactivado evita cargos fuera del crédito gratuito (§14).
 
@@ -89,7 +89,8 @@ confirmados. Mantener *pay as you go* desactivado evita cargos fuera del crédit
 | v3 | 5.508 | 679 | USD 0,0011 | USD 0,000890 | 5,5 s | Respuesta válida; todas las citas son fuentes primarias. Misma empresa y evidencia: evaluación `medium` (encaje 55,6; cobertura 90 %), con `document_need` 0,5 justificado por la falta de captura de comprobantes |
 
 El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Las tres
-llamadas suman unos USD 0,0028, pendientes de conciliar con la consola de Anthropic.
+llamadas suman USD 0,0027913; se conciliaron el 2026-10-12 con la consola de Anthropic, que
+mostró exactamente 16.143 tokens de entrada y 2.354 de salida.
 
 ### Observaciones y limitaciones
 
@@ -185,7 +186,12 @@ solicitud. Los datos de empresas y personas quedan en `data/` y no se reproducen
 - La calificación usó 6.175 tokens de entrada, por encima de los 6.000 que reserva la
   llamada; el costo estimado (USD 0,000961) siguió dentro de la reserva porque la salida usó
   687 de 1.000 tokens. Con la salida al máximo, el costo superaría la reserva y el registro
-  bloquearía nuevas llamadas hasta revisarlo. La estimación de 3 caracteres por token no basta.
+  bloquearía nuevas llamadas hasta revisarlo. El payload medía 13.757 bytes (unos 2,2 por
+  token): desde entonces la reserva usa esos bytes más 1.000 tokens de margen.
 - La extracción de contactos con Haiku devolvió 10 tokens de salida, sin candidatos.
-- Las 11 solicitudes están pendientes de conciliar con los paneles de Tavily y Hunter y con la
-  consola de Anthropic.
+- Conciliación del 2026-10-12, con los paneles que mostró el responsable: Tavily 7 / 1.000
+  créditos (2 antes de la prueba), igual a `usage`; Hunter 1 de 50 en un ciclo iniciado ese día
+  a las 15:49 y sin uso previo según el responsable, que usa su cuenta personal: el registro lo
+  anota con la referencia `hunter-equipo-plan-gratuito`, que ya tenía consumo de otra cuenta,
+  y sobrestima el uso. Las 2 llamadas a Haiku se conciliaron con el uso que informó la API,
+  aceptado por el responsable porque la consola aún no las mostraba.
