@@ -5,8 +5,9 @@ Latinoamérica. Incluye una pantalla inicial, contratos Pydantic, configuración
 versionada, persistencia SQLite, reserva/conciliación de presupuesto, un cliente
 HTTP JSON compartido, el descubrimiento de empresas candidatas y la extracción
 de páginas con Tavily, la resolución de identidad, duplicados y exclusiones, y la
-calificación con Claude Haiku y puntuación determinista, que se invocan desde Python.
-Todavía no busca contactos. La pantalla no necesita claves, no consume APIs de
+calificación con Claude Haiku y puntuación determinista, y la búsqueda de personas
+y canales profesionales con Hunter y evidencia pública, que se invocan desde Python.
+La pantalla no necesita claves, no consume APIs de
 proveedores y no muestra resultados comerciales simulados.
 
 ## Instalación
@@ -53,7 +54,9 @@ Las pruebas bloquean conexiones externas y usan datos explícitamente sintético
 y bases temporales. Comprueban contratos, procedencia, relaciones, transacciones,
 historial, consumo decimal exacto y recuperación al reabrir SQLite. Comprueban
 reservas concurrentes, cupos de créditos y autorizaciones acumuladas, duplicados,
-conciliación y timeouts mediante transportes sintéticos. También
+conciliación y timeouts mediante transportes sintéticos. Verifican identidad,
+vigencia y estados de canales, la extracción pública citada,
+límites de contactos y respuestas pendientes de Hunter sin repetir consumo. También
 ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se importen
 sin cargar Streamlit. Estas pruebas no demuestran acceso a proveedores ni
 validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
@@ -67,7 +70,8 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `prospecting/providers.py`: cliente JSON acotado, cliente de Claude con el SDK oficial y errores de proveedor.
 - `prospecting/discovery.py`: consultas, validación de URLs y respuestas de Tavily, selección de candidatos, identidad y exclusiones.
 - `prospecting/qualification.py`: rúbrica, puntuación, prioridad, solicitud a Haiku y validación de su respuesta.
-- `prospecting/pipeline.py`: reservas, llamadas a proveedores y persistencia del descubrimiento, la extracción, la identidad y la calificación.
+- `prospecting/contacts.py`: búsqueda con Hunter, extracción pública con Haiku, personas, canales y condición de listo.
+- `prospecting/pipeline.py`: reservas, llamadas a proveedores y persistencia del descubrimiento, la extracción, la identidad, la calificación y los contactos.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, clientes, descubrimiento y calificación con datos sintéticos.
 - `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
@@ -75,6 +79,7 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `docs/budget-providers.md`: presupuesto, autorizaciones, conciliación y cliente de proveedores.
 - `docs/discovery.md`: descubrimiento y extracción con Tavily, identidad, duplicados y exclusiones.
 - `docs/qualification.md`: calificación con Haiku, puntuación y prioridad.
+- `docs/contacts.md`: invocación desde Python, acceso a Hunter, personas, canales y límites de búsqueda.
 - `.streamlit/config.toml`: acceso local y telemetría desactivada.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
