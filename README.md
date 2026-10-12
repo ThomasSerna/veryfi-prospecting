@@ -2,10 +2,11 @@
 
 Prototipo académico local para investigar posibles clientes de Veryfi en
 Latinoamérica. Incluye una pantalla inicial, contratos Pydantic, configuración
-versionada, persistencia SQLite, reserva/conciliación de presupuesto y un cliente
-HTTP JSON compartido. Todavía no
-descubre empresas, califica prospectos ni busca contactos. No necesita claves,
-no consume APIs de proveedores y no muestra resultados comerciales simulados.
+versionada, persistencia SQLite, reserva/conciliación de presupuesto, un cliente
+HTTP JSON compartido y el descubrimiento de empresas candidatas y la extracción
+de páginas con Tavily, que se invocan desde Python. No califica prospectos ni busca
+contactos. La pantalla no necesita claves, no consume APIs de proveedores y no
+muestra resultados comerciales simulados.
 
 ## Instalación
 
@@ -218,6 +219,59 @@ ese resultado, requieren revisión. Un segundo intento necesita conciliación,
 fallo transitorio identificado por el adaptador y otra reserva; después de un
 reinicio no se deduce transitoriedad del mensaje guardado.
 
+## Descubrimiento y extracción con Tavily
+
+`prospecting/pipeline.py` es el único módulo que reserva consumo y llama a Tavily.
+`prospecting/discovery.py` construye consultas, valida respuestas y selecciona
+candidatos sin red ni base de datos. Ambas funciones admiten solamente crédito
+gratuito (`funding_source="free_credit"`, USD 0 por llamada) y exigen un
+`SpendingAuthorization` registrado para la operación `search` o `extract`:
+
+```python
+import time
+
+from prospecting.discovery import TAVILY_OPERATIONS
+from prospecting.pipeline import extract_company_pages, run_discovery
+from prospecting.providers import ProviderClient
+
+client = ProviderClient(budget, TAVILY_OPERATIONS)
+report = run_discovery(db, budget, client, campaign.id, account_ref="cuenta-tavily",
+                       authorization=search_grant, deadline=time.monotonic() + 60)
+pages = extract_company_pages(db, budget, client, campaign.id, report.selected_company_ids[0],
+                              urls, account_ref="cuenta-tavily", authorization=extract_grant)
+```
+
+`run_discovery` genera consultas de plantilla (`discovery_queries_v1`) solo para los
+países y segmentos de la campaña, con un máximo de 8 consultas `basic` de 10
+resultados cada una, y aplica el tope de 60 candidatos brutos. Agrupa los resultados
+por host exacto y selecciona hasta `max_companies`, intentando
+`target_per_country_segment` por combinación; si una combinación no alcanza esa meta,
+el informe lo indica en lugar de rellenarla. Guarda en una sola transacción, para cada
+candidato seleccionado, `Company`, `Evidence` y `RunItem` en la etapa `discovered`;
+el resto de candidatos solo aparece en el informe. Si la campaña ya tiene empresas
+guardadas, la función no vuelve a llamar.
+
+Cada empresa queda con identidad `pending`, nombre inferido (evidencia `inference`)
+y dominio respaldado por los resultados observados. País de operación y segmento
+quedan desconocidos. La evidencia guarda la URL, `provider="tavily"`, la referencia
+de la solicitud, el fragmento acotado del buscador y `retrieved_at`.
+El fragmento del buscador solo localiza la fuente.
+
+`extract_company_pages` valida cada URL: solo admite HTTP(S) hacia nombres públicos
+y rechaza IP, `localhost`, credenciales, puertos no estándar, redes sociales y
+dominios de gobierno. Respeta el cupo de páginas de `effort.initial`, menos las ya
+consumidas, y guarda hasta 3 fragmentos de 800 caracteres como máximo por página.
+Un fragmento cuenta como fuente `primary` solo si la página pertenece al dominio de
+la empresa. Las URLs que Tavily no pudo extraer no generan evidencia.
+
+Los fallos se informan con motivos propios de Tavily: `permission_denied`,
+`quota_exceeded`, `rate_limited`, `invalid_input`, `provider_error`, `timeout` e
+`invalid_response`. No se reintentan automáticamente. Los créditos que devuelve
+`usage` se registran como observados; la conciliación sigue siendo manual con
+`Budget.reconcile`. Los textos de páginas y buscadores se guardan como datos y no
+modifican límites, consultas ni permisos. `docs/provider-check.md` registra la
+comprobación real de acceso.
+
 ## Estructura y responsabilidades
 
 - `app.py`: pantalla inicial de Streamlit, sin lógica de negocio.
@@ -225,8 +279,11 @@ reinicio no se deduce transitoriedad del mensaje guardado.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
 - `prospecting/providers.py`: cliente JSON acotado y errores de proveedor.
+- `prospecting/discovery.py`: consultas, validación de URLs y respuestas de Tavily, y selección de candidatos.
+- `prospecting/pipeline.py`: reserva, llamadas a Tavily y persistencia del descubrimiento y la extracción.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
-- `tests/`: pruebas de inicialización, contratos y persistencia con datos sintéticos.
+- `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, cliente y descubrimiento con datos sintéticos.
+- `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
 - `.streamlit/config.toml`: acceso local y telemetría desactivada.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
