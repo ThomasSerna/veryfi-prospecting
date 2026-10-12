@@ -37,7 +37,10 @@ campaña. Haiku propone y Python decide:
   - `low` fija el resultado comercial `low_fit`.
   - `insufficient_evidence` queda en el `stop_reason`, sin fijarse como resultado
     comercial, porque aún cabe una ampliación de evidencia.
-  - Repetir la calificación reutiliza la evaluación guardada.
+  - Repetir la calificación reutiliza la evaluación guardada. La única excepción es una
+    evaluación `insufficient_evidence` con evidencia de empresa posterior (no manual ni de
+    contactos) que entra en la solicitud, como la de la ampliación: entonces se consulta de
+    nuevo a Haiku y la evaluación nueva revisa la anterior (`revision_of`).
 
 `ClaudeClient` (`prospecting/providers/claude.py`) usa el SDK oficial `anthropic` con la clave de `ANTHROPIC_API_KEY`,
 `max_retries=0` y un timeout de 30 s como máximo. Sigue el mismo protocolo de

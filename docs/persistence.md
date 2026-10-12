@@ -95,7 +95,8 @@ y las instantáneas de las pruebas del pipeline los fijan:
   payload, método, endpoint y cabeceras. El payload de Haiku incluye el esquema
   JSON; el de contactos contiene los nombres de las clases `HaikuContacts`,
   `HaikuContactCandidate` y `CitedContactFact`.
-- Claves de `RunItem.attempts`: `tavily_extract` y las de contactos
+- Claves de `RunItem.attempts`: `tavily_extract`, las de la ampliación de evidencia
+  (`research:expansion`, `research:web_queries`, `research:pages`) y las de contactos
   (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,
   `verify:`, `domain_search`, `web_queries`, `pages`, `extract`, `hunter_enrichments`).
 - `Company.identity_key` (`dominio|nombre|países`), con índice único.
@@ -104,5 +105,5 @@ y las instantáneas de las pruebas del pipeline los fijan:
 - Marcadores de resultados de buscador, que nunca prueban un hecho: `claim` que
   empieza por `Tavily devolvió esta página` y `external_reference` que empieza
   por `contacts_search:`.
-- Versiones: `discovery_queries_v1`, `haiku_assessment_v3`, `contacts_extraction_v1`,
-  `rubric_v1` y el esquema SQLite `user_version=1`.
+- Versiones: `discovery_queries_v1`, `research_queries_v1`, `haiku_assessment_v3`,
+  `contacts_extraction_v1`, `rubric_v1` y el esquema SQLite `user_version=1`.

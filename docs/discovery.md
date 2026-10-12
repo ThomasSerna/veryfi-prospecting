@@ -6,8 +6,8 @@ Las etapas de `prospecting.pipeline` son las únicas que reservan consumo y llam
 `prospecting/discovery.py` construye consultas y selecciona candidatos;
 `prospecting/providers/tavily.py` define las operaciones, valida respuestas y clasifica
 errores; `prospecting/identity.py` resuelve identidad y exclusiones. Ninguno de los tres
-hace red ni usa la base de datos. Ambas funciones admiten solamente crédito
-gratuito (`funding_source="free_credit"`, USD 0 por llamada) y exigen un
+hace red ni usa la base de datos. Las funciones que llaman a Tavily admiten solamente
+crédito gratuito (`funding_source="free_credit"`, USD 0 por llamada) y exigen un
 `SpendingAuthorization` registrado para la operación `search` o `extract`:
 
 ```python
@@ -43,9 +43,23 @@ El fragmento del buscador solo localiza la fuente.
 `extract_company_pages` valida cada URL: solo admite HTTP(S) hacia nombres públicos
 y rechaza IP, `localhost`, credenciales, puertos no estándar, redes sociales y
 dominios de gobierno. Respeta el cupo de páginas de `effort.initial`, menos las ya
-consumidas, y guarda hasta 3 fragmentos de 800 caracteres como máximo por página.
+consumidas (solo cuentan las de solicitudes enviadas al proveedor), y guarda hasta
+3 fragmentos de 800 caracteres como máximo por página.
 Un fragmento cuenta como fuente `primary` solo si la página pertenece al dominio de
 la empresa. Las URLs que Tavily no pudo extraer no generan evidencia.
+
+`research_company(db, budget, client, campaign_id, company_id, account_ref=...,
+authorizations=...)` amplía una sola vez la evidencia de una empresa
+(`limits.evidence_expansions_per_company`) con el esfuerzo `insufficient_evidence`: una
+búsqueda `basic` restringida al dominio de la empresa (`include_domains`, consulta de plantilla
+`research_queries_v1` con su nombre, las señales de sus segmentos y los países de la campaña) y
+la extracción de hasta 2 páginas propias aún no leídas, primero las que acaba de localizar.
+Los resultados de esa búsqueda se guardan como resultados de buscador: solo localizan
+páginas. Cada paso guarda su intento (`research:expansion`, `research:web_queries`,
+`research:pages`) y suma los límites consumidos; una llamada enviada cuenta aunque falle y
+reanudar continúa la misma ampliación sin repetirla. Sin páginas nuevas termina con
+`no_new_sources`, sin llamar. La función no cambia la prioridad: después se resuelve la
+identidad y se recalifica ([Orquestación de campañas](campaign.md)).
 
 Los fallos se informan con motivos propios de Tavily: `permission_denied`,
 `quota_exceeded`, `rate_limited`, `invalid_input`, `provider_error`, `timeout` e
