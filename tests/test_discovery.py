@@ -125,6 +125,17 @@ def test_parse_discards_unsafe_and_non_business_results():
     assert all(not hit.host.endswith(tuple(NON_BUSINESS_DOMAINS)) for hit in hits)
 
 
+@pytest.mark.parametrize("url", [
+    "https://www.getapp.com.co/directory/579/expenses-management/software",
+    "https://www.capterra.mx/directory/30051/expense-management/software",
+    "https://www.g2.com/categories/expense-management",
+])
+def test_software_directories_are_not_candidates(url):
+    hits, discarded = parse_search(planned(), 0, search_response((url, "Directorio sintético")), uuid4(), RETRIEVED_AT)
+    assert hits == []
+    assert discarded == {"non_business_domain": 1}
+
+
 def test_same_host_groups_but_subdomains_stay_separate():
     hits = hits_for(
         planned(), 0,

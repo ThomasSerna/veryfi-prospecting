@@ -75,6 +75,8 @@ NON_BUSINESS_DOMAINS = (
     "wikipedia.org", "medium.com", "blogspot.com", "wordpress.com",
     "apps.apple.com", "play.google.com", "google.com", "crunchbase.com",
     "glassdoor.com", "indeed.com", "computrabajo.com", "gov.co", "gob.mx",
+    "getapp.com", "getapp.com.co", "getapp.com.mx", "capterra.com", "capterra.co",
+    "capterra.mx", "g2.com", "softwareadvice.com", "trustradius.com",
 )
 
 _GENERIC_LABELS = {
