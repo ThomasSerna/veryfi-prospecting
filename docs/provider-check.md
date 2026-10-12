@@ -123,13 +123,14 @@ llamadas suman unos USD 0,0028, pendientes de conciliar con la consola de Anthro
 | Fecha | 2026-10-12 (America/Bogota) |
 | Cuenta | `hunter-equipo-plan-gratuito`; plan Free; el responsable informó 50 créditos sin uso en el panel |
 | Origen de financiación | `free_credit`; desembolso USD 0 |
-| Autorización | Responsable del cupo, en la sesión: 1 `domain_search`, ≤ 3 créditos, USD 0. Finder y Verifier no habilitados (falta comprobar que el guardado automático de leads está desactivado) |
+| Autorización | Responsable del cupo, en la sesión: 2 autorizaciones de 1 `domain_search`, ≤ 3 créditos cada una, USD 0 (comprobación y medición de precio). Finder y Verifier no habilitados (falta comprobar que el guardado automático de leads está desactivado) |
 | Endpoint usado | `GET https://api.hunter.io/v2/domain-search` con `Authorization: Bearer` |
 | Documentación | [API v2](https://hunter.io/api-documentation/v2), [precios](https://hunter.io/pricing) y [consumo de la API](https://help.hunter.io/en/articles/1970956-hunter-api), consultadas el 2026-10-12 |
 
 | Operación | Parámetros principales | Llamadas | Créditos reservados | Créditos observados | Latencia | Resultado |
 |---|---|---:|---:|---:|---|---|
-| Domain Search | `domain` confirmado, `type=personal`, `job_titles` de la evaluación, `limit=1` (cupo de personas en prioridad media), `offset=0` | 1 | 1 | 1 (estimado: un correo devuelto) | 0,55 s | 1 persona con nombre completo y cargo pertinente; correo del dominio de la empresa con verificación `valid` de Hunter y un perfil de LinkedIn sin confirmar |
+| Domain Search | `domain` confirmado, `type=personal`, `job_titles` de la evaluación, `limit=1`, `offset=0` | 1 | 1 | 1 | 0,55 s | 1 persona con nombre completo y cargo pertinente; correo del dominio de la empresa con verificación `valid` de Hunter y un perfil de LinkedIn sin confirmar |
+| Domain Search (medición de precio) | Mismo dominio, sin filtro de cargo, `limit=3`; sin guardar contactos | 1 | 3 | 1 según el panel | 0,58 s | 3 correos nuevos devueltos; el panel pasó de 1 a 2 créditos usados |
 
 Campaña de prueba: Colombia, `fintech_software`; empresa confirmada de prioridad `medium`.
 Resultado comercial: `qualified_no_contact`. Hunter no demuestra que el empleo esté vigente;
@@ -141,9 +142,15 @@ comprobante local queda en `data/conciliaciones/`.
 
 ### Observaciones y limitaciones
 
-- Precio de Domain Search: la página de precios indica 1 crédito por correo encontrado y
-  el artículo de consumo de la API, 1 crédito por cada 1 a 10 correos devueltos. La
-  reserva cubre el peor caso (un crédito por resultado pedido). Con `limit=1` ambos
-  criterios coinciden, así que esta prueba no resuelve la discrepancia.
+- **Precio de Domain Search, medido:** la página de precios indica 1 crédito por correo
+  encontrado, y el artículo de consumo de la API, 1 crédito por cada 1 a 10 correos
+  devueltos. Una búsqueda con 3 correos nuevos costó 1 crédito, así que en la API se cobra
+  por llamada. Por eso el código conserva `limit=10` con una reserva de 1 crédito y no
+  estima consumo de Hunter (la respuesta no lo informa). Las correcciones que asumían un
+  cobro por correo se revirtieron el mismo día.
+- La llamada de medición quedó registrada con 3 créditos observados, una estimación por
+  correo de las correcciones revertidas, mientras el panel cobró 1. El registro no permite
+  sustituir un consumo ya anotado, así que esa fila queda sin conciliar: sobrestima el
+  consumo en 2 créditos, del lado prudente. La primera llamada sí quedó conciliada.
 - No se probaron Finder, Verifier ni errores reales (401, 403, 429, 451); solo con
   respuestas sintéticas.

@@ -114,7 +114,9 @@ No crear alias o cupos por operación para un mismo saldo, ni sumar búsquedas y
 verificaciones de cuotas independientes como si fueran créditos intercambiables.
 
 Las cotas documentadas son 1 crédito para Domain Search con hasta 10 resultados y
-1 para Finder. Verifier reserva 0,5 créditos unificados o 1 crédito de su cuota
+1 para Finder. El cobro por llamada de Domain Search se comprobó con la cuenta real el
+2026-10-12: una consulta con 3 correos costó 1 crédito, aunque la página de precios
+mencione un crédito por correo (véase `docs/provider-check.md`). Verifier reserva 0,5 créditos unificados o 1 crédito de su cuota
 separada, según la cuenta comprobada. Finder incluye la verificación del correo
 encontrado. Estos valores no comprueban acceso ni saldo en la cuenta del equipo;
 el origen y la valoración económica deben quedar acreditados antes del gasto.
