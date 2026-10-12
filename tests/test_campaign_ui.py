@@ -145,6 +145,11 @@ def test_operations_respect_separate_hunter_accounts(access):
             "hunter_access": hunter | {"automatic_lead_saving_disabled": False},
         })
 
+    domain_search_only = ProviderAccess.model_validate(checked.model_dump() | {
+        "hunter_access": hunter | {"enabled_operations": ["domain_search"], "automatic_lead_saving_disabled": False},
+    })
+    assert provider_operations(domain_search_only)[-1] == ("hunter", "domain_search", "hunter-search-sintetica")
+
 
 def test_execute_builds_fresh_grants_after_budget_and_preserves_campaign(tmp_path, make_campaign, access, monkeypatch):
     path = tmp_path / "synthetic.sqlite3"

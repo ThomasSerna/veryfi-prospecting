@@ -95,7 +95,7 @@ class ProviderAccess(Contract):
                     (CLAUDE_PROVIDER, self.claude_account_ref, self.claude_funding_source)]
         hunter = self.hunter_access
         if hunter is not None:
-            if hunter.enabled_operations and not hunter.automatic_lead_saving_disabled:
+            if any(operation in ("email_finder", "email_verifier") for operation in hunter.enabled_operations) and not hunter.automatic_lead_saving_disabled:
                 raise ValueError("Debe estar comprobada la desactivación del guardado automático de Hunter.")
             expected.extend((provider, account, hunter.funding_source) for provider, _, account in
                             provider_operations(self) if provider == HUNTER)
