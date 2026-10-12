@@ -7,6 +7,7 @@ contacto, de mayor a menor prioridad. Ninguna función contacta a nadie.
 """
 
 from datetime import timedelta
+import threading
 import time
 from typing import Callable, Literal
 from uuid import UUID
@@ -49,6 +50,8 @@ _EXTRACTION_SETTLED = {
     "invalid_response", "duplicate_request",
 }
 _HUMAN_REVIEW = ("exclusion_review", "duplicate_review")
+# Una ejecución a la vez por proceso (§13.3): Streamlit atiende todas sus sesiones en un solo proceso.
+_EXECUTION = threading.Lock()
 _FINAL = {Priority.EXCLUDED: BusinessStatus.EXCLUDED, Priority.LOW: BusinessStatus.LOW_FIT}
 
 
@@ -341,8 +344,24 @@ def run_campaign(db: Database, budget: Budget, client: ProviderClient, campaign_
     acotada y contactos. Termina en `completed` si todas las empresas tienen resultado; `partial`
     si alguna quedó pendiente o se agotó el tiempo global; `paused_budget` si falta presupuesto o
     autorización; `failed` si el descubrimiento no deja empresas por error o ante una excepción,
-    que se relanza. Una interrupción deja la campaña `running` para reanudarla.
+    que se relanza. Una interrupción deja la campaña `running` para reanudarla. Mientras otra
+    ejecución sigue en curso en este proceso, no hace nada y devuelve `campaign_already_running`.
     """
+    if not _EXECUTION.acquire(blocking=False):
+        if db.get_campaign(campaign_id) is None:
+            raise ValueError("La campaña no existe.")
+        return _report(db, campaign_id, stop_reason="campaign_already_running", exclusions=exclusions)
+    try:
+        return _execute(db, campaign_id, exclusions, lambda campaign: _Run(
+            db, budget, client, campaign, authorizations=authorizations, tavily_account_ref=tavily_account_ref,
+            claude=claude, claude_account_ref=claude_account_ref, claude_funding_source=claude_funding_source,
+            hunter_access=hunter_access, exclusions=exclusions, progress=progress))
+    finally:
+        _EXECUTION.release()
+
+
+def _execute(db: Database, campaign_id: UUID, exclusions: ExclusionList | None,
+             build: Callable[[Campaign], _Run]) -> CampaignReport:
     with db.transaction():
         campaign = db.get_campaign(campaign_id)
         if campaign is None:
@@ -355,10 +374,7 @@ def run_campaign(db: Database, budget: Budget, client: ProviderClient, campaign_
     if blocked or campaign.status == CampaignStatus.COMPLETED:
         return _report(db, campaign_id, stop_reason="another_campaign_active" if blocked else None,
                        exclusions=exclusions)
-    run = _Run(db, budget, client, db.get_campaign(campaign_id), authorizations=authorizations,
-               tavily_account_ref=tavily_account_ref, claude=claude, claude_account_ref=claude_account_ref,
-               claude_funding_source=claude_funding_source, hunter_access=hunter_access,
-               exclusions=exclusions, progress=progress)
+    run = build(db.get_campaign(campaign_id))
     try:
         discovery = run.execute()
     except Exception:

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 import json
 import re
+import threading
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -10,6 +11,7 @@ from uuid import uuid4
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
+from prospecting.db import Database
 from prospecting.identity import ExclusionList
 from prospecting.models import CampaignLimits, CampaignStatus, RunStage, utc_now
 from prospecting.pipeline import close_campaign, run_campaign, start_campaign
@@ -363,6 +365,38 @@ def test_unavailable_provider_stops_the_pass_and_keeps_the_literal_reason(world)
     failed = [item for item in case.by_domain().values() if item.error_message]
     assert len(failed) == 1 and failed[0].error_message.startswith("permission_denied: HTTP 401.")
     assert all(item.stage == RunStage.DISCOVERED for item in case.by_domain().values())
+
+
+def test_concurrent_run_returns_without_traffic_or_changes(world, tmp_path):
+    """Otra sesión, con su propia conexión, pulsa mientras la primera espera una respuesta."""
+    case = world.setup()
+    start(case)
+    seen = {}
+
+    def second_session():
+        try:
+            with Database(tmp_path / "synthetic.sqlite3") as other:
+                seen["report"] = run_campaign(other, Budget(other, case.config.defaults.budget, []), case.client,
+                                              case.campaign.id, authorizations=[], tavily_account_ref=TAVILY)
+                seen["status"] = other.get_campaign(case.campaign.id).status
+        except Exception as error:  # Se comprueba abajo; un hilo no propaga excepciones.
+            seen["error"] = error
+
+    def during_first_call(operation, payload):
+        if not seen:
+            thread = threading.Thread(target=second_session)
+            thread.start()
+            thread.join(timeout=20)
+            seen["alive"], seen["events"] = thread.is_alive(), len(case.events)
+        return None
+
+    case.failure = during_first_call
+    report = case.run()
+    assert "error" not in seen and seen["alive"] is False
+    assert seen["report"].stop_reason == "campaign_already_running" and seen["events"] == 1
+    assert seen["status"] == CampaignStatus.RUNNING
+    assert report.status == CampaignStatus.COMPLETED
+    assert_no_request_sent_twice(case)
 
 
 def test_another_active_campaign_blocks_the_run_until_it_is_closed(world, make_campaign):
