@@ -18,10 +18,15 @@ ALLOWED = {
     "prospecting.providers": {"prospecting.providers.claude", "prospecting.providers.http"},
     "prospecting.providers.http": {"prospecting.budget", "prospecting.models"},
     "prospecting.providers.claude": {"prospecting.budget", "prospecting.models", "prospecting.providers.http"},
+    "prospecting.providers.tavily": {
+        "prospecting.discovery", "prospecting.models", "prospecting.providers.http", "prospecting.sources",
+        "prospecting.text",
+    },
     "prospecting.text": set(),
     "prospecting.sources": {"prospecting.models"},
     "prospecting.haiku": set(),
-    "prospecting.discovery": {"prospecting.models", "prospecting.providers", "prospecting.sources", "prospecting.text"},
+    "prospecting.discovery": {"prospecting.models", "prospecting.sources", "prospecting.text"},
+    "prospecting.identity": {"prospecting.discovery", "prospecting.models", "prospecting.sources", "prospecting.text"},
     "prospecting.qualification": {"prospecting.haiku", "prospecting.models", "prospecting.sources", "prospecting.text"},
     "prospecting.contacts": {"prospecting.haiku", "prospecting.models", "prospecting.providers", "prospecting.sources"},
     "prospecting.pipeline": {
@@ -30,20 +35,20 @@ ALLOWED = {
     },
     "prospecting.pipeline.calls": {"prospecting.budget", "prospecting.models", "prospecting.providers"},
     "prospecting.pipeline.discovery": {
-        "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.models",
-        "prospecting.pipeline.calls", "prospecting.providers",
+        "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.identity", "prospecting.models",
+        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily",
     },
     "prospecting.pipeline.research": {
         "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.models",
-        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.sources",
+        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily", "prospecting.sources",
     },
     "prospecting.pipeline.qualification": {
         "prospecting.budget", "prospecting.db", "prospecting.haiku", "prospecting.models",
         "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
     },
     "prospecting.pipeline.contacts": {
-        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery", "prospecting.haiku",
-        "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers", "prospecting.sources",
+        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.haiku", "prospecting.models",
+        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily", "prospecting.sources",
     },
 }
 # Interfaz, envío de mensajes y automatización de navegador quedan fuera del paquete (§1, §15).

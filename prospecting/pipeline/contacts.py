@@ -17,21 +17,19 @@ from prospecting.contacts import (
     verifier_request,
 )
 from prospecting.db import Database
-from prospecting.discovery import (
-    SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error,
-    extract_credits, extract_request, parse_extract,
-)
 from prospecting.haiku import MODEL_ID
 from prospecting.models import (
-    BusinessStatus, Contract, Evidence, IdentityStatus, Priority, RunStage, Text, TokenUsage, Usage,
-    UsageStatus, utc_now,
+    BusinessStatus, Contract, IdentityStatus, Priority, RunStage, Text, TokenUsage, Usage, UsageStatus, utc_now,
 )
 from prospecting.pipeline.calls import observed_credits, seconds_left
 from prospecting.providers import (
-    CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, ProviderRequest,
-    reservation_cost,
+    CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, reservation_cost,
 )
-from prospecting.sources import CONTACT_SEARCH_REFERENCE, SEARCH_HIT_CLAIM, is_non_business, url_host
+from prospecting.providers.tavily import (
+    SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,
+    contact_search_request, extract_credits, extract_request, parse_extract,
+)
+from prospecting.sources import CONTACT_SEARCH_REFERENCE, is_non_business, url_host
 
 
 class ContactReport(Contract):
@@ -325,21 +323,11 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
             queries += [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in existing if item.name]
             queries += [f'"{company.name}" equipo producto ingeniería marketing contacto profesional']
             for query in list(dict.fromkeys(queries))[:effort.web_queries]:
-                request = ProviderRequest(provider="tavily", operation="search", account_ref=tavily_account_ref,
-                                          payload={"query": query, "search_depth": "basic", "topic": "general",
-                                                   "max_results": 10, "include_usage": True,
-                                                   "exclude_domains": ["linkedin.com"]})
-                def public_hits(data, request_id):
-                    facts = [Evidence(company_id=company_id, claim=f"{SEARCH_HIT_CLAIM} en una búsqueda pública de contactos; requiere contraste.",
-                                      url=hit.url, provider="tavily", external_reference=f"{CONTACT_SEARCH_REFERENCE}{request_id}:{index}",
-                                      excerpt=(hit.content or hit.title or "Resultado sin texto.")[:800],
-                                      retrieved_at=utc_now(), kind="observed", source_type="secondary")
-                             for index, hit in enumerate(data.results) if url_host(hit.url) is not None
-                             and not is_non_business(url_host(hit.url))]
-                    return [], facts
+                request = contact_search_request(query, tavily_account_ref)
                 perform(request, TavilySearchResponse, credits=SEARCH_CREDITS,
                         count_key="contacts:web_queries", cap=effort.web_queries,
-                        consumed={"web_queries": 1}, parse=public_hits)
+                        consumed={"web_queries": 1},
+                        parse=lambda data, request_id: ([], contact_search_evidence(company_id, data, request_id)))
             now = utc_now()
             facts = db.list_evidence(company_id)
             urls = list(dict.fromkeys(str(item.url) for item in facts if item.url is not None

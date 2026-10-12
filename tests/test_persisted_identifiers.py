@@ -18,13 +18,12 @@ from prospecting.contacts import (
     finder_request, parse_contacts_output, parse_domain_search, target_departments, verifier_request,
 )
 from prospecting.db import Database
-from prospecting.discovery import (
-    TAVILY_OPERATIONS, ExclusionList, build_search_queries, exclusion_evidence,
-    extract_query, extract_request, match_exclusion, search_request,
-)
+from prospecting.discovery import build_search_queries, extract_query
 from prospecting.haiku import MODEL_ID
+from prospecting.identity import ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
 from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ClaudeClient, ProviderClient
+from prospecting.providers.tavily import TAVILY_OPERATIONS, extract_request, search_request
 from prospecting.qualification import build_haiku_request, unknown_criteria
 from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit
 

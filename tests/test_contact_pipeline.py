@@ -12,10 +12,10 @@ import pytest
 
 from prospecting.budget import AccountAllowance, Budget, CreditValuation, SpendingAuthorization
 from prospecting.contacts import HUNTER_OPERATIONS, HunterAccess
-from prospecting.discovery import TAVILY_OPERATIONS
 from prospecting.models import BusinessStatus, Channel, Contact, Evidence, IdentityStatus, Priority, RunItem, Usage, utc_now
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, HttpResponse
+from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 
 @pytest.fixture

@@ -10,10 +10,12 @@ from urllib.parse import urlsplit
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
-from prospecting.discovery import TAVILY_OPERATIONS, ExclusionList, build_search_queries
+from prospecting.discovery import build_search_queries
+from prospecting.identity import ExclusionList
 from prospecting.models import CampaignLimits, UsageStatus, utc_now
 from prospecting.pipeline import extract_company_pages, resolve_company_identity, run_discovery
 from prospecting.providers import HttpResponse, ProviderClient
+from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 
 SYNTHETIC_KEY = "clave-exclusivamente-sintetica-para-pruebas"

@@ -8,11 +8,15 @@ import pytest
 from pydantic import ValidationError
 
 from prospecting.discovery import (
-    TEMPLATE_VERSION, ExclusionList, PlannedQuery, TavilyExtractResponse,
-    TavilySearchResponse, assess_identity, build_company, build_search_queries,
-    classify_tavily_error, exclusions_status, extract_credits, extract_request, find_reusable,
-    group_candidates, infer_name, load_exclusions, match_exclusion, parse_extract, parse_search,
-    search_request, select_candidates,
+    TEMPLATE_VERSION, PlannedQuery, build_company, build_search_queries, group_candidates, infer_name,
+    select_candidates,
+)
+from prospecting.identity import (
+    ExclusionList, assess_identity, exclusions_status, find_reusable, load_exclusions, match_exclusion,
+)
+from prospecting.providers.tavily import (
+    TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, extract_credits, extract_request,
+    parse_extract, parse_search, search_request,
 )
 from prospecting.models import CampaignLimits, Company, Evidence, IdentityStatus
 from prospecting.providers import ProviderError
