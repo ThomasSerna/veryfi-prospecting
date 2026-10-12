@@ -1,6 +1,6 @@
 """Calificación determinista y Haiku con respuestas exclusivamente sintéticas, sin red."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
 from types import SimpleNamespace
@@ -13,7 +13,7 @@ import pytest
 from prospecting.budget import AccountAllowance, Budget, BudgetError, SpendingAuthorization
 from prospecting.haiku import MODEL_ID
 from prospecting.models import (
-    BusinessStatus, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
+    BusinessStatus, Contact, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
 )
 from prospecting.pipeline import qualify_company
 from prospecting.providers import ClaudeClient, ProviderError, claude_cost
@@ -362,6 +362,67 @@ def test_rerun_reuses_assessment_without_calling_again(claude):
     first = claude.qualify()
     second = claude.qualify()
     assert second.status == "already_assessed" and second.assessment_id == first.assessment_id
+    assert len(claude.requests) == 1
+
+
+def new_primary(case, excerpt="Empresa Uno procesa facturas de proveedores recibidas."):
+    fact = Evidence(company_id=case.company.id, claim="Texto sintético de la ampliación.",
+                    url="https://empresa-uno.example/facturas", excerpt=excerpt,
+                    retrieved_at=utc_now(), kind="observed", source_type="primary")
+    case.db.save_evidence(fact)
+    return fact
+
+
+def test_insufficient_assessment_is_repeated_once_after_new_company_evidence(claude):
+    claude.reply = message(output(claude, values=(None, None, 1, None, None)))
+    first = claude.qualify()
+    assert first.priority == "insufficient_evidence"
+    assert claude.qualify().status == "already_assessed" and len(claude.requests) == 1
+    fact = new_primary(claude)
+    claude.reply = message(output(claude, values=(1, 1, 0.5, 1, None)))
+    second = claude.qualify()
+    assert second.status == "assessed" and second.priority == "high" and len(claude.requests) == 2
+    assert str(fact.id) in json.loads(claude.requests[1].content)["messages"][0]["content"]
+    assert claude.db.get_assessment(second.assessment_id).revision_of == first.assessment_id
+    assert claude.qualify().status == "already_assessed" and len(claude.requests) == 2
+
+
+def test_new_evidence_does_not_repeat_a_sufficient_assessment(claude):
+    first = claude.qualify()
+    new_primary(claude)
+    again = claude.qualify()
+    assert first.priority == "medium" and again.status == "already_assessed"
+    assert len(claude.requests) == 1
+
+
+@pytest.mark.parametrize("change", ["manual", "contact", "crowded"])
+def test_only_company_evidence_that_reaches_haiku_repeats_an_insufficient_assessment(claude, change):
+    if change == "crowded":
+        # Fuentes primarias posteriores a la citada llenan el límite de entrada; la nueva, más
+        # reciente y más larga que cualquiera de ellas, no cabe en el espacio que dejan.
+        for index in range(30):
+            claude.db.save_evidence(Evidence(
+                company_id=claude.company.id, claim=f"Texto sintético anterior {index}.",
+                url=f"https://empresa-uno.example/pagina-{index}", excerpt="Texto sintético. " * 30,
+                retrieved_at=RETRIEVED_AT + timedelta(hours=1), kind="observed", source_type="primary"))
+    claude.reply = message(output(claude, values=(None, None, 1, None, None)))
+    first = claude.qualify()
+    assert first.priority == "insufficient_evidence"
+    if change == "manual":
+        claude.db.save_evidence(Evidence(
+            company_id=claude.company.id, claim="Revisión manual sintética posterior.", provider="veryfi_exclusions",
+            external_reference="lista:2", retrieved_at=utc_now(), kind="observed", source_type="manual"))
+    elif change == "contact":
+        contact = Contact(company_id=claude.company.id)
+        claude.db.save_contact(contact)
+        claude.db.save_evidence(Evidence(
+            company_id=claude.company.id, contact_id=contact.id, claim="Hecho sintético de contacto.",
+            url="https://empresa-uno.example/equipo", excerpt="Persona sintética.", retrieved_at=utc_now(),
+            kind="observed", source_type="primary"))
+    else:
+        new_primary(claude, excerpt="Página nueva sintética. " * 40)
+    again = claude.qualify()
+    assert again.status == "already_assessed" and again.assessment_id == first.assessment_id
     assert len(claude.requests) == 1
 
 

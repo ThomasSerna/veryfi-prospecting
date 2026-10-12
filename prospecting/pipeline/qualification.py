@@ -38,6 +38,14 @@ class QualificationReport(Contract):
 _FINAL_STATUS = {Priority.LOW: BusinessStatus.LOW_FIT}
 
 
+def _expanded_evidence(assessment: Assessment, evidence) -> set[UUID]:
+    """Evidencia de empresa posterior a una evaluación insuficiente: la ampliación de §7 permite recalificar."""
+    if assessment.priority != Priority.INSUFFICIENT_EVIDENCE:
+        return set()
+    return {item.id for item in evidence if item.contact_id is None and item.source_type != "manual"
+            and item.retrieved_at > assessment.created_at}
+
+
 def _store_assessment(db: Database, run_item: RunItem, assessment: Assessment, *, stop_reason) -> Assessment:
     stages = list(RunStage)
     stage = max(run_item.stage, RunStage.ASSESSED, key=stages.index)
@@ -61,6 +69,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     Sin identidad confirmada o con exclusión no se consulta a Haiku. Un fallo deja la
     evaluación pendiente con su motivo literal, sin reintentar ni cambiar de modelo (§12.2).
     `insufficient_evidence` no se fija como resultado comercial: queda una ampliación (§7).
+    Solo una evaluación insuficiente se repite, y solo si hay evidencia de empresa posterior
+    que entre en la solicitud; las demás se reutilizan.
     """
     campaign = db.get_campaign(campaign_id)
     run_item = db.get_run_item(campaign_id, company_id)
@@ -72,10 +82,16 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                 if item.rubric_version == campaign.rubric_version]
     latest = previous[-1] if previous else None
     modeled = [item for item in previous if item.prompt_version == PROMPT_VERSION]
-    if modeled:
+    evidence = db.list_evidence(company_id)
+    fresh = set() if not modeled else _expanded_evidence(modeled[-1], evidence)
+
+    def reuse():
         return QualificationReport(**base, status="already_assessed", assessment_id=modeled[-1].id,
                                    priority=modeled[-1].priority, fit_score=modeled[-1].fit_score,
                                    coverage=modeled[-1].coverage)
+
+    if modeled and not fresh:
+        return reuse()
 
     def pending(reason, message, **extra):
         db.save_run_item(run_item.model_copy(update={
@@ -106,11 +122,13 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
             f"Identidad no confirmada ({run_item.stop_reason or 'pendiente'}); no se consultó a Haiku.",
             "insufficient_evidence:identity_unconfirmed",
         )
-    evidence = db.list_evidence(company_id)
     try:
         payload, selected = build_haiku_request(company, evidence, campaign)
     except QualificationError as error:
         return pending(error.code, error.message)
+    if fresh and not fresh & {item.id for item in selected}:
+        # La evidencia nueva no cabe en la solicitud: repetirla no aportaría nada a Haiku.
+        return reuse()
     if not selected:
         return without_model(Priority.INSUFFICIENT_EVIDENCE, "no_evidence",
                              "No hay evidencia utilizable de la empresa; no se consultó a Haiku.",
