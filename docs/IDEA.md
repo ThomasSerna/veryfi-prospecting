@@ -1,6 +1,6 @@
 # Veryfi Prospecting: descubrimiento y calificación de clientes potenciales
 
-Versión 1.2 — 11 de octubre de 2026. Fechas en America/Bogota.
+Versión 1.3 — 12 de octubre de 2026. Fechas en America/Bogota.
 
 Documento de producto, plan de implementación y guía para agentes de código del proyecto de Sistemas de Información para Veryfi. Recoge las decisiones tomadas con el equipo. Las reglas numéricas de calificación, las metas de evaluación y la arquitectura son propuestas iniciales para implementar y validar; no representan criterios comerciales ya certificados por Veryfi.
 
@@ -36,10 +36,12 @@ Una empresa atractiva sin canal directo queda como **pendiente de contacto**, no
 | Entrega final académica | 6 de noviembre de 2026 |
 | Presupuesto | Mantener gastos bajos; máximo USD 20 para todo el primer sprint |
 | Modelo de IA | Haiku 5.5 para interpretación y clasificación; el equipo declara acceso API |
-| Proveedores de datos | El equipo puede abrir cuentas de Tavily, Apollo y Hunter; acceso y créditos concretos pendientes de probar |
+| Proveedores de datos | MVP: Tavily Search/Extract para empresas y evidencia; Hunter para búsqueda de personas y correos profesionales, sujeto a acceso y cupo verificados. Apollo y X-Ray Search quedan como ampliaciones condicionales para la entrega final |
 | Validación | El Head of LATAM Engineering puede revisar resultados y ayudar con ejemplos y exclusiones |
 
 Valores de implementación propuestos: hasta 20 empresas analizadas por ejecución, uno a tres contactos por empresa, ejecución a demanda, interfaz y explicaciones en español, lectura de fuentes en español e inglés. Colombia y México son la muestra inicial; no se afirma cobertura validada de toda Latinoamérica. Brasil/portugués requieren una evaluación posterior.
+
+La ruta inicial de contactos para el MVP será Hunter Domain Search sobre dominios confirmados y cargos pertinentes; si la respuesta resulta insuficiente, se podrá complementar con fuentes públicas encontradas mediante Tavily y Hunter Email Finder para personas identificadas. No asumir que un endpoint o crédito está habilitado por tener una clave: comprobar condiciones reales de acceso, costo, límites y procedencia antes de hacer llamadas.
 
 El presupuesto posterior al 16 de octubre no está definido. No renovar el cupo de USD 20 automáticamente: mientras no haya una nueva decisión, los siguientes sprints deben usar el remanente, créditos gratuitos y pruebas sin consumo.
 
@@ -67,7 +69,7 @@ La tecnología de Veryfi es lo que se busca vender. Esta aplicación no necesita
 - Buscar evidencia de un caso de uso y asociarlo al catálogo de Veryfi.
 - Calificar con criterios visibles y registrar datos desconocidos.
 - Asignar una investigación de contactos básica o profunda según prioridad.
-- Encontrar personas, verificar su relación con la empresa y buscar un canal directo.
+- Encontrar personas y canales con la ruta inicial Tavily + Hunter, condicionada a acceso comprobado; verificar relación laboral, cargo, procedencia y estado del canal.
 - Mostrar resultados parciales, evidencia, motivos de detención y consumo.
 - Guardar ejecuciones y permitir revisión y exportación CSV.
 - Aplicar límites de gasto, exclusiones y la prohibición de contactar.
@@ -75,7 +77,8 @@ La tecnología de Veryfi es lo que se busca vender. Esta aplicación no necesita
 ### 4.2 Hasta la entrega final
 
 - Ajustar reglas con la revisión de Veryfi y evaluar empresas no usadas para ajustarlas.
-- Completar el proveedor alternativo de contactos si no entró en el primer sprint.
+- Evaluar Apollo como segunda fuente de personas/enriquecimiento si los resultados del MVP muestran cobertura insuficiente y su cuenta permite acceso y consumo controlado.
+- Evaluar X-Ray Search con buscadores tradicionales para localizar perfiles públicos indexados de LinkedIn; implementarlo solo si aporta cobertura y respeta las restricciones de §11.2.
 - Evaluar la clasificación de Haiku con evidencia revisada y ajustar los prompts cuando sea necesario.
 - Mejorar recuperación de ejecuciones, frescura de datos y manejo de fallos.
 - Entregar documentación reproducible, evaluación y límites observados.
@@ -226,14 +229,14 @@ La prioridad decide cuánto investigar, no autoriza gasto ilimitado. Todos los n
 | Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Hasta 3 personas; hasta 3 enriquecimientos por proveedor habilitado | 180 s adicionales |
 | Prioridad baja/excluida | Ninguna adicional | Ninguna adicional | Ninguno | Detener |
 
-En búsqueda de personas, permitir como máximo una consulta Apollo para prioridad media y dos para alta. Cada verificación de correo también consume su cupo; máximo una por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada.
+En búsqueda de personas, permitir como máximo una consulta al proveedor especializado para prioridad media y dos para alta (Hunter Domain Search en el MVP; Apollo solo si se habilita después). Los límites de personas y enriquecimientos permanecen vigentes. Cada llamada a Hunter Finder/Verifier y cada verificación de correo consume el cupo correspondiente; máximo una verificación por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
 
 Secuencia de menor a mayor esfuerzo:
 
 1. Revisar evidencia ya obtenida, páginas corporativas y canales laborales publicados.
-2. Buscar personas por función y empresa en Apollo si el acceso está habilitado; complementar con web pública.
-3. Enriquecer solamente candidatos con identidad y función pertinentes. Preferir correo corporativo; no solicitar emails personales.
-4. Si falta correo, usar Hunter Email Finder con nombre y dominio confirmados. No fabricar combinaciones de correo.
+2. Consultar Hunter Domain Search sobre el dominio confirmado, filtrando por función y cargos del perfil, si la cuenta tiene acceso y cupo; complementar candidatos con búsqueda web pública mediante Tavily cuando haga falta.
+3. Verificar nombre completo, entidad, cargo actual, pertinencia y procedencia. Enriquecer solamente candidatos con identidad y función pertinentes; preferir correo corporativo y no solicitar emails personales.
+4. Si falta correo, usar Hunter Email Finder con nombre y dominio confirmados. Reutilizar las verificaciones vigentes incluidas en la respuesta y usar Verifier solo cuando corresponda y haya cupo; no fabricar direcciones.
 5. Usar teléfono directo/extensión o WhatsApp profesional publicado cuando haya asociación explícita a la persona.
 6. Mantener LinkedIn como alternativa; si es el único canal, pedir confirmación humana de que ventas puede usar mensajería.
 
@@ -249,7 +252,7 @@ Tope inicial global de ejecución: 45 minutos, además de los límites de llamad
 
 Nombre completo identificado, empresa/entidad correcta, cargo respaldado, función relevante y evidencia de relación vigente sin contradicciones pendientes. Guardar función en la compra como `business_champion`, `technical_champion`, `economic_buyer` o `unknown`; un título por sí solo no confirma autoridad de compra.
 
-Cuando Apollo entregue identificadores o nombres incompletos, conservarlos como candidatos; no completar apellidos con IA. Resolver identidad por enriquecimiento o fuente pública antes de marcar listo.
+Cuando Hunter, una búsqueda web o una futura integración con Apollo entreguen identificadores o nombres incompletos, conservarlos como candidatos; no completar apellidos con IA. Resolver identidad con evidencia del proveedor o fuentes públicas antes de marcar listo.
 
 ### 10.2 Reglas por canal
 
@@ -286,16 +289,17 @@ Documentación consultada el 10 de octubre de 2026. Acceso, planes y consumo se 
 | Componente | Elección inicial y función | Condición y alternativa |
 |---|---|---|
 | Búsqueda/evidencia | Tavily Search/Extract | Usar créditos gratuitos primero, búsqueda básica y URLs seleccionadas. Sin Research/Crawl amplio por defecto [W1] |
-| Personas | Apollo People Search y enriquecimiento selectivo | Search no devuelve email/teléfono; acceso gratuito puede exigir correo laboral y elegibilidad. Si falla, búsqueda web + Hunter [W2] |
-| Correo | Hunter Email Finder/Verifier | Recupera datos de una persona identificada; conservar fuentes y estados. No sustituye validación del cargo [W3] |
+| Personas (MVP) | Hunter Domain Search | Buscar personas por dominio de empresa confirmado y cargos relevantes. Complementar con Tavily cuando haya cobertura insuficiente; habilitar solo con acceso, consumo y fuentes verificados [W3] |
+| Correo (MVP) | Hunter Email Finder/Verifier | Obtener correo laboral de una persona identificada y verificarlo solo cuando sea necesario; conservar estado, fuentes y fechas. No sustituye validación del cargo [W3] |
+| Personas (ampliación condicional) | Apollo People Search y enriquecimiento selectivo | Evaluar después del MVP si mejora cobertura/pertinencia a un costo justificable y la cuenta permite los endpoints. Search no entrega email/teléfono; no habilitar por defecto [W2] |
 | Interpretación y clasificación | Haiku 5.5 | Extraer hechos, evaluar criterios, relacionar casos de uso y producir explicación breve con referencias; Python aplica el cálculo y las reglas [W4] |
 | Revisión de perfiles | LinkedIn manual | No depender de una API abierta de Sales Navigator ni automatizar el sitio [W5] |
 
 Alternativas evaluadas, no integraciones obligatorias: Exa para descubrimiento semántico de empresas/personas y Brave Search API para búsqueda general [W6, W7]. Cambiar de buscador solo si la evaluación muestra una limitación concreta; no integrar varios a la vez por previsión.
 
-Apollo: empezar por `mixed_people/api_search` y `people/match`; comprobar correspondencia actual entre persona y empresa incluso si el filtro devuelve un empleo anterior. Enriquecimiento de móvil y waterfall quedan desactivados en el sprint: cuestan más créditos y pueden requerir resultados asíncronos. Verificar parámetros y respuesta en la documentación de la cuenta antes de implementar [W2].
+Apollo (evaluación para la entrega final, no T06 del MVP): si las pruebas de cobertura justifican incorporarlo, considerar `mixed_people/api_search` y `people/match`, verificando correspondencia actual entre persona y empresa incluso si aparece un empleo anterior. Mantener desactivados enriquecimiento de móvil y waterfall de costo variable. Verificar parámetros, respuesta y disponibilidad en la cuenta antes de desarrollar o consumir [W2].
 
-Hunter: activar Finder y Verifier según necesidad, reutilizando verificación ya incluida cuando siga vigente. Su clave pública de prueba devuelve datos ficticios: sirve para probar contratos, nunca para presentar resultados como prospectos reales [W3].
+Hunter (primera ruta de T06): comprobar Domain Search con filtros de cargo/departamento y fuentes; usar Email Finder únicamente para candidatos identificados cuyo correo no se obtuvo. Activar Verifier solo si hace falta, reutilizando una verificación incluida y vigente. Confirmar acceso, parámetros, créditos y procedencia con la cuenta real. Su clave pública de prueba devuelve datos ficticios: sirve para probar contratos, nunca para presentar resultados como prospectos reales [W3].
 
 No añadir endpoints de secuencias, envío, creación de campañas ni sincronización de contactos a plataformas externas. Las integraciones de prospección usan lectura/búsqueda/enriquecimiento aunque algunas llamadas HTTP sean POST.
 
@@ -303,11 +307,11 @@ No añadir endpoints de secuencias, envío, creación de campañas ni sincroniza
 
 Probar una muestra mínima y registrar para cada proveedor: cuenta disponible, endpoints permitidos, crédito inicial, límite, costo real de la llamada y resultado. Crear un pequeño registro `docs/provider-check.md` sin secretos ni datos personales innecesarios.
 
-Si Apollo no permite enriquecer, usar web + Hunter. Si tampoco hay datos accesibles por esa vía, continuar con evidencia pública y alternativas, registrando la carencia. No comprar un plan que supere el presupuesto ni sustituir contactos reales por datos inventados. La obtención automática de canales directos debe demostrarse con resultados reales para considerarla validada.
+Para el MVP, comprobar primero la ruta Hunter y sus créditos. Si Domain Search o Finder no están disponibles, continuar con evidencia pública mediante Tavily, dejar el contacto como pendiente cuando no exista canal útil y registrar la limitación; la incorporación anticipada de Apollo exige una decisión explícita. No comprar un plan que supere el presupuesto ni sustituir contactos reales por datos inventados. La obtención automática de canales directos debe demostrarse con resultados reales para considerarla validada.
 
 ### 11.2 Extensión futura: X-Ray Search para descubrimiento de contactos
 
-Se propone incorporar una estrategia de **X-Ray Search** que permita descubrir posibles contactos profesionales mediante motores de búsqueda tradicionales, utilizando consultas restringidas a perfiles públicos indexados de LinkedIn.
+Para la entrega final del 6 de noviembre, se propone **evaluar** una estrategia de X-Ray Search que descubra posibles contactos profesionales mediante motores de búsqueda tradicionales y consultas restringidas a perfiles públicos indexados de LinkedIn. No forma parte de T06 ni es condición para cerrar el MVP; su implementación dependerá de cobertura, costo, acceso y tiempo disponibles.
 
 El objetivo es reducir la dependencia de proveedores de enriquecimiento comercial para la identificación inicial de personas y ampliar las fuentes disponibles.
 
@@ -336,7 +340,13 @@ El objetivo es reducir la dependencia de proveedores de enriquecimiento comercia
 
 **Evaluación futura:**
 
-Antes de integrar esta funcionalidad, comparar su cobertura, precisión, costo y actualidad de los perfiles frente a Apollo y las búsquedas web convencionales.
+Antes de integrar esta funcionalidad, comparar su cobertura, pertinencia, costo y actualidad de los perfiles frente a la ruta Tavily + Hunter y, si está disponible, Apollo. Si no aporta una mejora verificable, documentar la evaluación y aplazar la integración.
+
+### 11.3 Evolución de la búsqueda de contactos
+
+T06 implementa una sola ruta principal viable: Tavily para evidencia pública y Hunter para personas/canales. La validación de identidad, puesto, canal, procedencia y estado comercial debe ser independiente de la fuente concreta y reutilizar los contratos `Contact`, `Channel` y `Evidence` (§13.2); no construir una plataforma genérica de conectores.
+
+Para la entrega final, considerar Apollo y X-Ray Search como extensiones **opcionales**, no como proveedores obligatorios ni como permiso para ampliar presupuesto. Decidir a partir de una muestra de empresas calificadas: personas pertinentes halladas, cobertura de canales utilizables, actualidad de fuentes, crédito/costo consumido y fallos. Solo implementar si el incremento es útil y se mantiene el alcance sin contacto comercial automático.
 
 ## 12. Uso de IA y protección de decisiones
 
@@ -420,7 +430,7 @@ find_contacts(company, assessment, limits) -> contacts + channels + stop_reason
 derive_readiness(assessment, contacts, evidence, review) -> resultado comercial
 ```
 
-Cada función devuelve datos y errores tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` y el cálculo de score son código determinista. Solo `pipeline` decide avanzar y reserva gasto antes de llamar proveedores.
+Cada función devuelve datos y errores tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` y el cálculo de score son código determinista. Solo `pipeline` decide avanzar y reserva gasto antes de llamar proveedores. Las fuentes presentes o futuras de personas deben desembocar en los mismos contratos y reglas de verificación, sin crear capas de abstracción especulativas.
 
 ### 13.3 Ejecución y recuperación
 
@@ -486,7 +496,7 @@ Las fechas siguientes son hitos propuestos. El equipo debe iniciar por comprobar
 | 10–11 oct. | Contratos, catálogo/rúbrica inicial, cuentas y pruebas mínimas de acceso; solicitar ejemplos a Veryfi | Contratos compartidos y registro de proveedor con acceso, consumo y limitaciones reales |
 | 11–12 oct. | Descubrimiento en los dos segmentos/países y persistencia de fuentes | Empresas reales con dominio y evidencia; duplicados/exclusiones identificados |
 | 12–13 oct. | Haiku, evaluación por criterios, cálculo en Python y límites de esfuerzo | Desglose explicable; casos desconocidos y negativos diferenciados |
-| 12–14 oct. | Búsqueda de personas y canal por la primera ruta viable | Al menos una ficha real con persona/canal respaldados; sin envío |
+| 12–14 oct. | T06: comprobar acceso y desarrollar la primera ruta Tavily + Hunter (Domain Search y Finder según necesidad) | Al menos una ficha real con persona/canal respaldados si el proveedor lo permite; sin envío y con límites documentados |
 | 14–15 oct. | Integración UI, CSV, recuperación, presupuesto y pruebas críticas | Flujo completo desde criterios hasta resultado; fallos simulados conservan datos |
 | 15–16 oct. | Ejecución pequeña, revisión con Veryfi y preparación de demo | Resultados reales, métricas iniciales, gasto conciliado y límites documentados |
 
@@ -505,8 +515,8 @@ Repartir código por archivos/responsabilidad después de acordar contratos. Un 
 
 | Período | Objetivo | Resultado |
 |---|---|---|
-| 17–23 oct. | Revisar falsos positivos y falta de canales; completar alternativa de proveedor | Rúbrica revisada con ejemplos, mejores razones de descarte y cobertura medida |
-| 24–30 oct. | Validar la calificación con Haiku en empresas nuevas | Tabla de calidad, costo, tiempo y fallos por país/segmento; ajustes sustentados de rúbrica y prompts |
+| 17–23 oct. | Revisar falsos positivos y cobertura Hunter; evaluar Apollo como ampliación condicional | Calidad y cobertura medidas; integrar Apollo solo si el acceso y la mejora justifican el costo |
+| 24–30 oct. | Validar Haiku en empresas nuevas y evaluar X-Ray Search de perfiles indexados | Tabla de calidad, costo, tiempo y fallos; decisión documentada sobre X-Ray sin retrasar la validación de Haiku |
 | 31 oct.–5 nov. | Corregir fallos, congelar alcance y preparar entrega | Instalación reproducible, pruebas, demo sin consumo obligatorio y documento académico |
 | 6 nov. | Entrega | Código del prototipo, guía, evaluación, limitaciones y propuesta de condiciones para piloto |
 
@@ -540,7 +550,16 @@ No abrir cuentas, comprar planes, desplegar públicamente, enviar mensajes ni ge
 | T10 | Incorporar revisión de Veryfi y validar la calificación con Haiku | T09 | Rúbrica/versiones registradas, conjunto de evaluación separado y conclusión sustentada |
 | T11 | Preparar entrega y condiciones del piloto | T09–T10 | README reproducible, informe, demo y límites de producción explícitos |
 
-T03/T04, T05 y T06/T08 pueden desarrollarse por personas distintas usando los contratos acordados. La ejecución real contra proveedores debe compartir control de presupuesto. T10 no bloquea el MVP del 16 de octubre.
+T03/T04, T05 y T06/T08 pueden desarrollarse por personas distintas usando los contratos acordados. La ejecución real contra proveedores debe compartir control de presupuesto. T10 no bloquea el MVP del 16 de octubre. T06 prioriza Hunter como ruta inicial, condicionada a comprobación de acceso; Apollo y X-Ray no son requisitos del MVP.
+
+Posibles tareas adicionales para el proyecto final (propuestas, **aún no issues creados**):
+
+| ID propuesto | Encargo | Dependencias | Criterio para implementarlo |
+|---|---|---|---|
+| T12 | Evaluar e integrar Apollo como fuente adicional de personas/canales | T06, T09; acceso y presupuesto autorizados | Mayor cobertura/pertinencia medida frente a Hunter, con procedencia, validación y gasto controlados |
+| T13 | Evaluar e integrar X-Ray Search mediante buscadores públicos | T06, T09; resultados indexados utilizables | Descubrimiento adicional con fuentes contrastadas; sin scraping de LinkedIn ni URL aislada como canal útil |
+
+T12 y T13 son independientes y opcionales; pueden limitarse a evaluación documentada si la evidencia no justifica implementarlas. No se añaden como dependencias de T11 ni habilitan consumo nuevo.
 
 ### 17.3 Plantilla para asignar una tarea
 
@@ -592,7 +611,7 @@ Objetivos orientativos para discutir con Veryfi, no resultados prometidos: al me
 ### MVP del 16 de octubre
 
 - Una ejecución parte de criterios y descubre empresas reales de los perfiles seleccionados.
-- El flujo produce evidencia, score/desglose, asignación de esfuerzo y búsqueda de personas/canales.
+- El flujo produce evidencia, score/desglose, asignación de esfuerzo y búsqueda de personas/canales mediante la ruta inicial Tavily + Hunter, cuando el acceso haya sido comprobado; no depende de Apollo ni X-Ray Search.
 - Se demuestra al menos un prospecto real completo; se muestran honestamente pendientes y fallos. Si no se obtiene ninguno, la parte de contactabilidad sigue sin validar.
 - No aparece como listo ningún registro que incumpla la regla de canal directo.
 - UI, revisión y exportación funcionan; no dependen de contactar a nadie.
@@ -610,8 +629,9 @@ Pasar a piloto requiere, como mínimo, datos suficientes para que ventas lo cons
 
 | Riesgo | Respuesta prevista |
 |---|---|
-| Proveedor inaccesible o sin crédito de enriquecimiento | Comprobación temprana; ruta web + proveedor alternativo; informar cobertura real |
+| Hunter inaccesible o con cobertura insuficiente | Comprobar cuenta y créditos; usar evidencia pública de Tavily para candidatos, mantener canales no demostrados en pendiente y evaluar Apollo después sin activarlo automáticamente |
 | Persona correcta pero sin canal | Estado pendiente; esfuerzo acotado; medir costo por resultado útil |
+| X-Ray Search encuentra perfiles desactualizados o incompletos | Contrastar empleo actual y entidad con fuentes adicionales; URL de LinkedIn no equivale a canal confirmado |
 | Cargo antiguo o matriz equivocada | Evidencia por entidad/país, fechas y revisión de contradicciones |
 | Score parece probabilidad comercial | Etiquetar encaje y cobertura; mostrar criterios; calibrar con Veryfi |
 | Modelo barato produce errores | Revisar evidencia y contratos; comparar configuraciones sin asumir calidad por precio |
