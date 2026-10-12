@@ -279,7 +279,7 @@ def test_automatic_lead_saving_blocks_finder_and_verifier(contact_case):
 def test_missing_persisted_result_never_repeats_sent_operation(contact_case):
     case = contact_case
     from prospecting.providers.hunter import domain_search_request
-    request = domain_search_request(case.company, ["Product Manager"], case.access.search_account_ref)
+    request = domain_search_request(case.company, ["Product Manager"], case.access.search_account_ref, limit=1)
     usage = Usage(campaign_id=case.campaign.id, company_id=case.company.id, provider="hunter", operation="domain_search",
                   account_ref=case.access.search_account_ref, request_fingerprint=case.client.fingerprint(request),
                   reserved_credits="1", reserved_cost_usd="0", funding_source="free_credit", status="succeeded", outcome="succeeded")
@@ -340,10 +340,11 @@ def high_priority(case):
 def test_high_priority_bounds_people_and_second_department_query(contact_case):
     case = contact_case
     high_priority(case)
-    case.replies["domain_search"] = {"data": {"domain": case.company.domain, "organization": case.company.name,
+    # Como Hunter, el servidor sintético devuelve como máximo `limit` resultados.
+    case.replies["domain_search"] = lambda params: {"data": {"domain": case.company.domain, "organization": case.company.name,
         "emails": [{"value": f"persona-{index}@empresa-sintetica.example", "type": "personal",
                     "first_name": "Persona Sintética", "last_name": f"Candidato{index}", "position": "Product Manager"}
-                   for index in range(10)]}}
+                   for index in range(10)][:int(params["limit"])]}}
     report = case.find()
     assert report.business_status == "qualified_no_contact" and len(case.db.list_contacts(case.company.id)) == 3
     assert len(case.calls) == 2 and case.calls[0][1]["job_titles"] == "Product Manager"
@@ -351,6 +352,26 @@ def test_high_priority_bounds_people_and_second_department_query(contact_case):
     run = case.db.get_run_item(case.campaign.id, case.company.id)
     assert run.consumed_limits.people_queries == 2
     assert sum(key.startswith("contacts:person:") for key in run.attempts) == 3
+
+
+@pytest.mark.parametrize(("priority", "limit", "queries"), [("medium", "1", 1), ("high", "3", 2)])
+def test_domain_search_requests_and_reserves_only_the_people_cap(contact_case, priority, limit, queries):
+    case = contact_case
+    if priority == "high":
+        high_priority(case)
+    case.find(hunter_access=case.access.model_copy(update={"enabled_operations": ["domain_search"]}))
+    assert [params["limit"] for _, params, _ in case.calls] == [limit] * queries
+    assert [str(item.reserved_credits) for item in case.db.list_usage(provider="hunter")] == [limit] * queries
+
+
+def test_domain_search_limit_stays_within_hunter_bounds(contact_case):
+    from prospecting.contacts import ContactError
+    from prospecting.providers.hunter import domain_search_request
+    for limit in (0, 11, True):
+        with pytest.raises(ContactError):
+            domain_search_request(contact_case.company, ["Product Manager"], "cuenta-sintetica", limit=limit)
+    request = domain_search_request(contact_case.company, ["Product Manager"], "cuenta-sintetica")
+    assert request.params["limit"] == 10
 
 
 def test_first_useful_domain_result_stops_high_priority(contact_case):

@@ -316,11 +316,14 @@ class _ContactStage:
         access, company = self.hunter_access, self.company
         if access is None or "domain_search" not in access.enabled_operations:
             return None
+        # Se piden tantos resultados como personas permite el nivel y se reserva un crédito por cada uno.
+        limit = min(self.effort.people, 10)
         for index in range(self.effort.people_queries):
             request = domain_search_request(company, self.roles, access.search_account_ref,
-                                            departments=target_departments(self.roles) if index else None)
+                                            departments=target_departments(self.roles) if index else None,
+                                            limit=limit)
             try:
-                self.perform(request, HunterDomainSearchResponse, credits=1,
+                self.perform(request, HunterDomainSearchResponse, credits=limit,
                              count_key=DOMAIN_SEARCH_KEY, cap=self.effort.people_queries,
                              consumed={"people_queries": 1}, funding=access.funding_source,
                              parse=lambda data, request_id: self.save_candidates(

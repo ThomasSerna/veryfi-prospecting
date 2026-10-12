@@ -173,8 +173,11 @@ def _confirmed_domain(company: Company) -> str:
 
 
 def domain_search_request(company: Company, roles: list[str], account_ref: str, *,
-                          departments: list[str] | None = None) -> ProviderRequest:
-    params = {"domain": _confirmed_domain(company), "type": "personal", "limit": 10, "offset": 0}
+                          departments: list[str] | None = None, limit: int = 10) -> ProviderRequest:
+    """Hunter cobra 1 crédito por correo encontrado: `limit` acota el consumo de la consulta."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10:
+        raise ContactError("invalid_limit", "Domain Search admite entre 1 y 10 resultados por consulta.")
+    params = {"domain": _confirmed_domain(company), "type": "personal", "limit": limit, "offset": 0}
     if departments:
         params["department"] = ",".join(dict.fromkeys(departments))
     elif roles:
