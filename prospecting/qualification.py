@@ -24,6 +24,7 @@ EXCERPT_CHARS = 600
 JUSTIFICATION_CHARS = 400
 EXPLANATION_CHARS = 600
 UNCERTAINTY_CHARS = 200
+MAX_UNCERTAINTIES = 3
 _CRITERIA_ORDER = (
     "document_need", "offer_match", "scale_potential", "adoption_capacity", "opportunity_timing",
 )
@@ -333,7 +334,7 @@ def identity_confirmed(company: Company) -> bool:
 
 def explanation_text(output: HaikuAssessment) -> str:
     """Explicación breve más la información que falta (§1, pregunta 3)."""
-    missing = [_clip(item, UNCERTAINTY_CHARS) for item in output.uncertainties[:5]]
-    missing = [item for item in missing if item]
+    missing = [_clip(item, UNCERTAINTY_CHARS) for item in output.uncertainties[:MAX_UNCERTAINTIES]]
+    missing = [item.rstrip(" .;:,") for item in missing if item and item.rstrip(" .;:,")]
     text = _clip(output.explanation, EXPLANATION_CHARS)
     return text + (f" Información pendiente: {'; '.join(missing)}." if missing else "")

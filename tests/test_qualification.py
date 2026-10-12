@@ -18,7 +18,7 @@ from prospecting.pipeline import qualify_company
 from prospecting.providers import ClaudeClient, ProviderError, claude_cost
 from prospecting.qualification import (
     MODEL_ID, PROMPT_VERSION, HaikuAssessment, QualificationError, build_haiku_request, classify,
-    compute_score, parse_output, rubric_for, validate_output,
+    compute_score, explanation_text, parse_output, rubric_for, validate_output,
 )
 
 
@@ -198,6 +198,15 @@ def test_known_value_without_evidence_and_invented_ids_are_rejected(scenario):
     with pytest.raises(QualificationError) as error:
         validate_output(HaikuAssessment.model_validate(data), [scenario.primary], scenario.campaign)
     assert error.value.code == "unknown_evidence"
+
+
+def test_explanation_lists_at_most_three_pending_items_with_single_punctuation(scenario):
+    data = json.loads(output(scenario, uncertainties=[
+        "Sin volumen documental.", "Sin calendario;", "Sin usuarios.", "Cuarto dato.",
+    ]))
+    text = explanation_text(HaikuAssessment.model_validate(data))
+    assert text.endswith("Información pendiente: Sin volumen documental; Sin calendario; Sin usuarios.")
+    assert ".." not in text and ";;" not in text and "Cuarto dato" not in text
 
 
 @pytest.mark.parametrize(("text", "stop_reason", "code"), [
