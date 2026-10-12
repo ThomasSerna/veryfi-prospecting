@@ -1,6 +1,5 @@
 """Calificación con Haiku: Python valida, puntúa y decide la prioridad."""
 
-from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -8,13 +7,11 @@ from pydantic import StrictBool
 
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
-from prospecting.haiku import MODEL_ID
 from prospecting.models import (
-    Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, Usage,
-    UsageStatus, utc_now,
+    Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, utc_now,
 )
-from prospecting.pipeline.calls import seconds_left
-from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderError, reservation_cost
+from prospecting.pipeline.calls import reserve_claude, seconds_left
+from prospecting.providers import ClaudeClient, ProviderError
 from prospecting.qualification import (
     PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
     identity_confirmed, material_contradiction, parse_output, primary_support, rubric_for,
@@ -123,14 +120,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         return pending("time_limit", "Se agotó el tiempo de la etapa antes de llamar.")
     limits = campaign.limits.llm
     try:
-        usage = budget.reserve(Usage(
-            **base, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION, account_ref=account_ref,
-            request_fingerprint=claude.fingerprint(payload, account_ref),
-            reserved_cost_usd=reservation_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
-            reserved_credits=Decimal(0),
-            reserved_tokens=TokenUsage(input_tokens=limits.max_input_tokens, output_tokens=limits.max_output_tokens),
-            funding_source=funding_source, status=UsageStatus.RESERVED,
-        ), authorization)
+        usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), limits, account_ref=account_ref,
+                               funding_source=funding_source, authorization=authorization, **base)
         call = claude.create(usage.request_id, payload, account_ref=account_ref,
                              authorization=authorization, remaining_seconds=remaining)
     except BudgetError as error:

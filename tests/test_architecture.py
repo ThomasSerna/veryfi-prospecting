@@ -39,7 +39,9 @@ ALLOWED = {
         "prospecting.pipeline.contacts", "prospecting.pipeline.discovery", "prospecting.pipeline.qualification",
         "prospecting.pipeline.research",
     },
-    "prospecting.pipeline.calls": {"prospecting.budget", "prospecting.models", "prospecting.providers"},
+    "prospecting.pipeline.calls": {
+        "prospecting.budget", "prospecting.haiku", "prospecting.models", "prospecting.providers",
+    },
     "prospecting.pipeline.discovery": {
         "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.identity", "prospecting.models",
         "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily",
@@ -49,12 +51,12 @@ ALLOWED = {
         "prospecting.pipeline.calls", "prospecting.providers", "prospecting.providers.tavily", "prospecting.sources",
     },
     "prospecting.pipeline.qualification": {
-        "prospecting.budget", "prospecting.db", "prospecting.haiku", "prospecting.models",
+        "prospecting.budget", "prospecting.db", "prospecting.models",
         "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
     },
     "prospecting.pipeline.contacts": {
         "prospecting.budget", "prospecting.contact_extraction", "prospecting.contacts", "prospecting.db",
-        "prospecting.haiku", "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers",
+        "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers",
         "prospecting.providers.hunter", "prospecting.providers.tavily", "prospecting.sources",
     },
 }
@@ -132,9 +134,9 @@ def test_package_has_no_interface_messaging_or_browser_automation():
 
 
 def test_only_the_pipeline_reserves_spending():
-    """Solo el orquestador reserva gasto antes de llamar a un proveedor (§13.2)."""
+    """Solo `pipeline/calls.py` reserva gasto antes de llamar a un proveedor (§13.2, §14.3)."""
     callers = sorted(
-        name for name, tree in trees().items() if not name.startswith("prospecting.pipeline")
+        name for name, tree in trees().items() if name != "prospecting.pipeline.calls"
         and any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                 and node.func.attr == "reserve" for node in ast.walk(tree))
     )

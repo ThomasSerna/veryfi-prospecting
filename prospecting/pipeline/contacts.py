@@ -15,14 +15,9 @@ from prospecting.contacts import (
     validate_contact,
 )
 from prospecting.db import Database
-from prospecting.haiku import MODEL_ID
-from prospecting.models import (
-    BusinessStatus, Contract, IdentityStatus, Priority, RunStage, Text, TokenUsage, Usage, UsageStatus, utc_now,
-)
-from prospecting.pipeline.calls import observed_credits, seconds_left
-from prospecting.providers import (
-    CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, reservation_cost,
-)
+from prospecting.models import BusinessStatus, Contract, IdentityStatus, Priority, RunStage, Text, UsageStatus, utc_now
+from prospecting.pipeline.calls import observed_credits, reserve_claude, reserve_credits, seconds_left
+from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.hunter import (
     HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
     domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
@@ -178,20 +173,8 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
         return False
 
     def reserve(request, fingerprint, credits, funding):
-        cost = Decimal(0)
-        if funding != "free_credit":
-            account = next((item for item in budget.account_allowances if
-                            (item.provider, item.account_ref, item.funding_source) ==
-                            (request.provider, request.account_ref, funding)), None)
-            if account is None or account.credit_valuation is None:
-                raise BudgetError("price_unbounded", "Falta la valoración comprobada del crédito de esta cuenta.")
-            cost = credits * account.credit_valuation.unit_value_usd
-        return budget.reserve(Usage(
-            **base, provider=request.provider, operation=request.operation,
-            account_ref=request.account_ref, request_fingerprint=fingerprint,
-            reserved_credits=credits, reserved_cost_usd=cost,
-            funding_source=funding, status=UsageStatus.RESERVED,
-        ), grant(request.provider, request.operation, request.account_ref))
+        return reserve_credits(budget, request, fingerprint, credits, funding_source=funding,
+                               authorization=grant(request.provider, request.operation, request.account_ref), **base)
 
     def perform(request, response_model, *, credits, count_key, cap, consumed,
                 parse, funding="free_credit", pages=0):
@@ -362,14 +345,10 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
                     if not cached(fingerprint, CLAUDE_PROVIDER, CLAUDE_OPERATION, claude_account_ref, campaign.limits.cache.contact_days):
                         if seconds_left(deadline) <= 0:
                             raise BudgetError("time_limit", "Se agotó el tiempo antes de extraer contactos.")
-                        limits = campaign.limits.llm
-                        usage = budget.reserve(Usage(
-                            **base, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION, account_ref=claude_account_ref,
-                            request_fingerprint=fingerprint, reserved_credits=Decimal(0),
-                            reserved_tokens=TokenUsage(input_tokens=limits.max_input_tokens, output_tokens=limits.max_output_tokens),
-                            reserved_cost_usd=reservation_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
-                            funding_source=claude_funding_source, status=UsageStatus.RESERVED,
-                        ), grant(CLAUDE_PROVIDER, CLAUDE_OPERATION, claude_account_ref))
+                        usage = reserve_claude(budget, fingerprint, campaign.limits.llm, account_ref=claude_account_ref,
+                                               funding_source=claude_funding_source,
+                                               authorization=grant(CLAUDE_PROVIDER, CLAUDE_OPERATION, claude_account_ref),
+                                               **base)
                         requests.append(usage.request_id)
                         try:
                             call = claude.create(usage.request_id, payload, account_ref=claude_account_ref,
