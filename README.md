@@ -347,19 +347,26 @@ campaña. Haiku propone y Python decide:
   confirmada o sin evidencia útil recibe `insufficient_evidence`, con los cinco
   criterios en `null`.
 - **Solicitud:** usa el modelo `claude-haiku-5-5` con el prompt versionado
-  `haiku_assessment_v2`, *thinking* desactivado y *effort* `low`.
+  `haiku_assessment_v3`, *thinking* desactivado y *effort* `low`.
   - La salida es JSON con esquema. El límite de entrada es
     `limits.llm.max_input_tokens` (unos 3 caracteres por token) y el de salida,
     `limits.llm.max_output_tokens`.
   - El prompt limita cada justificación a 25 palabras, la explicación a dos frases y
     los datos pendientes a tres. Una versión nueva del prompt genera una evaluación
     nueva que revisa la anterior (`revision_of`); la anterior se conserva.
+  - Un `1` exige una afirmación explícita, y ante la duda entre dos niveles se elige
+    el menor. Para `document_need`, el `1` exige que el producto reciba o procese
+    comprobantes; emitir facturas o conciliar bancos es, como máximo, `0.5`. La
+    explicación solo puede afirmar hechos de la evidencia citada.
   - La evidencia de la empresa va como datos delimitados y no confiables: primero
     las fuentes primarias, sin la evidencia de contactos ni las revisiones manuales.
+    Los resultados del buscador llegan marcados como `search_result` y sin el texto
+    de la consulta, que no es un hecho sobre la empresa.
 - **Validación:** Haiku devuelve un valor `0`, `0.5`, `1` o `null` por criterio, con
   `evidence_ids` y justificación, además de productos, cargos, contradicciones y datos
   faltantes. Python rechaza los ids no suministrados, los valores conocidos sin
-  evidencia y los productos o cargos fuera de la configuración. No los corrige.
+  evidencia, los productos o cargos fuera de la configuración y los `1` que solo se
+  apoyan en resultados del buscador. No los corrige.
 - **Puntuación:** Python calcula `fit_score` y `coverage` con los pesos de
   `rubric_v1`. `null` no suma peso ni equivale a cero. La prioridad sigue las reglas
   de IDEA.md §8.2 con los umbrales de la rúbrica: `high` exige además que la
