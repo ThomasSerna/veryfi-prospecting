@@ -135,8 +135,9 @@ Campaña de prueba: Colombia, `fintech_software`; empresa confirmada de priorida
 Resultado comercial: `qualified_no_contact`. Hunter no demuestra que el empleo esté vigente;
 las reglas de §10 exigen una fuente fechada o un directorio corporativo actual, que la ruta
 pública (Tavily más Haiku) puede aportar. La etapa se ejecutó solo con Hunter. Los datos de
-la persona quedan en `data/` y no se reproducen aquí. El consumo está pendiente de conciliar
-con el panel de Hunter.
+la persona quedan en `data/` y no se reproducen aquí. Conciliado el 2026-10-12 con el panel
+de Hunter, verificado por el responsable: 1 crédito usado y 49 disponibles, USD 0. El
+comprobante local queda en `data/conciliaciones/`.
 
 ### Observaciones y limitaciones
 
