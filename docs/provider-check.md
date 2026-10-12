@@ -77,32 +77,41 @@ confirmados. Mantener *pay as you go* desactivado evita cargos fuera del crédit
 |---|---|
 | Fecha | 2026-10-11 (America/Bogota) |
 | Cuenta | `anthropic-equipo-prepago`; saldo prepago; cupo asignado por el responsable: USD 3 (partida de IA, §14) |
-| Autorización | Responsable del cupo, en la sesión: 2 autorizaciones de 1 llamada `messages` a `claude-haiku-5-5`, ≤ USD 0,005 cada una (prompt v1 y v2) |
+| Autorización | Responsable del cupo, en la sesión: 3 autorizaciones de 1 llamada `messages` a `claude-haiku-5-5`, ≤ USD 0,005 cada una (prompts v1, v2 y v3) |
 | Cliente | SDK oficial `anthropic==1.11.0`, `max_retries=0`, timeout ≤ 30 s |
-| Parámetros | `thinking={"type": "disabled"}`, `output_config.effort="low"`, salida JSON con esquema (`output_config.format`), `max_tokens=1000`, prompts `haiku_assessment_v1` y `haiku_assessment_v2` |
+| Parámetros | `thinking={"type": "disabled"}`, `output_config.effort="low"`, salida JSON con esquema (`output_config.format`), `max_tokens=1000`, prompts `haiku_assessment_v1` a `haiku_assessment_v3` |
 | Documentación | Referencia oficial de la API de Claude (modelos, precios y parámetros), consultada el 2026-10-11 |
 
 | Prompt | Tokens de entrada | Tokens de salida | Costo reservado | Costo estimado | Latencia | Resultado |
 |---|---:|---:|---:|---:|---|---|
 | v1 | 5.288 | 939 | USD 0,0011 | USD 0,000998 | 9,6 s | Respuesta válida; todas las referencias existen; evaluación `medium` (encaje 55,6, cobertura 90 %) de la empresa confirmada de la campaña de prueba |
 | v2 | 5.347 | 736 | USD 0,0011 | USD 0,000903 | 6,0 s | Respuesta válida y referencias existentes; justificaciones de 11–14 palabras (antes 20–38). Misma empresa y evidencia: evaluación `high` (encaje 75,0, en el umbral; cobertura 90 %) |
+| v3 | 5.508 | 679 | USD 0,0011 | USD 0,000890 | 5,5 s | Respuesta válida; todas las citas son fuentes primarias. Misma empresa y evidencia: evaluación `medium` (encaje 55,6; cobertura 90 %), con `document_need` 0,5 justificado por la falta de captura de comprobantes |
 
-El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Las dos
-llamadas suman unos USD 0,0019, pendientes de conciliar con la consola de Anthropic.
+El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Las tres
+llamadas suman unos USD 0,0028, pendientes de conciliar con la consola de Anthropic.
 
 ### Observaciones y limitaciones
 
 - El API aceptó el esquema (con `enum` que incluye `null` y `format: uuid`), el *thinking*
   desactivado y el *effort* `low`.
 - Con v1, la salida usó 939 de 1.000 tokens y se arriesgaba a quedar truncada. Con v2 usó
-  736, que deja margen. Una respuesta truncada deja la evaluación pendiente; no se inventa.
+  736 y con v3, 679, que dejan margen. Una respuesta truncada deja la evaluación pendiente;
+  no se inventa.
 - La entrada usó unos 5.300 de los 6.000 tokens reservados, con unos 3,4 caracteres por
   token. El presupuesto de caracteres (3 por token) deja margen, aunque estrecho.
 - **Calidad:** con la misma evidencia, `document_need` pasó de 0,5 (v1) a 1 (v2), y la
   prioridad, de `medium` a `high`. Las referencias de v2 existen, pero los fragmentos citados
   hablan de facturación electrónica y conciliación bancaria, no de recibir o procesar
   comprobantes. Además, la explicación de v2 afirma una «captura de recibos» que no aparece
-  en esas páginas. Una causa probable es que la evidencia del buscador incluye el texto de
-  la consulta. La validación automática comprueba referencias, no si la fuente respalda la
-  afirmación, así que este error necesita revisión humana (§12.1) y evaluación (T10).
-- Son dos llamadas sobre una sola empresa: no miden calidad ni calibración de la calificación.
+  en esas páginas. Su justificación de `offer_match` citaba el resumen del buscador y
+  repetía el texto de la consulta («gestión de gastos que escanea recibos»). La validación
+  automática comprueba referencias, no si la fuente respalda la afirmación.
+- **Corrección (v3):** la evidencia del buscador llega a Haiku sin la consulta y marcada
+  como `search_result`. Un `1` exige una afirmación explícita (en `document_need`, recibir o
+  procesar comprobantes) y Python rechaza los `1` apoyados solo en resultados de búsqueda.
+  Con la misma evidencia, v3 volvió a `document_need` 0,5 y a `medium`, citando solo
+  fuentes primarias y sin afirmaciones ausentes de las páginas.
+- Son tres llamadas sobre una sola empresa: muestran que el prompt influye en la
+  clasificación cerca de los umbrales, pero no miden calidad ni calibración (T10). La
+  revisión humana de §6 sigue siendo necesaria.
