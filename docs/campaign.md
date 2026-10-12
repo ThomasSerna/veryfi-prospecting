@@ -114,7 +114,8 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
   aplicación.
 - La guarda de ejecución única es por proceso: dos procesos distintos sobre la misma base
   no se coordinan entre sí.
-- El descubrimiento guarda las empresas al terminar. Si se interrumpe a mitad, las búsquedas
-  ya enviadas no se repiten ni se recuperan: la campaña termina `failed` y hay que crear otra.
+- El descubrimiento guarda las empresas al terminar. Si se interrumpe a mitad, al reanudar
+  las búsquedas ya enviadas no se repiten y sus resultados se pierden; solo las consultas no
+  enviadas aportan empresas. Si ninguna deja empresas, la campaña termina `failed`.
 - Las pruebas usan proveedores simulados; la orquestación y la búsqueda de ampliación con
   `include_domains` no se han ejecutado con llamadas reales.
