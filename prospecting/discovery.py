@@ -374,6 +374,15 @@ def select_candidates(candidates: list[Candidate], campaign: Campaign) -> tuple[
     return selected, report
 
 
+SEARCH_HIT_CLAIM = "Tavily devolvió esta página"
+
+
+def is_search_hit(item: Evidence) -> bool:
+    """Resultado del buscador: localiza una fuente, pero no confirma hechos (§7.3)."""
+    return (item.provider == PROVIDER and item.source_type == "secondary"
+            and item.claim.startswith(SEARCH_HIT_CLAIM))
+
+
 def build_hit_evidence(candidate: Candidate, company_id: UUID) -> list[Evidence]:
     """Un hecho por resultado del buscador; solo localiza la fuente (§7.3)."""
     evidence = []
@@ -382,7 +391,7 @@ def build_hit_evidence(candidate: Candidate, company_id: UUID) -> list[Evidence]
         evidence.append(Evidence(
             company_id=company_id,
             claim=_clip(
-                f"Tavily devolvió esta página en el puesto {hit.rank} para la consulta "
+                f"{SEARCH_HIT_CLAIM} en el puesto {hit.rank} para la consulta "
                 f"«{hit.query.query}» (perfil {hit.query.profile_id}, país {hit.query.country}).{title}",
                 600,
             ),

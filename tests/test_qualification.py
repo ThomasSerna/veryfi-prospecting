@@ -11,6 +11,7 @@ import httpx2
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, BudgetError, SpendingAuthorization
+from prospecting.discovery import SEARCH_HIT_CLAIM
 from prospecting.models import (
     BusinessStatus, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
 )
@@ -164,14 +165,52 @@ def test_request_is_bounded_and_keeps_external_text_as_data(scenario):
     assert size <= scenario.campaign.limits.llm.max_input_tokens * 3
 
 
-def test_prompt_v2_bounds_response_length_without_raising_output_limit(scenario):
+def search_hit(scenario, query="software que escanea recibos sintéticos"):
+    return Evidence(
+        company_id=scenario.company.id,
+        claim=f"{SEARCH_HIT_CLAIM} en el puesto 1 para la consulta «{query}» (perfil sintético, país CO).",
+        url="https://empresa-uno.example/blog", provider="tavily", external_reference="busqueda-sintetica#1",
+        excerpt="Resumen sintético del buscador.", retrieved_at=RETRIEVED_AT, kind="observed",
+        source_type="secondary",
+    )
+
+
+def test_prompt_v3_bounds_length_and_makes_strong_signals_explicit(scenario):
     payload, _ = build_haiku_request(scenario.company, scenario.db.list_evidence(scenario.company.id),
                                      scenario.campaign)
-    assert PROMPT_VERSION == "haiku_assessment_v2"
-    assert "25 palabras como máximo" in payload["system"]
-    assert "como máximo 3 datos que faltan" in payload["system"]
-    assert "dos frases como máximo" in payload["system"]
+    system = payload["system"]
+    assert PROMPT_VERSION == "haiku_assessment_v3"
+    assert "25 palabras como máximo" in system and "como máximo 3 datos que faltan" in system
+    assert "dos frases como máximo" in system and "solo afirma hechos presentes en la evidencia citada" in system
+    assert "si dudas entre dos niveles, elige el menor" in system
+    assert "Emitir facturas electrónicas, conciliar bancos" in system and "como máximo, 0.5" in system
+    assert "search_result" in system
     assert payload["max_tokens"] == scenario.campaign.limits.llm.max_output_tokens == 1000
+
+
+def test_search_results_reach_haiku_without_the_query_text(scenario):
+    hit = search_hit(scenario, query="consulta exclusivamente sintética de recibos")
+    payload, selected = build_haiku_request(scenario.company, [scenario.primary, hit], scenario.campaign)
+    user = payload["messages"][0]["content"]
+    assert hit.id in {item.id for item in selected}
+    assert "consulta exclusivamente sintética de recibos" not in user
+    assert '"kind": "search_result"' in user and SEARCH_HIT_CLAIM not in user
+    assert "Resumen sintético del buscador." in user
+
+
+def test_strong_signal_backed_only_by_search_results_is_rejected(scenario):
+    hit = search_hit(scenario)
+    data = json.loads(output(scenario))
+    data["criteria"]["document_need"]["evidence_ids"] = [str(hit.id)]
+    with pytest.raises(QualificationError) as error:
+        validate_output(HaikuAssessment.model_validate(data), [scenario.primary, hit], scenario.campaign)
+    assert error.value.code == "search_only_strong_signal"
+    data["criteria"]["document_need"]["evidence_ids"] = [str(hit.id), str(scenario.primary.id)]
+    criteria = validate_output(HaikuAssessment.model_validate(data), [scenario.primary, hit], scenario.campaign)
+    assert criteria["document_need"].value == 1
+    data["criteria"]["document_need"] = {"value": 0.5, "evidence_ids": [str(hit.id)], "justification": "Parcial."}
+    criteria = validate_output(HaikuAssessment.model_validate(data), [scenario.primary, hit], scenario.campaign)
+    assert criteria["document_need"].value == 0.5
 
 
 def test_evidence_selection_respects_character_budget(scenario):

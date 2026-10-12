@@ -11,7 +11,7 @@ from prospecting.discovery import (
     NON_BUSINESS_DOMAINS, TEMPLATE_VERSION, ExclusionList, PlannedQuery, TavilyExtractResponse,
     TavilySearchResponse, assess_identity, build_company, build_search_queries,
     classify_tavily_error, exclusions_status, extract_credits, extract_request, find_reusable,
-    group_candidates, infer_name, load_exclusions, match_exclusion, parse_extract, parse_search,
+    group_candidates, infer_name, is_search_hit, load_exclusions, match_exclusion, parse_extract, parse_search,
     search_request, select_candidates, validate_public_url,
 )
 from prospecting.models import CampaignLimits, Company, Evidence, IdentityStatus
@@ -210,6 +210,15 @@ def test_company_keeps_provenance_and_unknown_country_segment(database, make_cam
     assert query.query in hit_fact.claim and "CO" in hit_fact.claim
     database.save_company(company, evidence=evidence)
     assert {item.id for item in database.list_evidence(company.id)} == {item.id for item in evidence}
+
+
+def test_only_search_results_are_marked_as_search_hits():
+    hits = hits_for(planned(), 0, ("https://empresa-uno.example/", "Inicio | Empresa Uno"))
+    company, evidence = build_company(group_candidates(hits, 60)[0][0])
+    hits = [item for item in evidence if item.id in company.provenance["domain"]]
+    names = [item for item in evidence if item.id in company.provenance["name"]]
+    assert hits and all(is_search_hit(item) for item in hits)
+    assert names and not any(is_search_hit(item) for item in names)
 
 
 def test_extract_request_is_bounded_and_counts_credits():
