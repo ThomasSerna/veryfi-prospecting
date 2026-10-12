@@ -206,7 +206,8 @@ def test_finder_only_for_identified_person_without_email(contact_case):
     assert [operation for operation, _, _ in case.calls] == ["domain_search", "email_finder"]
     assert case.calls[1][1]["full_name"] == "Persona Sintética Uno" and case.calls[1][1]["max_duration"] == "6"
     usage = case.db.list_usage(provider="hunter")
-    assert all(item.credits is None and item.reserved_credits == 1 for item in usage)
+    assert [(item.operation, item.reserved_credits, item.credits) for item in usage] == [
+        ("domain_search", 1, 0), ("email_finder", 1, 1)]
 
 
 def test_medium_finder_does_not_add_verifier_after_exhausting_enrichment(contact_case):
@@ -228,7 +229,7 @@ def test_verifier_uses_fractional_credit_and_specific_timeout(contact_case):
     assert [operation for operation, _, _ in case.calls] == ["domain_search", "email_verifier"]
     assert case.calls[-1][2] == 25.0
     usage = case.db.list_usage(provider="hunter")[-1]
-    assert usage.reserved_credits == Decimal("0.5") and usage.credits is None
+    assert usage.reserved_credits == Decimal("0.5") and usage.credits == Decimal("0.5")
 
 
 def test_pending_verification_conserves_reserve_and_never_polls(contact_case):
@@ -362,6 +363,35 @@ def test_domain_search_requests_and_reserves_only_the_people_cap(contact_case, p
     case.find(hunter_access=case.access.model_copy(update={"enabled_operations": ["domain_search"]}))
     assert [params["limit"] for _, params, _ in case.calls] == [limit] * queries
     assert [str(item.reserved_credits) for item in case.db.list_usage(provider="hunter")] == [limit] * queries
+
+
+def test_hunter_credits_follow_published_prices():
+    from prospecting.providers.hunter import (
+        HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, observed_hunter_credits,
+    )
+    two = HunterDomainSearchResponse.model_validate({"data": {"emails": [{"value": "a@x.example"}, {"value": "b@x.example"}]}})
+    assert observed_hunter_credits("domain_search", two) == 2
+    assert observed_hunter_credits("domain_search", HunterDomainSearchResponse.model_validate({"data": None})) == 0
+    assert observed_hunter_credits("email_finder", HunterFinderResponse.model_validate({"data": {"email": "a@x.example"}})) == 1
+    assert observed_hunter_credits("email_finder", HunterFinderResponse.model_validate({"data": {"email": None}})) == 0
+    for status, credits in (("valid", Decimal("0.5")), ("accept_all", Decimal("0.5")), ("invalid", Decimal("0.5")),
+                            ("unknown", 0), ("disposable", 0)):
+        reply = HunterVerifierResponse.model_validate({"data": {"email": "a@x.example", "status": status}})
+        assert observed_hunter_credits("email_verifier", reply) == credits
+    assert observed_hunter_credits("email_verifier", HunterVerifierResponse.model_validate({"data": {}})) is None
+
+
+def test_hunter_overrun_blocks_the_next_reservation(contact_case):
+    case = contact_case
+    high_priority(case)
+    # Una respuesta con más correos de los pedidos supera la reserva: no se gasta más sin revisión.
+    case.replies["domain_search"] = {"data": {"domain": case.company.domain, "organization": case.company.name,
+        "emails": [{"value": f"persona-{index}@empresa-sintetica.example", "type": "personal"} for index in range(5)]}}
+    report = case.find(hunter_access=case.access.model_copy(update={"enabled_operations": ["domain_search"]}))
+    assert report.status == "pending" and report.stop_reason == "reservation_overrun"
+    assert len(case.calls) == 1
+    usage = case.db.list_usage(provider="hunter")
+    assert [(item.reserved_credits, item.credits) for item in usage] == [(3, 5)]
 
 
 def test_domain_search_limit_stays_within_hunter_bounds(contact_case):

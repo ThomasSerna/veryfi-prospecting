@@ -20,8 +20,8 @@ from prospecting.pipeline.calls import observed_credits, reserve_claude, reserve
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.hunter import (
     HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
-    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
-    verifier_request,
+    domain_search_request, finder_request, observed_hunter_credits, parse_domain_search, parse_finder,
+    parse_verifier, target_departments, verifier_request,
 )
 from prospecting.providers.tavily import (
     SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,
@@ -206,10 +206,14 @@ class _ContactStage:
             if current_usage.status != UsageStatus.RESERVED and not getattr(error, "no_send", False):
                 self.checkpoint(attempts=attempts, consumed=consumed)
             raise
+        observed = None
         if request.provider == "tavily":
             observed = observed_credits(result.data)
-            if observed is not None:
-                self.budget.record_result(usage.request_id, Observation(outcome="succeeded", credits=observed))
+        elif request.provider == "hunter" and result.http_status != 202:
+            # Hunter no informa el consumo; un exceso sobre la reserva bloquea nuevas llamadas.
+            observed = observed_hunter_credits(request.operation, result.data)
+        if observed is not None:
+            self.budget.record_result(usage.request_id, Observation(outcome="succeeded", credits=observed))
         if result.http_status == 202:
             self.checkpoint(attempts=attempts, consumed=consumed)
             raise BudgetError("verification_pending", "Hunter mantiene la verificación en procesamiento.", usage.request_id)
