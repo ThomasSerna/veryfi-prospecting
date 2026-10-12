@@ -6,6 +6,9 @@ contactos. Decide siempre con lo guardado en SQLite, así que repetir un clic, u
 Streamlit o reanudar tras un cierre no duplica la campaña ni repite llamadas. Ninguna
 función envía mensajes ni contacta a nadie.
 
+La interfaz de Streamlit usa este mismo pipeline y esta misma base; su configuración
+local, permisos y exportaciones se describen en [Interfaz local](ui.md).
+
 ## Invocación
 
 La llamada presupone una base y un `Budget` abiertos, y permisos explícitos del responsable
@@ -50,6 +53,29 @@ report = run_campaign(
 Cada proveedor se usa solo si se proporcionan su cuenta y su permiso: sin `claude` no se
 califica y la campaña queda `partial` con `qualification_unavailable`; sin `hunter_access`
 los contactos usan únicamente la ruta pública.
+
+## Puente de la interfaz
+
+Las funciones exportadas por `prospecting.pipeline` reciben la ruta de la base y los
+IDs o contratos validados; abren y cierran SQLite dentro del pipeline. La interfaz no
+crea clientes ni reserva gasto:
+
+- `prepare_campaign(db_path, campaign)` guarda un borrador `created` sin tráfico y
+  puede crear la base. Reutiliza una campaña activa o el mismo ID.
+- `list_saved_campaigns(db_path)` devuelve el historial; una base ausente da una lista
+  vacía. `read_campaign(...)` devuelve `CampaignView`, con presupuesto, evidencia,
+  evaluaciones y contactos, y recalcula disponibilidad y canales utilizables a la
+  fecha de consulta. Consultar no crea una base ni cambia los datos.
+- `execute_campaign(db_path, campaign_id, access=..., approvals=...)` crea un `Budget`
+  con los cupos comprobados, registra permisos frescos de `AuthorizationInput` y
+  ejecuta la misma orquestación que `run_campaign`, bajo la misma guarda de ejecución.
+  Un archivo de acceso no concede autorización de gasto.
+- `finish_campaign(...)` cierra conservando datos; `review_company(...)` guarda estado,
+  motivo y fecha sin recalificar; `confirm_alternative_channel(...)` añade evidencia
+  manual y recalcula disponibilidad de forma atómica, sin llamar a proveedores.
+
+Las correcciones y el cierre están bloqueados mientras la ejecución sigue activa en
+el proceso. Las APIs anteriores desde Python se conservan.
 
 ## Orden de trabajo
 
@@ -115,7 +141,15 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
 - La guarda de ejecución única es por proceso: dos procesos distintos sobre la misma base
   no se coordinan entre sí.
 - El descubrimiento guarda las empresas al terminar. Si se interrumpe a mitad, al reanudar
-  las búsquedas ya enviadas no se repiten y sus resultados se pierden; solo las consultas no
-  enviadas aportan empresas. Si ninguna deja empresas, la campaña termina `failed`.
-- Las pruebas usan proveedores simulados; la orquestación y la búsqueda de ampliación con
-  `include_domains` no se han ejecutado con llamadas reales.
+  las búsquedas ya enviadas no se repiten y sus resultados aún no persistidos se pierden.
+  La primera huella repetida produce `duplicate_request`, omite las consultas restantes
+  y termina `failed` si no hay empresas. El ledger y las reservas se conservan; la interfaz
+  explica esta limitación y no fabrica resultados.
+- Las pruebas sin red cubren interrupción de descubrimiento, tiempo acumulado al reanudar,
+  excepción inesperada con checkpoints conservados y guarda liberada, y campaña completa
+  con `HunterAccess` sintético. No demuestran acceso real ni contactabilidad comercial.
+- El [registro de proveedores](provider-check.md) documenta una campaña real del
+  2026-10-12, incluida ampliación con `include_domains`, que terminó `completed` desde
+  Python. Sus resultados comerciales fueron `insufficient_evidence` y
+  `qualified_no_contact`: ninguna persona quedó lista. La interfaz y su puente se
+  verifican con datos sintéticos, sin una nueva campaña real.

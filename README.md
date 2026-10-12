@@ -1,15 +1,12 @@
 # Veryfi Prospecting
 
 Prototipo académico local para investigar posibles clientes de Veryfi en
-Latinoamérica. Incluye una pantalla inicial, contratos Pydantic, configuración
-versionada, persistencia SQLite, reserva/conciliación de presupuesto, un cliente
-HTTP JSON compartido, el descubrimiento de empresas candidatas y la extracción
-de páginas con Tavily, la resolución de identidad, duplicados y exclusiones, y la
-calificación con Claude Haiku y puntuación determinista, la búsqueda de personas
-y canales profesionales con Hunter y evidencia pública, y la orquestación de campañas
-que recorre esas etapas con límites de esfuerzo y reanudación; todo se invoca desde Python.
-La pantalla no necesita claves, no consume APIs de
-proveedores y no muestra resultados comerciales simulados.
+Latinoamérica. La interfaz local de Streamlit permite configurar y ejecutar campañas,
+consultar progreso, evidencia y presupuesto, revisar empresas, confirmar canales
+alternativos existentes y descargar CSV seguro. Reutiliza SQLite y el pipeline de
+descubrimiento con Tavily, calificación determinista con Claude Haiku y búsqueda de
+personas con Hunter y evidencia pública. La aplicación no envía mensajes ni contacta
+a nadie; ventas revisa y contacta fuera de ella.
 
 ## Instalación
 
@@ -38,10 +35,22 @@ Desde la raíz del repositorio:
 uv run --locked streamlit run app.py
 ```
 
-Abre [http://127.0.0.1:8501](http://127.0.0.1:8501). Debes ver el título
-«Veryfi Prospecting» y el mensaje «Aplicación inicial funcionando».
+Abre [http://127.0.0.1:8501](http://127.0.0.1:8501). La pantalla puede abrirse sin
+claves y consultar campañas ya guardadas. Preparar una campaña guarda sus criterios
+sin llamar a proveedores; ejecutar o reanudar requiere cuentas y cupos comprobados,
+claves en variables de entorno y autorización explícita por operación, cuenta y tope.
 Detén el servidor con Ctrl+C. La configuración fija `127.0.0.1`, desactiva la
 telemetría y permite iniciar sin abrir un navegador ni pedir un correo.
+
+Usa una sola instancia local de la aplicación con `data/prospecting.sqlite3`.
+El procesamiento es secuencial e interactivo: no continúa en segundo plano al cerrar
+la aplicación. El historial permite recuperar checkpoints, revisar resultados y
+exportar personas actualmente listas o, explícitamente, todos los resultados.
+
+La configuración local de acceso se guarda en `data/provider-access.json`, ignorado
+por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reutilizables.
+Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
+La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
 ## Verificación
 
@@ -58,17 +67,21 @@ reservas concurrentes, cupos de créditos y autorizaciones acumuladas, duplicado
 conciliación y timeouts mediante transportes sintéticos. Verifican identidad,
 vigencia y estados de canales, la extracción pública citada,
 límites de contactos y respuestas pendientes de Hunter sin repetir consumo. Recorren
-campañas completas y comprueban que reanudar o repetir un clic no repite llamadas, y que
-el presupuesto y el tiempo detienen la ejecución conservando lo guardado. También
+campañas completas y comprueban que reanudar o repetir un clic no repite llamadas, que
+las interrupciones conservan el gasto y que el presupuesto y el tiempo acumulado
+detienen la ejecución conservando lo guardado. También
 ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se importen
 sin cargar Streamlit. También comprueban la dirección de las importaciones entre
 módulos, que la estructura documentada coincide con el paquete y que los
 identificadores guardados en SQLite no cambien. Estas pruebas no demuestran acceso a proveedores ni
-validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
+validación comercial. Las comprobaciones reales realizadas desde Python están en
+[el registro de proveedores](docs/provider-check.md); el lote de campaña registrado
+no produjo ninguna persona lista. La interfaz y sus exportaciones se verifican con
+datos sintéticos. Los archivos de ejemplo y `uv.lock` sí se versionan.
 
 ## Estructura y responsabilidades
 
-- `app.py`: pantalla inicial de Streamlit, sin lógica de negocio.
+- `app.py`: configuración, ejecución, consulta, revisión y exportación con Streamlit.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
@@ -89,15 +102,19 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `docs/qualification.md`: calificación con Haiku, puntuación y prioridad.
 - `docs/contacts.md`: invocación desde Python, acceso a Hunter, personas, canales y límites de búsqueda.
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
-- `.streamlit/config.toml`: acceso local y telemetría desactivada.
+- `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
+- `.streamlit/config.toml`: acceso local, telemetría y exportación integrada de tablas desactivadas.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
 - `docs/IDEA.md` y `AGENTS.md`: requisitos y reglas de desarrollo.
 
-La aplicación no lee `.env`; no copies ni rellenes `.env.example` para arrancarla.
+La aplicación no carga `.env` automáticamente; `.env.example` solo enumera las variables.
+Para ejecutar proveedores, define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y, si está
+habilitado, `HUNTER_API_KEY` en el entorno del proceso antes de iniciar Streamlit.
 `data/`, bases SQLite, credenciales y cachés quedan fuera de Git. Importar los
-módulos o iniciar la pantalla no crea una base; abrir `Database` sobre una ruta
-nueva sí la crea.
+módulos o iniciar la pantalla no crea una base. Preparar una campaña desde la
+interfaz crea la base si falta; abrir `Database` sobre una ruta nueva también la crea.
+Conserva la base y sus archivos auxiliares: contienen resultados y consumo ya pagado.
 
 ## Integrantes
 

@@ -1,6 +1,7 @@
 # Contratos y persistencia local
 
-La pantalla no crea ni consulta una base automáticamente.
+Abrir la pantalla no crea una base. Si ya existe, consulta el historial y los
+resultados; preparar una campaña crea un borrador y la base si falta.
 La capa de datos puede utilizarse desde Python, sin Streamlit ni claves:
 
 ```python
@@ -73,6 +74,26 @@ confirmación manual: requiere una observación posterior del proveedor y su
 evidencia. El checkpoint de contactos conserva el resultado comercial separado
 de `error_stage`, `error_message` y `stop_reason`; una interrupción técnica no
 borra la calificación ni el consumo.
+
+La revisión humana guarda `review_status` (`accepted`, `rejected` o `pending`),
+`review_reason` y `reviewed_at` en el `RunItem` de esa campaña. No cambia la evaluación,
+la rúbrica ni las referencias de evidencia. El estado comercial vigente que ve la
+interfaz se recalcula al consultar y al pulsar la descarga, con una conexión nueva;
+puede diferir del checkpoint si un canal o una fuente caducó. Una descarga no
+reutiliza resultados precalculados ni se permite durante ejecución.
+
+Confirmar un canal alternativo existente guarda una nueva `Evidence` con
+`source_type="manual"`, la fecha y el motivo de confirmación del canal, y el `business_status`
+recalculado del `RunItem` en una sola transacción. Si falla una escritura, se revierte
+todo. Se conservan las fuentes, advertencias y verificaciones negativas; la
+confirmación no demuestra identidad ni empleo por sí sola.
+
+`data/provider-access.json` contiene `ProviderAccess`: cupos iniciales comprobados
+y referencias de acceso. No contiene claves ni permisos. Cada ejecución crea
+autorizaciones frescas después de abrir `Budget`; el consumo permanece en `Usage`
+y sigue descontándose de los cupos al reiniciar. `session_state` solo mantiene
+selección, filtros y estado visual. Este flujo no cambia el esquema SQLite ni
+requiere migraciones.
 
 La base se crea únicamente cuando la ruta no existe. Reabrir una base compatible
 conserva checkpoints y uso; un esquema incompatible, incompleto o corrupto genera
