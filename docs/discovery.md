@@ -2,7 +2,7 @@
 
 ## Descubrimiento y extracción con Tavily
 
-`prospecting/pipeline.py` es el único módulo que reserva consumo y llama a Tavily.
+Las etapas de `prospecting.pipeline` son las únicas que reservan consumo y llaman a Tavily.
 `prospecting/discovery.py` construye consultas, valida respuestas y selecciona
 candidatos sin red ni base de datos. Ambas funciones admiten solamente crédito
 gratuito (`funding_source="free_credit"`, USD 0 por llamada) y exigen un

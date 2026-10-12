@@ -71,7 +71,7 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `prospecting/discovery.py`: consultas, validación de URLs y respuestas de Tavily, selección de candidatos, identidad y exclusiones.
 - `prospecting/qualification.py`: rúbrica, puntuación, prioridad, solicitud a Haiku y validación de su respuesta.
 - `prospecting/contacts.py`: búsqueda con Hunter, extracción pública con Haiku, personas, canales y condición de listo.
-- `prospecting/pipeline.py`: reservas, llamadas a proveedores y persistencia del descubrimiento, la extracción, la identidad, la calificación y los contactos.
+- `prospecting/pipeline/`: etapas que reservan gasto, llaman a proveedores y guardan resultados, un módulo por etapa (descubrimiento e identidad, extracción, calificación y contactos) y las llamadas con reserva compartidas en `calls.py`.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, clientes, descubrimiento y calificación con datos sintéticos.
 - `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
