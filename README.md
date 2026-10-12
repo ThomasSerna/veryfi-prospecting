@@ -3,8 +3,9 @@
 Prototipo académico local para investigar posibles clientes de Veryfi en
 Latinoamérica. Incluye una pantalla inicial, contratos Pydantic, configuración
 versionada, persistencia SQLite, reserva/conciliación de presupuesto, un cliente
-HTTP JSON compartido y el descubrimiento de empresas candidatas y la extracción
-de páginas con Tavily, que se invocan desde Python. No califica prospectos ni busca
+HTTP JSON compartido, el descubrimiento de empresas candidatas y la extracción
+de páginas con Tavily, y la resolución de identidad, duplicados y exclusiones,
+que se invocan desde Python. No califica prospectos ni busca
 contactos. La pantalla no necesita claves, no consume APIs de proveedores y no
 muestra resultados comerciales simulados.
 
@@ -272,6 +273,70 @@ Los fallos se informan con motivos propios de Tavily: `permission_denied`,
 modifican límites, consultas ni permisos. `docs/provider-check.md` registra la
 comprobación real de acceso.
 
+## Identidad, duplicados y exclusiones
+
+La lista de clientes actuales, oportunidades y exclusiones de Veryfi se guarda
+localmente en `data/exclusions.json`, fuera de Git. Los módulos no la crean.
+Su formato:
+
+```json
+{
+  "version": "exclusiones-2026-10",
+  "validation_status": "validated",
+  "source_reference": "Lista entregada por Veryfi",
+  "observed_at": "2026-10-11T12:00:00Z",
+  "entries": [
+    {"id": "e1", "name": "Nombre de la cuenta", "domains": ["dominio.example"],
+     "aliases": [], "scope": "entity", "countries": [],
+     "reason": "current_customer", "detail": null, "source_reference": "Fila 1"}
+  ]
+}
+```
+
+`scope` admite `entity`, `country` (con `countries` obligatorio) o `group`.
+`reason` admite `current_customer`, `open_opportunity` o `excluded`.
+`load_exclusions(path)` devuelve `None` si el archivo no existe; un archivo inválido
+produce un error de validación. Si la lista falta (`missing`) o no está validada
+(`pending`), los informes lo indican con `exclusions_status`: las exclusiones
+comerciales no están validadas y no se afirma ausencia de relación con Veryfi.
+
+`run_discovery(..., exclusions=lista)` descarta antes de seleccionar los candidatos
+cuyo host coincide con un dominio de la lista (o es un subdominio). No ocupan plaza
+y solo aparecen en `report.excluded`. Una coincidencia solo por nombre puede ser un
+homónimo: el candidato se guarda con `stop_reason="exclusion_review"` y una
+evidencia manual de la coincidencia. Una empresa con identidad confirmada, el
+mismo dominio, el mismo nombre o alias y el país de la consulta se reutiliza
+(`report.reused_company_ids`); en cualquier otro caso se crea otra empresa.
+
+`resolve_company_identity(db, campaign_id, company_id, exclusions=lista)` no llama a
+proveedores: decide con la evidencia guardada.
+
+Para confirmar la identidad hacen falta tres cosas:
+- **Fuente primaria:** al menos un fragmento de una página del propio dominio.
+- **Nombre:** el nombre inferido aparece en esa página como palabra completa. Si no aparece,
+  vale la etiqueta del dominio en su forma observada; en ese caso esa forma pasa a ser
+  el nombre y el inferido queda como alias.
+- **País de la campaña:** un ccTLD local (`.com.co`, `.net.co`, `.org.co` o `.mx`) o una
+  mención en una página propia (texto o ruta como `/colombia` o `/mx/`).
+
+Lo que no se comprueba queda `pending`, sin avanzar de etapa, y se registra el
+`stop_reason`: `identity_unverified`, `name_unconfirmed`, `country_unconfirmed`,
+`exclusion_review` o `duplicate_review:<id>`. Un ccTLD extranjero sin mención del país
+genera una advertencia, pero no una exclusión.
+
+La identidad confirmada recibe la clave `dominio|nombre|países`. Por eso, filiales
+con el mismo dominio y distinto nombre, homónimos con distinto dominio y la misma
+marca en otro país nunca se fusionan.
+
+Si otra empresa confirmada de la misma campaña ya tiene esa clave, el `RunItem`
+queda excluido como `duplicate_of:<id>`. Una coincidencia con el dominio de la lista
+también lo excluye (`excluded_account`).
+
+Las exclusiones guardan `business_status="excluded"` antes de cualquier
+enriquecimiento. País y segmento se acumulan con su procedencia, y una identidad
+confirmada no se degrada desde otra campaña. Repetir la resolución no duplica
+evidencia.
+
 ## Estructura y responsabilidades
 
 - `app.py`: pantalla inicial de Streamlit, sin lógica de negocio.
@@ -279,8 +344,8 @@ comprobación real de acceso.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
 - `prospecting/providers.py`: cliente JSON acotado y errores de proveedor.
-- `prospecting/discovery.py`: consultas, validación de URLs y respuestas de Tavily, y selección de candidatos.
-- `prospecting/pipeline.py`: reserva, llamadas a Tavily y persistencia del descubrimiento y la extracción.
+- `prospecting/discovery.py`: consultas, validación de URLs y respuestas de Tavily, selección de candidatos, identidad y exclusiones.
+- `prospecting/pipeline.py`: reserva, llamadas a Tavily y persistencia del descubrimiento, la extracción y la resolución de identidad.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, cliente y descubrimiento con datos sintéticos.
 - `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
