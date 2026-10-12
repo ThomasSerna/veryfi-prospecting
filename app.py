@@ -11,9 +11,9 @@ import streamlit as st
 
 from prospecting.models import Campaign, CampaignFilters, VeryfiConfig
 from prospecting.pipeline import (
-    AuthorizationInput, execute_campaign,
+    AuthorizationInput, confirm_alternative_channel, execute_campaign,
     finish_campaign, list_saved_campaigns, load_provider_access, prepare_campaign,
-    provider_operations, read_campaign,
+    provider_operations, read_campaign, review_company,
 )
 from prospecting.sources import validate_public_url
 
@@ -235,6 +235,16 @@ def show_contact(person, view):
             st.caption("El formato comprobado no garantiza que el canal atienda.")
         for warning in channel.warnings:
             st.text(warning)
+        if channel.type not in ("linkedin", "other") or channel.normalized_status == "invalid":
+            continue
+        key = f"confirm_{contact.id}_{channel.type}_{channel.value}"
+        with st.form(key):
+            reason = st.text_area("Motivo de la confirmación", key=f"reason_{key}")
+            confirmed = st.checkbox("He comprobado desde mi cuenta que puedo contactar directamente a esta persona por este canal, sin enviar mensajes.", key=f"checked_{key}")
+            submitted = st.form_submit_button("Guardar confirmación manual", disabled=view.is_executing or not person.eligible)
+        if submitted:
+            confirm_alternative_channel(DB_PATH, view.campaign.id, contact.id, channel.type, channel.value, reason=reason, confirmed=confirmed)
+            st.rerun()
 
 
 def company_detail(result, view):
@@ -279,6 +289,14 @@ def company_detail(result, view):
             st.info("Todavía no hay personas identificadas. La empresa conserva su calificación y motivo.")
         for person in result.contacts:
             show_contact(person, view)
+    with st.form(f"review_{company.id}"):
+        status = st.selectbox("Revisión humana", ["pending", "accepted", "rejected"],
+                              index=["pending", "accepted", "rejected"].index(item.review_status), format_func=label)
+        reason = st.text_area("Motivo de la revisión", value=item.review_reason or "")
+        submitted = st.form_submit_button("Guardar revisión", disabled=view.is_executing)
+    if submitted:
+        review_company(DB_PATH, view.campaign.id, company.id, status=status, reason=reason)
+        st.rerun()
 
 
 def results_panel(view):

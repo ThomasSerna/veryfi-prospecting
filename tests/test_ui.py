@@ -160,6 +160,41 @@ def test_filters_and_company_detail_show_persisted_evidence(ui_results):
     assert any("Ninguna empresa coincide" in element.value for element in at.info)
 
 
+def test_human_review_saves_reason_and_survives_new_streamlit_session(ui_results):
+    at = open_company(screen(), ui_results.companies[0])
+    widget(at.selectbox, "Revisión humana").select("accepted")
+    widget(at.text_area, "Motivo de la revisión").input("Aceptación exclusivamente sintética, con canal pendiente.")
+    widget(at.button, "Guardar revisión").click().run()
+    assert not at.exception and not at.error
+    saved = read_campaign(ui_results.paths.db, ui_results.campaign.id).companies
+    result = next(item for item in saved if item.company.id == ui_results.companies[0].id)
+    assert result.run_item.review_status == "accepted" and result.run_item.reviewed_at is not None
+    assert result.business_status == "needs_channel_confirmation"
+    reopened = open_company(screen(), ui_results.companies[0])
+    assert widget(reopened.selectbox, "Revisión humana").value == "accepted"
+    assert "exclusivamente sintética" in widget(reopened.text_area, "Motivo de la revisión").value
+
+
+def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_action(ui_results):
+    at = open_company(screen(), ui_results.companies[0])
+    reason = widget(at.text_area, "Motivo de la confirmación")
+    reason.input("Mensajería profesional nominal comprobada sin enviar nada.")
+    button = widget(at.button, "Guardar confirmación manual")
+    button.click().run()
+    assert not at.exception and at.error
+    with Database(ui_results.paths.db) as db:
+        assert db.get_contact(ui_results.contact.id) == ui_results.contact
+    checkbox = next(element for element in at.checkbox if "He comprobado" in element.label)
+    checkbox.check()
+    widget(at.button, "Guardar confirmación manual").click().run()
+    assert not at.exception and not at.error
+    result = next(item for item in read_campaign(ui_results.paths.db, ui_results.campaign.id).companies
+                  if item.company.id == ui_results.companies[0].id)
+    assert result.business_status == "ready_alternative"
+    assert result.contacts[0].usable_channels[0].manual_confirmed_at is not None
+    assert result.run_item.review_status == "pending"
+
+
 def test_execution_requires_explicit_operations_and_responsible_confirmation(ui_paths, ui_access, monkeypatch):
     calls = []
     monkeypatch.setattr(app, "execute_campaign", lambda *args, **kwargs: calls.append(True))
@@ -218,6 +253,17 @@ def test_approved_execution_displays_saved_progress_and_rerun_does_not_repeat(
         assert db.list_campaigns()[0].status == "completed" and len(db.list_run_items(db.list_campaigns()[0].id)) == 1
     at.run()
     assert len(events) == 1 and not at.exception
+
+
+def test_live_execution_disables_human_writes_close_and_download(ui_results):
+    with Database(ui_results.paths.db) as db:
+        db.save_campaign(ui_results.campaign.model_copy(update={"status": CampaignStatus.RUNNING}))
+    with bridge._EXECUTION:
+        at = open_company(screen(), ui_results.companies[0])
+        assert widget(at.button, "Guardar revisión").disabled
+        assert widget(at.button, "Cerrar campaña conservando resultados").disabled
+        assert widget(at.button, "Guardar confirmación manual").disabled
+        assert not at.get("download_button")
 
 
 def test_validated_exclusions_do_not_display_missing_list_warning(ui_results):
