@@ -34,6 +34,23 @@ de Tavily**. El comprobante local queda en `data/conciliaciones/`, fuera de Git.
 Después de la conciliación, el proyecto deja de usar esta cuenta. Su consumo se conserva
 en el registro con su referencia propia y no se mezcla con el de otra cuenta.
 
+### Cuenta actual (`tavily-cuenta-2`)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-11 (America/Bogota) |
+| Cuenta | Plan gratuito «Researcher»; el panel mostraba 0 / 1.000 créditos y *pay as you go* desactivado |
+| Origen de financiación | `free_credit`; desembolso USD 0 |
+| Autorización | Responsable del cupo, en la sesión: 1 búsqueda `basic` de comprobación, ≤ 1 crédito, USD 0 |
+
+| Operación | Parámetros principales | Llamadas | Créditos reservados | Créditos según `usage` | Latencia | Resultado |
+|---|---|---:|---:|---:|---|---|
+| Search | Los mismos de la tabla anterior | 1 | 1 | 1 | 2,2 s | 10 resultados, 10 hosts candidatos y 5 seleccionados, uno reutilizado de una campaña anterior |
+
+Campaña de comprobación: Colombia, `fintech_software`, `web_queries=1` y `max_companies=5`.
+Consumo pendiente de conciliar: 1 crédito, USD 0. Mantener *pay as you go* desactivado
+evita cargos fuera del crédito gratuito (§14).
+
 ### Observaciones y limitaciones
 
 - La respuesta incluyó `usage.credits` y `request_id`. En Extract, `usage.credits` fue 0 con
