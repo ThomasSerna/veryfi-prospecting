@@ -154,3 +154,38 @@ comprobante local queda en `data/conciliaciones/`.
   consumo en 2 créditos, del lado prudente. La primera llamada sí quedó conciliada.
 - No se probaron Finder, Verifier ni errores reales (401, 403, 429, 451); solo con
   respuestas sintéticas.
+
+## Orquestación de campaña (T07)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-12 (America/Bogota) |
+| Autorización | Responsable del cupo, en la sesión: Tavily `search` ≤ 12 créditos y `extract` ≤ 8 créditos (`tavily-cuenta-2`, USD 0); Haiku `messages` ≤ USD 0,01 (`anthropic-equipo-prepago`); Hunter `domain_search` ≤ 4 créditos (`hunter-equipo-plan-gratuito`, USD 0). Finder y Verifier, deshabilitados |
+| Campaña | Colombia, `fintech_software`, `max_companies=2`, `discovery.web_queries=1`; sin lista de exclusiones (`missing`) |
+| Ejecución | `start_campaign` y `run_campaign` sobre la base local, en 28,1 s; estado final `completed` |
+
+| Operación | Llamadas | Créditos reservados | Créditos según `usage` | Costo reservado | Costo estimado | Latencia |
+|---|---:|---:|---:|---:|---:|---|
+| Tavily Search (descubrimiento, ampliación y contactos) | 4 | 4 | 4 | USD 0 | USD 0 | 2,2–3,5 s |
+| Tavily Extract (inicial, ampliación y contactos) | 4 | 4 | 1 | USD 0 | USD 0 | 0,3–5,5 s |
+| Haiku `messages` (calificación y extracción de contactos) | 2 | — | — | USD 0,0022 | USD 0,0016 | 2,9–5,6 s |
+| Hunter Domain Search | 1 | 1 | sin dato | USD 0 | USD 0 | 0,8 s |
+
+Resultado: el descubrimiento devolvió 9 resultados y seleccionó 2 empresas, una reutilizada
+de una campaña anterior. Una quedó con identidad pendiente por país sin confirmar: se amplió
+una vez su evidencia con la búsqueda restringida al dominio (`include_domains`, aceptada por
+Tavily con 1 crédito) y una página más, y siguió sin confirmar el país, así que terminó como
+`insufficient_evidence`. La otra se calificó `medium`; Domain Search y la ruta pública no
+dieron una persona con empleo vigente demostrable, y terminó como `qualified_no_contact`
+(`contact_plan_exhausted`). Repetir `run_campaign` sobre la campaña terminada no creó ninguna
+solicitud. Los datos de empresas y personas quedan en `data/` y no se reproducen aquí.
+
+### Observaciones y limitaciones
+
+- La calificación usó 6.175 tokens de entrada, por encima de los 6.000 que reserva la
+  llamada; el costo estimado (USD 0,000961) siguió dentro de la reserva porque la salida usó
+  687 de 1.000 tokens. Con la salida al máximo, el costo superaría la reserva y el registro
+  bloquearía nuevas llamadas hasta revisarlo. La estimación de 3 caracteres por token no basta.
+- La extracción de contactos con Haiku devolvió 10 tokens de salida, sin candidatos.
+- Las 11 solicitudes están pendientes de conciliar con los paneles de Tavily y Hunter y con la
+  consola de Anthropic.
