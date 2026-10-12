@@ -13,8 +13,8 @@ from prospecting.models import (
     Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, Usage,
     UsageStatus, utc_now,
 )
-from prospecting.pipeline.calls import reserved_claude_cost, seconds_left
-from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderError
+from prospecting.pipeline.calls import seconds_left
+from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderError, reservation_cost
 from prospecting.qualification import (
     PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
     identity_confirmed, material_contradiction, parse_output, primary_support, rubric_for,
@@ -126,7 +126,7 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         usage = budget.reserve(Usage(
             **base, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION, account_ref=account_ref,
             request_fingerprint=claude.fingerprint(payload, account_ref),
-            reserved_cost_usd=reserved_claude_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
+            reserved_cost_usd=reservation_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
             reserved_credits=Decimal(0),
             reserved_tokens=TokenUsage(input_tokens=limits.max_input_tokens, output_tokens=limits.max_output_tokens),
             funding_source=funding_source, status=UsageStatus.RESERVED,

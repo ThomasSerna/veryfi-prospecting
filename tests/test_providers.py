@@ -24,7 +24,7 @@ from prospecting.models import Contract, Usage, UsageStatus, utc_now
 from prospecting.providers import (
     HttpResponse, OperationSpec, ProviderClient, ProviderError, ProviderRequest,
 )
-import prospecting.providers as providers
+import prospecting.providers.http as providers
 
 
 SYNTHETIC_KEY = "clave-exclusivamente-sintetica-para-pruebas"

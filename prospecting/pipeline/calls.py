@@ -6,7 +6,7 @@ from uuid import UUID
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.models import Usage, UsageStatus
-from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ProviderClient, ProviderRequest
+from prospecting.providers import ProviderClient, ProviderRequest
 
 
 def seconds_left(deadline: float | None) -> float | None:
@@ -43,6 +43,3 @@ def call_free_credit(budget: Budget, client: ProviderClient, request: ProviderRe
     return usage, result, observed
 
 
-def reserved_claude_cost(model: str, max_input: int, max_output: int) -> Decimal:
-    price_in, price_out = CLAUDE_PRICES_PER_MTOK[model]
-    return (max_input * price_in + max_output * price_out) / Decimal(1_000_000)

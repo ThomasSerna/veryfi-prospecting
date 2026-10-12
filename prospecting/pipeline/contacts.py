@@ -26,9 +26,10 @@ from prospecting.models import (
     BusinessStatus, Contract, Evidence, IdentityStatus, Priority, RunStage, Text, TokenUsage, Usage,
     UsageStatus, utc_now,
 )
-from prospecting.pipeline.calls import observed_credits, reserved_claude_cost, seconds_left
+from prospecting.pipeline.calls import observed_credits, seconds_left
 from prospecting.providers import (
     CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, ProviderRequest,
+    reservation_cost,
 )
 from prospecting.sources import CONTACT_SEARCH_REFERENCE, SEARCH_HIT_CLAIM, is_non_business, url_host
 
@@ -375,7 +376,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
                             **base, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION, account_ref=claude_account_ref,
                             request_fingerprint=fingerprint, reserved_credits=Decimal(0),
                             reserved_tokens=TokenUsage(input_tokens=limits.max_input_tokens, output_tokens=limits.max_output_tokens),
-                            reserved_cost_usd=reserved_claude_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
+                            reserved_cost_usd=reservation_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
                             funding_source=claude_funding_source, status=UsageStatus.RESERVED,
                         ), grant(CLAUDE_PROVIDER, CLAUDE_OPERATION, claude_account_ref))
                         requests.append(usage.request_id)
