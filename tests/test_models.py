@@ -316,11 +316,22 @@ def test_run_item_keeps_technical_failure_separate_from_business_result():
 
 @pytest.mark.parametrize("change", [
     {"web_queries": True}, {"pages": "1"}, {"active_seconds": float("nan")},
+    {"contacts_active_seconds": True}, {"contacts_active_seconds": "1"},
+    {"contacts_active_seconds": -1.0}, {"contacts_active_seconds": float("nan")},
+    {"contacts_active_seconds": float("inf")},
     {"enrichments": -1}, {"unknown_counter": 1},
 ])
 def test_consumed_limits_have_known_nonnegative_types(change):
     with pytest.raises(ValidationError):
         ConsumedLimits.model_validate(change)
+
+
+def test_contacts_time_defaults_to_zero_for_previous_json_and_roundtrips():
+    previous = ConsumedLimits.model_validate_json('{"active_seconds": 12.5}')
+    assert previous.contacts_active_seconds == 0.0
+    current = previous.model_copy(update={"contacts_active_seconds": 2.5})
+    assert ConsumedLimits.model_validate_json(current.model_dump_json()) == current
+    assert current.active_seconds == 12.5
 
 
 def test_usage_keeps_exact_money_unknown_consumption_and_previous_outcome():

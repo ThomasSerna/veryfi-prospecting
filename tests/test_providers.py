@@ -35,6 +35,16 @@ class SyntheticResponse(Contract):
     matches: list[str]
 
 
+class SyntheticPendingMeta(Contract):
+    params: dict[str, str]
+    message: str
+
+
+class SyntheticPendingResponse(Contract):
+    data: dict[str, str]
+    meta: SyntheticPendingMeta
+
+
 @pytest.fixture
 def provider_case(database, config, make_campaign, monkeypatch, tmp_path):
     """Una cuenta ficticia, sin proveedores activos ni conexiones externas."""
@@ -98,6 +108,40 @@ def provider_case(database, config, make_campaign, monkeypatch, tmp_path):
     return case
 
 
+@pytest.fixture
+def hunter_case(provider_case, config, monkeypatch):
+    """Verifier ficticio: reutiliza el transporte sintético, sin consultar Hunter."""
+    case = provider_case
+    case.allowance = case.allowance.model_copy(update={"provider": "hunter"})
+    case.budget = Budget(case.db, config.defaults.budget, [case.allowance])
+    case.grant = case.budget.authorize(case.grant.model_copy(update={
+        "provider": "hunter", "operation": "email_verifier", "authorized_at": utc_now(),
+    }))
+    case.spec = OperationSpec(
+        provider="hunter", operation="email_verifier", method="GET",
+        endpoint="https://api.hunter.io/v2/email-verifier", api_key_env="HUNTER_API_KEY",
+        timeout_seconds=25.0,
+    )
+    case.request = ProviderRequest(
+        provider="hunter", operation="email_verifier", account_ref=case.grant.account_ref,
+        params={"email": "persona-sintetica@example.com"},
+    )
+    case.client = ProviderClient(case.budget, [case.spec], transport=case.transport)
+
+    def reserve():
+        return case.budget.reserve(Usage(
+            campaign_id=case.campaign.id, provider="hunter", operation="email_verifier",
+            account_ref=case.request.account_ref,
+            request_fingerprint=case.client.fingerprint(case.request),
+            reserved_cost_usd="0.10", reserved_credits="0.5",
+            funding_source="prepaid", status=UsageStatus.RESERVED,
+        ), case.grant)
+
+    case.reserve = reserve
+    monkeypatch.setenv("HUNTER_API_KEY", SYNTHETIC_KEY)
+    return case
+
+
 def call(case, usage, **kwargs):
     return case.client.request_json(
         usage.request_id, case.request, SyntheticResponse,
@@ -113,6 +157,10 @@ def test_success_validates_response_and_leaves_cost_pending(provider_case):
     assert isinstance(result.data, SyntheticResponse)
     assert result.data.matches == ["Resultado exclusivamente sintetico"]
     assert result.observation.outcome == "succeeded"
+    assert result.http_status == 200
+    previous = result.model_dump()
+    previous.pop("http_status")
+    assert type(result).model_validate(previous).http_status == 200
     saved = case.db.get_usage(usage.request_id)
     assert saved.outcome == "succeeded"
     assert saved.final_cost_usd is None
@@ -208,6 +256,119 @@ def test_default_timeout_does_not_grow_with_remaining_time(provider_case):
     usage = case.reserve()
     call(case, usage, remaining_seconds=100)
     assert case.calls[0][1] == 10
+
+
+@pytest.mark.parametrize("remaining, expected", [(None, 25.0), (100.0, 25.0), (2.5, 2.5)])
+def test_operation_timeout_respects_the_remaining_deadline(hunter_case, remaining, expected):
+    case = hunter_case
+    usage = case.reserve()
+    call(case, usage, remaining_seconds=remaining)
+    prepared, timeout, _ = case.calls[0]
+    assert 0 < timeout <= expected
+    if remaining is None or remaining == 100.0:
+        assert timeout == expected
+    assert prepared.get_method() == "GET"
+    assert SYNTHETIC_KEY not in prepared.full_url
+    assert prepared.get_header("Authorization") == f"Bearer {SYNTHETIC_KEY}"
+
+
+@pytest.mark.parametrize("timeout", [0.0, -1.0, True, "25", float("nan"), float("inf")])
+def test_operation_timeout_rejects_unbounded_or_invalid_values(provider_case, timeout):
+    with pytest.raises(ValidationError):
+        OperationSpec.model_validate(provider_case.spec.model_dump() | {"timeout_seconds": timeout})
+
+
+def test_hunter_pending_verification_keeps_reservation_across_reopen(hunter_case):
+    case = hunter_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=202, headers={"Content-Type": "application/json"},
+        body=json.dumps({"data": {}, "meta": {
+            "params": case.request.params, "message": "Verificación sintética pendiente",
+        }}).encode("utf-8"),
+    )
+    result = case.client.request_json(
+        usage.request_id, case.request, SyntheticPendingResponse, authorization=case.grant,
+    )
+    assert result.http_status == 202
+    assert result.observation.outcome == "unknown"
+    assert result.data.meta.params == case.request.params
+    with Database(case.db_path) as reopened:
+        saved = reopened.get_usage(usage.request_id)
+        assert saved.status == UsageStatus.UNCERTAIN
+        assert saved.outcome == "unknown"
+        assert saved.reserved_credits == Decimal("0.5")
+        assert saved.reserved_cost_usd == Decimal("0.10")
+        assert saved.credits is None and saved.final_cost_usd is None
+    with pytest.raises(BudgetError):
+        case.client.request_json(
+            usage.request_id, case.request, SyntheticPendingResponse, authorization=case.grant,
+        )
+    assert len(case.calls) == 1
+
+
+@pytest.mark.parametrize("body, content_type, kind", [
+    (b"{invalido", "application/json", "json"),
+    (b'{"data": {}, "meta": {}}', "application/json", "schema"),
+    (b"respuesta sintetica", "text/plain", "content_type"),
+    (b"x" * (1024 * 1024 + 1), "application/json", "response_limit"),
+], ids=["invalid-json", "invalid-schema", "non-json", "oversize"])
+def test_malformed_hunter_pending_response_remains_uncertain(
+    hunter_case, body, content_type, kind
+):
+    case = hunter_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=202, headers={"Content-Type": content_type}, body=body,
+    )
+    with pytest.raises(ProviderError) as error:
+        case.client.request_json(
+            usage.request_id, case.request, SyntheticPendingResponse, authorization=case.grant,
+        )
+    assert error.value.kind == kind
+    saved = case.db.get_usage(usage.request_id)
+    assert saved.status == UsageStatus.UNCERTAIN and saved.outcome == "unknown"
+    assert saved.reserved_credits == Decimal("0.5") and saved.credits is None
+    assert saved.error_message == error.value.message
+
+
+def test_hunter_smtp_failure_is_an_error_despite_2xx(hunter_case):
+    case = hunter_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=222, headers={"Content-Type": "application/json"},
+        body=b'{"errors": [{"id": "smtp_error", "code": 222, "details": "Fallo SMTP sintetico"}]}',
+    )
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    assert error.value.kind == "http" and error.value.http_status == 222
+    assert error.value.message == "HTTP 222. smtp_error 222 Fallo SMTP sintetico"
+    saved = case.db.get_usage(usage.request_id)
+    assert saved.status == UsageStatus.FAILED and saved.outcome == "failed"
+    assert saved.reserved_credits == Decimal("0.5") and saved.credits is None
+    assert len(case.calls) == 1
+
+
+def test_hunter_error_array_preserves_literal_without_credentials_or_personal_data(hunter_case):
+    case = hunter_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=451, headers={"Content-Type": "application/json"},
+        body=json.dumps({"errors": [{
+            "id": "claimed_email", "code": 451,
+            "details": f"Fallo sintético literal {case.request.params['email']} {SYNTHETIC_KEY} "
+                       "+573001234567 https://example.com/synthetic",
+        }]}).encode("utf-8"),
+    )
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    saved = case.db.get_usage(usage.request_id)
+    assert saved.error_message == error.value.message
+    assert "claimed_email 451 Fallo sintético literal" in saved.error_message
+    assert SYNTHETIC_KEY not in saved.error_message
+    assert case.request.params["email"] not in saved.error_message
+    assert "+573001234567" not in saved.error_message
+    assert "https://example.com/synthetic" not in saved.error_message
 
 
 @pytest.mark.parametrize("ticks", [[0.0, 3.0], [0.0, 1.0, 3.0]])

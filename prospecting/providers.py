@@ -49,6 +49,7 @@ class OperationSpec(Contract):
     auth_header: Text = "Authorization"
     auth_prefix: StrictStr = "Bearer "
     headers: dict[Text, StrictStr] = Field(default_factory=dict)
+    timeout_seconds: Annotated[float, Field(strict=True, gt=0, allow_inf_nan=False)] = DEFAULT_TIMEOUT_SECONDS
 
     @field_validator("endpoint")
     @classmethod
@@ -129,6 +130,7 @@ class ProviderResult(Contract, Generic[T]):
     request_id: UUID
     data: T
     observation: Observation
+    http_status: Annotated[StrictInt, Field(ge=100, le=599)] = 200
 
 
 class ProviderError(Exception):
@@ -272,7 +274,7 @@ class ProviderClient:
         context = {"request_id": request_id, "provider": request.provider, "operation": request.operation}
         if not isinstance(response_model, type) or not issubclass(response_model, BaseModel):
             raise ProviderError("local", "La respuesta exige un modelo Pydantic.", **context)
-        timeout = DEFAULT_TIMEOUT_SECONDS
+        timeout = spec.timeout_seconds
         if remaining_seconds is not None:
             if isinstance(remaining_seconds, bool) or not isinstance(remaining_seconds, (int, float)) or not math.isfinite(remaining_seconds) or remaining_seconds <= 0:
                 raise ProviderError("local", "El tiempo restante debe ser positivo y finito.", **context)
@@ -326,19 +328,29 @@ class ProviderClient:
             self._fail(error, "unknown")
         except (ValueError, TypeError):
             self._fail(ProviderError("transport", "Respuesta inválida del transporte; consumo pendiente.", **context), "unknown")
+        hunter_verifier = request.provider == "hunter" and request.operation == "email_verifier"
+        pending = hunter_verifier and response.status == 202
+        failure_outcome = "unknown" if pending else "failed"
         if len(response.body) > MAX_RESPONSE_BYTES:
-            self._fail(ProviderError("response_limit", "La respuesta supera el límite de tamaño.", **context), "failed")
-        if response.status >= 300 or response.status < 200:
+            self._fail(ProviderError("response_limit", "La respuesta supera el límite de tamaño.", **context), failure_outcome)
+        if response.status >= 300 or response.status < 200 or hunter_verifier and response.status == 222:
             message = f"HTTP {response.status}."
             try:
                 raw = json.loads(response.body)
                 if isinstance(raw, dict):
-                    detail = raw.get("error", raw)
-                    if isinstance(detail, dict):
-                        detail = detail.get("message", detail.get("detail"))
-                    # Tavily responde {"detail": {"error": "..."}}.
-                    if isinstance(detail, dict):
-                        detail = detail.get("error", detail.get("message"))
+                    if isinstance(raw.get("errors"), list):
+                        detail = "; ".join(
+                            " ".join(str(item[field]) for field in ("id", "code", "details")
+                                     if isinstance(item.get(field), (str, int)) and not isinstance(item[field], bool))
+                            for item in raw["errors"] if isinstance(item, dict)
+                        )
+                    else:
+                        detail = raw.get("error", raw)
+                        if isinstance(detail, dict):
+                            detail = detail.get("message", detail.get("detail"))
+                        # Tavily responde {"detail": {"error": "..."}}.
+                        if isinstance(detail, dict):
+                            detail = detail.get("error", detail.get("message"))
                     if isinstance(detail, str):
                         message += " " + _safe_message(detail, key, request)
             except (ValueError, UnicodeError, RecursionError):
@@ -349,18 +361,19 @@ class ProviderClient:
             self._fail(error, "failed")
         content_type = (_header(response.headers, "Content-Type") or "").split(";", 1)[0].strip().lower()
         if content_type != "application/json" and not (content_type.startswith("application/") and content_type.endswith("+json")):
-            self._fail(ProviderError("content_type", "El proveedor no devolvió contenido JSON.", **context), "failed")
+            self._fail(ProviderError("content_type", "El proveedor no devolvió contenido JSON.", **context), failure_outcome)
         try:
             json.loads(response.body, parse_constant=_reject_json_constant)
         except (ValueError, UnicodeError, RecursionError):
-            self._fail(ProviderError("json", "JSON inválido del proveedor.", **context), "failed")
+            self._fail(ProviderError("json", "JSON inválido del proveedor.", **context), failure_outcome)
         try:
             data = response_model.model_validate_json(response.body)
         except (ValueError, TypeError):
-            self._fail(ProviderError("schema", "La respuesta no cumple el esquema esperado.", **context), "failed")
-        observation = Observation(outcome="succeeded")
+            self._fail(ProviderError("schema", "La respuesta no cumple el esquema esperado.", **context), failure_outcome)
+        observation = Observation(outcome="unknown" if pending else "succeeded")
         self.budget.record_result(request_id, observation)
-        return ProviderResult(request_id=request_id, data=data, observation=observation)
+        return ProviderResult(request_id=request_id, data=data, observation=observation,
+                              http_status=response.status)
 
     def _fail(self, error, outcome, *, no_send=False):
         self.budget.record_result(error.request_id, Observation(outcome=outcome, error_message=error.message), no_send=no_send)

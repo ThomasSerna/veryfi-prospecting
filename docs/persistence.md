@@ -51,6 +51,29 @@ Empresas con el mismo dominio permanecen separadas. `None` se conserva como
 desconocido, distinto de cero o `False`; el consumo desconocido no se rellena.
 Dinero y créditos se guardan como texto decimal exacto, sin sumas SQLite `REAL`.
 
+`RunItem.consumed_limits` conserva el esfuerzo ya utilizado. `active_seconds`
+acumula el tiempo activo de la empresa y `contacts_active_seconds` permite limitar
+la etapa de contactos por separado. Este último campo es un número finito,
+no negativo, con valor predeterminado `0.0`: las bases anteriores cuyo JSON no lo
+incluye se leen sin recrear tablas ni migrar el esquema. Al guardar, ningún
+contador ni tiempo consumido puede reducirse. El tiempo no se borra al reanudar.
+
+Los contactos se guardan mediante `save_contact(contact, evidence=...)` con sus
+referencias de nombre, cargo, empleo y canales. Una asociación laboral o un canal
+incompleto permanece pendiente; persistirlos no los vuelve utilizables.
+`employment_evidence_ids` prueba el vínculo laboral, mientras que cada canal
+conserva su propia evidencia, estado original del proveedor, estado normalizado y
+fechas. Una respuesta de Hunter consultada hoy no sustituye la fecha de verificación
+del correo ni demuestra empleo vigente. La evaluación de estas condiciones está
+descrita en [Personas y canales](contacts.md).
+
+Al fusionar la misma persona se conservan fuentes, canales y advertencias
+anteriores. Una verificación negativa no desaparece por una publicación o una
+confirmación manual: requiere una observación posterior del proveedor y su
+evidencia. El checkpoint de contactos conserva el resultado comercial separado
+de `error_stage`, `error_message` y `stop_reason`; una interrupción técnica no
+borra la calificación ni el consumo.
+
 La base se crea únicamente cuando la ruta no existe. Reabrir una base compatible
 conserva checkpoints y uso; un esquema incompatible, incompleto o corrupto genera
 un error, sin recrear tablas. No hay funciones de borrado ni migraciones

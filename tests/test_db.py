@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from decimal import Decimal
+import json
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -691,6 +692,35 @@ def test_reopen_recovers_checkpoint_and_paid_usage(tmp_path, records, persist_re
         assert len(restored.list_evidence(records.company.id)) == len(
             records.company_evidence + records.contact_evidence
         )
+
+
+def test_reopen_previous_limits_json_and_preserve_contacts_time(
+    tmp_path, records, persist_records
+):
+    path = tmp_path / "synthetic-previous-limits.sqlite3"
+    records.run_item = records.run_item.model_copy(update={
+        "consumed_limits": ConsumedLimits(active_seconds=12.5),
+    })
+    with Database(path) as database:
+        persist_records(database, records)
+    previous = records.run_item.consumed_limits.model_dump()
+    previous.pop("contacts_active_seconds")
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE run_items SET consumed_limits=? WHERE campaign_id=? AND company_id=?",
+            (json.dumps(previous), str(records.campaign.id), str(records.company.id)),
+        )
+    with Database(path) as restored:
+        item = restored.get_run_item(records.campaign.id, records.company.id)
+        assert item.consumed_limits.contacts_active_seconds == 0.0
+        assert item.consumed_limits.active_seconds == 12.5
+        consumed = item.consumed_limits.model_copy(update={"contacts_active_seconds": 2.5})
+        updated = restored.save_run_item(item.model_copy(update={"consumed_limits": consumed}))
+        with pytest.raises(ValueError, match="reducir límites"):
+            restored.save_run_item(item)
+    with Database(path) as reopened:
+        assert reopened.get_run_item(records.campaign.id, records.company.id) == updated
+        assert reopened.get_usage(records.usage.request_id) == records.usage
 
 
 def test_reopen_preserves_failed_stage_and_uncertain_reservation(

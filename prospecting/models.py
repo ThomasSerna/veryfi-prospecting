@@ -677,6 +677,7 @@ class ConsumedLimits(Contract):
     enrichments: Count = 0
     email_verifications: Count = 0
     active_seconds: Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)] = 0.0
+    contacts_active_seconds: Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)] = 0.0
 
 
 class RunItem(Contract):

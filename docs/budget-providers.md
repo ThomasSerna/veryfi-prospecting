@@ -74,17 +74,21 @@ automáticamente. No borres la base ni sus archivos auxiliares para liberar sald
 operaciones explícitas y un transporte opcional para pruebas.
 `fingerprint` calcula una huella SHA-256 sin autenticación.
 `request_json` exige reserva persistida y autorización, ejecuta un solo intento y
-devuelve `ProviderResult` con un modelo Pydantic validado. Devuelve errores tipados
+devuelve `ProviderResult` con un modelo Pydantic validado, `observation` y
+`http_status` (200 por defecto para resultados anteriores). Devuelve errores tipados
 para fallos locales, HTTP, transporte, timeout, formato y tamaño; las claves y
 entradas sensibles se omiten de los mensajes. No interpreta permisos o cuota con
 una tabla HTTP universal ni reintenta automáticamente.
 
 El transporte estándar utiliza HTTPS verificado, un opener privado sin proxies
-heredados ni redirecciones, timeout de 10 segundos como máximo por operación
-bloqueante y respuesta máxima de 1 MiB. Descuenta del tiempo restante el empleado
+heredados ni redirecciones y respuesta máxima de 1 MiB. Cada descriptor fija
+`timeout_seconds`, positivo y finito: 10 segundos por defecto; Hunter Verifier
+usa 25 segundos para permitir su procesamiento de hasta 20 segundos.
+Descuenta del tiempo restante el empleado
 en la preparación y reclamación. Ese timeout no garantiza un plazo absoluto para
-DNS o toda la llamada. El cliente no descarga páginas arbitrarias ni implementa
-integraciones comerciales: la pantalla no tiene operaciones externas habilitadas.
+DNS o toda la llamada. El cliente no descarga páginas arbitrarias. Los adaptadores
+de Tavily y Hunter habilitan únicamente las operaciones explícitas de lectura;
+la pantalla no inicia llamadas automáticamente.
 
 Las claves se leen únicamente de variables de entorno al ejecutar una operación:
 `TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `APOLLO_API_KEY` y `HUNTER_API_KEY`.
@@ -96,3 +100,40 @@ Los éxitos repetidos se bloquean para recuperar su resultado guardado; si falta
 ese resultado, requieren revisión. Un segundo intento necesita conciliación,
 fallo transitorio identificado por el adaptador y otra reserva; después de un
 reinicio no se deduce transitoriedad del mensaje guardado.
+
+## Consumo y respuestas de Hunter
+
+`HunterAccess` registra operaciones disponibles, fecha y referencia de la
+comprobación, financiación y la referencia canónica de cada saldo real. Sus
+referencias `search_account_ref` y `verification_account_ref` se utilizan como
+`account_ref` del ledger y de los permisos, sin enviarse a Hunter.
+Domain Search y Finder comparten el mismo saldo de búsqueda. En una cuenta con
+créditos unificados también lo comparte Verifier; en una cuenta con cuotas
+separadas, el saldo de verificación tiene otra referencia y otro `AccountAllowance`.
+No crear alias o cupos por operación para un mismo saldo, ni sumar búsquedas y
+verificaciones de cuotas independientes como si fueran créditos intercambiables.
+
+Las cotas documentadas son 1 crédito para Domain Search con hasta 10 resultados y
+1 para Finder. Verifier reserva 0,5 créditos unificados o 1 crédito de su cuota
+separada, según la cuenta comprobada. Finder incluye la verificación del correo
+encontrado. Estos valores no comprueban acceso ni saldo en la cuenta del equipo;
+el origen y la valoración económica deben quedar acreditados antes del gasto.
+Consulta la [referencia de consumo de la API](https://help.hunter.io/en/articles/1970956-hunter-api)
+y la [distinción entre créditos de verificación](https://help.hunter.io/en/articles/1935055-how-many-credits-are-used-to-verify-an-email).
+
+No asumir consumo exacto por obtener resultados: las reservas y estimaciones se
+mantienen hasta conciliación con un comprobante del proveedor. Un resultado vacío
+o una verificación desconocida tampoco autorizan liberar importes sin confirmar.
+
+Para `hunter/email_verifier`, HTTP 202 conserva `Usage` como `uncertain`, con
+`outcome="unknown"`, y el saldo reservado. Un cuerpo 202 inválido también mantiene
+esa incertidumbre. No hay polling ni reenvío automático: el candidato queda
+pendiente. HTTP 222 se trata como fallo aunque pertenezca al rango 2xx. El mensaje
+de `errors[]` conserva `id`, `code` y `details` después de omitir claves, entradas
+sensibles, correos, números y URLs; no se guarda el cuerpo HTTP.
+
+Finder y Verifier solo pueden habilitarse tras comprobar que el guardado automático
+de leads está desactivado en la cuenta. El
+[OpenAPI oficial de Hunter](https://hunter.io/openapi.json) describe ese efecto y
+su desactivación a nivel de cuenta; no se supone un parámetro de petición para
+desactivarlo. La comprobación de acceso no cambia ajustes de la cuenta desde el código.
