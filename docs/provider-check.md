@@ -115,3 +115,34 @@ llamadas suman unos USD 0,0028, pendientes de conciliar con la consola de Anthro
 - Son tres llamadas sobre una sola empresa: muestran que el prompt influye en la
   clasificación cerca de los umbrales, pero no miden calidad ni calibración (T10). La
   revisión humana de §6 sigue siendo necesaria.
+
+## Hunter
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-12 (America/Bogota) |
+| Cuenta | `hunter-equipo-plan-gratuito`; plan Free; el responsable informó 50 créditos sin uso en el panel |
+| Origen de financiación | `free_credit`; desembolso USD 0 |
+| Autorización | Responsable del cupo, en la sesión: 1 `domain_search`, ≤ 3 créditos, USD 0. Finder y Verifier no habilitados (falta comprobar que el guardado automático de leads está desactivado) |
+| Endpoint usado | `GET https://api.hunter.io/v2/domain-search` con `Authorization: Bearer` |
+| Documentación | [API v2](https://hunter.io/api-documentation/v2), [precios](https://hunter.io/pricing) y [consumo de la API](https://help.hunter.io/en/articles/1970956-hunter-api), consultadas el 2026-10-12 |
+
+| Operación | Parámetros principales | Llamadas | Créditos reservados | Créditos observados | Latencia | Resultado |
+|---|---|---:|---:|---:|---|---|
+| Domain Search | `domain` confirmado, `type=personal`, `job_titles` de la evaluación, `limit=1` (cupo de personas en prioridad media), `offset=0` | 1 | 1 | 1 (estimado: un correo devuelto) | 0,55 s | 1 persona con nombre completo y cargo pertinente; correo del dominio de la empresa con verificación `valid` de Hunter y un perfil de LinkedIn sin confirmar |
+
+Campaña de prueba: Colombia, `fintech_software`; empresa confirmada de prioridad `medium`.
+Resultado comercial: `qualified_no_contact`. Hunter no demuestra que el empleo esté vigente;
+las reglas de §10 exigen una fuente fechada o un directorio corporativo actual, que la ruta
+pública (Tavily más Haiku) puede aportar. La etapa se ejecutó solo con Hunter. Los datos de
+la persona quedan en `data/` y no se reproducen aquí. El consumo está pendiente de conciliar
+con el panel de Hunter.
+
+### Observaciones y limitaciones
+
+- Precio de Domain Search: la página de precios indica 1 crédito por correo encontrado y
+  el artículo de consumo de la API, 1 crédito por cada 1 a 10 correos devueltos. La
+  reserva cubre el peor caso (un crédito por resultado pedido). Con `limit=1` ambos
+  criterios coinciden, así que esta prueba no resuelve la discrepancia.
+- No se probaron Finder, Verifier ni errores reales (401, 403, 429, 451); solo con
+  respuestas sintéticas.
