@@ -39,9 +39,11 @@ campaña. Haiku propone y Python decide:
     comercial, porque aún cabe una ampliación de evidencia.
   - Repetir la calificación reutiliza la evaluación guardada.
 
-`ClaudeClient` usa el SDK oficial `anthropic` con la clave de `ANTHROPIC_API_KEY`,
+`ClaudeClient` (`prospecting/providers/claude.py`) usa el SDK oficial `anthropic` con la clave de `ANTHROPIC_API_KEY`,
 `max_retries=0` y un timeout de 30 s como máximo. Sigue el mismo protocolo de
-reserva, reclamación y registro que `ProviderClient`.
+reserva, reclamación y registro que `ProviderClient`. El modelo y la forma común de
+la solicitud estructurada están en `prospecting/haiku.py`; el prompt y su validación,
+en `prospecting/qualification.py`.
 
 - **Presupuesto:** cada llamada reserva el costo máximo con los precios publicados
   (USD 0,10 por millón de tokens de entrada y USD 0,50 por millón de salida): unos

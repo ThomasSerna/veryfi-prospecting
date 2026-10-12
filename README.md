@@ -68,7 +68,7 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
 - `prospecting/text.py`, `sources.py` y `haiku.py`: texto externo, política de URLs y fuentes, y forma común de las solicitudes a Haiku.
-- `prospecting/providers.py`: cliente JSON acotado, cliente de Claude con el SDK oficial y errores de proveedor.
+- `prospecting/providers/`: cliente JSON acotado y errores de proveedor (`http.py`) y cliente de Claude con el SDK oficial, precios y tope de reserva (`claude.py`).
 - `prospecting/discovery.py`: consultas y respuestas de Tavily, selección de candidatos, identidad y exclusiones.
 - `prospecting/qualification.py`: rúbrica, puntuación, prioridad, solicitud a Haiku y validación de su respuesta.
 - `prospecting/contacts.py`: búsqueda con Hunter, extracción pública con Haiku, personas, canales y condición de listo.
