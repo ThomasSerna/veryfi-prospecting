@@ -127,6 +127,23 @@ def test_internal_imports_have_no_cycles():
         visit(name)
 
 
+def test_documented_structure_matches_the_package():
+    """El árbol de IDEA.md §13.1 describe exactamente los módulos del paquete."""
+    idea = (PROJECT_ROOT / "docs" / "IDEA.md").read_text(encoding="utf-8")
+    tree = idea.split("### 13.1", 1)[1].split("```text", 1)[1].split("```", 1)[0]
+    documented, folder = set(), []
+    for line in tree.splitlines():
+        entry = line.split()[0] if line.strip() else ""
+        depth = (len(line) - len(line.lstrip())) // 2
+        if entry.endswith("/"):
+            folder[depth:] = [entry.rstrip("/")]
+        elif entry.endswith(".py") and folder and folder[0] == "prospecting":
+            parts = folder[:depth] + [entry[:-3]]
+            documented.add(".".join(parts))
+    package = {name for name, path in modules().items() if path.name != "__init__.py"}
+    assert documented == package
+
+
 def test_package_has_no_interface_messaging_or_browser_automation():
     used = {name: sorted({item.split(".")[0] for item in imported(tree)} & FORBIDDEN)
             for name, tree in trees().items()}
