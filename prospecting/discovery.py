@@ -6,6 +6,7 @@ nunca modifican límites, consultas ni instrucciones del flujo.
 
 import re
 from typing import Annotated
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from pydantic import Field, StrictBool, StrictInt
@@ -13,7 +14,9 @@ from pydantic import Field, StrictBool, StrictInt
 from prospecting.models import (
     Campaign, Company, Contract, Count, CountryCode, Evidence, Segment, Text, UtcDatetime,
 )
-from prospecting.sources import SEARCH_HIT_CLAIM, SEARCH_PROVIDER, domain_label
+from prospecting.sources import (
+    SEARCH_HIT_CLAIM, SEARCH_PROVIDER, domain_label, is_search_hit, url_host, within_domain,
+)
 from prospecting.text import clip, compact
 
 
@@ -219,6 +222,28 @@ def extract_query(campaign: Campaign) -> str:
     return clip("; ".join(dict.fromkeys(signals)), 400)
 
 
-# Identidad, duplicados y exclusiones: reglas deterministas; lo no comprobado queda pendiente.
+# Análisis inicial y ampliación de evidencia de una empresa ya descubierta (§7, §9).
+
+RESEARCH_QUERY_VERSION = "research_queries_v1"
+RESEARCH_TERMS = {
+    Segment.FINTECH_SOFTWARE: "recibos facturas comprobantes gastos",
+    Segment.CPG_LOYALTY: "promoción ticket factura de compra premios",
+}
 
 
+def initial_urls(company: Company, evidence: list[Evidence], limit: int) -> list[str]:
+    """Páginas propias que el buscador ya localizó y, si queda cupo, la portada con el host observado."""
+    if company.domain is None or limit <= 0:
+        return []
+    own = [str(item.url) for item in evidence if is_search_hit(item) and item.url is not None
+           and url_host(str(item.url)) is not None and within_domain(url_host(str(item.url)), company.domain)]
+    first = urlsplit(own[0]) if own else None
+    home = f"{first.scheme}://{first.netloc}/" if first else f"https://{company.domain}/"
+    return list(dict.fromkeys([*own, home]))[:limit]
+
+
+def expansion_query(company: Company, campaign: Campaign) -> str:
+    """Consulta de plantilla de la ampliación; se restringe al dominio de la empresa al buscar."""
+    segments = [segment for segment in campaign.segments if segment in (company.segments or campaign.segments)]
+    countries = [COUNTRIES[country][0] for country in campaign.countries if country in COUNTRIES]
+    return clip(" ".join([company.name, *(RESEARCH_TERMS[segment] for segment in segments), *countries]), 400)

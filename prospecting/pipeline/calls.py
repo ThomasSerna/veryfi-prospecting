@@ -16,6 +16,13 @@ def seconds_left(deadline: float | None) -> float | None:
     return None if deadline is None else deadline - time.monotonic()
 
 
+def grant_for(authorizations: list[SpendingAuthorization] | None, provider: str, operation: str,
+              account_ref: str | None) -> SpendingAuthorization | None:
+    """Permiso de la sesión para la operación y cuenta exactas; sin él, la reserva se rechaza."""
+    return next((item for item in authorizations or [] if
+                 (item.provider, item.operation, item.account_ref) == (provider, operation, account_ref)), None)
+
+
 def was_sent(budget: Budget, error) -> bool:
     """Un error con la reserva aún `reserved` o con prueba de no envío no consumió cupo del proveedor."""
     if getattr(error, "no_send", False) or getattr(error, "request_id", None) is None:

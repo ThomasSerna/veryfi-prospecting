@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
-from prospecting.discovery import COUNTRIES, PlannedQuery, SearchHit
+from prospecting.discovery import COUNTRIES, RESEARCH_QUERY_VERSION, PlannedQuery, SearchHit
 from prospecting.models import Company, DiscoveryLimits, Evidence, utc_now
 from prospecting.providers.http import OperationSpec, ProviderError, ProviderRequest
 from prospecting.sources import (
@@ -197,6 +197,41 @@ def classify_tavily_error(error: ProviderError) -> str:
         "content_type": "invalid_response", "response_limit": "invalid_response",
     }.get(error.kind, "provider_error")
 
+
+
+COMPANY_SEARCH_RESULTS = 5
+
+
+def company_search_request(company: Company, query: str, account_ref: str) -> ProviderRequest:
+    """Búsqueda de la ampliación restringida al dominio; su payload forma parte de la huella persistida."""
+    if company.domain is None:
+        raise ValueError("La ampliación necesita el dominio de la empresa.")
+    return ProviderRequest(provider=PROVIDER, operation=SEARCH_OPERATION, account_ref=account_ref,
+                           payload={"query": query, "search_depth": "basic", "topic": "general",
+                                    "max_results": COMPANY_SEARCH_RESULTS, "include_domains": [company.domain],
+                                    "include_answer": False, "include_raw_content": False,
+                                    "include_images": False, "include_usage": True})
+
+
+def company_search_evidence(company: Company, response: TavilySearchResponse, local_request_id: UUID,
+                            retrieved_at: datetime) -> list[Evidence]:
+    """Resultados del propio dominio marcados como búsqueda: localizan páginas, nunca confirman hechos."""
+    reference = clip(response.request_id, 120) or str(local_request_id)
+    evidence = []
+    for rank, result in enumerate(response.results, start=1):
+        host = url_host(result.url)
+        if host is None or company.domain is None or not within_domain(host, company.domain):
+            continue
+        title = f" Título: {clip(result.title, TITLE_CHARS)}." if clip(result.title, TITLE_CHARS) else ""
+        evidence.append(Evidence(
+            company_id=company.id,
+            claim=clip(f"{SEARCH_HIT_CLAIM} en el puesto {rank} de la ampliación de evidencia "
+                       f"({RESEARCH_QUERY_VERSION}).{title}", 600),
+            url=result.url.strip(), provider=PROVIDER, external_reference=f"{reference}#{rank}",
+            excerpt=clip(result.content, SNIPPET_CHARS), retrieved_at=retrieved_at,
+            kind="observed", source_type="secondary",
+        ))
+    return evidence
 
 
 def contact_search_request(query: str, account_ref: str) -> ProviderRequest:

@@ -10,10 +10,12 @@ from prospecting.pipeline.discovery import (
     DiscoveryReport, ExcludedCandidate, IdentityReport, QueryOutcome, resolve_company_identity, run_discovery,
 )
 from prospecting.pipeline.qualification import QualificationReport, qualify_company
-from prospecting.pipeline.research import ExtractReport, UrlFailure, extract_company_pages
+from prospecting.pipeline.research import (
+    ExtractReport, ResearchReport, UrlFailure, extract_company_pages, research_company,
+)
 
 __all__ = [
     "ContactReport", "DiscoveryReport", "ExcludedCandidate", "ExtractReport", "IdentityReport",
-    "QualificationReport", "QueryOutcome", "UrlFailure", "extract_company_pages", "find_contacts",
-    "qualify_company", "resolve_company_identity", "run_discovery",
+    "QualificationReport", "QueryOutcome", "ResearchReport", "UrlFailure", "extract_company_pages",
+    "find_contacts", "qualify_company", "research_company", "resolve_company_identity", "run_discovery",
 ]

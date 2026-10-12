@@ -15,7 +15,7 @@ from uuid import UUID
 
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.db import Database
-from prospecting.discovery import build_search_queries, extract_query
+from prospecting.discovery import build_search_queries, expansion_query, extract_query
 from prospecting.haiku import MODEL_ID
 from prospecting.identity import ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
@@ -24,7 +24,7 @@ from prospecting.providers.hunter import (
     HUNTER_OPERATIONS, HunterDomainSearchResponse, domain_search_request, finder_request, parse_domain_search,
     target_departments, verifier_request,
 )
-from prospecting.providers.tavily import TAVILY_OPERATIONS, extract_request, search_request
+from prospecting.providers.tavily import TAVILY_OPERATIONS, company_search_request, extract_request, search_request
 from prospecting.qualification import build_haiku_request, unknown_criteria
 from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit
 
@@ -104,6 +104,8 @@ def fingerprints(config) -> dict[str, str]:
         "tavily_search_last": client.fingerprint(search_request(queries[-1], ACCOUNT, current.limits.discovery)),
         "tavily_extract": client.fingerprint(extract_request(
             ["https://empresa-uno.example/producto"], extract_query(current), ACCOUNT)),
+        "tavily_company_search": client.fingerprint(company_search_request(
+            company(), expansion_query(company(), current), ACCOUNT)),
         "hunter_domain_roles": client.fingerprint(domain_search_request(company(), ["Product Manager"], ACCOUNT)),
         "hunter_domain_departments": client.fingerprint(domain_search_request(
             company(), ["Product Manager"], ACCOUNT, departments=target_departments(["Product Manager", "CTO"]))),
@@ -118,6 +120,7 @@ EXPECTED_FINGERPRINTS = {
     "tavily_search": "7ffaf59b70b633b6ebe2d1e28ab3eed5efce00c238f68484b23322315016e7b9",
     "tavily_search_last": "fc242ce31da2306567a247424a85d7d8504676f6ef2882d52694abbb74c07387",
     "tavily_extract": "e07e6d049bdc92127ed965084c09e7494dca1cba5c5073aa903e40968b4c2823",
+    "tavily_company_search": "5d36ec882ff69fdaa130850da1565389d4015986f9829fdda6da3ae49d119f46",
     "hunter_domain_roles": "75821173a121c6ef99b3491a2280a8b507d1c636f4c4aea34fea8a64652f8ae7",
     "hunter_domain_departments": "9f6184b7ee6b0286f02e6481f4138500581e8cacb3611eaf94597f03210c6877",
     "hunter_finder": "8054608a83cf35292d9a3808652a2c5ff6e9ca5d90682f6f05f420668b578074",

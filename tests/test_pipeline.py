@@ -6,16 +6,20 @@ import hashlib
 import json
 from types import SimpleNamespace
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
-from prospecting.discovery import build_search_queries
+from prospecting.discovery import build_search_queries, initial_urls
 from prospecting.identity import ExclusionList
 from prospecting.models import CampaignLimits, UsageStatus, utc_now
-from prospecting.pipeline import extract_company_pages, resolve_company_identity, run_discovery
+from prospecting.pipeline import (
+    extract_company_pages, research_company, resolve_company_identity, run_discovery,
+)
 from prospecting.providers import HttpResponse, ProviderClient
 from prospecting.providers.tavily import TAVILY_OPERATIONS
+from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit
 
 
 SYNTHETIC_KEY = "clave-exclusivamente-sintetica-para-pruebas"
@@ -513,3 +517,107 @@ def test_persisted_attempts_and_ledger_do_not_change(tavily):
     assert case.db.get_run_item(case.campaign.id, company_id).attempts == {"tavily_extract": 1}
     assert rows == [("search", "succeeded", "1", "0", "1.0", "free_credit", None)] * 4 + [
         ("extract", "succeeded", "1", "0", "1.0", "free_credit", company_id)]
+
+
+# Análisis inicial y ampliación acotada de evidencia (T07), con resultados exclusivamente sintéticos.
+
+def test_initial_urls_prefer_observed_own_pages_and_keep_the_observed_host(make_company):
+    company, facts = make_company(domain="empresa-uno.example")
+    hit = facts[0].model_copy(update={
+        "claim": f"{SEARCH_HIT_CLAIM} en el puesto 1.", "url": "https://www.empresa-uno.example/producto",
+        "provider": "tavily", "source_type": "secondary"})
+    other = hit.model_copy(update={"id": uuid4(), "url": "https://directorio.example/empresa-uno"})
+    assert initial_urls(company, [other, hit], 3) == [
+        "https://www.empresa-uno.example/producto", "https://www.empresa-uno.example/"]
+    assert initial_urls(company, [], 3) == ["https://empresa-uno.example/"]
+    assert initial_urls(company, [hit], 1) == ["https://www.empresa-uno.example/producto"]
+
+
+def expansion_search(domain, paths=("facturas", "clientes", "precios")):
+    """Discovery con resultados fijos; la búsqueda restringida al dominio devuelve páginas propias y una ajena."""
+    def search(payload):
+        if "include_domains" not in payload:
+            return fixed_search(payload)
+        results = [{"url": f"https://{domain}/{path}", "title": f"Página {path}", "content": HOSTILE, "score": 0.5}
+                   for path in paths]
+        results.insert(1, {"url": "https://otra.example/nota", "title": "Nota", "content": "Ajena.", "score": 0.4})
+        return {"results": results, "usage": {"credits": 1}, "request_id": "ampliacion-sintetica"}
+    return search
+
+
+def research(case, company_id, **kwargs):
+    return research_company(case.db, case.budget, case.client, case.campaign.id, company_id, account_ref=ACCOUNT,
+                            authorizations=kwargs.pop("authorizations", list(case.grants.values())), **kwargs)
+
+
+def expansion_case(tavily, **campaign_fields):
+    case = tavily.setup(**campaign_fields)
+    case.search = fixed_search
+    company_id = company_by_domain(case, discover(case).selected_company_ids, "nueva-uno.example")
+    extract_confirming_page(case, company_id)
+    case.search = expansion_search("nueva-uno.example")
+    return case, company_id
+
+
+def test_expansion_searches_own_domain_once_and_extracts_new_own_pages(tavily):
+    case, company_id = expansion_case(tavily)
+    before = case.db.get_campaign(case.campaign.id)
+    calls = len(case.calls)
+    report = research(case, company_id)
+    (search_op, search), (extract_op, extracted) = case.calls[calls:]
+    assert (search_op, extract_op) == ("search", "extract")
+    assert search["include_domains"] == ["nueva-uno.example"] and search["search_depth"] == "basic"
+    assert search["query"].startswith("Nueva Uno ") and "Colombia" in search["query"]
+    assert extracted["urls"] == ["https://nueva-uno.example/facturas", "https://nueva-uno.example/clientes"]
+    assert report.status == "researched" and report.requested_urls == extracted["urls"]
+    facts = {fact.id: fact for fact in case.db.list_evidence(company_id)}
+    hits = [facts[item] for item in report.evidence_ids if is_search_hit(facts[item])]
+    assert len(hits) == 3 and all("research_queries_v1" in fact.claim for fact in hits)
+    assert all("otra.example" not in str(fact.url) for fact in facts.values())
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.attempts == {"tavily_extract": 1, "research:expansion": 1, "research:web_queries": 1,
+                             "research:pages": 2}
+    assert (item.consumed_limits.web_queries, item.consumed_limits.pages) == (1, 3)
+    assert case.db.get_campaign(case.campaign.id) == before
+    calls = len(case.calls)
+    again = research(case, company_id)
+    assert again.status == "researched" and again.stop_reason == "page_limit" and again.request_ids == []
+    assert len(case.calls) == calls
+
+
+def test_expansion_without_new_sources_or_quota_makes_no_call(tavily, config):
+    limits = config.defaults.model_dump(include=set(CampaignLimits.model_fields))
+    limits["effort"]["insufficient_evidence"].update(web_queries=0)
+    case, company_id = expansion_case(tavily, limits=limits)
+    calls = len(case.calls)
+    report = research(case, company_id)
+    assert report.status == "researched" and report.stop_reason == "no_new_sources"
+    assert len(case.calls) == calls
+    limits["evidence_expansions_per_company"] = 0
+    case, company_id = expansion_case(tavily, limits=limits)
+    calls = len(case.calls)
+    assert research(case, company_id).stop_reason == "expansion_limit" and len(case.calls) == calls
+    assert "research:expansion" not in case.db.get_run_item(case.campaign.id, company_id).attempts
+
+
+def test_failed_expansion_search_counts_once_and_resumes_with_known_pages(tavily):
+    case, company_id = expansion_case(tavily)
+    case.failure = lambda operation, payload: json_response({"detail": {"error": "Fallo sintético"}}, 500)
+    report = research(case, company_id)
+    assert report.status == "pending" and report.stop_reason == "provider_error"
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.attempts["research:web_queries"] == 1 and item.consumed_limits.web_queries == 1
+    assert item.error_message.startswith("provider_error")
+    case.failure = None
+    calls = len(case.calls)
+    resumed = research(case, company_id)
+    assert len(case.calls) == calls and resumed.stop_reason == "no_new_sources"
+
+
+def test_unauthorized_or_expired_expansion_never_reaches_transport(tavily):
+    case, company_id = expansion_case(tavily)
+    calls = len(case.calls)
+    assert research(case, company_id, authorizations=[]).stop_reason == "authorization_required"
+    assert research(case, company_id, deadline=0.0).stop_reason == "time_limit"
+    assert len(case.calls) == calls
+    assert "research:web_queries" not in case.db.get_run_item(case.campaign.id, company_id).attempts
