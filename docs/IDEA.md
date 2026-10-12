@@ -421,7 +421,7 @@ pyproject.toml                 Dependencias y configuración de pruebas
 README.md                      Instalación, ejecución y demostración
 ```
 
-Es una orientación y el objetivo de la migración incremental R01–R10 (§17.2): el árbol del repositorio manda. Una fuente nueva de empresas, evidencia o personas añade `providers/<proveedor>.py` y una fase en la etapa correspondiente, y entrega los contratos y reglas existentes. No añadir capas de repositorios, factorías ni interfaces genéricas de conectores sin necesidad concreta.
+Es la estructura del repositorio tras la refactorización R01–R10 (§17.2); si difieren, el árbol del repositorio manda. Una fuente nueva de empresas, evidencia o personas añade `providers/<proveedor>.py` y una fase en la etapa correspondiente, y entrega los contratos y reglas existentes. No añadir capas de repositorios, factorías ni interfaces genéricas de conectores sin necesidad concreta.
 
 ### 13.2 Contratos compartidos
 
@@ -592,7 +592,7 @@ Posibles tareas adicionales para el proyecto final (propuestas, **aún no issues
 
 T12 y T13 son independientes y opcionales; pueden limitarse a evaluación documentada si la evidencia no justifica implementarlas. No se añaden como dependencias de T11 ni habilitan consumo nuevo.
 
-Refactorización modular (aprobada el 12 de octubre de 2026). Conserva la conducta; cada tarea es un commit `refactor:` verificable que lleva el código hacia §13.1:
+Refactorización modular (aprobada el 12 de octubre de 2026). Conserva la conducta; cada tarea es un commit `refactor:` verificable que lleva el código hacia §13.1. R01–R08 y R10 están hechas; R09 es opcional y queda aplazada hasta decidir T12, porque solo elimina duplicación en el protocolo de envío:
 
 | ID | Encargo al agente | Dependencias | Criterio de aceptación |
 |---|---|---|---|
@@ -605,7 +605,7 @@ Refactorización modular (aprobada el 12 de octubre de 2026). Conserva la conduc
 | R07 | Unificar reservas en `pipeline/calls.py` | R02, R04, R06 | Solo `pipeline/calls.py` reserva; ledger igual |
 | R08 | Estructurar la etapa de contactos por fases | R06–R07 | Claves de intentos y ledger iguales; pruebas de contactos sin editar |
 | R09 | Unificar el protocolo de envío de los proveedores | R04, R06 | `providers/http.py` sin nombres de proveedor; pruebas de proveedores sin editar |
-| R10 | Completar reglas de dependencia y documentación | R01–R09 | Ningún documento cita rutas inexistentes; la prueba de arquitectura cubre §13 |
+| R10 | Completar reglas de dependencia y documentación | R01–R08 | Ningún documento cita rutas inexistentes; la prueba de arquitectura cubre §13 |
 
 ### 17.3 Plantilla para asignar una tarea
 

@@ -58,7 +58,9 @@ conciliación y timeouts mediante transportes sintéticos. Verifican identidad,
 vigencia y estados de canales, la extracción pública citada,
 límites de contactos y respuestas pendientes de Hunter sin repetir consumo. También
 ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se importen
-sin cargar Streamlit. Estas pruebas no demuestran acceso a proveedores ni
+sin cargar Streamlit. También comprueban la dirección de las importaciones entre
+módulos, que la estructura documentada coincide con el paquete y que los
+identificadores guardados en SQLite no cambien. Estas pruebas no demuestran acceso a proveedores ni
 validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 
 ## Estructura y responsabilidades
