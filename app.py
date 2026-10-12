@@ -286,7 +286,7 @@ def execute_form(view, access):
 def table_columns():
     return {"company": st.column_config.TextColumn("Empresa", width="medium"), "countries": "País", "segments": "Segmento",
             "priority": st.column_config.TextColumn("Prioridad", width="small"),
-            "fit_score": st.column_config.NumberColumn("Encaje", format="%.1f"),
+            "fit_score": st.column_config.NumberColumn("Encaje", format="%.1f", width=110),
             "coverage": st.column_config.NumberColumn("Cobertura", format="percent"),
             "stage": "Etapa", "status": st.column_config.TextColumn("Disponibilidad", width="medium"),
             "review": st.column_config.TextColumn("Revisión humana", width="small")}
