@@ -450,7 +450,7 @@ find_contacts(db, budget, client, campaign_id, company_id, …) -> ContactReport
 derive_readiness(assessment, contacts, evidence, limits, now, company) -> BusinessStatus
 ```
 
-Las cinco primeras están en `prospecting.pipeline`: son las únicas que reservan gasto (mediante `pipeline/calls.py`), llaman a proveedores y guardan checkpoints, y devuelven informes tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` (`contacts.py`) y el cálculo de score (`qualification.py`) son código determinista. Toda fuente de personas, presente o futura, entrega `Contact`, `Channel` y `Evidence` y pasa por las mismas reglas de `contacts.py`, sin capas de abstracción especulativas. La ampliación de evidencia de T07 (`research_company`) irá en `pipeline/research.py`; hoy solo existe la extracción de URLs dadas.
+Las cinco primeras están en `prospecting.pipeline`: son las únicas que reservan gasto (mediante `pipeline/calls.py`), llaman a proveedores y guardan checkpoints, y devuelven informes tipados; la UI no interpreta respuestas crudas de APIs. `derive_readiness` (`contacts.py`) y el cálculo de score (`qualification.py`) son código determinista. Toda fuente de personas, presente o futura, entrega `Contact`, `Channel` y `Evidence` y pasa por las mismas reglas de `contacts.py`, sin capas de abstracción especulativas. La ampliación de evidencia (`research_company`) está en `pipeline/research.py` y la orquestación de campaña (`start_campaign`, `run_campaign`, `close_campaign`) en `pipeline/campaign.py`.
 
 ### 13.3 Ejecución y recuperación
 
