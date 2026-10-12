@@ -347,10 +347,13 @@ campaña. Haiku propone y Python decide:
   confirmada o sin evidencia útil recibe `insufficient_evidence`, con los cinco
   criterios en `null`.
 - **Solicitud:** usa el modelo `claude-haiku-5-5` con el prompt versionado
-  `haiku_assessment_v1`, *thinking* desactivado y *effort* `low`.
+  `haiku_assessment_v2`, *thinking* desactivado y *effort* `low`.
   - La salida es JSON con esquema. El límite de entrada es
     `limits.llm.max_input_tokens` (unos 3 caracteres por token) y el de salida,
     `limits.llm.max_output_tokens`.
+  - El prompt limita cada justificación a 25 palabras, la explicación a dos frases y
+    los datos pendientes a tres. Una versión nueva del prompt genera una evaluación
+    nueva que revisa la anterior (`revision_of`); la anterior se conserva.
   - La evidencia de la empresa va como datos delimitados y no confiables: primero
     las fuentes primarias, sin la evidencia de contactos ni las revisiones manuales.
 - **Validación:** Haiku devuelve un valor `0`, `0.5`, `1` o `null` por criterio, con

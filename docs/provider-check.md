@@ -46,11 +46,16 @@ en el registro con su referencia propia y no se mezcla con el de otra cuenta.
 | Operación | Parámetros principales | Llamadas | Créditos reservados | Créditos según `usage` | Latencia | Resultado |
 |---|---|---:|---:|---:|---|---|
 | Search | Los mismos de la tabla anterior | 1 | 1 | 1 | 2,2 s | 10 resultados, 10 hosts candidatos y 5 seleccionados, uno reutilizado de una campaña anterior |
+| Extract | Los mismos de la tabla anterior; portada `https://<dominio>/` más las URLs observadas, 3 páginas como máximo por empresa | 7 (una por empresa pendiente) | 7 | 1 | 0,5–1,8 s | 23 fragmentos guardados. 5 portadas sin `www` fallaron con «Failed to fetch url» (no se cobran). Un directorio se rechazó localmente sin llamar |
 
 Campaña de comprobación: Colombia, `fintech_software`, `web_queries=1` y `max_companies=5`.
-Conciliado el 2026-10-11 con el panel de Tavily, verificado por el responsable: 1 / 1.000
-créditos, USD 0. El comprobante local queda en `data/conciliaciones/`. Mantener *pay as you
-go* desactivado evita cargos fuera del crédito gratuito (§14).
+La búsqueda se concilió el 2026-10-11 con el panel de Tavily, verificado por el responsable:
+1 / 1.000 créditos, USD 0. El comprobante local queda en `data/conciliaciones/`.
+
+Las extracciones (autorización en la sesión: ≤ 7 créditos, USD 0) están pendientes de
+conciliar con el panel; según `usage`, sumaron 1 crédito. Después de extraer, la resolución
+local de identidad confirmó 1 empresa más. El resto quedó pendiente por país o nombre no
+confirmados. Mantener *pay as you go* desactivado evita cargos fuera del crédito gratuito (§14).
 
 ### Observaciones y limitaciones
 
@@ -72,25 +77,32 @@ go* desactivado evita cargos fuera del crédito gratuito (§14).
 |---|---|
 | Fecha | 2026-10-11 (America/Bogota) |
 | Cuenta | `anthropic-equipo-prepago`; saldo prepago; cupo asignado por el responsable: USD 3 (partida de IA, §14) |
-| Autorización | Responsable del cupo, en la sesión: 1 llamada `messages` a `claude-haiku-5-5`, ≤ USD 0,005 |
+| Autorización | Responsable del cupo, en la sesión: 2 autorizaciones de 1 llamada `messages` a `claude-haiku-5-5`, ≤ USD 0,005 cada una (prompt v1 y v2) |
 | Cliente | SDK oficial `anthropic==1.11.0`, `max_retries=0`, timeout ≤ 30 s |
-| Parámetros | `thinking={"type": "disabled"}`, `output_config.effort="low"`, salida JSON con esquema (`output_config.format`), `max_tokens=1000`, prompt `haiku_assessment_v1` |
+| Parámetros | `thinking={"type": "disabled"}`, `output_config.effort="low"`, salida JSON con esquema (`output_config.format`), `max_tokens=1000`, prompts `haiku_assessment_v1` y `haiku_assessment_v2` |
 | Documentación | Referencia oficial de la API de Claude (modelos, precios y parámetros), consultada el 2026-10-11 |
 
-| Llamadas | Tokens de entrada | Tokens de salida | Costo reservado | Costo estimado | Latencia | Resultado |
-|---:|---:|---:|---:|---:|---|---|
-| 1 | 5.288 | 939 | USD 0,0011 | USD 0,000998 | 9,6 s | Respuesta válida; todas las referencias existen; evaluación `medium` (encaje 55,6, cobertura 90 %) de la empresa confirmada de la campaña de prueba |
+| Prompt | Tokens de entrada | Tokens de salida | Costo reservado | Costo estimado | Latencia | Resultado |
+|---|---:|---:|---:|---:|---|---|
+| v1 | 5.288 | 939 | USD 0,0011 | USD 0,000998 | 9,6 s | Respuesta válida; todas las referencias existen; evaluación `medium` (encaje 55,6, cobertura 90 %) de la empresa confirmada de la campaña de prueba |
+| v2 | 5.347 | 736 | USD 0,0011 | USD 0,000903 | 6,0 s | Respuesta válida y referencias existentes; justificaciones de 11–14 palabras (antes 20–38). Misma empresa y evidencia: evaluación `high` (encaje 75,0, en el umbral; cobertura 90 %) |
 
-El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Queda
-pendiente conciliarlo con la consola de Anthropic.
+El costo estimado sale de los tokens que informó la respuesta y del precio publicado. Las dos
+llamadas suman unos USD 0,0019, pendientes de conciliar con la consola de Anthropic.
 
 ### Observaciones y limitaciones
 
 - El API aceptó el esquema (con `enum` que incluye `null` y `format: uuid`), el *thinking*
   desactivado y el *effort* `low`.
-- La salida usó 939 de 1.000 tokens. Con más evidencia o justificaciones más largas, la
-  respuesta podría truncarse (`max_tokens`). En ese caso la evaluación queda pendiente; no
-  se inventa.
-- La entrada usó 5.288 de los 6.000 tokens reservados, con unos 3,4 caracteres por token.
-  El presupuesto de caracteres (3 por token) deja margen, aunque estrecho.
-- Es una sola llamada: no mide calidad ni calibración de la calificación (T10).
+- Con v1, la salida usó 939 de 1.000 tokens y se arriesgaba a quedar truncada. Con v2 usó
+  736, que deja margen. Una respuesta truncada deja la evaluación pendiente; no se inventa.
+- La entrada usó unos 5.300 de los 6.000 tokens reservados, con unos 3,4 caracteres por
+  token. El presupuesto de caracteres (3 por token) deja margen, aunque estrecho.
+- **Calidad:** con la misma evidencia, `document_need` pasó de 0,5 (v1) a 1 (v2), y la
+  prioridad, de `medium` a `high`. Las referencias de v2 existen, pero los fragmentos citados
+  hablan de facturación electrónica y conciliación bancaria, no de recibir o procesar
+  comprobantes. Además, la explicación de v2 afirma una «captura de recibos» que no aparece
+  en esas páginas. Una causa probable es que la evidencia del buscador incluye el texto de
+  la consulta. La validación automática comprueba referencias, no si la fuente respalda la
+  afirmación, así que este error necesita revisión humana (§12.1) y evaluación (T10).
+- Son dos llamadas sobre una sola empresa: no miden calidad ni calibración de la calificación.
