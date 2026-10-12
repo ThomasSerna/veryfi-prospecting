@@ -3,17 +3,19 @@
 ## Descubrimiento y extracción con Tavily
 
 Las etapas de `prospecting.pipeline` son las únicas que reservan consumo y llaman a Tavily.
-`prospecting/discovery.py` construye consultas, valida respuestas y selecciona
-candidatos sin red ni base de datos. Ambas funciones admiten solamente crédito
+`prospecting/discovery.py` construye consultas y selecciona candidatos;
+`prospecting/providers/tavily.py` define las operaciones, valida respuestas y clasifica
+errores; `prospecting/identity.py` resuelve identidad y exclusiones. Ninguno de los tres
+hace red ni usa la base de datos. Ambas funciones admiten solamente crédito
 gratuito (`funding_source="free_credit"`, USD 0 por llamada) y exigen un
 `SpendingAuthorization` registrado para la operación `search` o `extract`:
 
 ```python
 import time
 
-from prospecting.discovery import TAVILY_OPERATIONS
 from prospecting.pipeline import extract_company_pages, run_discovery
 from prospecting.providers import ProviderClient
+from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 client = ProviderClient(budget, TAVILY_OPERATIONS)
 report = run_discovery(db, budget, client, campaign.id, account_ref="cuenta-tavily",

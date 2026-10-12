@@ -92,9 +92,9 @@ si se proporciona su cuenta y el permiso correspondiente.
 
 ```python
 from prospecting.contacts import HUNTER_OPERATIONS
-from prospecting.discovery import TAVILY_OPERATIONS
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, ProviderClient
+from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 client = ProviderClient(budget, [*HUNTER_OPERATIONS, *TAVILY_OPERATIONS])
 report = find_contacts(
