@@ -555,7 +555,7 @@ EXPECTED_PERSISTED = {
             ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
             ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
             ("tavily", "extract", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
-            ("anthropic", "messages", "claude-synthetic", "succeeded", "0", "0.0011", "prepaid", True),
+            ("anthropic", "messages", "claude-synthetic", "succeeded", "0", "0.0009145", "prepaid", True),
         ],
         "evidence": [
             *COMPANY_FACTS, ("<id>", "provider", "inference", False), ("<id>#1.1", "primary", "observed", False),

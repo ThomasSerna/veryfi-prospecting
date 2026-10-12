@@ -393,7 +393,7 @@ class _ContactStage:
         if seconds_left(self.deadline) <= 0:
             raise BudgetError("time_limit", "Se agotó el tiempo antes de extraer contactos.")
         grant = self.grant(CLAUDE_PROVIDER, CLAUDE_OPERATION, account)
-        usage = reserve_claude(self.budget, fingerprint, campaign.limits.llm, account_ref=account,
+        usage = reserve_claude(self.budget, fingerprint, payload, account_ref=account,
                                funding_source=self.claude_funding_source, authorization=grant, **self.base)
         self.requests.append(usage.request_id)
         try:

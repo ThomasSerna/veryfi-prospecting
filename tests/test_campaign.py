@@ -273,7 +273,7 @@ def test_budget_pause_stops_without_traffic_and_resumes_with_a_new_session(world
 def test_exhausted_company_cap_closes_that_company_without_pausing_the_campaign(world):
     # El tope por empresa cubre la reserva de calificación, pero no la de extracción de contactos;
     # al fallar aún queda saldo de la empresa, menor que la reserva.
-    case = world.setup(budget__company_usd="0.0015")
+    case = world.setup(budget__company_usd="0.002")
     start(case)
     report = case.run()
     assert report.status == CampaignStatus.COMPLETED and report.stop_reason is None

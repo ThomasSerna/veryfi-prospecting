@@ -5,8 +5,8 @@ del SDK oficial. Los adaptadores por proveedor se importan desde su propio módu
 """
 
 from prospecting.providers.claude import (
-    CLAUDE_OPERATION, CLAUDE_PRICES_PER_MTOK, CLAUDE_PROVIDER, CLAUDE_TIMEOUT_SECONDS, ClaudeCall, ClaudeClient,
-    claude_cost, reservation_cost,
+    CLAUDE_OPERATION, CLAUDE_PRICES_PER_MTOK, CLAUDE_PROVIDER, CLAUDE_TIMEOUT_SECONDS, INJECTED_PROMPT_TOKENS,
+    ClaudeCall, ClaudeClient, claude_cost, input_token_bound, reservation_cost,
 )
 from prospecting.providers.http import (
     DEFAULT_TIMEOUT_SECONDS, MAX_RESPONSE_BYTES, HttpResponse, OperationSpec, ProviderClient, ProviderError,
@@ -15,7 +15,7 @@ from prospecting.providers.http import (
 
 __all__ = [
     "CLAUDE_OPERATION", "CLAUDE_PRICES_PER_MTOK", "CLAUDE_PROVIDER", "CLAUDE_TIMEOUT_SECONDS",
-    "DEFAULT_TIMEOUT_SECONDS", "MAX_RESPONSE_BYTES", "ClaudeCall", "ClaudeClient", "HttpResponse",
-    "OperationSpec", "ProviderClient", "ProviderError", "ProviderRequest", "ProviderResult", "claude_cost",
-    "reservation_cost",
+    "DEFAULT_TIMEOUT_SECONDS", "INJECTED_PROMPT_TOKENS", "MAX_RESPONSE_BYTES", "ClaudeCall", "ClaudeClient",
+    "HttpResponse", "OperationSpec", "ProviderClient", "ProviderError", "ProviderRequest", "ProviderResult",
+    "claude_cost", "input_token_bound", "reservation_cost",
 ]

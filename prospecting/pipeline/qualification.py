@@ -136,9 +136,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     remaining = seconds_left(deadline)
     if remaining is not None and remaining <= 0:
         return pending("time_limit", "Se agotó el tiempo de la etapa antes de llamar.")
-    limits = campaign.limits.llm
     try:
-        usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), limits, account_ref=account_ref,
+        usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), payload, account_ref=account_ref,
                                funding_source=funding_source, authorization=authorization, **base)
         call = claude.create(usage.request_id, payload, account_ref=account_ref,
                              authorization=authorization, remaining_seconds=remaining)

@@ -16,7 +16,9 @@ from prospecting.models import (
     BusinessStatus, Contact, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
 )
 from prospecting.pipeline import qualify_company
-from prospecting.providers import ClaudeClient, ProviderError, claude_cost
+from prospecting.providers import (
+    INJECTED_PROMPT_TOKENS, ClaudeClient, ProviderError, claude_cost, input_token_bound, reservation_cost,
+)
 from prospecting.qualification import (
     PROMPT_VERSION, HaikuAssessment, QualificationError, build_haiku_request, classify,
     compute_score, explanation_text, parse_output, rubric_for, validate_output,
@@ -340,7 +342,34 @@ def test_qualification_saves_assessment_and_records_usage(claude):
     assert item.business_status is None and item.stop_reason is None
     usage = claude.db.get_usage(report.request_id)
     assert usage.status == UsageStatus.SUCCEEDED and usage.estimated_cost_usd == Decimal("0.00027")
-    assert usage.tokens.input_tokens == 1200 and usage.reserved_cost_usd == Decimal("0.0011")
+    assert usage.tokens.input_tokens == 1200 and usage.reserved_cost_usd == expected_reservation(claude)[1]
+
+
+def expected_reservation(case):
+    """Cota de entrada del payload que se envía y salida máxima, al precio publicado."""
+    payload, _ = build_haiku_request(case.company, case.db.list_evidence(case.company.id), case.campaign)
+    tokens = input_token_bound(payload)
+    return tokens, reservation_cost(MODEL_ID, tokens, payload["max_tokens"])
+
+
+def test_reservation_covers_dense_prompt_and_maximum_output(claude):
+    """Con 2,2 bytes por token (medido el 2026-10-12) y la salida al máximo, el costo cabe en la reserva."""
+    for index in range(30):
+        claude.db.save_evidence(Evidence(
+            company_id=claude.company.id, claim=f"Texto sintético anterior {index}.",
+            url=f"https://empresa-uno.example/pagina-{index}", excerpt="Texto sintético. " * 30,
+            retrieved_at=RETRIEVED_AT + timedelta(hours=1), kind="observed", source_type="primary"))
+    payload, _ = build_haiku_request(claude.company, claude.db.list_evidence(claude.company.id), claude.campaign)
+    size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    dense = size * 10 // 22
+    assert dense > claude.campaign.limits.llm.max_input_tokens  # La reserva fija anterior no lo cubría.
+    claude.reply = message(output(claude), input_tokens=dense, output_tokens=payload["max_tokens"])
+    report = claude.qualify()
+    usage = claude.db.get_usage(report.request_id)
+    assert (usage.reserved_tokens.input_tokens, usage.reserved_tokens.output_tokens) == (
+        size + INJECTED_PROMPT_TOKENS, payload["max_tokens"])
+    assert usage.estimated_cost_usd <= usage.reserved_cost_usd
+    assert claude.budget.snapshot(claude.campaign.id).reservation_overrun is False
 
 
 def test_high_is_supported_by_the_primary_source(claude):
@@ -487,7 +516,7 @@ def test_http_errors_are_not_retried_and_keep_reservation(claude, status):
     assert report.status == "pending" and report.reason == f"http_{status}"
     assert len(claude.requests) == 1
     usage = claude.db.get_usage(report.request_id)
-    assert usage.status == UsageStatus.FAILED and usage.reserved_cost_usd == Decimal("0.0011")
+    assert usage.status == UsageStatus.FAILED and usage.reserved_cost_usd == expected_reservation(claude)[1]
     assert "Fallo sintético" in usage.error_message
 
 
@@ -510,10 +539,10 @@ def test_client_rejects_unbound_requests_before_sending(claude):
 
 
 def test_reservation_and_attempts_do_not_change(claude):
-    """La reserva acota tokens máximos por el precio publicado; la calificación no usa intentos."""
+    """La reserva acota los tokens del payload y la salida máxima al precio publicado; la calificación no usa intentos."""
     report = claude.qualify()
     usage = claude.db.get_usage(report.request_id)
     assert (usage.provider, usage.operation, usage.account_ref, usage.funding_source, str(usage.reserved_cost_usd),
             str(usage.reserved_credits), usage.reserved_tokens.input_tokens, usage.reserved_tokens.output_tokens) == (
-        "anthropic", "messages", ACCOUNT, "prepaid", "0.0011", "0", 6000, 1000)
+        "anthropic", "messages", ACCOUNT, "prepaid", "0.0014947", "0", 9947, 1000)
     assert claude.db.get_run_item(claude.campaign.id, claude.company.id).attempts == {}

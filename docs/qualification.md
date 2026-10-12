@@ -49,10 +49,16 @@ la solicitud estructurada están en `prospecting/haiku.py`; el prompt y su valid
 en `prospecting/qualification.py`.
 
 - **Presupuesto:** cada llamada reserva el costo máximo con los precios publicados
-  (USD 0,10 por millón de tokens de entrada y USD 0,50 por millón de salida): unos
-  USD 0,0011 con los límites iniciales. Se registran los tokens y el costo estimado;
-  la conciliación sigue siendo manual. El cupo de la cuenta `anthropic` se configura
-  con `AccountAllowance`, con origen `prepaid` o `new_outlay` y `cost_limit_usd`.
+  (USD 0,10 por millón de tokens de entrada y USD 0,50 por millón de salida). La
+  entrada se acota con los bytes UTF-8 del payload que se envía más 1.000 tokens para
+  el prompt que Anthropic inyecta con las salidas estructuradas; la salida, con
+  `max_tokens`. La estimación de caracteres por token solo dimensiona el prompt y no
+  basta como cota: el 2026-10-12 un payload de 13.757 bytes se facturó como 6.175
+  tokens (unos 2,2 bytes por token), por encima de los 6.000 que se reservaban. Con los
+  límites iniciales una calificación reserva como máximo unos USD 0,0025. Se registran
+  los tokens y el costo estimado; la conciliación sigue siendo manual. El cupo de la
+  cuenta `anthropic` se configura con `AccountAllowance`, con origen `prepaid` o
+  `new_outlay` y `cost_limit_usd`.
 - **Fallos:** un rechazo (`refusal`), una respuesta truncada (`max_tokens`), un JSON o
   una validación inválidos, o un error HTTP, de red o de timeout dejan la evaluación
   pendiente (`assessment_pending:<motivo>`) con el mensaje literal. Se conserva la

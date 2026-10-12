@@ -21,6 +21,20 @@ CLAUDE_TIMEOUT_SECONDS = 30.0
 # USD por millón de tokens (entrada, salida) para prompts de hasta 100K tokens;
 # referencia oficial de la API de Claude (W4), consultada el 2026-10-11.
 CLAUDE_PRICES_PER_MTOK = {"claude-haiku-5-5": (Decimal("0.10"), Decimal("0.50"))}
+# Margen para el prompt de sistema que Anthropic inyecta con las salidas estructuradas y el formato
+# de los mensajes: también se factura como entrada y la documentación no publica su tamaño (W4).
+INJECTED_PROMPT_TOKENS = 1000
+
+
+def input_token_bound(payload: dict) -> int:
+    """Cota superior de tokens de entrada facturables del payload que se envía.
+
+    Supone que cada token cubre al menos un byte del texto: cuenta los bytes UTF-8 del payload
+    serializado (sistema, mensajes y esquema; claves y escapes solo suman) y el margen del prompt
+    inyectado. Medido el 2026-10-12: 13.757 bytes frente a 6.175 tokens facturados.
+    """
+    serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return len(serialized.encode("utf-8")) + INJECTED_PROMPT_TOKENS
 
 
 def reservation_cost(model: str, max_input: int, max_output: int) -> Decimal:

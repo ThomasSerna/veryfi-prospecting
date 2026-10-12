@@ -6,9 +6,9 @@ from uuid import UUID
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.haiku import MODEL_ID
-from prospecting.models import LlmLimits, TokenUsage, Usage, UsageStatus
+from prospecting.models import TokenUsage, Usage, UsageStatus
 from prospecting.providers import (
-    CLAUDE_OPERATION, CLAUDE_PROVIDER, ProviderClient, ProviderRequest, reservation_cost,
+    CLAUDE_OPERATION, CLAUDE_PROVIDER, ProviderClient, ProviderRequest, input_token_bound, reservation_cost,
 )
 
 
@@ -57,16 +57,17 @@ def reserve_credits(budget: Budget, request: ProviderRequest, fingerprint: str, 
     ), authorization)
 
 
-def reserve_claude(budget: Budget, fingerprint: str, limits: LlmLimits, *, account_ref: str, funding_source: str,
+def reserve_claude(budget: Budget, fingerprint: str, payload: dict, *, account_ref: str, funding_source: str,
                    campaign_id: UUID, company_id: UUID | None,
                    authorization: SpendingAuthorization | None) -> Usage:
-    """Reserva tokens máximos de entrada y salida al precio publicado de Haiku (§14.3)."""
+    """Reserva la cota de entrada del payload real y su máximo de salida al precio publicado de Haiku (§14.3)."""
+    input_tokens, output_tokens = input_token_bound(payload), payload["max_tokens"]
     return budget.reserve(Usage(
         campaign_id=campaign_id, company_id=company_id, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION,
         account_ref=account_ref, request_fingerprint=fingerprint,
-        reserved_cost_usd=reservation_cost(MODEL_ID, limits.max_input_tokens, limits.max_output_tokens),
+        reserved_cost_usd=reservation_cost(MODEL_ID, input_tokens, output_tokens),
         reserved_credits=Decimal(0),
-        reserved_tokens=TokenUsage(input_tokens=limits.max_input_tokens, output_tokens=limits.max_output_tokens),
+        reserved_tokens=TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
         funding_source=funding_source, status=UsageStatus.RESERVED,
     ), authorization)
 

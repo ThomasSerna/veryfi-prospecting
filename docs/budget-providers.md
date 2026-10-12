@@ -11,7 +11,8 @@ El máximo global es USD 20 y las llamadas automáticas se limitan a USD 15. El
 margen de USD 5 no habilita llamadas adicionales. El límite por campaña es USD 2
 y el de USD 0,25 por empresa acumula todas sus campañas. Una reserva que supera algún
 límite se rechaza con `budget_exceeded`, o con `company_budget_exceeded` si el único
-superado es el de la empresa. Las reducciones guardadas en una campaña se respetan. La distribución IA/web/contactos es orientativa.
+superado es el de la empresa. Las reducciones guardadas en una campaña se respetan.
+La distribución IA/web/contactos es orientativa.
 
 Los cupos se proporcionan como objetos `AccountAllowance` validados, con
 `provider`, `account_ref`, `funding_source`, `credit_limit`, `cost_limit_usd`,
