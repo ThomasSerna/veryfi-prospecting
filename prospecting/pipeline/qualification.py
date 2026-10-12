@@ -10,7 +10,7 @@ from prospecting.db import Database
 from prospecting.models import (
     Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, utc_now,
 )
-from prospecting.pipeline.calls import reserve_claude, seconds_left
+from prospecting.pipeline.calls import reserve_claude, seconds_left, was_sent
 from prospecting.providers import ClaudeClient, ProviderError
 from prospecting.qualification import (
     PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
@@ -128,7 +128,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         return pending(error.code, str(error), request_id=error.request_id)
     except ProviderError as error:
         reason = f"http_{error.http_status}" if error.kind == "http" else error.kind
-        return pending(reason, error.message, request_id=error.request_id, called_model=not error.no_send)
+        return pending(reason, error.message, request_id=error.request_id,
+                       called_model=was_sent(budget, error))
     spent = {"called_model": True, "request_id": call.request_id, "tokens": call.tokens,
              "estimated_cost_usd": call.estimated_cost_usd}
     try:

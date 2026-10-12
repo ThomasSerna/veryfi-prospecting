@@ -410,7 +410,7 @@ def test_missing_key_or_authorization_never_reaches_provider(claude, monkeypatch
     assert report.status == "pending" and report.reason == "authorization_unregistered"
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     report = claude.qualify()
-    assert report.status == "pending" and report.reason == "local"
+    assert report.status == "pending" and report.reason == "local" and report.called_model is False
     assert claude.requests == []
     usage = claude.db.list_usage()
     assert len(usage) == 1 and usage[0].status == UsageStatus.RESERVED
