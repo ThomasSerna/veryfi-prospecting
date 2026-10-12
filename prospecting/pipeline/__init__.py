@@ -6,7 +6,10 @@ Cada etapa vive en su módulo y guarda su propio checkpoint.
 """
 
 from prospecting.pipeline.campaign import (
-    CampaignReport, CompanyProgress, close_campaign, run_campaign, start_campaign,
+    AuthorizationInput, CampaignReport, CampaignView, CompanyProgress, CompanyResult, ContactResult, ProviderAccess,
+    close_campaign, confirm_alternative_channel, execute_campaign, finish_campaign, list_saved_campaigns,
+    load_provider_access, prepare_campaign, provider_operations, read_campaign, review_company, run_campaign,
+    start_campaign,
 )
 from prospecting.pipeline.contacts import ContactReport, find_contacts
 from prospecting.pipeline.discovery import (
@@ -18,8 +21,11 @@ from prospecting.pipeline.research import (
 )
 
 __all__ = [
-    "CampaignReport", "CompanyProgress", "ContactReport", "DiscoveryReport", "ExcludedCandidate", "ExtractReport",
+    "AuthorizationInput", "CampaignReport", "CampaignView", "CompanyProgress", "CompanyResult", "ContactResult",
+    "ProviderAccess", "ContactReport", "DiscoveryReport", "ExcludedCandidate", "ExtractReport",
     "IdentityReport", "QualificationReport", "QueryOutcome", "ResearchReport", "UrlFailure", "close_campaign",
     "extract_company_pages", "find_contacts", "qualify_company", "research_company", "resolve_company_identity",
-    "run_campaign", "run_discovery", "start_campaign",
+    "run_campaign", "run_discovery", "start_campaign", "confirm_alternative_channel", "execute_campaign",
+    "finish_campaign", "list_saved_campaigns", "load_provider_access", "prepare_campaign", "provider_operations",
+    "read_campaign", "review_company",
 ]

@@ -7,20 +7,22 @@ contacto, de mayor a menor prioridad. Ninguna función contacta a nadie.
 """
 
 from datetime import timedelta
+from pathlib import Path
 import threading
 import time
 from typing import Callable, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, StrictBool, ValidationError, model_validator
 
-from prospecting.budget import Budget, SpendingAuthorization
-from prospecting.contacts import derive_readiness
+from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
+from prospecting.contacts import channel_is_usable, derive_readiness, validate_contact
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
-from prospecting.identity import ExclusionList, ExclusionStatus, exclusions_status
+from prospecting.identity import ExclusionList, ExclusionStatus, exclusions_status, load_exclusions
 from prospecting.models import (
-    BusinessStatus, Campaign, CampaignStatus, Contract, Priority, RunStage, Text, utc_now,
+    Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract,
+    Evidence, Money, Priority, RunItem, RunStage, Text, utc_now,
 )
 from prospecting.pipeline.calls import grant_for, seconds_left
 from prospecting.pipeline.contacts import find_contacts
@@ -28,8 +30,8 @@ from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_iden
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import extract_company_pages, research_company
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
-from prospecting.providers.hunter import HunterAccess
-from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION
+from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess, PROVIDER as HUNTER
+from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION, TAVILY_OPERATIONS
 from prospecting.sources import is_search_evidence
 
 
@@ -73,6 +75,247 @@ class CampaignReport(Contract):
     exclusions_status: ExclusionStatus
     discovery: DiscoveryReport | None = None
     companies: list[CompanyProgress] = Field(default_factory=list)
+
+
+class ProviderAccess(Contract):
+    """Cupos comprobados de la instalación local; nunca contiene claves ni permisos."""
+
+    account_allowances: list[AccountAllowance]
+    tavily_account_ref: Text
+    claude_account_ref: Text
+    claude_funding_source: FundingSource = "prepaid"
+    hunter_access: HunterAccess | None = None
+
+    @model_validator(mode="after")
+    def validate_accounts(self):
+        accounts = {(item.provider, item.account_ref): item for item in self.account_allowances}
+        if len(accounts) != len(self.account_allowances):
+            raise ValueError("Las cuentas de consumo deben tener referencias únicas.")
+        expected = [(TAVILY, self.tavily_account_ref, "free_credit"),
+                    (CLAUDE_PROVIDER, self.claude_account_ref, self.claude_funding_source)]
+        hunter = self.hunter_access
+        if hunter is not None:
+            if hunter.enabled_operations and not hunter.automatic_lead_saving_disabled:
+                raise ValueError("Debe estar comprobada la desactivación del guardado automático de Hunter.")
+            expected.extend((provider, account, hunter.funding_source) for provider, _, account in
+                            provider_operations(self) if provider == HUNTER)
+        if any(accounts.get((provider, account)) is None or
+               accounts[provider, account].funding_source != funding for provider, account, funding in expected):
+            raise ValueError("Cada proveedor habilitado necesita una cuenta y financiación comprobadas.")
+        if any(item.observed_at > utc_now() for item in self.account_allowances):
+            raise ValueError("Los cupos comprobados no pueden tener fecha futura.")
+        return self
+
+
+class AuthorizationInput(Contract):
+    """Aprobación explícita del formulario; la fecha se asigna en la nueva sesión de Budget."""
+
+    provider: Text
+    operation: Text
+    account_ref: Text
+    max_cost_usd: Money
+    max_credits: Money
+    responsible: Text
+    source_reference: Text
+
+
+class ContactResult(Contract):
+    contact: Contact
+    eligible: StrictBool
+    usable_channels: list[Channel]
+
+
+class CompanyResult(Contract):
+    company: Company
+    run_item: RunItem
+    assessment: Assessment | None
+    evidence: list[Evidence]
+    contacts: list[ContactResult]
+    business_status: BusinessStatus | None
+
+
+class CampaignView(Contract):
+    campaign: Campaign
+    companies: list[CompanyResult]
+    budget: BudgetSnapshot
+    is_executing: StrictBool
+    exclusions_status: ExclusionStatus
+
+
+def provider_operations(access: ProviderAccess) -> list[tuple[str, str, str]]:
+    """Operaciones acotadas para mostrar y autorizar; no consulta ningún proveedor."""
+    operations = [(TAVILY, SEARCH_OPERATION, access.tavily_account_ref),
+                  (TAVILY, EXTRACT_OPERATION, access.tavily_account_ref),
+                  (CLAUDE_PROVIDER, CLAUDE_OPERATION, access.claude_account_ref)]
+    if access.hunter_access is not None:
+        hunter = access.hunter_access
+        operations.extend((HUNTER, operation,
+                           hunter.verification_account_ref or hunter.search_account_ref
+                           if operation == "email_verifier" else hunter.search_account_ref)
+                          for operation in hunter.enabled_operations)
+    return operations
+
+
+def load_provider_access(path: Path) -> ProviderAccess:
+    """Un archivo ausente o inválido bloquea la ejecución, sin mostrar datos del JSON."""
+    try:
+        return ProviderAccess.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValidationError):
+        raise ValueError("No se pudo leer la configuración válida de cupos y acceso a proveedores.") from None
+
+
+def _saved_database(db_path: Path) -> Database:
+    """Consultar y corregir jamás crea una base que no existe."""
+    if not Path(db_path).is_file():
+        raise ValueError("La base local no existe; primero prepara una campaña.")
+    return Database(Path(db_path))
+
+
+def list_saved_campaigns(db_path: Path) -> list[Campaign]:
+    if not Path(db_path).exists():
+        return []
+    with _saved_database(db_path) as db:
+        return db.list_campaigns()
+
+
+def prepare_campaign(db_path: Path, campaign: Campaign) -> Campaign:
+    """Única acción de la interfaz que puede crear la base; guarda un borrador sin tráfico."""
+    campaign = Campaign.model_validate(campaign)
+    with Database(Path(db_path)) as db, db.transaction():
+        existing = db.get_active_campaign() or db.get_campaign(campaign.id)
+        if existing is not None:
+            return existing
+        return db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.CREATED}))
+
+
+def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[AccountAllowance] | None = None,
+                  exclusions_path: Path | None = None) -> CampaignView:
+    """Lectura para la UI/CSV; recalcula persona, canales y disponibilidad con la fecha actual."""
+    exclusions = None if exclusions_path is None else load_exclusions(exclusions_path)
+    with _saved_database(db_path) as db:
+        campaign = db.get_campaign(campaign_id)
+        if campaign is None:
+            raise ValueError("La campaña no existe.")
+        budget = Budget(db, campaign.config_snapshot.defaults.budget, account_allowances or []).snapshot(campaign_id)
+        companies, now = [], utc_now()
+        with db.transaction():
+            for item in db.list_run_items(campaign_id):
+                company = db.get_company(item.company_id)
+                assessment = None if item.last_assessment_id is None else db.get_assessment(item.last_assessment_id)
+                evidence, contacts = db.list_evidence(company.id), db.list_contacts(company.id)
+                results = []
+                for contact in contacts:
+                    eligible = item.business_status != BusinessStatus.EXCLUDED and assessment is not None and validate_contact(
+                        contact, company, assessment, evidence, campaign.limits, now)
+                    usable = [channel for channel in contact.channels if eligible and channel_is_usable(
+                        channel, contact, evidence, campaign.limits, now, company)]
+                    results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable))
+                status = None if assessment is None else derive_readiness(
+                    assessment, contacts, evidence, campaign.limits, now, company)
+                if item.business_status == BusinessStatus.EXCLUDED:
+                    status = BusinessStatus.EXCLUDED
+                companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
+                                               evidence=evidence, contacts=results, business_status=status))
+        return CampaignView(campaign=campaign, companies=companies, budget=budget,
+                            is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions))
+
+
+def _approve(budget: Budget, access: ProviderAccess, approvals: list[AuthorizationInput], campaign_id: UUID
+             ) -> list[SpendingAuthorization]:
+    allowed = set(provider_operations(access))
+    inputs = [AuthorizationInput.model_validate(item) for item in approvals]
+    keys = [(item.provider, item.operation, item.account_ref) for item in inputs]
+    if len(keys) != len(set(keys)) or any(key not in allowed for key in keys):
+        raise ValueError("Cada permiso debe corresponder a una única operación y cuenta habilitadas.")
+    snapshot = budget.snapshot(campaign_id)
+    costs = (snapshot.global_budget, snapshot.operating, snapshot.campaign)
+    if snapshot.reservation_overrun or any(amount.unknown or amount.exceeded for amount in costs):
+        raise ValueError("El consumo pendiente necesita conciliación antes de ejecutar.")
+    for item in inputs:
+        account = next(account for account in snapshot.accounts if
+                       (account.provider, account.account_ref) == (item.provider, item.account_ref))
+        if account.cost.unknown or account.credits.unknown:
+            raise ValueError("Hay consumo de la cuenta sin conciliar; no se autoriza tráfico.")
+        if item.max_cost_usd > 0 and any(amount.available is None or item.max_cost_usd > amount.available
+                                       for amount in (*costs, account.cost)):
+            raise ValueError("El permiso supera el cupo económico disponible.")
+        if item.max_credits > 0 and (account.credits.available is None or
+                                     item.max_credits > account.credits.available):
+            raise ValueError("El permiso supera los créditos comprobados disponibles.")
+    return [budget.authorize(SpendingAuthorization(**item.model_dump(), authorized_at=utc_now())) for item in inputs]
+
+
+def execute_campaign(db_path: Path, campaign_id: UUID, *, access: ProviderAccess,
+                     approvals: list[AuthorizationInput], progress: Callable[[CompanyProgress], None] | None = None,
+                     exclusions_path: Path | None = None) -> CampaignReport:
+    """Una acción explícita crea permisos de sesión frescos; ningún permiso se persiste o reutiliza."""
+    access = ProviderAccess.model_validate(access)
+    exclusions = None if exclusions_path is None else load_exclusions(exclusions_path)
+    with _saved_database(db_path) as db:
+        campaign = db.get_campaign(campaign_id)
+        if campaign is None:
+            raise ValueError("La campaña no existe.")
+        if not _EXECUTION.acquire(blocking=False):
+            return _report(db, campaign_id, stop_reason="campaign_already_running", exclusions=exclusions)
+        try:
+            campaign = db.get_campaign(campaign_id)
+            active = db.get_active_campaign()
+            if campaign.status == CampaignStatus.COMPLETED or (active is not None and active.id != campaign_id):
+                return _report(db, campaign_id, stop_reason="another_campaign_active" if
+                               active is not None and active.id != campaign_id else None, exclusions=exclusions)
+            budget = Budget(db, campaign.config_snapshot.defaults.budget, access.account_allowances)
+            authorizations = _approve(budget, access, approvals, campaign_id)
+            client = ProviderClient(budget, TAVILY_OPERATIONS + HUNTER_OPERATIONS)
+            return _execute(db, campaign_id, exclusions, lambda saved: _Run(
+                db, budget, client, saved, authorizations=authorizations, tavily_account_ref=access.tavily_account_ref,
+                claude=ClaudeClient(budget), claude_account_ref=access.claude_account_ref,
+                claude_funding_source=access.claude_funding_source, hunter_access=access.hunter_access,
+                exclusions=exclusions, progress=progress))
+        finally:
+            _EXECUTION.release()
+
+
+def finish_campaign(db_path: Path, campaign_id: UUID) -> Campaign:
+    if not _EXECUTION.acquire(blocking=False):
+        raise ValueError("La campaña está ejecutándose; espera antes de cerrarla.")
+    try:
+        with _saved_database(db_path) as db:
+            return close_campaign(db, campaign_id)
+    finally:
+        _EXECUTION.release()
+
+
+def review_company(db_path: Path, campaign_id: UUID, company_id: UUID, *,
+                   status: Literal["accepted", "rejected", "pending"], reason: str) -> RunItem:
+    if not _EXECUTION.acquire(blocking=False):
+        raise ValueError("La campaña está ejecutándose; espera antes de revisarla.")
+    try:
+        with _saved_database(db_path) as db, db.transaction():
+            item = db.get_run_item(campaign_id, company_id)
+            if item is None:
+                raise ValueError("La empresa no pertenece a esta campaña.")
+            now = utc_now()
+            updated = RunItem.model_validate(item.model_dump() | {
+                "review_status": status, "review_reason": reason, "reviewed_at": now, "updated_at": now,
+            })
+            return db.save_run_item(updated)
+    finally:
+        _EXECUTION.release()
+
+
+def confirm_alternative_channel(db_path: Path, campaign_id: UUID, contact_id: UUID,
+                                channel_type: ChannelType, channel_value: str, *, reason: str,
+                                confirmed: bool) -> RunItem:
+    from prospecting.pipeline.contacts import confirm_alternative_channel as confirm_channel
+
+    if not _EXECUTION.acquire(blocking=False):
+        raise ValueError("La campaña está ejecutándose; espera antes de confirmar canales.")
+    try:
+        with _saved_database(db_path) as db:
+            return confirm_channel(db, campaign_id, contact_id, channel_type, channel_value,
+                                   reason=reason, confirmed=confirmed)
+    finally:
+        _EXECUTION.release()
 
 
 def start_campaign(db: Database, campaign: Campaign) -> tuple[Campaign, bool]:
