@@ -301,6 +301,20 @@ def test_extract_failure_records_reason_without_losing_evidence(tavily):
     assert case.db.list_evidence(company_id) == before
 
 
+def test_unsent_extract_keeps_page_quota_and_reservation(tavily, monkeypatch):
+    """Un error local antes de enviar no consume páginas ni intentos de la empresa."""
+    case = tavily.setup()
+    company_id = discover(case).selected_company_ids[0]
+    calls = len(case.calls)
+    monkeypatch.delenv("TAVILY_API_KEY")
+    report = extract(case, company_id, [f"https://{case.db.get_company(company_id).domain}/producto"])
+    assert report.stop_reason == "local_error" and len(case.calls) == calls
+    run_item = case.db.get_run_item(case.campaign.id, company_id)
+    assert run_item.consumed_limits.pages == 0 and "tavily_extract" not in run_item.attempts
+    assert run_item.error_message.startswith("local_error")
+    assert case.db.get_usage(report.request_id).status == UsageStatus.RESERVED
+
+
 def test_extract_failed_urls_create_no_evidence(tavily):
     case = tavily.setup()
     company_id = discover(case).selected_company_ids[0]

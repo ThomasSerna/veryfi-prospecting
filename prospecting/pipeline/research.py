@@ -6,7 +6,7 @@ from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import extract_query
 from prospecting.models import Contract, Money, Text, utc_now
-from prospecting.pipeline.calls import call_free_credit
+from prospecting.pipeline.calls import call_free_credit, was_sent
 from prospecting.providers import ProviderClient, ProviderError
 from prospecting.providers.tavily import (
     TavilyExtractResponse, classify_tavily_error, extract_credits, extract_request, parse_extract,
@@ -78,7 +78,7 @@ def extract_company_pages(db: Database, budget: Budget, client: ProviderClient,
         reason = classify_tavily_error(error)
         update = {"error_message": f"{reason}: {error.message}", "error_stage": run_item.stage,
                   "updated_at": utc_now()}
-        if not error.no_send:
+        if was_sent(budget, error):
             update |= {"attempts": attempts, "consumed_limits": pages}
         db.save_run_item(run_item.model_copy(update=update))
         return ExtractReport(**report, request_id=error.request_id,

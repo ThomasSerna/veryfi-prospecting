@@ -16,6 +16,14 @@ def seconds_left(deadline: float | None) -> float | None:
     return None if deadline is None else deadline - time.monotonic()
 
 
+def was_sent(budget: Budget, error) -> bool:
+    """Un error con la reserva aún `reserved` o con prueba de no envío no consumió cupo del proveedor."""
+    if getattr(error, "no_send", False) or getattr(error, "request_id", None) is None:
+        return False
+    usage = budget.db.get_usage(error.request_id)
+    return usage is not None and usage.status != UsageStatus.RESERVED
+
+
 def observed_credits(data) -> Decimal | None:
     if data.usage is None or data.usage.credits is None:
         return None
