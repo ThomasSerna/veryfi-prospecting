@@ -166,7 +166,7 @@ class _Run:
                     "active_seconds": item.consumed_limits.active_seconds + elapsed})
                 self.db.save_run_item(item.model_copy(update={"consumed_limits": consumed}))
 
-    def halt(self, reason: str | None, company_id: UUID | None) -> bool:
+    def halt(self, reason: str | None) -> bool:
         """True si la pasada se detiene; el presupuesto agotado pausa además la campaña.
 
         `company_budget_exceeded` (solo el tope de esa empresa) no detiene nada: la campaña
@@ -215,7 +215,7 @@ class _Run:
                 self.db, self.budget, self.client, self.campaign.id, account_ref=self.tavily_account_ref,
                 authorization=grant_for(self.authorizations, TAVILY, SEARCH_OPERATION, self.tavily_account_ref),
                 deadline=self.deadline, exclusions=self.exclusions)
-            self.halt(discovery.stop_reason, None)
+            self.halt(discovery.stop_reason)
             if self.paused:
                 return discovery
             if not discovery.selected_company_ids:
@@ -248,7 +248,7 @@ class _Run:
                 authorization=grant_for(self.authorizations, TAVILY, EXTRACT_OPERATION, self.tavily_account_ref)))
             if report.stop_reason not in _EXTRACTION_SETTLED:
                 self.notify(company_id)
-                if self.halt(report.stop_reason, company_id):
+                if self.halt(report.stop_reason):
                     return
                 continue
             self.identity(company_id)
@@ -273,7 +273,7 @@ class _Run:
     def qualify_company(self, company_id: UUID) -> bool:
         report = self.qualify(company_id, ("initial",))
         if report.status == "pending":
-            return self.halt(report.reason, company_id)
+            return self.halt(report.reason)
         if report.priority == Priority.INSUFFICIENT_EVIDENCE:
             identity = self.identity(company_id)
             if not (identity.decision.stop_reason or "").startswith(_HUMAN_REVIEW):
@@ -283,11 +283,11 @@ class _Run:
                     account_ref=self.tavily_account_ref, authorizations=self.authorizations,
                     deadline=self.company_deadline(company_id, levels)))
                 if research.status == "pending":
-                    return self.halt(research.stop_reason, company_id)
+                    return self.halt(research.stop_reason)
                 identity = self.identity(company_id)
                 report = self.qualify(company_id, levels)
                 if report.status == "pending":
-                    return self.halt(report.reason, company_id)
+                    return self.halt(report.reason)
             if report.priority == Priority.INSUFFICIENT_EVIDENCE:
                 current = self.db.get_run_item(self.campaign.id, company_id).stop_reason
                 reason = (identity.decision.stop_reason if identity.decision.status == "pending"
@@ -327,7 +327,7 @@ class _Run:
                     assessment, self.db.list_contacts(company_id), self.db.list_evidence(company_id),
                     self.campaign.limits, utc_now(), company), report.stop_reason)
             self.notify(company_id)
-            if report.status == "pending" and not exhausted and self.halt(report.stop_reason, company_id):
+            if report.status == "pending" and not exhausted and self.halt(report.stop_reason):
                 return
 
 
