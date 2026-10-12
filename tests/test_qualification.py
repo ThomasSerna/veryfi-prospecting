@@ -445,3 +445,13 @@ def test_client_rejects_unbound_requests_before_sending(claude):
     with pytest.raises((BudgetError, ProviderError)):
         claude.client.create(uuid4(), {"model": MODEL_ID}, account_ref=ACCOUNT, authorization=claude.grant)
     assert claude.requests == []
+
+
+def test_reservation_and_attempts_do_not_change(claude):
+    """La reserva acota tokens máximos por el precio publicado; la calificación no usa intentos."""
+    report = claude.qualify()
+    usage = claude.db.get_usage(report.request_id)
+    assert (usage.provider, usage.operation, usage.account_ref, usage.funding_source, str(usage.reserved_cost_usd),
+            str(usage.reserved_credits), usage.reserved_tokens.input_tokens, usage.reserved_tokens.output_tokens) == (
+        "anthropic", "messages", ACCOUNT, "prepaid", "0.0011", "0", 6000, 1000)
+    assert claude.db.get_run_item(claude.campaign.id, claude.company.id).attempts == {}

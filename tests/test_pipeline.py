@@ -485,3 +485,15 @@ def test_confirmed_company_is_reused_but_pending_ones_are_not(tavily):
     again = resolve(case, company_id, campaign_id=later.id)
     assert again.decision.status == "confirmed"
     assert case.db.get_company(company_id).identity_key == key
+
+
+def test_persisted_attempts_and_ledger_do_not_change(tavily):
+    """La reanudación depende de estas claves y filas; reorganizar código no las cambia."""
+    case = tavily.setup()
+    company_id = discover(case).selected_company_ids[0]
+    extract(case, company_id, [f"https://{case.db.get_company(company_id).domain}/producto"])
+    rows = [(item.operation, str(item.status), str(item.reserved_credits), str(item.reserved_cost_usd),
+             str(item.credits), item.funding_source, item.company_id) for item in case.db.list_usage()]
+    assert case.db.get_run_item(case.campaign.id, company_id).attempts == {"tavily_extract": 1}
+    assert rows == [("search", "succeeded", "1", "0", "1.0", "free_credit", None)] * 4 + [
+        ("extract", "succeeded", "1", "0", "1.0", "free_credit", company_id)]

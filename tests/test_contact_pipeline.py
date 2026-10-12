@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 import json
+import re
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
@@ -519,3 +520,83 @@ def test_public_contradiction_suspends_ready_alternative_and_preserves_both_fact
     assert any(item.contradiction_ids for item in case.db.list_evidence(case.company.id))
     assert saved.channels[0].manual_confirmed_at == channel.manual_confirmed_at
     assert [operation for operation, _, _ in case.calls] == ["domain_search"]
+
+
+_GENERATED = re.compile(r"[0-9a-f]{64}|[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}")
+
+
+def persisted(case):
+    """Lo que la reanudación compara: claves de intentos, consumo y referencias, sin ids ni fechas."""
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    return {
+        "attempts": sorted(f"{_GENERATED.sub('<id>', key)}={value}" for key, value in run.attempts.items()),
+        "usage": [(item.provider, item.operation, item.account_ref, str(item.status), str(item.reserved_credits),
+                   str(item.reserved_cost_usd), item.funding_source, item.company_id == case.company.id)
+                  for item in case.db.list_usage()],
+        "evidence": sorted((_GENERATED.sub("<id>", item.external_reference or ""), item.source_type, item.kind,
+                            item.claim.startswith("Tavily devolvió esta página"))
+                           for item in case.db.list_evidence(case.company.id)),
+        "searches": [params for operation, params, _ in case.calls if operation == "search"],
+    }
+
+
+PUBLIC_SEARCH = {"search_depth": "basic", "topic": "general", "max_results": 10, "include_usage": True,
+                 "exclude_domains": ["linkedin.com"]}
+COMPANY_FACTS = [("", "primary", "observed", False)] * 4
+HUNTER_USAGE = ("hunter", "domain_search", "hunter-synthetic:unified", "succeeded", "1", "0", "free_credit", True)
+EXPECTED_PERSISTED = {
+    "public": {
+        "attempts": [
+            "contacts:extract=1", "contacts:haiku=1", "contacts:haiku_request:<id>=1", "contacts:pages=1",
+            "contacts:person:<id>=1", *["contacts:processed:<id>=1"] * 4, *["contacts:request:<id>=1"] * 3,
+            "contacts:web_queries=2",
+        ],
+        "usage": [
+            ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
+            ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
+            ("tavily", "extract", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
+            ("anthropic", "messages", "claude-synthetic", "succeeded", "0", "0.0011", "prepaid", True),
+        ],
+        "evidence": [
+            *COMPANY_FACTS, ("<id>", "provider", "inference", False), ("<id>#1.1", "primary", "observed", False),
+            *[(f"<id>#1.1#contact:{field}", "primary", "observed", False)
+              for field in ("email", "employment", "name", "title")],
+            *[("contacts_search:<id>:0", "secondary", "observed", True)] * 2,
+        ],
+        "searches": [
+            {"query": '"Empresa Sintética" Product Manager equipo directorio CO'} | PUBLIC_SEARCH,
+            {"query": '"Empresa Sintética" equipo producto ingeniería marketing contacto profesional'} | PUBLIC_SEARCH,
+        ],
+    },
+    "finder": {
+        "attempts": ["contacts:domain_search=1", "contacts:hunter_enrichments=1", "contacts:person:<id>=1",
+                     *["contacts:processed:<id>=1"] * 2, *["contacts:request:<id>=1"] * 2],
+        "usage": [HUNTER_USAGE, ("hunter", "email_finder", "hunter-synthetic:unified", "succeeded", "1", "0",
+                                 "free_credit", True)],
+        "evidence": [*COMPANY_FACTS, ("", "primary", "observed", False), ("<id>#email", "provider", "observed", False)],
+        "searches": [],
+    },
+    "verifier": {
+        "attempts": ["contacts:domain_search=1", "contacts:hunter_enrichments=1", "contacts:person:<id>=1",
+                     *["contacts:processed:<id>=1"] * 2, *["contacts:request:<id>=1"] * 2,
+                     "contacts:verify:<id>=1"],
+        "usage": [HUNTER_USAGE, ("hunter", "email_verifier", "hunter-synthetic:unified", "succeeded", "0.5", "0",
+                                 "free_credit", True)],
+        "evidence": [*COMPANY_FACTS, ("", "primary", "observed", False),
+                     ("<id>#verification", "provider", "observed", False),
+                     ("verificacion-sintetica", "provider", "observed", False)],
+        "searches": [],
+    },
+}
+
+
+@pytest.mark.parametrize("route", ["public", "finder", "verifier"])
+def test_persisted_keys_and_ledger_do_not_change(contact_case, route):
+    case = contact_case
+    if route == "public":
+        case.find(hunter_access=None, tavily_account_ref="tavily-synthetic", claude=case.claude,
+                  claude_account_ref="claude-synthetic")
+    else:
+        seed_contact(case, "unknown" if route == "verifier" else None)
+        case.find()
+    assert persisted(case) == EXPECTED_PERSISTED[route]
