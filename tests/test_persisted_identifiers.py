@@ -19,12 +19,14 @@ from prospecting.contacts import (
 )
 from prospecting.db import Database
 from prospecting.discovery import (
-    SEARCH_HIT_CLAIM, TAVILY_OPERATIONS, ExclusionList, build_search_queries, exclusion_evidence,
-    extract_query, extract_request, is_search_hit, match_exclusion, search_request,
+    TAVILY_OPERATIONS, ExclusionList, build_search_queries, exclusion_evidence,
+    extract_query, extract_request, match_exclusion, search_request,
 )
+from prospecting.haiku import MODEL_ID
 from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
 from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ClaudeClient, ProviderClient
-from prospecting.qualification import MODEL_ID, build_haiku_request, unknown_criteria
+from prospecting.qualification import build_haiku_request, unknown_criteria
+from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit
 
 
 RETRIEVED_AT = datetime(2026, 10, 11, 12, tzinfo=UTC)

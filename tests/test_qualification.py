@@ -11,16 +11,17 @@ import httpx2
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, BudgetError, SpendingAuthorization
-from prospecting.discovery import SEARCH_HIT_CLAIM
+from prospecting.haiku import MODEL_ID
 from prospecting.models import (
     BusinessStatus, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
 )
 from prospecting.pipeline import qualify_company
 from prospecting.providers import ClaudeClient, ProviderError, claude_cost
 from prospecting.qualification import (
-    MODEL_ID, PROMPT_VERSION, HaikuAssessment, QualificationError, build_haiku_request, classify,
+    PROMPT_VERSION, HaikuAssessment, QualificationError, build_haiku_request, classify,
     compute_score, explanation_text, parse_output, rubric_for, validate_output,
 )
+from prospecting.sources import SEARCH_HIT_CLAIM
 
 
 SYNTHETIC_KEY = "clave-anthropic-exclusivamente-sintetica"

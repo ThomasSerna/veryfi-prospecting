@@ -18,9 +18,10 @@ from prospecting.contacts import (
 )
 from prospecting.db import Database
 from prospecting.discovery import (
-    SEARCH_CREDITS, SEARCH_HIT_CLAIM, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error,
-    extract_credits, extract_request, is_non_business, parse_extract, url_host,
+    SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error,
+    extract_credits, extract_request, parse_extract,
 )
+from prospecting.haiku import MODEL_ID
 from prospecting.models import (
     BusinessStatus, Contract, Evidence, IdentityStatus, Priority, RunStage, Text, TokenUsage, Usage,
     UsageStatus, utc_now,
@@ -29,7 +30,7 @@ from prospecting.pipeline.calls import observed_credits, reserved_claude_cost, s
 from prospecting.providers import (
     CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError, ProviderRequest,
 )
-from prospecting.qualification import MODEL_ID
+from prospecting.sources import CONTACT_SEARCH_REFERENCE, SEARCH_HIT_CLAIM, is_non_business, url_host
 
 
 class ContactReport(Contract):
@@ -329,7 +330,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
                                                    "exclude_domains": ["linkedin.com"]})
                 def public_hits(data, request_id):
                     facts = [Evidence(company_id=company_id, claim=f"{SEARCH_HIT_CLAIM} en una búsqueda pública de contactos; requiere contraste.",
-                                      url=hit.url, provider="tavily", external_reference=f"contacts_search:{request_id}:{index}",
+                                      url=hit.url, provider="tavily", external_reference=f"{CONTACT_SEARCH_REFERENCE}{request_id}:{index}",
                                       excerpt=(hit.content or hit.title or "Resultado sin texto.")[:800],
                                       retrieved_at=utc_now(), kind="observed", source_type="secondary")
                              for index, hit in enumerate(data.results) if url_host(hit.url) is not None
@@ -341,7 +342,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
             now = utc_now()
             facts = db.list_evidence(company_id)
             urls = list(dict.fromkeys(str(item.url) for item in facts if item.url is not None
-                                     and item.external_reference and item.external_reference.startswith("contacts_search:")
+                                     and item.external_reference and item.external_reference.startswith(CONTACT_SEARCH_REFERENCE)
                                      and now - timedelta(days=campaign.limits.cache.web_days) <= item.retrieved_at <= now
                                      and url_host(str(item.url)) is not None and not is_non_business(url_host(str(item.url)))))
             left = max(0, effort.pages - run.attempts.get("contacts:pages", 0))
@@ -360,7 +361,7 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
             now = utc_now()
             public = [item for item in db.list_evidence(company_id) if item.excerpt is not None
                       and item.source_type in ("primary", "secondary")
-                      and not (item.external_reference or "").startswith("contacts_search:")
+                      and not (item.external_reference or "").startswith(CONTACT_SEARCH_REFERENCE)
                       and now - timedelta(days=campaign.limits.cache.web_days) <= item.retrieved_at <= now]
             if public:
                 payload, supplied = build_contacts_request(company, assessment, campaign, public, people())

@@ -8,14 +8,15 @@ import pytest
 from pydantic import ValidationError
 
 from prospecting.discovery import (
-    NON_BUSINESS_DOMAINS, TEMPLATE_VERSION, ExclusionList, PlannedQuery, TavilyExtractResponse,
+    TEMPLATE_VERSION, ExclusionList, PlannedQuery, TavilyExtractResponse,
     TavilySearchResponse, assess_identity, build_company, build_search_queries,
     classify_tavily_error, exclusions_status, extract_credits, extract_request, find_reusable,
-    group_candidates, infer_name, is_search_hit, load_exclusions, match_exclusion, parse_extract, parse_search,
-    search_request, select_candidates, validate_public_url,
+    group_candidates, infer_name, load_exclusions, match_exclusion, parse_extract, parse_search,
+    search_request, select_candidates,
 )
 from prospecting.models import CampaignLimits, Company, Evidence, IdentityStatus
 from prospecting.providers import ProviderError
+from prospecting.sources import NON_BUSINESS_DOMAINS, is_search_hit, validate_public_url
 
 
 RETRIEVED_AT = datetime(2026, 10, 11, 12, tzinfo=UTC)

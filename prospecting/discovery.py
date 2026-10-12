@@ -5,11 +5,9 @@ nunca modifican límites, consultas ni instrucciones del flujo.
 """
 
 from datetime import datetime
-import ipaddress
 from pathlib import Path
 import re
 from typing import Annotated, Literal, Self
-import unicodedata
 from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -22,10 +20,15 @@ from prospecting.models import (
     IdentityStatus, Segment, Text, UtcDatetime, _domain,
 )
 from prospecting.providers import OperationSpec, ProviderError, ProviderRequest
+from prospecting.sources import (
+    NON_BUSINESS_DOMAINS, SEARCH_HIT_CLAIM, SEARCH_PROVIDER, domain_label, is_non_business, url_host,
+    within_domain,
+)
+from prospecting.text import clip, compact, plain
 
 
 TEMPLATE_VERSION = "discovery_queries_v1"
-PROVIDER = "tavily"
+PROVIDER = SEARCH_PROVIDER
 SEARCH_OPERATION = "search"
 EXTRACT_OPERATION = "extract"
 SEARCH_CREDITS = 1
@@ -71,22 +74,6 @@ QUERY_TEMPLATES = {
     ),
 }
 
-# Hosts que no representan a la empresa buscada: redes, directorios, tiendas y gobierno.
-NON_BUSINESS_DOMAINS = (
-    "linkedin.com", "facebook.com", "instagram.com", "x.com", "twitter.com",
-    "tiktok.com", "youtube.com", "youtu.be", "pinterest.com", "reddit.com",
-    "wikipedia.org", "medium.com", "blogspot.com", "wordpress.com",
-    "apps.apple.com", "play.google.com", "google.com", "crunchbase.com",
-    "glassdoor.com", "indeed.com", "computrabajo.com", "gov.co", "gob.mx",
-    "getapp.com", "getapp.com.co", "getapp.com.mx", "capterra.com", "capterra.co",
-    "capterra.mx", "g2.com", "softwareadvice.com", "trustradius.com",
-)
-
-_GENERIC_LABELS = {
-    "www", "app", "web", "m", "es", "com", "co", "mx", "net", "org", "io", "la",
-    "lat", "ai", "online", "site", "store", "shop", "info", "biz",
-}
-_LOCAL_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home", ".corp", ".intranet")
 _TITLE_SEPARATORS = re.compile(r"\s+[|\-–—:·»]\s+")
 
 
@@ -169,70 +156,6 @@ class CombinationReport(Contract):
     insufficient: StrictBool
 
 
-def _clip(value: str | None, limit: int) -> str | None:
-    """Colapsa espacios y controles y acota la longitud de un texto externo."""
-    if value is None:
-        return None
-    text = re.sub(r"[\x00-\x1f\x7f\s]+", " ", value).strip()
-    if not text:
-        return None
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
-
-
-def _plain(value: str) -> str:
-    """Minúsculas sin tildes; todo lo que no es letra o dígito pasa a un espacio."""
-    text = unicodedata.normalize("NFKD", value.casefold())
-    text = "".join(char for char in text if not unicodedata.combining(char))
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
-
-
-def _fold(value: str) -> str:
-    return _plain(value).replace(" ", "")
-
-
-def is_non_business(host: str) -> bool:
-    return any(host == domain or host.endswith("." + domain) for domain in NON_BUSINESS_DOMAINS)
-
-
-def validate_public_url(value: object) -> str | None:
-    """Devuelve la URL si es HTTP(S) pública por nombre; si no, None (§15)."""
-    if not isinstance(value, str) or len(value) > 2048:
-        return None
-    url = value.strip()
-    if any(ord(char) <= 32 or ord(char) == 127 for char in url):
-        return None
-    try:
-        parts = urlsplit(url)
-        port = parts.port
-    except ValueError:
-        return None
-    if parts.scheme not in ("http", "https") or parts.username or parts.password:
-        return None
-    if port not in (None, 80, 443) or not parts.hostname:
-        return None
-    try:
-        ipaddress.ip_address(parts.hostname.strip("[]"))
-    except ValueError:
-        pass
-    else:
-        return None
-    try:
-        host = _domain(parts.hostname)
-    except ValueError:
-        return None
-    if host == "localhost" or host.endswith(_LOCAL_SUFFIXES):
-        return None
-    return url
-
-
-def url_host(url: str) -> str | None:
-    """Host normalizado sin `www.`; None si la URL no es pública."""
-    if validate_public_url(url) is None:
-        return None
-    host = _domain(urlsplit(url.strip()).hostname)
-    return host[4:] if host.startswith("www.") and host.count(".") > 1 else host
-
-
 def build_search_queries(campaign: Campaign) -> list[PlannedQuery]:
     """Consultas de plantilla solo para países y segmentos de la campaña."""
     profiles = {
@@ -296,30 +219,22 @@ def parse_search(planned: PlannedQuery, query_index: int, response: TavilySearch
             continue
         hits.append(SearchHit(
             url=result.url.strip(), host=host,
-            title=_clip(result.title, TITLE_CHARS), snippet=_clip(result.content, SNIPPET_CHARS),
+            title=clip(result.title, TITLE_CHARS), snippet=clip(result.content, SNIPPET_CHARS),
             rank=rank, query=planned, query_index=query_index,
             local_request_id=local_request_id,
-            provider_request_id=_clip(response.request_id, 120),
+            provider_request_id=clip(response.request_id, 120),
             retrieved_at=retrieved_at,
         ))
     return hits, discarded
 
 
-def _domain_label(host: str) -> str:
-    """Etiqueta distintiva del dominio, sin TLD ni etiquetas genéricas (com, co, www…)."""
-    labels = host.split(".")[:-1]
-    while len(labels) > 1 and labels[-1] in _GENERIC_LABELS:
-        labels.pop()
-    return labels[-1]
-
-
 def infer_name(title: str | None, host: str) -> str:
     """Nombre aparente a partir del título o del dominio; siempre es una inferencia."""
-    label = _domain_label(host)
+    label = domain_label(host)
     if title:
         matching = [
             segment.strip() for segment in _TITLE_SEPARATORS.split(title)
-            if segment.strip() and len(segment.strip()) <= 60 and _fold(label) in _fold(segment)
+            if segment.strip() and len(segment.strip()) <= 60 and compact(label) in compact(segment)
         ]
         if matching:
             return min(matching, key=len)
@@ -374,15 +289,6 @@ def select_candidates(candidates: list[Candidate], campaign: Campaign) -> tuple[
     return selected, report
 
 
-SEARCH_HIT_CLAIM = "Tavily devolvió esta página"
-
-
-def is_search_hit(item: Evidence) -> bool:
-    """Resultado del buscador: localiza una fuente, pero no confirma hechos (§7.3)."""
-    return (item.provider == PROVIDER and item.source_type == "secondary"
-            and item.claim.startswith(SEARCH_HIT_CLAIM))
-
-
 def build_hit_evidence(candidate: Candidate, company_id: UUID) -> list[Evidence]:
     """Un hecho por resultado del buscador; solo localiza la fuente (§7.3)."""
     evidence = []
@@ -390,7 +296,7 @@ def build_hit_evidence(candidate: Candidate, company_id: UUID) -> list[Evidence]
         title = f" Título: {hit.title}." if hit.title else ""
         evidence.append(Evidence(
             company_id=company_id,
-            claim=_clip(
+            claim=clip(
                 f"{SEARCH_HIT_CLAIM} en el puesto {hit.rank} para la consulta "
                 f"«{hit.query.query}» (perfil {hit.query.profile_id}, país {hit.query.country}).{title}",
                 600,
@@ -428,7 +334,7 @@ def extract_query(campaign: Campaign) -> str:
         signal for profile in campaign.config_snapshot.profiles
         if profile.segment in campaign.segments for signal in profile.signals
     ]
-    return _clip("; ".join(dict.fromkeys(signals)), 400)
+    return clip("; ".join(dict.fromkeys(signals)), 400)
 
 
 def extract_credits(url_count: int) -> int:
@@ -450,15 +356,15 @@ def parse_extract(company: Company, requested: list[str], response: TavilyExtrac
                   local_request_id: UUID, retrieved_at: datetime) -> tuple[list[Evidence], list[tuple[str, str]]]:
     """Fragmentos mínimos de las URLs solicitadas; los fallos no crean evidencia."""
     requested_set = {url.strip() for url in requested}
-    reference = _clip(response.request_id, 120) or str(local_request_id)
+    reference = clip(response.request_id, 120) or str(local_request_id)
     evidence = []
     for index, result in enumerate(response.results, start=1):
         url = result.url.strip()
         if url not in requested_set or url_host(url) is None:
             continue
         host = url_host(url)
-        primary = company.domain is not None and (host == company.domain or host.endswith("." + company.domain))
-        chunks = [_clip(chunk, CHUNK_CHARS) for chunk in (result.raw_content or "").split("[...]")]
+        primary = company.domain is not None and within_domain(host, company.domain)
+        chunks = [clip(chunk, CHUNK_CHARS) for chunk in (result.raw_content or "").split("[...]")]
         for chunk_index, chunk in enumerate([chunk for chunk in chunks if chunk][:EXTRACT_CHUNKS_PER_SOURCE], start=1):
             evidence.append(Evidence(
                 company_id=company.id,
@@ -469,7 +375,7 @@ def parse_extract(company: Company, requested: list[str], response: TavilyExtrac
                 source_type="primary" if primary else "secondary",
             ))
     failures = [
-        (item.url.strip(), _clip(item.error, 200) or "Fallo sin detalle del proveedor.")
+        (item.url.strip(), clip(item.error, 200) or "Fallo sin detalle del proveedor.")
         for item in response.failed_results if item.url.strip() in requested_set
     ]
     return evidence, failures
@@ -606,14 +512,12 @@ def match_exclusion(host: str | None, names, countries,
     """El dominio confirma la exclusión; el nombre solo, no (puede ser un homónimo)."""
     if exclusions is None:
         return None
-    folded = {_fold(name) for name in names if name and len(_fold(name)) >= 3}
+    folded = {compact(name) for name in names if name and len(compact(name)) >= 3}
     countries = set(countries or ())
     ambiguous = None
     for entry in exclusions.entries:
-        domain_hit = host is not None and any(
-            host == domain or host.endswith("." + domain) for domain in entry.domains
-        )
-        name_hit = bool(folded & {_fold(value) for value in (entry.name, *entry.aliases)})
+        domain_hit = host is not None and any(within_domain(host, domain) for domain in entry.domains)
+        name_hit = bool(folded & {compact(value) for value in (entry.name, *entry.aliases)})
         if not (domain_hit or name_hit):
             continue
         if entry.scope == "country":
@@ -654,17 +558,17 @@ def exclusion_evidence(company_id: UUID, match: ExclusionMatch, exclusions: Excl
 def find_reusable(candidate: Candidate, companies: list[Company]) -> Company | None:
     """Solo una identidad confirmada con el mismo dominio, nombre y país se reutiliza."""
     country = candidate.hits[0].query.country
-    name = _fold(candidate.name)
+    name = compact(candidate.name)
     for company in companies:
         if (company.identity_status == IdentityStatus.CONFIRMED and company.domain == candidate.host
                 and country in (company.operating_countries or [])
-                and name in {_fold(value) for value in (company.name, *(company.aliases or []))}):
+                and name in {compact(value) for value in (company.name, *(company.aliases or []))}):
             return company
     return None
 
 
 def _mentions(pattern: re.Pattern, item: Evidence) -> bool:
-    return bool(pattern.search(_plain(item.excerpt or "")))
+    return bool(pattern.search(plain(item.excerpt or "")))
 
 
 def assess_identity(company: Company, evidence: list[Evidence], campaign: Campaign,
@@ -694,7 +598,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
         if ids:
             segments.append(segment)
             segment_ids += ids
-    name = _plain(company.name)
+    name = plain(company.name)
     name_ids = [
         item.id for item in primary
         if len(name.replace(" ", "")) >= 3 and _mentions(re.compile(rf"\b{re.escape(name)}\b"), item)
@@ -702,7 +606,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
     observed_name = None
     if not name_ids and domain:
         # El nombre inferido no aparece: vale la etiqueta del dominio en su forma observada.
-        label = _domain_label(domain)
+        label = domain_label(domain)
         pattern = re.compile(r"(?<!\w)" + r"\s+".join(map(re.escape, label.split("-"))) + r"(?!\w)", re.IGNORECASE)
         for item in primary:
             found = pattern.search(item.excerpt or "") if len(label.replace("-", "")) >= 3 else None
@@ -719,7 +623,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
         "segments": segments or None,
         "segment_evidence_ids": list(dict.fromkeys(segment_ids)),
         "warnings": warnings,
-        "name": observed_name if observed_name and _fold(observed_name) != _fold(company.name) else None,
+        "name": observed_name if observed_name and compact(observed_name) != compact(company.name) else None,
         "name_evidence_ids": list(dict.fromkeys(name_ids)),
     }
     names = [company.name, *(company.aliases or []), *([observed_name] if observed_name else [])]
@@ -733,7 +637,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
     ):
         if failed:
             return IdentityDecision(status="pending", stop_reason=reason, exclusion=match, **base)
-    key = f"{domain}|{_fold(observed_name or company.name)}|{'+'.join(sorted(countries))}"
+    key = f"{domain}|{compact(observed_name or company.name)}|{'+'.join(sorted(countries))}"
     for other in confirmed:
         if other.id != company.id and other.identity_key == key:
             if other.id in campaign_company_ids:

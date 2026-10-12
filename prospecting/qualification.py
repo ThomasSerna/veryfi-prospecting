@@ -5,23 +5,22 @@ nunca cambian límites, presupuesto, prioridad ni instrucciones.
 """
 
 import json
-import re
 from uuid import UUID
 
 from pydantic import Field
 
-from prospecting.discovery import is_search_hit
+from prospecting.haiku import CHARS_PER_TOKEN, prompt_json, structured_request
 from prospecting.models import (
     CRITERION_NAMES, Campaign, Company, Contract, Criterion, CriterionName, CriterionValue,
     Evidence, IdentityStatus, Priority, Rubric, Text,
 )
+from prospecting.sources import is_search_hit
+from prospecting.text import clip
 
 
-MODEL_ID = "claude-haiku-5-5"
 PROMPT_VERSION = "haiku_assessment_v3"
 SEARCH_RESULT_CLAIM = ("La página apareció en una búsqueda web; el extracto es el resumen del buscador "
                        "y no confirma hechos de la empresa.")
-CHARS_PER_TOKEN = 3
 CLAIM_CHARS = 300
 EXCERPT_CHARS = 600
 JUSTIFICATION_CHARS = 400
@@ -65,15 +64,6 @@ class HaikuAssessment(Contract):
     contradiction_evidence_ids: list[UUID] = Field(default_factory=list)
     uncertainties: list[Text] = Field(default_factory=list)
     explanation: Text
-
-
-def _clip(value: str | None, limit: int) -> str | None:
-    if value is None:
-        return None
-    text = re.sub(r"[\x00-\x1f\x7f\s]+", " ", value).strip()
-    if not text:
-        return None
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def rubric_for(campaign: Campaign) -> Rubric:
@@ -140,14 +130,9 @@ def _evidence_item(item: Evidence) -> dict:
         "url": None if item.url is None else str(item.url), "provider": item.provider,
         "retrieved_at": item.retrieved_at.date().isoformat(),
         "published_at": None if item.published_at is None else item.published_at.date().isoformat(),
-        "claim": SEARCH_RESULT_CLAIM if search else _clip(item.claim, CLAIM_CHARS),
-        "excerpt": _clip(item.excerpt, EXCERPT_CHARS),
+        "claim": SEARCH_RESULT_CLAIM if search else clip(item.claim, CLAIM_CHARS),
+        "excerpt": clip(item.excerpt, EXCERPT_CHARS),
     }
-
-
-def _json(value) -> str:
-    # `<` escapado: ningún texto externo puede cerrar el bloque de evidencia.
-    return json.dumps(value, ensure_ascii=False, sort_keys=True).replace("<", "\\u003c")
 
 
 def select_evidence(evidence: list[Evidence], max_chars: int) -> list[Evidence]:
@@ -158,7 +143,7 @@ def select_evidence(evidence: list[Evidence], max_chars: int) -> list[Evidence]:
     ))
     selected, used = [], 0
     for item in ordered:
-        size = len(_json(_evidence_item(item))) + 2
+        size = len(prompt_json(_evidence_item(item))) + 2
         if used + size <= max_chars:
             selected.append(item)
             used += size
@@ -264,7 +249,7 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     limits = campaign.limits.llm
     system = _system_prompt(campaign)
     schema = response_schema(campaign)
-    profile = _json({
+    profile = prompt_json({
         "name": company.name, "domain": company.domain, "aliases": company.aliases,
         "operating_countries": company.operating_countries,
         "segments": None if company.segments is None else [str(item) for item in company.segments],
@@ -277,16 +262,8 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     if available <= 0:
         raise QualificationError("input_budget", "El prompt fijo supera el límite de entrada configurado.")
     selected = select_evidence(evidence, available)
-    user = template.format(profile=profile, evidence="\n".join(_json(_evidence_item(item)) for item in selected))
-    payload = {
-        "model": MODEL_ID,
-        "max_tokens": limits.max_output_tokens,
-        "system": system,
-        "messages": [{"role": "user", "content": user}],
-        "thinking": {"type": "disabled"},
-        "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": schema}},
-    }
-    return payload, selected
+    user = template.format(profile=profile, evidence="\n".join(prompt_json(_evidence_item(item)) for item in selected))
+    return structured_request(system, user, schema, limits.max_output_tokens), selected
 
 
 def parse_output(text: str, stop_reason: str | None) -> HaikuAssessment:
@@ -323,7 +300,7 @@ def validate_output(output: HaikuAssessment, supplied: list[Evidence],
         return {
             name: Criterion(
                 value=item.value, evidence_ids=list(dict.fromkeys(item.evidence_ids)),
-                justification=_clip(item.justification, JUSTIFICATION_CHARS),
+                justification=clip(item.justification, JUSTIFICATION_CHARS),
             )
             for name, item in output.criteria.items()
         }
@@ -355,7 +332,7 @@ def identity_confirmed(company: Company) -> bool:
 
 def explanation_text(output: HaikuAssessment) -> str:
     """Explicación breve más la información que falta (§1, pregunta 3)."""
-    missing = [_clip(item, UNCERTAINTY_CHARS) for item in output.uncertainties[:MAX_UNCERTAINTIES]]
+    missing = [clip(item, UNCERTAINTY_CHARS) for item in output.uncertainties[:MAX_UNCERTAINTIES]]
     missing = [item.rstrip(" .;:,") for item in missing if item and item.rstrip(" .;:,")]
-    text = _clip(output.explanation, EXPLANATION_CHARS)
+    text = clip(output.explanation, EXPLANATION_CHARS)
     return text + (f" Información pendiente: {'; '.join(missing)}." if missing else "")

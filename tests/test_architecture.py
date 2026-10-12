@@ -16,11 +16,12 @@ ALLOWED = {
     "prospecting.db": {"prospecting.models"},
     "prospecting.budget": {"prospecting.db", "prospecting.models"},
     "prospecting.providers": {"prospecting.budget", "prospecting.models"},
-    "prospecting.discovery": {"prospecting.models", "prospecting.providers"},
-    "prospecting.qualification": {"prospecting.discovery", "prospecting.models"},
-    "prospecting.contacts": {
-        "prospecting.discovery", "prospecting.models", "prospecting.providers", "prospecting.qualification",
-    },
+    "prospecting.text": set(),
+    "prospecting.sources": {"prospecting.models"},
+    "prospecting.haiku": set(),
+    "prospecting.discovery": {"prospecting.models", "prospecting.providers", "prospecting.sources", "prospecting.text"},
+    "prospecting.qualification": {"prospecting.haiku", "prospecting.models", "prospecting.sources", "prospecting.text"},
+    "prospecting.contacts": {"prospecting.haiku", "prospecting.models", "prospecting.providers", "prospecting.sources"},
     "prospecting.pipeline": {
         "prospecting.pipeline.contacts", "prospecting.pipeline.discovery", "prospecting.pipeline.qualification",
         "prospecting.pipeline.research",
@@ -32,15 +33,15 @@ ALLOWED = {
     },
     "prospecting.pipeline.research": {
         "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.models",
-        "prospecting.pipeline.calls", "prospecting.providers",
+        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.sources",
     },
     "prospecting.pipeline.qualification": {
-        "prospecting.budget", "prospecting.db", "prospecting.models", "prospecting.pipeline.calls",
-        "prospecting.providers", "prospecting.qualification",
+        "prospecting.budget", "prospecting.db", "prospecting.haiku", "prospecting.models",
+        "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
     },
     "prospecting.pipeline.contacts": {
-        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery",
-        "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers", "prospecting.qualification",
+        "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery", "prospecting.haiku",
+        "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers", "prospecting.sources",
     },
 }
 # Interfaz, envío de mensajes y automatización de navegador quedan fuera del paquete (§1, §15).

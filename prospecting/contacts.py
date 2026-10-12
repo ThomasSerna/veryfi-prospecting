@@ -13,13 +13,13 @@ from uuid import UUID, uuid4, uuid5
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator
 
-from prospecting.discovery import is_search_hit, url_host, validate_public_url
+from prospecting.haiku import CHARS_PER_TOKEN, MODEL_ID, prompt_json, structured_request
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignLimits, Channel, ChannelStatus, ChannelType,
     Company, Contact, Contract, Evidence, IdentityStatus, Priority, Text, UtcDatetime, utc_now,
 )
 from prospecting.providers import OperationSpec, ProviderError, ProviderRequest
-from prospecting.qualification import CHARS_PER_TOKEN, MODEL_ID
+from prospecting.sources import is_search_evidence, url_host, validate_public_url, within_domain
 
 
 PROVIDER = "hunter"
@@ -428,15 +428,11 @@ def _fresh(value: datetime | None, days: int, now: datetime) -> bool:
 
 def _corporate(company: Company, fact: Evidence) -> bool:
     host = None if fact.url is None else url_host(str(fact.url))
-    return company.domain is not None and host is not None and (host == company.domain or host.endswith("." + company.domain))
+    return company.domain is not None and host is not None and within_domain(host, company.domain)
 
 
 def _current_directory(fact: Evidence) -> bool:
     return fact.url is not None and bool(re.search(r"/(?:team|equipo|leadership|directivos|directorio|people|contacto|contact|about|nosotros)(?:[/#?._-]|$)", str(fact.url).lower()))
-
-
-def _is_search_evidence(fact: Evidence) -> bool:
-    return is_search_hit(fact) or (fact.external_reference or "").startswith("contacts_search:")
 
 
 def _employment_fresh(fact: Evidence, company: Company, limits: CampaignLimits, now: datetime) -> bool:
@@ -454,7 +450,7 @@ def _valid_refs(ids: list[UUID], contact: Contact, evidence: list[Evidence]) -> 
     if not ids or any(id not in by_id for id in ids):
         return []
     facts = [by_id[id] for id in ids]
-    if any(item.company_id != contact.company_id or item.contact_id not in (None, contact.id) or item.contradiction_ids or _is_search_evidence(item) for item in facts):
+    if any(item.company_id != contact.company_id or item.contact_id not in (None, contact.id) or item.contradiction_ids or is_search_evidence(item) for item in facts):
         return []
     return facts
 
@@ -493,7 +489,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
         if not regional and explicit and company.operating_countries and not explicit.intersection(company.operating_countries):
             return False
     facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
-    return bool(facts) and any(item.kind == "observed" and not _is_search_evidence(item) and
+    return bool(facts) and any(item.kind == "observed" and not is_search_evidence(item) and
                               _employment_fresh(item, company, limits, now) for item in facts)
 
 
@@ -631,25 +627,22 @@ Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign))}."""
     context = {"company": {"name": company.name, "entity_name": company.entity_name, "domain": company.domain,
                            "aliases": company.aliases},
                "contacts": [{"contact_id": str(item.id), "name": item.name, "title": item.title} for item in contacts]}
-    serialize = lambda value: json.dumps(value, ensure_ascii=False, sort_keys=True).replace("<", "\\u003c")
-    overhead = len(system) + len(json.dumps(schema)) + len(serialize(context)) + 200
+    overhead = len(system) + len(json.dumps(schema)) + len(prompt_json(context)) + 200
     available = campaign.limits.llm.max_input_tokens * CHARS_PER_TOKEN - overhead
     if available <= 0:
         raise ContactError("input_budget", "El prompt de contactos supera el límite de entrada.")
     selected, pieces, used = [], [], 0
     for item in sorted(evidence, key=lambda fact: (fact.source_type != "primary", str(fact.id))):
-        if item.company_id != company.id or item.kind != "observed" or _is_search_evidence(item) or not item.excerpt:
+        if item.company_id != company.id or item.kind != "observed" or is_search_evidence(item) or not item.excerpt:
             continue
-        piece = serialize({"evidence_id": str(item.id), "excerpt": item.excerpt[:800], "source_type": item.source_type,
-                           "url": None if item.url is None else str(item.url), "published_at": str(item.published_at) if item.published_at else None})
+        piece = prompt_json({"evidence_id": str(item.id), "excerpt": item.excerpt[:800], "source_type": item.source_type,
+                             "url": None if item.url is None else str(item.url), "published_at": str(item.published_at) if item.published_at else None})
         if used + len(piece) + 2 <= available:
             selected.append(item)
             pieces.append(piece)
             used += len(piece) + 2
-    payload = {"model": MODEL_ID, "max_tokens": campaign.limits.llm.max_output_tokens, "system": system,
-               "messages": [{"role": "user", "content": serialize(context) + "\n<evidencia>\n" + "\n".join(pieces) + "\n</evidencia>"}],
-               "thinking": {"type": "disabled"},
-               "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": schema}}}
+    user = prompt_json(context) + "\n<evidencia>\n" + "\n".join(pieces) + "\n</evidencia>"
+    payload = structured_request(system, user, schema, campaign.limits.llm.max_output_tokens)
     return payload, selected
 
 
@@ -679,7 +672,7 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
             raise ContactError("duplicate_fact", "Un candidato contiene hechos duplicados para el mismo campo.")
         for fact in candidate.facts:
             source = by_id.get(fact.evidence_id)
-            if source is None or source.company_id != company.id or _is_search_evidence(source) or source.kind != "observed":
+            if source is None or source.company_id != company.id or is_search_evidence(source) or source.kind != "observed":
                 raise ContactError("unknown_evidence", "Haiku citó evidencia inexistente o un resumen de buscador.")
             if source.contact_id not in (None, candidate.contact_id):
                 raise ContactError("unknown_evidence", "Haiku citó evidencia asignada a otra persona.")

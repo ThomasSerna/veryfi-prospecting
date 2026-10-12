@@ -5,12 +5,12 @@ from uuid import UUID
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import (
-    TavilyExtractResponse, classify_tavily_error, extract_credits, extract_query, extract_request,
-    is_non_business, parse_extract, url_host,
+    TavilyExtractResponse, classify_tavily_error, extract_credits, extract_query, extract_request, parse_extract,
 )
 from prospecting.models import Contract, Money, Text, utc_now
 from prospecting.pipeline.calls import call_free_credit
 from prospecting.providers import ProviderClient, ProviderError
+from prospecting.sources import is_non_business, url_host
 
 
 class UrlFailure(Contract):

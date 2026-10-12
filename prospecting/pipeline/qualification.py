@@ -8,6 +8,7 @@ from pydantic import StrictBool
 
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
+from prospecting.haiku import MODEL_ID
 from prospecting.models import (
     Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, Usage,
     UsageStatus, utc_now,
@@ -15,7 +16,7 @@ from prospecting.models import (
 from prospecting.pipeline.calls import reserved_claude_cost, seconds_left
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderError
 from prospecting.qualification import (
-    MODEL_ID, PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
+    PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
     identity_confirmed, material_contradiction, parse_output, primary_support, rubric_for,
     unknown_criteria, validate_output,
 )
