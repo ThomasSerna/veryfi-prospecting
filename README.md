@@ -68,11 +68,12 @@ validación comercial. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
 - `prospecting/text.py`, `sources.py` y `haiku.py`: texto externo, política de URLs y fuentes, y forma común de las solicitudes a Haiku.
-- `prospecting/providers/`: cliente JSON acotado y errores de proveedor (`http.py`), cliente de Claude con el SDK oficial, precios y tope de reserva (`claude.py`) y formato de Tavily (`tavily.py`).
+- `prospecting/providers/`: cliente JSON acotado y errores de proveedor (`http.py`), cliente de Claude con el SDK oficial, precios y tope de reserva (`claude.py`) y formato de Tavily (`tavily.py`) y Hunter (`hunter.py`).
 - `prospecting/discovery.py`: consultas de plantilla y selección de empresas candidatas.
 - `prospecting/identity.py`: identidad, duplicados y exclusiones.
 - `prospecting/qualification.py`: rúbrica, puntuación, prioridad, solicitud a Haiku y validación de su respuesta.
-- `prospecting/contacts.py`: búsqueda con Hunter, extracción pública con Haiku, personas, canales y condición de listo.
+- `prospecting/contacts.py`: reglas de personas, canales y condición de listo, independientes de la fuente.
+- `prospecting/contact_extraction.py`: extracción de contactos públicos con Haiku y validación de sus citas.
 - `prospecting/pipeline/`: etapas que reservan gasto, llaman a proveedores y guardan resultados, un módulo por etapa (descubrimiento e identidad, extracción, calificación y contactos) y las llamadas con reserva compartidas en `calls.py`.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, clientes, descubrimiento y calificación con datos sintéticos.

@@ -1,8 +1,11 @@
 # Personas y canales profesionales
 
 La búsqueda utiliza Hunter para personas y correos, y Tavily para localizar o
-contrastar información pública. `prospecting.contacts` construye solicitudes,
-valida respuestas y deriva estados mediante funciones sin red ni persistencia.
+contrastar información pública. `prospecting.providers.hunter` construye las
+solicitudes de Hunter y convierte sus respuestas; `prospecting.contact_extraction`
+prepara la extracción con Haiku y valida sus citas; `prospecting.contacts` aplica las
+reglas de persona, canal y listo, independientes de la fuente. Los tres son funciones
+sin red ni persistencia.
 `prospecting.pipeline` reserva gasto, llama proveedores y guarda resultados. No
 hay envío de mensajes, llamadas comerciales, secuencias ni sincronización de
 contactos a otra plataforma. Apollo y X-Ray Search no están habilitados.
@@ -91,9 +94,9 @@ ejemplo no crea ni concede autorizaciones. Cada proveedor opcional solo se usa
 si se proporciona su cuenta y el permiso correspondiente.
 
 ```python
-from prospecting.contacts import HUNTER_OPERATIONS
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, ProviderClient
+from prospecting.providers.hunter import HUNTER_OPERATIONS
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 client = ProviderClient(budget, [*HUNTER_OPERATIONS, *TAVILY_OPERATIONS])

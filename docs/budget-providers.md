@@ -87,8 +87,8 @@ usa 25 segundos para permitir su procesamiento de hasta 20 segundos.
 Descuenta del tiempo restante el empleado
 en la preparación y reclamación. Ese timeout no garantiza un plazo absoluto para
 DNS o toda la llamada. El cliente no descarga páginas arbitrarias. Los adaptadores
-de Tavily y Hunter habilitan únicamente las operaciones explícitas de lectura;
-la pantalla no inicia llamadas automáticamente.
+`prospecting/providers/tavily.py` y `prospecting/providers/hunter.py` habilitan únicamente
+las operaciones explícitas de lectura; la pantalla no inicia llamadas automáticamente.
 
 Las claves se leen únicamente de variables de entorno al ejecutar una operación:
 `TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `APOLLO_API_KEY` y `HUNTER_API_KEY`.
@@ -103,7 +103,7 @@ reinicio no se deduce transitoriedad del mensaje guardado.
 
 ## Consumo y respuestas de Hunter
 
-`HunterAccess` registra operaciones disponibles, fecha y referencia de la
+`HunterAccess` (`prospecting/providers/hunter.py`) registra operaciones disponibles, fecha y referencia de la
 comprobación, financiación y la referencia canónica de cada saldo real. Sus
 referencias `search_account_ref` y `verification_account_ref` se utilizan como
 `account_ref` del ledger y de los permisos, sin enviarse a Hunter.
