@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from app import CSV_FIELDS, csv_text, download_csv, export_csv
+from webapp.presentation import CSV_FIELDS, csv_text, download_csv, export_csv
 from prospecting.db import Database
 from prospecting.models import BusinessStatus, Channel, Contact, Evidence, RunItem, RunStage, utc_now
 from prospecting.pipeline import prepare_campaign, read_campaign, review_company
