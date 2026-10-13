@@ -41,6 +41,7 @@ class QualificationReport(Contract):
 
 
 _FINAL_STATUS = {Priority.LOW: BusinessStatus.LOW_FIT}
+_EVALUATION_DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
 
 
 class _EvaluationTrace:
@@ -48,10 +49,8 @@ class _EvaluationTrace:
 
     def __init__(self, directory: Path):
         directory = Path(directory).resolve()
-        root = Path(__file__).resolve().parents[2]
-        if (directory.is_relative_to(root) and not directory.is_relative_to(root / "data")
-                or not any(parent.name.lower() == "data" for parent in (directory, *directory.parents))):
-            raise ValueError("Las trazas deben guardarse bajo data/.")
+        if not directory.is_relative_to(_EVALUATION_DATA_ROOT.resolve()):
+            raise ValueError("Las trazas deben guardarse bajo data/ de este repositorio.")
         self.id = uuid4()
         self.path = directory / str(self.id)
         self.path.mkdir(parents=True, exist_ok=False)

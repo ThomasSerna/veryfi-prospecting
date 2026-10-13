@@ -11,6 +11,12 @@ from prospecting.pipeline import qualification
 from test_qualification import claude, message, output, scenario
 
 
+@pytest.fixture(autouse=True)
+def synthetic_data_root(tmp_path, monkeypatch):
+    """Captura únicamente bajo la raíz temporal declarada por la prueba."""
+    monkeypatch.setattr(qualification, "_EVALUATION_DATA_ROOT", tmp_path / "data")
+
+
 def synthetic_copy(directory, target):
     """Crea una fixture nueva del transporte simulado; conserva intacta la captura original."""
     source = next(directory.iterdir())

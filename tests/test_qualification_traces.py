@@ -16,6 +16,12 @@ from test_qualification import (
 )
 
 
+@pytest.fixture(autouse=True)
+def synthetic_data_root(tmp_path, monkeypatch):
+    """Aísla la raíz protegida; las pruebas nunca escriben en los datos reales."""
+    monkeypatch.setattr(qualification, "_EVALUATION_DATA_ROOT", tmp_path / "data")
+
+
 def read_trace(directory):
     paths = list(directory.iterdir())
     assert len(paths) == 1
@@ -122,8 +128,9 @@ def test_without_model_is_captured_without_provider_response(claude, tmp_path, i
     assert claude.requests == []
 
 
-def test_capture_directory_outside_data_blocks_reservation_and_transport(claude, tmp_path):
-    directory = tmp_path / "unsafe"
+@pytest.mark.parametrize("relative", ["unsafe", "another-project/data/traces", "data/../external/data/traces"])
+def test_capture_directory_outside_data_blocks_reservation_and_transport(claude, tmp_path, relative):
+    directory = tmp_path / relative
     report = claude.qualify(evaluation_dir=directory)
     assert report.status == "pending" and report.reason == "trace_capture_failed"
     assert "Traza de evaluación incompleta" in report.error_message
