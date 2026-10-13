@@ -383,7 +383,8 @@ def test_incomplete_request_capture_preserves_the_failure_without_replay(tmp_pat
     manifest["cases"][0]["label"] = write_reference(path.parent, label_reference["path"], label)
     write_reference(path.parent, path.name, manifest)
     row = evaluation.evaluate_manifest(path)["cases"][0]
-    assert row["mode"] == "incomplete_trace" and row["error_reason"] == "capture_incomplete" and row["priority"] is None
+    assert row["mode"] == "incomplete_trace" and row["error_reason"] == "trace_capture_failed" and row["priority"] is None
+    assert row["capture_error_reason"] == "capture_incomplete"
 
 
 def test_blind_context_and_pairing_use_exact_messages_instead_of_full_excerpt(tmp_path, config):
@@ -473,3 +474,24 @@ def test_historical_unknown_contradictions_stay_partial_and_block_counterfactual
     assert row["classification_reproducibility"] == "partial_conditions"
     with pytest.raises(ValueError, match="condiciones originales"):
         evaluation.evaluate_manifest(path, {"version": "candidate_v2", "rubric": config.rubrics["rubric_v1"]})
+
+
+def test_response_capture_failure_keeps_observed_false_positive_and_paid_usage(tmp_path, config):
+    path = write_synthetic_dataset(tmp_path, config, [{"case_id": "capture_loss", "acceptance": "rejected"}])
+    add_trace(path)
+    baseline = evaluation.evaluate_manifest(path)
+    assert baseline["summaries"][0]["counts"]["FP"] == 1
+
+    def lose_response(trace):
+        trace["artifacts"].pop("response.json")
+        trace.update(complete=False, capture_errors=["Fallo de escritura sintético."])
+    revise_case(path, 0, "artifact", lose_response)
+    report = evaluation.evaluate_manifest(path)
+    row, summary = report["cases"][0], report["summaries"][0]
+    assert row["priority"] == "high" and row["error_reason"] is None
+    assert row["mode"] == "incomplete_trace" and row["capture_error_reason"] == "capture_incomplete"
+    assert row["classification_reproducibility"] == "partial_conditions"
+    assert summary["counts"]["FP"] == 1 and summary["counts"]["capture_errors"] == 1
+    assert summary["metrics"]["precision"]["denominator"] == 1
+    assert row["evaluation_final_cost_usd"] == baseline["cases"][0]["evaluation_final_cost_usd"]
+    assert evaluation.evaluate_manifest(path) == report

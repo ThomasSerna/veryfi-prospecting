@@ -48,8 +48,8 @@ def synthetic_copy(directory, target):
     ("invalid", "replay", None, "max_tokens"),
     ("timeout", "trace_without_response", None, "timeout"),
     ("no_authorization", "trace_without_response", None, "authorization_required"),
-    ("storage", "incomplete_trace", None, "capture_incomplete"),
-    ("response_storage", "incomplete_trace", None, "capture_incomplete"),
+    ("storage", "incomplete_trace", None, "trace_capture_failed"),
+    ("response_storage", "incomplete_trace", "medium", None),
 ])
 def test_pipeline_capture_is_consumed_without_any_new_call(
         claude, tmp_path, monkeypatch, condition, mode, priority, error):
@@ -82,6 +82,7 @@ def test_pipeline_capture_is_consumed_without_any_new_call(
     row = result["cases"][0]
     assert row["origin"] == "synthetic" and row["mode"] == mode
     assert row["priority"] == priority and row["error_reason"] == error
+    assert row["capture_error_reason"] == ("capture_incomplete" if condition in {"storage", "response_storage"} else None)
     if condition == "response_storage":
         assert row["model_id"] == claude.reply["model"]
         assert row["capture_metadata"]["requested_model_id"] == "claude-haiku-5-5"

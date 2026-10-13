@@ -317,12 +317,15 @@ def load_snapshot(root, case):
     if source.request_payload is not None and submitted is None:
         mode = "audit_only"
     if not trace.complete or trace.capture_errors:
-        snapshot.error_reason = "capture_incomplete"
+        if assessment is None and snapshot.error_reason is None:
+            snapshot.error_reason = "capture_incomplete"
         mode = "incomplete_trace"
     metadata = {"model_id": response.model if response else (None if assessment is None else assessment.model_id),
                 "requested_model_id": source.requested_model_id,
                 "prompt_version": source.prompt_version, "capture_commit": source.commit,
                 "capture_code_hashes": source.code_hashes,
+                "capture_error_reason": "capture_incomplete" if mode == "incomplete_trace" else None,
+                "capture_errors": trace.capture_errors,
                 "submitted_evidence_verified": submitted is not None,
                 "submitted_messages": None if source.request_payload is None else source.request_payload.get("messages"),
                 "request_payload_sha256": None if source.request_payload is None else digest(source.request_payload)}
@@ -426,6 +429,7 @@ def summarize(rows):
         counts["accepted_not_selected"] += acceptance == "accepted" and predicted not in {"high", "medium"}
         counts["accepted_excluded"] += acceptance == "accepted" and predicted == "excluded"
         counts["errors"] += row["error_reason"] is not None
+        counts["capture_errors"] += row.get("capture_error_reason") is not None
         counts["abstentions"] += predicted == "insufficient_evidence"
         counts["excluded"] += predicted == "excluded"
         counts["label_pending"] += acceptance == "pending"
@@ -458,7 +462,7 @@ def summarize(rows):
         amount["cost_per_accepted_usd"] = (str(Decimal(amount["total_usd"]) / counts["accepted"])
              if counts["accepted"] and amount["known_cases"] == len(rows) else None)
     for key in ("TP", "FP", "FN", "TN", "cases", "reviewed", "accepted", "accepted_not_selected",
-                "errors", "abstentions", "excluded", "accepted_excluded", "label_pending", "blind_reviews", "visible_reviews"):
+                "errors", "capture_errors", "abstentions", "excluded", "accepted_excluded", "label_pending", "blind_reviews", "visible_reviews"):
         counts.setdefault(key, 0)
     return {"counts": dict(counts), "metrics": metrics, "per_criterion": per_criterion, "costs": costs,
             "priority_confusion": dict(Counter(f"{row['expected_priority']}->{row['priority']}" for row in rows if row["expected_priority"] is not None)),
@@ -565,6 +569,7 @@ def evaluate_manifest(path, candidate=None):
                      "label_sha256": None if case.label is None else case.label.sha256,
                      "label_content_sha256": None if label is None else digest(label.model_dump(mode="json", exclude={"snapshot_sha256", "assessment_id", "label_id", "version", "previous_sha256", "audits"})),
                      "artifact_sha256": case.artifact.sha256, "priority": priority, "error_reason": error,
+                     "capture_error_reason": metadata.get("capture_error_reason"),
                      "classification_reproducibility": ("not_assessed" if assessment is None else
                                                          "exact_replay" if mode == "replay" else "partial_conditions"),
                      "expected_priority": expected, "criteria_comparison": comparisons,
