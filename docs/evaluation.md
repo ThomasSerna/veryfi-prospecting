@@ -214,3 +214,35 @@ revisado. Las pruebas de archivos incoherentes rechazan identificadores, tokens,
 costos y resultados que no corresponden entre sí, aunque sus hashes se hayan
 recalculado. Ninguno de estos resultados demuestra una nueva inferencia real ni
 revisión efectiva de Veryfi.
+
+### Correcciones de la revisión de T10
+
+Verificación del 13 de octubre de 2026 (America/Bogota): **772 pruebas
+aprobadas en 60,82 s**, con `uv run --locked --offline python -m pytest`.
+`uv lock --check --offline` y `git diff --check` también pasan. Se añadieron
+11 regresiones sintéticas respecto de las 761 pruebas anteriores:
+
+- El replay rechaza evidencia declarada que no aparece en la solicitud,
+  procedencia o texto incompatibles, aunque los hashes sean coherentes. Un
+  formato histórico desconocido queda como auditoría, sin reconstruir el prompt.
+- Las instantáneas rechazan puntuación, cobertura y prioridades imposibles bajo
+  la rúbrica congelada. Las contradicciones no persistidas siguen como condición
+  desconocida y bloquean contrafactuales que no reproducen la clasificación base.
+- Perder la respuesta cruda conserva una clasificación válida y sus falsos
+  positivos observados; registra la captura incompleta aparte e impide el replay.
+- Una ruta externa llamada `data` o que escape mediante `..` se rechaza antes
+  de reservar gasto o enviar la solicitud. Las capturas de prueba usan una raíz
+  protegida temporal, sin escribir en los datos reales.
+
+No se cambiaron dependencias, esquema SQLite, prompts, rúbrica ni catálogo.
+No hubo llamadas reales a proveedores ni etiquetas nuevas de Veryfi. Estos
+resultados validan correcciones técnicas, no calidad comercial.
+
+El [protocolo](t10-evaluation.md#pendientes-de-cierre-y-entrega) conserva los
+pendientes: recuperar identificadores originales T05/T09 y ajustes v1–v3,
+demostrar independencia, preparar la muestra nueva, obtener revisión atribuible
+de Veryfi y publicar una conclusión real. También registra los bloqueos de
+entrega MVP/T11: demo real completa, catálogo y exclusiones confirmados y gasto
+histórico conciliado. La captura explícita desde el pipeline ya está documentada;
+no autoriza consumo ni altera las reglas de reutilización de evaluaciones.
+T10 sigue pendiente hasta resolver esos requisitos comerciales y de evidencia.

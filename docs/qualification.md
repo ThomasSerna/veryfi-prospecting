@@ -70,6 +70,8 @@ El argumento `evaluation_dir=Path("data/evaluation/traces")` conserva una traza
 por invocación en un subdirectorio nuevo con identificador UUID. Sin ese argumento
 el flujo sigue funcionando sin crear artefactos de evaluación. La captura no
 autoriza consumo ni cambia la solicitud, la reserva o las reglas de reutilización.
+Solo admite rutas bajo el `data/` de este repositorio, resueltas antes de reservar;
+una carpeta externa con ese nombre no cumple la protección.
 
 `input.json` guarda campaña, empresa, evidencia de empresa, ids seleccionados,
 payload exacto, versiones, commit y hashes del código. Después de reservar se
@@ -92,3 +94,7 @@ se descarta una evaluación válida por ese fallo.
 El [protocolo de evaluación](t10-evaluation.md) describe la revisión atribuida,
 las particiones independientes y la lectura offline de estos artefactos. Una
 captura comprobada con transporte sintético no demuestra una ejecución real.
+La interfaz no activa esta captura: el protocolo incluye la invocación explícita
+de la etapa con la base y el presupuesto compartidos. Una pérdida de captura
+se informa aparte de la clasificación conservada y no elimina sus métricas
+comerciales observadas; impide presentar un replay exacto.

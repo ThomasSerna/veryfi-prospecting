@@ -141,7 +141,9 @@ evaluación, proveedor, framework ni UI nueva. Los archivos de evaluación son
 artefactos locales que no migran ni recrean el esquema de SQLite.
 
 La captura prospectiva se solicita con el parámetro opcional `evaluation_dir`
-de `qualify_company`, apuntando a un directorio nuevo bajo `data/`. Su esquema
+de `qualify_company`, apuntando a un directorio bajo el `data/` de este repositorio.
+Las rutas se resuelven antes de reservar; una carpeta externa llamada `data`
+o una ruta que escape de la raíz protegida se rechaza. Su esquema
 es `evaluation_trace_v1` y conserva:
 
 - `input.json`: campaña, empresa y evidencia sin contactos, ids seleccionados,
@@ -167,6 +169,72 @@ Un fallo de proveedor puede tener traza completa sin respuesta: conserva el
 motivo literal y el consumo incierto en lugar de inventar una salida. Conservar
 los errores posteriores al envío junto al gasto y al resultado ya registrados;
 no repetir una llamada para disimular una captura incompleta.
+
+### Comprobaciones de reproducción
+
+El replay lee el bloque `<evidencia>` de los mensajes originales y comprueba
+identificadores, procedencia y fragmentos contra la instantánea. Los hashes
+correctos no bastan si la evidencia declarada difiere de la enviada. No se
+reconstruye una solicitud antigua con el prompt actual. Un formato de mensajes
+no reconocido queda como `audit_only`, con
+`context_reproducibility="unverified_format"`; no admite una comparación de
+prompts basada en supuesta igualdad de entrada.
+
+La puntuación y cobertura se recalculan con los criterios y la rúbrica
+congelados; una prioridad imposible bajo las condiciones disponibles se
+rechaza. `Assessment` histórico no conserva las contradicciones propuestas
+por Haiku ni prueba por sí solo una exclusión: las condiciones incompletas se
+declaran con `classification_reproducibility="partial_conditions"`, sin
+inventarlas. Un contrafactual necesita reproducir primero la clasificación base.
+
+`error_reason` describe el fallo de calificación; `capture_error_reason` y
+`capture_metadata.capture_errors` describen pérdidas de captura por separado.
+Una evaluación válida persistida sigue contando en TP/FP/FN/TN cuando su
+referencia comercial está resuelta, aunque falte la respuesta cruda. Su modo
+es `incomplete_trace`, sin replay, y el resumen cuenta `capture_errors`.
+Una pérdida de archivos no elimina un falso positivo observado. Sin evaluación
+válida el caso permanece pendiente y conserva el motivo técnico original.
+
+### Invocación de captura desde el pipeline
+
+La interfaz y `run_campaign` no activan la captura opcional. Para capturar la
+calificación de una empresa ya investigada, usar la etapa existente desde
+Python, con la base compartida abierta y el mismo `Budget` y cupos comprobados.
+El ejemplo presupone esos objetos, los UUID guardados y un permiso vigente;
+no crea campañas, reinicia cupos ni concede autorización:
+
+```python
+from pathlib import Path
+import time
+
+from prospecting.pipeline import qualify_company
+from prospecting.providers import ClaudeClient
+
+report = qualify_company(
+    db, budget, ClaudeClient(budget), campaign_id, company_id,
+    account_ref=claude_account_ref,
+    funding_source=claude_funding_source,
+    authorization=session_authorization,
+    deadline=time.monotonic() + remaining_active_seconds,
+    evaluation_dir=Path("data/evaluation/traces/dataset-v1"),
+)
+```
+
+`session_authorization` debe proceder de `budget.authorize` con proveedor
+`anthropic`, operación `messages`, cuenta y tope explícitamente aprobados en
+la sesión. `remaining_active_seconds` respeta los límites restantes de empresa
+y campaña; la captura no amplía el plazo. Usar la SQLite existente, no abrir
+una base nueva para la evaluación, y no ejecutar simultáneamente la campaña
+desde otra instancia. Capturar la etapa de calificación no exige buscar contactos.
+
+Si ya existe una evaluación suficiente, la función la reutiliza y captura una
+auditoría histórica; no produce una nueva inferencia ni evalúa otro prompt.
+No borrar la evaluación para forzar consumo. Cambiar prompts o el significado
+de criterios requiere una propuesta aprobada y respuestas nuevas autorizadas.
+Antes de enviar, congelar selección, versiones, evidencia y etiquetas ciegas.
+Después, conservar la traza original y enlazar su `manifest.json` mediante
+`FileReference` en una versión nueva del conjunto. Un fallo posterior al envío
+se registra sin repetir la llamada.
 
 ## Uso offline y formatos de entrada
 
@@ -382,3 +450,22 @@ T10 queda comercialmente pendiente hasta disponer de revisión documentada de
 Veryfi, un conjunto independiente verificable y una conclusión sustentada.
 La falta de validación o presupuesto se registra explícitamente, sin inventar
 resultados ni compensarla relajando las reglas del flujo.
+
+## Pendientes de cierre y entrega
+
+| Pendiente | Evidencia necesaria para resolverlo | Estado |
+|---|---|---|
+| Inventario histórico T05/T09 y ajustes v1–v3 | Artefactos originales e IDs de campaña, empresa, evaluación y solicitud; alias, dominios y grupos conocidos | Pendiente; el informe agregado no demuestra independencia |
+| Conjunto independiente | Selección congelada de hasta 20 empresas nuevas, cinco por celda CO/MX × FinTech/CPG; procedimiento, fecha y solapamientos comprobados | Pendiente; informar tamaño logrado y casos incompletos |
+| Referencias de Veryfi | Revisor y rol comprobados, fecha, procedencia, aceptación separada de criterios/productos y motivos; nuevas versiones para correcciones | Pendiente; la revisión académica o desde UI no acredita validación de Veryfi |
+| Calidad comercial | Evaluaciones reales y etiquetas comparables; métricas, intervalos, pérdidas, errores y costos atribuibles en `evaluation.md` | Pendiente; fixtures solo verifican el mecanismo |
+| MVP y T11 | Demostración documentada de al menos un prospecto real completo, informe reproducible y límites de producción | T09 documentó cero listos; no sustituir la demo por fixtures |
+| Catálogo, exclusiones y gasto | Confirmación documentada de Veryfi y conciliación del uso histórico, incluido el observado fuera del ledger | Pendiente; no activar nuevas fuentes ni multiplicar el cupo |
+
+Recuperar originales sin modificar la base existente y conservarlos inmutables
+bajo `data/`; los grupos agrupan para particionar sin fusionar entidades.
+Si faltan identificadores históricos, mantener `inventory.status` o
+`historical_coverage` pendiente. Ninguna autorización de T05/T09 habilita nuevas
+consultas. La conclusión agregada distinguirá resultados reales de simulados,
+costo de evaluación de costo total y estimado de conciliado. Sin línea base
+manual no hay ahorro demostrado. Apollo y X-Ray no son requisitos de este cierre.
