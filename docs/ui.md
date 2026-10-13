@@ -1,9 +1,19 @@
 # Interfaz local de campañas y revisión
 
-Inicia la aplicación con `uv run --locked streamlit run app.py` desde la raíz.
-Streamlit escucha en `127.0.0.1`; usa una sola instancia local con la base
+Inicia la aplicación desde la raíz:
+
+```console
+uv run --locked python manage.py runserver 127.0.0.1:8000 --noreload
+```
+
+Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). Django escucha en `127.0.0.1`;
+usa una sola instancia local con la base
 `data/prospecting.sqlite3`. La aplicación busca y lee información: no envía mensajes
 ni notificaciones para comprobar canales.
+
+La migración de la interfaz a Django fue aprobada el 13 de octubre de 2026.
+Sustituye la interfaz Streamlit descrita en la arquitectura inicial de `IDEA.md`;
+el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Preparar y ejecutar
 
@@ -14,12 +24,17 @@ ni notificaciones para comprobar canales.
 3. El responsable autoriza explícitamente cada operación habilitada, con cuenta, tope
    económico y de créditos, responsable y referencia. La ejecución crea permisos
    nuevos dentro de una sesión de `Budget`; no recupera permisos guardados.
-4. La campaña avanza secuencialmente. Durante descubrimiento el progreso es indeterminado;
-   después se muestran las etapas y resultados parciales tras guardarlos en SQLite.
+4. La campaña avanza secuencialmente en un hilo del servidor. Durante descubrimiento el
+   progreso es indeterminado; después se muestran las etapas y resultados parciales tras
+   guardarlos en SQLite. La pantalla consulta el estado cada dos segundos mientras se ejecuta.
 
 El historial recupera campañas y permite reanudar o cerrar una campaña interrumpida
-conservando resultados y consumo. Los reruns y clics duplicados no repiten solicitudes
-enviadas. No hay procesamiento en segundo plano al cerrar Streamlit. Una interrupción
+conservando resultados y consumo. Los clics duplicados no repiten solicitudes
+enviadas. Cerrar la pestaña no detiene la campaña; detener o reiniciar el servidor sí.
+No existe cola persistente ni reanudación automática: tras reiniciar, revisa el estado
+guardado y autoriza de nuevo. El último informe general está en memoria y se pierde al
+reiniciar; los errores y motivos por empresa, resultados y gasto permanecen en SQLite.
+Una interrupción
 durante descubrimiento puede dejar respuestas pagadas sin resultados guardados:
 reanudar termina con `duplicate_request` si la primera búsqueda ya fue enviada, sin
 repetirla ni borrar su reserva. Consulta [Orquestación](campaign.md) para los límites.
@@ -29,8 +44,8 @@ repetirla ni borrar su reserva. Consulta [Orquestación](campaign.md) para los l
 `data/` está ignorado por Git. `provider-access.json` solo guarda cuentas, cupos y
 comprobaciones de acceso; las claves viven en variables de entorno. La aplicación
 no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y,
-cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Streamlit; con un
-`.env` local, `uv run --locked --env-file .env streamlit run app.py` las pasa al proceso.
+cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Django; con un
+`.env` local, añade `--env-file .env` a `uv run --locked` para pasarlas al proceso.
 Si la interfaz indica «Falta configurar» con el `.env` presente, se inició sin `--env-file`.
 La interfaz indica únicamente si la variable local tiene un valor configurado,
 sin mostrarlo ni probarlo por red. Ese indicador no demuestra permisos ni saldo:
@@ -116,7 +131,9 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 
 ## Resultados y revisión
 
-La tabla permite filtrar por país, segmento, prioridad y canal. La ficha de empresa
+La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
+filtrar por país, segmento, prioridad y canal. La ficha de empresa organiza Resumen,
+Contactos y Evidencia y
 muestra encaje, cobertura, criterios y fuentes, caso de uso, contactos, advertencias
 y motivos de detención. El encaje no es una probabilidad de compra. Datos desconocidos
 se muestran separados de cero.
@@ -135,7 +152,7 @@ por sí sola no basta; la confirmación tampoco elimina una verificación negati
 ## Exportación CSV
 
 La descarga principal incluye personas actualmente listas con canales utilizables
-según las reglas. Al pulsar la descarga, una función diferida abre una conexión
+según las reglas. Al pulsar la descarga, la vista abre una conexión
 nueva, consulta SQLite y recalcula frescura; el CSV no reutiliza los bytes de una
 pantalla anterior. La descarga bloquea si hay una investigación en curso.
 La revisión humana se incluye, pero no exige `accepted` ni reemplaza las reglas
@@ -152,8 +169,7 @@ La descarga usa UTF-8 con BOM, `csv` estándar y todos los campos entrecomillado
 Los textos con prefijos peligrosos para hojas de cálculo se neutralizan anteponiendo
 un apóstrofo y un tabulador (`'\t`), también si hay espacios o controles antes del
 prefijo. Incluye teléfonos que empiezan por `+`. La fuente original no cambia en
-SQLite. La exportación integrada de tablas de Streamlit está desactivada para
-mantener este camino seguro; no se exporta HTML arbitrario.
+SQLite. Todas las descargas pasan por este mismo camino seguro; no se exporta HTML arbitrario.
 
 Las pruebas de la interfaz, revisión, confirmación y CSV usan proveedores simulados
 y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde la interfaz
@@ -161,7 +177,25 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
 
-## Verificación del 12 de octubre de 2026
+## Verificación de Django del 13 de octubre de 2026
+
+- `uv lock --check`, `uv run --locked python manage.py check` y la suite completa:
+  799 pruebas pasan. Las pruebas de negocio conservan sus aserciones; se trasladaron
+  los escenarios de interfaz a Django y se añadieron casos de CSRF, ejecución en
+  un hilo, clics duplicados, bloqueo de acciones y recuperación.
+- Se revisaron nueve capturas exclusivamente sintéticas: historial, campaña,
+  contactos, evidencia, preparación y autorización, en anchos de 1440, 1280 y 390 px.
+  La navegación móvil y las pestañas conservan acceso por teclado; los filtros tienen
+  nombres accesibles distintos. No se observaron desbordamientos de página.
+- Revisión independiente de código y diseño aprobada; detector de Impeccable sin
+  hallazgos. Se usa el logotipo blanco del media pack oficial de Veryfi y los colores
+  de su [guía de marca](https://www.veryfi.com/brand/), sin fuentes ni scripts remotos.
+- Streamlit y sus dependencias quedaron retirados. `prospecting/`, el catálogo,
+  el esquema persistido y el evaluador offline no se modificaron.
+- No se ejecutaron proveedores reales desde Django ni se probó con un lector de
+  pantalla real. Detener el servidor interrumpe el hilo; no hay cola persistente.
+
+## Verificación histórica de Streamlit del 12 de octubre de 2026
 
 - `uv lock --check` y `uv run --locked pytest`: 709 pruebas pasan, sin red externa;
   incluyen 14 casos de interfaz con `AppTest` y bases temporales.

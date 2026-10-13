@@ -2,11 +2,11 @@
 
 `prospecting/pipeline/campaign.py` recorre una campaña completa desde Python: descubre
 empresas, reúne evidencia, califica, amplía una vez la evidencia insuficiente y busca
-contactos. Decide siempre con lo guardado en SQLite, así que repetir un clic, un rerun de
-Streamlit o reanudar tras un cierre no duplica la campaña ni repite llamadas. Ninguna
+contactos. Decide siempre con lo guardado en SQLite, así que repetir un clic o
+reanudar tras un cierre no duplica la campaña ni repite llamadas. Ninguna
 función envía mensajes ni contacta a nadie.
 
-La interfaz de Streamlit usa este mismo pipeline y esta misma base; su configuración
+La interfaz de Django usa este mismo pipeline y esta misma base; su configuración
 local, permisos y exportaciones se describen en [Interfaz local](ui.md).
 
 ## Invocación
@@ -44,7 +44,7 @@ report = run_campaign(
   comercial, `stop_reason` y error. Si otra campaña está activa, no hace nada y devuelve
   `stop_reason="another_campaign_active"`. Una campaña `completed` no se vuelve a ejecutar.
   Mientras otra ejecución sigue en curso en el mismo proceso (por ejemplo, otra sesión de
-  Streamlit), tampoco hace nada y devuelve `stop_reason="campaign_already_running"`.
+  Django), tampoco hace nada y devuelve `stop_reason="campaign_already_running"`.
 - `close_campaign(db, campaign_id)` pasa una campaña `running` o `paused_budget` a `partial`.
   Conserva todos los datos y libera el lugar de campaña activa.
 - `progress`, si se suministra, recibe un `CompanyProgress` después de que cada paso de una

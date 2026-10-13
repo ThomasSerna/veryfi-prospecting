@@ -1,7 +1,7 @@
 # Veryfi Prospecting
 
 Prototipo académico local para investigar posibles clientes de Veryfi en
-Latinoamérica. La interfaz local de Streamlit permite configurar y ejecutar campañas,
+Latinoamérica. La interfaz local de Django permite configurar y ejecutar campañas,
 consultar progreso, evidencia y presupuesto, revisar empresas, confirmar canales
 alternativos existentes y descargar CSV seguro. Reutiliza SQLite y el pipeline de
 descubrimiento con Tavily, calificación determinista con Claude Haiku y búsqueda de
@@ -32,27 +32,33 @@ La instalación necesita Internet para descargar Python y las dependencias.
 Desde la raíz del repositorio:
 
 ```console
-uv run --locked streamlit run app.py
+uv run --locked python manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
 Si las claves están en un `.env` local (ignorado por Git), `uv` las pasa al proceso
-de Streamlit con `--env-file`; la aplicación por sí misma no lee ese archivo:
+de Django con `--env-file`; la aplicación por sí misma no lee ese archivo:
 
 ```console
-uv run --locked --env-file .env streamlit run app.py
+uv run --locked --env-file .env python manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
-Abre [http://127.0.0.1:8501](http://127.0.0.1:8501). La pantalla puede abrirse sin
+Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). La pantalla puede abrirse sin
 claves y consultar campañas ya guardadas. Preparar una campaña guarda sus criterios
 sin llamar a proveedores; ejecutar o reanudar requiere cuentas y cupos comprobados,
 claves en variables de entorno y autorización explícita por operación, cuenta y tope.
-Detén el servidor con Ctrl+C. La configuración fija `127.0.0.1`, desactiva la
-telemetría y permite iniciar sin abrir un navegador ni pedir un correo.
+Detén el servidor con Ctrl+C. El servidor se limita a `127.0.0.1`, no requiere
+autenticación y usa recursos estáticos locales, sin telemetría ni fuentes remotas.
+No requiere `migrate`: Django no administra los datos de prospección con su ORM.
 
 Usa una sola instancia local de la aplicación con `data/prospecting.sqlite3`.
-El procesamiento es secuencial e interactivo: no continúa en segundo plano al cerrar
-la aplicación. El historial permite recuperar checkpoints, revisar resultados y
-exportar personas actualmente listas o, explícitamente, todos los resultados.
+El procesamiento es secuencial, en un hilo de ese proceso: continúa al cerrar la
+pestaña mientras el servidor siga abierto. Al regresar, la pantalla recupera el
+progreso y los resultados guardados. Detener o reiniciar el servidor interrumpe
+la investigación; reanudar requiere autorización nueva y conserva los checkpoints
+y el consumo. No hay cola persistente ni reanudación automática. El último motivo
+global mostrado por la ejecución vive en memoria; los motivos por empresa permanecen
+en SQLite. El historial permite revisar resultados y exportar personas actualmente
+listas o, explícitamente, todos los resultados.
 
 La configuración local de acceso se guarda en `data/provider-access.json`, ignorado
 por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reutilizables.
@@ -101,8 +107,9 @@ Veryfi. Sin etiquetas comerciales documentadas no se presenta precisión comerci
 
 ```console
 uv lock --check
+uv run --locked python manage.py check
 uv run --locked pytest
-git check-ignore -v .env .env.local .venv/pyvenv.cfg data/prospecting.sqlite3 .streamlit/secrets.toml __pycache__/app.pyc .pytest_cache/v/cache/nodeids local.sqlite3-wal
+git check-ignore -v .env .env.local .venv/pyvenv.cfg data/prospecting.sqlite3 __pycache__/manage.pyc .pytest_cache/v/cache/nodeids local.sqlite3-wal
 ```
 
 Las pruebas bloquean conexiones externas y usan datos explícitamente sintéticos
@@ -115,8 +122,10 @@ límites de contactos y respuestas pendientes de Hunter sin repetir consumo. Rec
 campañas completas y comprueban que reanudar o repetir un clic no repite llamadas, que
 las interrupciones conservan el gasto y que el presupuesto y el tiempo acumulado
 detienen la ejecución conservando lo guardado. También
-ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se importen
-sin cargar Streamlit. También comprueban la dirección de las importaciones entre
+ejecutan las vistas con el cliente de pruebas de Django y comprueban CSRF, escape
+de contenido, exportaciones, ejecución en hilos y bloqueo de acciones concurrentes.
+Verifican que los módulos de datos se importen sin cargar Django. También comprueban
+la dirección de las importaciones entre
 módulos, que la estructura documentada coincide con el paquete y que los
 identificadores guardados en SQLite no cambien. Estas pruebas no demuestran acceso a proveedores ni
 validación comercial. Las comprobaciones reales están en
@@ -128,7 +137,8 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 
 ## Estructura y responsabilidades
 
-- `app.py`: configuración, ejecución, consulta, revisión y exportación con Streamlit.
+- `manage.py`: comandos y arranque del servicio Django local.
+- `webapp/`: formularios, vistas, ejecución en el proceso, plantillas, estilos y CSV seguro; usa las APIs públicas del pipeline.
 - `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
@@ -153,14 +163,14 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
 - `docs/t10-evaluation.md`: protocolo, formatos y reproducción de evaluaciones independientes.
-- `.streamlit/config.toml`: acceso local, telemetría y exportación integrada de tablas desactivadas.
+- `PRODUCT.md` y `DESIGN.md`: contexto de ventas y decisiones visuales de la interfaz.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
 - `docs/IDEA.md` y `AGENTS.md`: requisitos y reglas de desarrollo.
 
 La aplicación no carga `.env` automáticamente; `.env.example` solo enumera las variables.
 Para ejecutar proveedores, define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y, si está
-habilitado, `HUNTER_API_KEY` en el entorno del proceso antes de iniciar Streamlit.
+habilitado, `HUNTER_API_KEY` en el entorno del proceso antes de iniciar Django.
 `data/`, bases SQLite, credenciales y cachés quedan fuera de Git. Importar los
 módulos o iniciar la pantalla no crea una base. Preparar una campaña desde la
 interfaz crea la base si falta; abrir `Database` sobre una ruta nueva también la crea.
