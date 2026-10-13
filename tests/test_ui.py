@@ -19,6 +19,7 @@ from prospecting.models import (
 )
 from prospecting.pipeline import ProviderAccess, read_campaign
 from prospecting.pipeline import campaign as bridge
+from prospecting.sources import validate_public_url
 
 
 def widget(elements, label):
@@ -310,6 +311,45 @@ def test_budget_reservation_is_not_added_again_to_pending(ui_results):
     assert not at.exception
     assert next(metric.value for metric in at.metric if metric.label == "Reservado · campaña") == "USD 0.020000"
     assert any("Pendiente de conciliación: USD 0.020000" in element.value for element in at.caption)
+
+
+def test_hostile_external_text_is_rendered_only_as_plain_text(ui_paths, make_campaign, make_company, make_assessment):
+    hostile = "<script>alert(1)</script> **negrita** [enlace](javascript:alert(1))"
+    now, contact_id = utc_now(), uuid4()
+    campaign = make_campaign(status="completed")
+    company, sources = make_company(name=f"Empresa sintética {hostile}", domain="synthetic-hostile.example",
+                                    operating_countries=["CO"], segments=["fintech_software"], identity_status="confirmed")
+    page = Evidence(company_id=company.id, retrieved_at=now, kind="observed", source_type="primary",
+                    url="https://synthetic-hostile.example/equipo", claim=f"Afirmación sintética {hostile}", excerpt=hostile)
+    private = Evidence(company_id=company.id, retrieved_at=now, kind="observed", source_type="primary",
+                       url="http://127.0.0.1/panel", claim="Fuente sintética con destino privado.")
+    person = Evidence(company_id=company.id, contact_id=contact_id, retrieved_at=now, kind="observed",
+                      source_type="primary", url="https://synthetic-hostile.example/equipo",
+                      claim=f"Persona sintética {hostile}", excerpt=hostile)
+    contact = Contact(id=contact_id, company_id=company.id, name=f"Persona {hostile}", title=f"Cargo {hostile}",
+                      provenance={"name": [person.id], "title": [person.id]},
+                      channels=[Channel(contact_id=contact_id, type="other", value=f"Canal {hostile}",
+                                        evidence_ids=[person.id], retrieved_at=now)])
+    assessment = make_assessment(campaign.id, company.id, priority="low", explanation=f"Explicación sintética {hostile}")
+    with Database(ui_paths.db) as db:
+        db.save_campaign(campaign)
+        db.save_company(company, evidence=[*sources, page, private])
+        item = db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed",
+                                        stop_reason=f"motivo_sintetico {hostile}"))
+        db.save_assessment(assessment)
+        db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+        db.save_contact(contact, evidence=[person])
+    at = open_company(screen(), company)
+    shown = [element.value for element in at.text]
+    for expected in (company.name, page.claim, f"Explicación sintética {hostile}", f"Persona {hostile} · Cargo {hostile}",
+                     f"Otro canal: Canal {hostile}", f"Motivo registrado: motivo_sintetico {hostile}"):
+        assert any(expected in value for value in shown)
+    rendered = [element.value for kind in (at.markdown, at.caption, at.info, at.warning, at.error,
+                                           at.title, at.header, at.subheader) for element in kind]
+    assert not any("<script>" in value or "javascript:" in value or "**negrita**" in value for value in rendered)
+    links = [node.proto.url for node in at.get("link_button")]
+    assert "https://synthetic-hostile.example/equipo" in links and "http://127.0.0.1/panel" not in links
+    assert all(validate_public_url(url) == url for url in links)
 
 
 def test_results_prioritize_fit_and_stop_reasons_explain_the_next_action(ui_results):
