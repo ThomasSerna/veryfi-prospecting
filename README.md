@@ -81,10 +81,12 @@ ejecutan la pantalla con `AppTest` y verifican que los módulos de datos se impo
 sin cargar Streamlit. También comprueban la dirección de las importaciones entre
 módulos, que la estructura documentada coincide con el paquete y que los
 identificadores guardados en SQLite no cambien. Estas pruebas no demuestran acceso a proveedores ni
-validación comercial. Las comprobaciones reales realizadas desde Python están en
-[el registro de proveedores](docs/provider-check.md); el lote de campaña registrado
-no produjo ninguna persona lista. La interfaz y sus exportaciones se verifican con
-datos sintéticos. Los archivos de ejemplo y `uv.lock` sí se versionan.
+validación comercial. Las comprobaciones reales están en
+[el registro de proveedores](docs/provider-check.md) y la evaluación de los lotes
+ejecutados desde la interfaz, en [la evaluación](docs/evaluation.md); ninguno produjo
+una persona lista. Si una política de Windows bloquea `pytest.exe`,
+`uv run --locked python -m pytest` ejecuta la misma suite. Los archivos de ejemplo y
+`uv.lock` sí se versionan.
 
 ## Estructura y responsabilidades
 
@@ -110,6 +112,7 @@ datos sintéticos. Los archivos de ejemplo y `uv.lock` sí se versionan.
 - `docs/contacts.md`: invocación desde Python, acceso a Hunter, personas, canales y límites de búsqueda.
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
+- `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
 - `.streamlit/config.toml`: acceso local, telemetría y exportación integrada de tablas desactivadas.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
