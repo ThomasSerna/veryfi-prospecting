@@ -59,6 +59,26 @@ por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reut
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
+## Evaluación offline
+
+Desde la raíz, evalúa un manifiesto local con instantáneas y etiquetas versionadas:
+
+```console
+uv run --locked python evaluate_qualification.py data/evaluation/dataset-v1/manifest.json --output data/evaluation/reports/run-v1
+```
+
+El comando comprueba hashes, referencias y separación entre desarrollo y evaluación,
+y genera resultados JSON y un informe Markdown. No necesita claves, no llama a
+proveedores y no modifica SQLite. Cada salida requiere un directorio nuevo: conserva
+los informes anteriores. El [protocolo de evaluación](docs/t10-evaluation.md) describe
+los formatos de entrada, las fichas de revisión sin predicción, los denominadores
+y la comparación de versiones.
+
+Las instantáneas, las revisiones originales y los resultados por caso permanecen en
+`data/`, fuera de Git. Las métricas distinguen datos sintéticos, resultados reales
+guardados e inferencias nuevas, y separan la revisión académica de la atribuida a
+Veryfi. Sin etiquetas comerciales documentadas no se presenta precisión comercial.
+
 ## Verificación
 
 ```console
@@ -91,6 +111,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 ## Estructura y responsabilidades
 
 - `app.py`: configuración, ejecución, consulta, revisión y exportación con Streamlit.
+- `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
@@ -113,6 +134,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
+- `docs/t10-evaluation.md`: protocolo, formatos y reproducción de evaluaciones independientes.
 - `.streamlit/config.toml`: acceso local, telemetría y exportación integrada de tablas desactivadas.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
