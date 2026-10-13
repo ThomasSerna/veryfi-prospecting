@@ -156,9 +156,10 @@ SQLite. La exportación integrada de tablas de Streamlit está desactivada para
 mantener este camino seguro; no se exporta HTML arbitrario.
 
 Las pruebas de la interfaz, revisión, confirmación y CSV usan proveedores simulados
-y SQLite temporal, sin red. No demuestran que el nuevo flujo visual funcione con
-cuentas reales. La campaña real documentada en [Comprobación de proveedores](provider-check.md)
-se invocó desde Python y no produjo ninguna persona lista.
+y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde la interfaz
+y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
+Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
+canales solo se han verificado con datos sintéticos.
 
 ## Verificación del 12 de octubre de 2026
 

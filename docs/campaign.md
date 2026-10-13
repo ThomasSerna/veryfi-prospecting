@@ -151,5 +151,6 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
 - El [registro de proveedores](provider-check.md) documenta una campaña real del
   2026-10-12, incluida ampliación con `include_domains`, que terminó `completed` desde
   Python. Sus resultados comerciales fueron `insufficient_evidence` y
-  `qualified_no_contact`: ninguna persona quedó lista. La interfaz y su puente se
-  verifican con datos sintéticos, sin una nueva campaña real.
+  `qualified_no_contact`: ninguna persona quedó lista. Después, la T09 ejecutó dos lotes
+  reales de 8 empresas desde la interfaz, que terminaron `partial` sin ninguna persona
+  lista ([Evaluación de la T09](evaluation.md)).
