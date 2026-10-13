@@ -162,3 +162,55 @@ campaña. La interfaz muestra el cupo, el margen y lo pendiente de conciliar.
   - Preparar una campaña mientras otra está activa abre la activa sin avisar.
 - **Uso fuera del ledger**: el uso de Anthropic registrado fuera de esta base indica que no todas las
   ejecuciones del equipo pasaron por el mismo control de presupuesto.
+
+## T10: preparación de la evaluación independiente
+
+Estado del 13 de octubre de 2026 (America/Bogota). El
+[protocolo de evaluación](t10-evaluation.md) separa desarrollo de evaluación
+independiente, revisión ciega de retroalimentación desde la UI, trazabilidad
+semántica de referencias válidas y resultados reales de simulados. Conserva
+`rubric_v1`, `haiku_assessment_v3` y el catálogo pendiente de validación.
+
+Los casos T05/T09 sirven para desarrollo y regresión. No se presentan como una
+muestra independiente ni como aceptación de Veryfi. El objetivo independiente
+es 20 empresas nuevas, cinco por combinación CO/MX y FinTech/CPG, sujeto a
+evidencia disponible, revisión y autorización de gasto cuando sea necesaria.
+
+La base local examinada contiene una campaña CO/FinTech de dos empresas; no
+están aquí los dos lotes ni los comprobantes descritos en T09. Sus artefactos e
+identificadores originales deben localizarse antes de reproducirlos. Esta
+observación no reemplaza ni invalida los conteos históricos del informe.
+
+No hay nuevas etiquetas comerciales de Veryfi ni un resultado independiente
+real de T10 que permita calcular precisión o falsos positivos. Catálogo,
+exclusiones, ejemplos etiquetados y disponibilidad de revisión siguen
+pendientes. Tampoco se ha ajustado la rúbrica ni el prompt: cualquier ajuste
+posterior debe apoyarse en evidencia y conservar sus versiones y aprobación.
+
+Las pruebas sin red del evaluador verifican el mecanismo con datos sintéticos;
+no demuestran calidad comercial, nuevas llamadas reales ni cumplimiento de
+las metas orientativas de IDEA §18.2. El cierre comercial de T10 sigue pendiente
+de la revisión y del conjunto independiente.
+
+### Verificación técnica de la implementación
+
+```console
+uv lock --check --offline
+uv run --locked --offline python -m pytest
+```
+
+Resultado: **761 pruebas en verde**, incluidas 48 nuevas pruebas de captura,
+evaluación e integración. La suite completa terminó en 79,98 s; la comprobación
+del CLI volvió a pasar después de fijar UTF-8 para la salida de consola en Windows.
+`git diff --check` no encontró problemas. No se añadieron dependencias ni se cambió
+el esquema SQLite, la rúbrica o el prompt.
+
+Los transportes, empresas, respuestas y revisores de las pruebas son sintéticos.
+La integración recorre captura y lectura offline de una respuesta válida, una
+reutilización, una salida truncada, timeout, ausencia de autorización y fallos de
+almacenamiento antes y después del envío. Comprueba que evaluar no añade llamadas
+ni modifica el ledger y que una anotación omitida no se convierte en `null`
+revisado. Las pruebas de archivos incoherentes rechazan identificadores, tokens,
+costos y resultados que no corresponden entre sí, aunque sus hashes se hayan
+recalculado. Ninguno de estos resultados demuestra una nueva inferencia real ni
+revisión efectiva de Veryfi.

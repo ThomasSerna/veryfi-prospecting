@@ -1,7 +1,7 @@
 # Calificación con Haiku
 
 `qualify_company(db, budget, ClaudeClient(budget), campaign_id, company_id,
-account_ref=..., funding_source=..., authorization=...)` califica una empresa de la
+account_ref=..., funding_source=..., authorization=..., evaluation_dir=None)` califica una empresa de la
 campaña. Haiku propone y Python decide:
 
 - **Sin llamada a Haiku:** una empresa excluida recibe `excluded`. Una identidad no
@@ -63,3 +63,32 @@ en `prospecting/qualification.py`.
   una validación inválidos, o un error HTTP, de red o de timeout dejan la evaluación
   pendiente (`assessment_pending:<motivo>`) con el mensaje literal. Se conserva la
   evidencia y no se reintenta ni se cambia de modelo.
+
+## Captura optativa para evaluación
+
+El argumento `evaluation_dir=Path("data/evaluation/traces")` conserva una traza
+por invocación en un subdirectorio nuevo con identificador UUID. Sin ese argumento
+el flujo sigue funcionando sin crear artefactos de evaluación. La captura no
+autoriza consumo ni cambia la solicitud, la reserva o las reglas de reutilización.
+
+`input.json` guarda campaña, empresa, evidencia de empresa, ids seleccionados,
+payload exacto, versiones, commit y hashes del código. Después de reservar se
+guarda `request.json`; `response.json` conserva el texto original y el motivo de
+terminación, incluso si no supera la validación. `result.json` contiene el informe,
+la evaluación si existe, el consumo y la duración medida de la invocación.
+`manifest.json` registra hashes e integridad de la captura. No se copian claves,
+autorizaciones ni registros de contactos.
+
+Reutilizar una evaluación o decidir sin Haiku produce una instantánea sin respuesta
+cruda, duración de inferencia ni consumo inventados. Esos artefactos sirven para
+auditar el resultado guardado; no reconstruyen una llamada histórica.
+
+Si falla la captura antes del envío, no se consulta al proveedor. Una reserva ya
+creada se conserva sin envío para conciliación. Si falla después de la llamada,
+el gasto y los checkpoints se conservan y el informe y la ficha registran la
+traza incompleta. No se repite una llamada para reparar archivos faltantes ni
+se descarta una evaluación válida por ese fallo.
+
+El [protocolo de evaluación](t10-evaluation.md) describe la revisión atribuida,
+las particiones independientes y la lectura offline de estos artefactos. Una
+captura comprobada con transporte sintético no demuestra una ejecución real.
