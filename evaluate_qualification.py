@@ -26,7 +26,7 @@ from prospecting.models import (
     Priority, Usage, UtcDatetime,
 )
 from prospecting.qualification import (
-    classify, identity_confirmed, material_contradiction, parse_output, primary_support,
+    classify, compute_score, identity_confirmed, material_contradiction, parse_output, primary_support,
     QualificationError, allowed_roles, rubric_for, validate_output,
     SEARCH_RESULT_CLAIM,
 )
@@ -355,6 +355,23 @@ def validate_snapshot(snapshot, case, label):
                 or not set(assessment.target_roles) <= set(allowed_roles(campaign))
                 or not {ref for criterion in assessment.criteria.values() for ref in criterion.evidence_ids} <= ids):
             raise ValueError("La evaluación referencia otra entidad/configuración/evidencia.")
+        rubric = rubric_for(campaign)
+        fit, coverage = compute_score(assessment.criteria, rubric)
+        if (fit is None) != (assessment.fit_score is None) or (fit is not None and
+                not math.isclose(fit, assessment.fit_score, rel_tol=1e-9, abs_tol=1e-9)) or not math.isclose(coverage, assessment.coverage, abs_tol=1e-9):
+            raise ValueError("La puntuación/cobertura no corresponde a los criterios congelados.")
+        selected = facts if snapshot.selected_evidence_ids is None else [fact for fact in facts if fact.id in snapshot.selected_evidence_ids]
+        cited = {ref for criterion in assessment.criteria.values() for ref in criterion.evidence_ids}
+        if snapshot.selected_evidence_ids is not None and not cited <= set(snapshot.selected_evidence_ids):
+            raise ValueError("La evaluación cita evidencia que no se envió.")
+        contradiction = any(fact.contradiction_ids for fact in selected if fact.id in cited)
+        # Assessment histórico no conserva las contradicciones propuestas por Haiku.
+        possible = {classify(assessment.criteria, rubric, excluded=assessment.priority == "excluded",
+                            identity_confirmed=identity_confirmed(company), contradiction=flag,
+                            primary_support=primary_support(assessment.criteria, selected)).priority
+                    for flag in ({True} if contradiction else {False, True})}
+        if assessment.priority not in possible:
+            raise ValueError("La prioridad no corresponde a los criterios/condiciones disponibles.")
     if label is None:
         return
     if (label.case_id != case.case_id or label.snapshot_sha256 != case.artifact.sha256
@@ -548,6 +565,8 @@ def evaluate_manifest(path, candidate=None):
                      "label_sha256": None if case.label is None else case.label.sha256,
                      "label_content_sha256": None if label is None else digest(label.model_dump(mode="json", exclude={"snapshot_sha256", "assessment_id", "label_id", "version", "previous_sha256", "audits"})),
                      "artifact_sha256": case.artifact.sha256, "priority": priority, "error_reason": error,
+                     "classification_reproducibility": ("not_assessed" if assessment is None else
+                                                         "exact_replay" if mode == "replay" else "partial_conditions"),
                      "expected_priority": expected, "criteria_comparison": comparisons,
                      "audits": [] if label is None else [item.model_dump(mode="json") for item in label.audits],
                      "products_agree": None if label is None or label.products_status != "resolved" or assessment is None else set(label.products) == set(assessment.products),

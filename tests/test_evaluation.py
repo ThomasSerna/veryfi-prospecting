@@ -449,3 +449,27 @@ def test_unknown_archived_context_is_audit_only_without_rebuilding_prompt(tmp_pa
     assert row["mode"] == "audit_only" and row["context_reproducibility"] == "unverified_format"
     assert row["input_sha256"] is None and row["evidence_scope"] == "available_only"
     assert row["priority"] == "high"
+
+
+@pytest.mark.parametrize("change,reason", [
+    ({"fit_score": 99.0}, "puntuación/cobertura"),
+    ({"coverage": 0.6}, "puntuación/cobertura"),
+    ({"priority": "high"}, "prioridad"),
+])
+def test_historical_snapshot_rejects_incoherent_score_coverage_and_priority(tmp_path, config, change, reason):
+    path = write_synthetic_dataset(tmp_path, config, [
+        {"case_id": "historical_low", "values": [0, 0.5, 1, 1, 1], "acceptance": "rejected"}])
+    assert evaluation.evaluate_manifest(path)["summaries"][0]["counts"]["TN"] == 1
+    revise_case(path, 0, "artifact", lambda data: data["assessment"].update(change))
+    with pytest.raises(ValueError, match=reason):
+        evaluation.evaluate_manifest(path)
+
+
+def test_historical_unknown_contradictions_stay_partial_and_block_counterfactual(tmp_path, config):
+    path = write_synthetic_dataset(tmp_path, config, [{"case_id": "historical_pending"}])
+    revise_case(path, 0, "artifact", lambda data: data["assessment"].update(priority="insufficient_evidence"))
+    row = evaluation.evaluate_manifest(path)["cases"][0]
+    assert row["priority"] == "insufficient_evidence" and row["expected_priority"] is None
+    assert row["classification_reproducibility"] == "partial_conditions"
+    with pytest.raises(ValueError, match="condiciones originales"):
+        evaluation.evaluate_manifest(path, {"version": "candidate_v2", "rubric": config.rubrics["rubric_v1"]})
