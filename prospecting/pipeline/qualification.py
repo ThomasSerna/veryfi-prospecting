@@ -1,7 +1,12 @@
 """Calificación con Haiku: Python valida, puntúa y decide la prioridad."""
 
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import time
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import StrictBool
 
@@ -38,6 +43,42 @@ class QualificationReport(Contract):
 _FINAL_STATUS = {Priority.LOW: BusinessStatus.LOW_FIT}
 
 
+class _EvaluationTrace:
+    """Artefactos locales exclusivos; nunca sustituye un checkpoint ni modifica la solicitud."""
+
+    def __init__(self, directory: Path):
+        directory = Path(directory).resolve()
+        root = Path(__file__).resolve().parents[2]
+        if (directory.is_relative_to(root) and not directory.is_relative_to(root / "data")
+                or not any(parent.name.lower() == "data" for parent in (directory, *directory.parents))):
+            raise ValueError("Las trazas deben guardarse bajo data/.")
+        self.id = uuid4()
+        self.path = directory / str(self.id)
+        self.path.mkdir(parents=True, exist_ok=False)
+        self.hashes = {}
+
+    def write(self, name: str, value: dict) -> None:
+        content = (json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+        with (self.path / name).open("xb") as target:
+            target.write(content)
+        self.hashes[name] = hashlib.sha256(content).hexdigest()
+
+
+def _code_snapshot() -> tuple[str | None, dict[str, str]]:
+    root = Path(__file__).resolve().parents[2]
+    paths = ("prospecting/qualification.py", "prospecting/haiku.py", "prospecting/models.py",
+             "prospecting/pipeline/qualification.py", "prospecting/pipeline/calls.py",
+             "prospecting/providers/claude.py", "prospecting/budget.py")
+    hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in paths}
+    try:
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True,
+                                text=True, timeout=2, check=True)
+        commit = result.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        commit = None
+    return commit, hashes
+
+
 def _expanded_evidence(assessment: Assessment, evidence) -> set[UUID]:
     """Evidencia de empresa posterior a una evaluación insuficiente: la ampliación de §7 permite recalificar."""
     if assessment.priority != Priority.INSUFFICIENT_EVIDENCE:
@@ -63,15 +104,18 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                     company_id: UUID, *, account_ref: str,
                     funding_source: Literal["free_credit", "prepaid", "new_outlay"],
                     authorization: SpendingAuthorization | None,
-                    deadline: float | None = None) -> QualificationReport:
+                    deadline: float | None = None,
+                    evaluation_dir: Path | None = None) -> QualificationReport:
     """Haiku evalúa criterios con evidencia guardada; Python valida, puntúa y decide la prioridad.
 
     Sin identidad confirmada o con exclusión no se consulta a Haiku. Un fallo deja la
     evaluación pendiente con su motivo literal, sin reintentar ni cambiar de modelo (§12.2).
     `insufficient_evidence` no se fija como resultado comercial: queda una ampliación (§7).
     Solo una evaluación insuficiente se repite, y solo si hay evidencia de empresa posterior
-    que entre en la solicitud; las demás se reutilizan.
+    que entre en la solicitud; las demás se reutilizan. `evaluation_dir` conserva una
+    traza prospectiva bajo data/, sin reconstruir respuestas ni latencias anteriores.
     """
+    started = time.monotonic() if evaluation_dir is not None else None
     campaign = db.get_campaign(campaign_id)
     run_item = db.get_run_item(campaign_id, company_id)
     company = db.get_company(company_id)
@@ -84,11 +128,85 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     modeled = [item for item in previous if item.prompt_version == PROMPT_VERSION]
     evidence = db.list_evidence(company_id)
     fresh = set() if not modeled else _expanded_evidence(modeled[-1], evidence)
+    trace = None
+    capture_errors = []
+
+    def capture_input(payload=None, selected=()):
+        nonlocal trace
+        if evaluation_dir is None:
+            return True
+        try:
+            trace = _EvaluationTrace(evaluation_dir)
+            commit, hashes = _code_snapshot()
+            trace.write("input.json", {
+                "schema_version": "evaluation_trace_v1", "trace_id": str(trace.id),
+                "origin": "new_real" if payload is not None else "saved_real",
+                "captured_at": utc_now().isoformat(), "campaign": campaign.model_dump(mode="json"),
+                "company": company.model_dump(mode="json"),
+                "evidence": [item.model_dump(mode="json") for item in evidence if item.contact_id is None],
+                "selected_evidence_ids": [str(item.id) for item in selected], "request_payload": payload,
+                "prompt_version": PROMPT_VERSION if payload is not None else None,
+                "requested_model_id": None if payload is None else payload["model"],
+                "rubric_version": campaign.rubric_version,
+                "catalog_version": campaign.config_snapshot.catalog.version,
+                "commit": commit, "code_hashes": hashes,
+            })
+            return True
+        except (OSError, ValueError) as error:
+            capture_errors.append(f"No se pudo guardar la entrada de evaluación ({type(error).__name__}).")
+            return False
+
+    def capture(name, value):
+        if trace is None:
+            return True
+        try:
+            trace.write(name, value)
+            return True
+        except (OSError, ValueError) as error:
+            capture_errors.append(f"No se pudo guardar {name} ({type(error).__name__}).")
+            return False
+
+    def with_trace_error(report):
+        if not capture_errors:
+            return report
+        message = "Traza de evaluación incompleta: " + " ".join(capture_errors)
+        previous_message = (report.error_message or "").split("Traza de evaluación incompleta:", 1)[0].strip()
+        if previous_message and previous_message not in message:
+            message = previous_message + " " + message
+        updated = db.get_run_item(campaign_id, company_id)
+        if updated.error_message != message:
+            db.save_run_item(updated.model_copy(update={
+                "error_message": message, "error_stage": RunStage.ASSESSED, "updated_at": utc_now(),
+            }))
+        return report.model_copy(update={"error_message": message})
+
+    def finish(report):
+        if evaluation_dir is None:
+            return report
+        if trace is None and not capture_errors:
+            capture_input()
+        report = with_trace_error(report)
+        if trace is not None:
+            assessment = None if report.assessment_id is None else db.get_assessment(report.assessment_id)
+            usage = None if report.request_id is None else budget.db.get_usage(report.request_id)
+            capture("result.json", {
+                "assessment": None if assessment is None else assessment.model_dump(mode="json"),
+                "report": report.model_dump(mode="json"),
+                "usage": None if usage is None else usage.model_dump(mode="json"),
+                "called_model": report.called_model,
+                "duration_seconds": time.monotonic() - started if report.called_model else None,
+            })
+            capture("manifest.json", {
+                "schema_version": "evaluation_trace_v1", "trace_id": str(trace.id),
+                "artifacts": dict(trace.hashes), "complete": not capture_errors,
+                "capture_errors": list(capture_errors),
+            })
+        return with_trace_error(report) if capture_errors else report
 
     def reuse():
-        return QualificationReport(**base, status="already_assessed", assessment_id=modeled[-1].id,
+        return finish(QualificationReport(**base, status="already_assessed", assessment_id=modeled[-1].id,
                                    priority=modeled[-1].priority, fit_score=modeled[-1].fit_score,
-                                   coverage=modeled[-1].coverage)
+                                   coverage=modeled[-1].coverage))
 
     if modeled and not fresh:
         return reuse()
@@ -98,19 +216,19 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
             "stop_reason": f"assessment_pending:{reason}", "error_message": message,
             "error_stage": RunStage.ASSESSED, "updated_at": utc_now(),
         }))
-        return QualificationReport(**base, status="pending", reason=reason, error_message=message, **extra)
+        return finish(QualificationReport(**base, status="pending", reason=reason, error_message=message, **extra))
 
     def without_model(priority, reason, explanation, stop_reason):
         if latest is not None and latest.model_id is None and latest.priority == priority:
-            return QualificationReport(**base, status="already_assessed", assessment_id=latest.id,
-                                       priority=priority, coverage=latest.coverage, reason=reason)
+            return finish(QualificationReport(**base, status="already_assessed", assessment_id=latest.id,
+                                       priority=priority, coverage=latest.coverage, reason=reason))
         assessment = _store_assessment(db, run_item, Assessment(
             **base, criteria=unknown_criteria(explanation), fit_score=None, coverage=0.0,
             priority=priority, rubric_version=campaign.rubric_version, explanation=explanation,
             revision_of=None if latest is None else latest.id,
         ), stop_reason=stop_reason)
-        return QualificationReport(**base, status="assessed", assessment_id=assessment.id,
-                                   priority=priority, coverage=0.0, reason=reason)
+        return finish(QualificationReport(**base, status="assessed", assessment_id=assessment.id,
+                                   priority=priority, coverage=0.0, reason=reason))
 
     if run_item.business_status == BusinessStatus.EXCLUDED:
         return without_model(Priority.EXCLUDED, "confirmed_exclusion",
@@ -136,9 +254,24 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     remaining = seconds_left(deadline)
     if remaining is not None and remaining <= 0:
         return pending("time_limit", "Se agotó el tiempo de la etapa antes de llamar.")
+    if not capture_input(payload, selected):
+        return pending("trace_capture_failed", capture_errors[-1])
+    if evaluation_dir is not None:
+        remaining = seconds_left(deadline)
+        if remaining is not None and remaining <= 0:
+            return pending("time_limit", "Se agotó el tiempo de la etapa durante la captura, antes de reservar.")
     try:
         usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), payload, account_ref=account_ref,
                                funding_source=funding_source, authorization=authorization, **base)
+        if not capture("request.json", {"request_id": str(usage.request_id),
+                                        "request_fingerprint": usage.request_fingerprint}):
+            return pending("trace_capture_failed", capture_errors[-1] +
+                           " La reserva se conserva sin envío para conciliación.", request_id=usage.request_id)
+        if evaluation_dir is not None:
+            remaining = seconds_left(deadline)
+            if remaining is not None and remaining <= 0:
+                return pending("time_limit", "Se agotó el tiempo de la etapa durante la captura; "
+                               "la reserva se conserva sin envío para conciliación.", request_id=usage.request_id)
         call = claude.create(usage.request_id, payload, account_ref=account_ref,
                              authorization=authorization, remaining_seconds=remaining)
     except BudgetError as error:
@@ -149,6 +282,7 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                        called_model=was_sent(budget, error))
     spent = {"called_model": True, "request_id": call.request_id, "tokens": call.tokens,
              "estimated_cost_usd": call.estimated_cost_usd}
+    capture("response.json", call.model_dump(mode="json"))
     try:
         output = parse_output(call.text, call.stop_reason)
         criteria = validate_output(output, selected, campaign)
@@ -168,6 +302,6 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     ), stop_reason={
         Priority.LOW: "low_fit", Priority.INSUFFICIENT_EVIDENCE: f"insufficient_evidence:{result.reason}",
     }.get(result.priority))
-    return QualificationReport(**base, status="assessed", assessment_id=assessment.id,
+    return finish(QualificationReport(**base, status="assessed", assessment_id=assessment.id,
                                priority=result.priority, fit_score=result.fit_score,
-                               coverage=result.coverage, reason=result.reason, **spent)
+                               coverage=result.coverage, reason=result.reason, **spent))
