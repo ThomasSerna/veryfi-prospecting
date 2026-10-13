@@ -1,0 +1,28 @@
+{% extends 'webapp/base.html' %}
+{% load prospecting_ui %}
+{% block title %}Nueva campaña · Veryfi Prospecting{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><span>Nueva campaña</span>{% endblock %}
+{% block content %}
+<header class="page-heading"><div><h1>¿Dónde está tu próxima oportunidad?</h1><p>Define el mercado de esta campaña. Podrás revisar los topes antes de empezar a investigar.</p></div></header>
+{% if is_executing or execution.is_executing %}<div class="notice notice-info"><strong>Hay una investigación en curso.</strong><p>Espera a que termine para preparar otra campaña.</p></div>{% endif %}
+<div class="preparation-layout">
+  <form method="post" class="surface preparation-form" data-idle-form>{% csrf_token %}{% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    <fieldset {% if is_executing or execution.is_executing %}disabled{% endif %}>
+      <legend class="section-title">El mercado que quieres explorar</legend>
+      <div class="form-grid">{% include 'webapp/_field.html' with field=form.countries %}{% include 'webapp/_field.html' with field=form.segments %}</div>
+      <div class="form-divider"></div>
+      <h2>Afina la búsqueda</h2>
+      {% include 'webapp/_field.html' with field=form.keywords %}
+      {% include 'webapp/_field.html' with field=form.max_companies %}
+      <div class="form-actions"><button type="submit" class="button button-primary" data-idle-only>Preparar campaña</button><a href="{% url 'webapp:campaigns' %}" class="text-link">Volver a campañas</a></div>
+    </fieldset>
+  </form>
+  <aside class="preparation-aside" aria-label="Qué pasa después">
+    <h2>Primero preparas.<br>Después decides.</h2><p>Guardar estos criterios no inicia la investigación ni consume tu cupo.</p>
+    <dl class="budget-limits"><div><dt>Tope por campaña</dt><dd>{{ config.defaults.budget.campaign_usd|money }}</dd></div><div><dt>Tope por empresa</dt><dd>{{ config.defaults.budget.company_usd|money }}</dd></div></dl>
+    <p>En la siguiente pantalla podrás comprobar el presupuesto y aprobar cada operación con sus límites.</p>
+    <div class="aside-note"><strong>Todo se conserva</strong><p>Los criterios, la evidencia y el consumo quedan guardados para retomar y revisar la campaña.</p></div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% load static prospecting_ui tz %}
+{% localtime off %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Veryfi Prospecting{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'webapp/app.css' %}">
+  <script src="{% static 'webapp/app.js' %}" defer></script>
+</head>
+<body data-running="{% if is_executing or execution.is_executing %}true{% else %}false{% endif %}" {% if campaign %}data-status-url="{% url 'webapp:status' campaign.id %}"{% elif active_campaign %}data-status-url="{% url 'webapp:status' active_campaign.id %}"{% elif execution.campaign_id and execution.campaign_id != 'None' %}data-status-url="{% url 'webapp:status' execution.campaign_id %}"{% endif %}>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="navigation" aria-label="Navegación principal">
+      <a href="{% url 'webapp:campaigns' %}" class="brand" aria-label="Veryfi Prospecting, inicio">
+        <img src="{% static 'webapp/veryfi-logo.svg' %}" alt="Veryfi" width="112" height="42">
+        <span>Prospecting</span>
+      </a>
+      <a href="{% url 'webapp:new_campaign' %}" class="button button-primary sidebar-create" data-idle-only {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>
+      <nav class="main-nav">
+        <a href="{% url 'webapp:campaigns' %}" {% if not campaign %}aria-current="page"{% endif %}>Campañas</a>
+      </nav>
+      {% if campaigns %}
+      <div class="sidebar-history">
+        <p class="sidebar-label">Recientes</p>
+        <nav aria-label="Campañas recientes">
+          {% for saved in campaigns|slice:":5" %}
+          <a href="{% url 'webapp:campaign' saved.id %}" class="history-link" {% if saved.id == campaign.id %}aria-current="page"{% endif %}>
+            <span>{{ saved.created_at|date:"d M · H:i" }} UTC</span>
+            <small>{{ saved.status|label }} · {{ saved.id|stringformat:"s"|slice:":8" }}</small>
+          </a>
+          {% endfor %}
+        </nav>
+      </div>
+      {% endif %}
+      <div class="sidebar-footer">
+        <span class="local-indicator">Instancia local</span>
+        <p>Una investigación a la vez.<br>Los resultados y el consumo se conservan.</p>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="navigation" aria-label="Abrir navegación"><span></span><span></span><span></span></button>
+        <div class="breadcrumb">{% block breadcrumb %}<span>Espacio de ventas</span>{% endblock %}</div>
+        <span class="topbar-note">Veryfi · Latinoamérica</span>
+      </header>
+      <main id="main" class="main-content" tabindex="-1">
+        {% if messages %}{% for message in messages %}<div class="notice {% if message.tags == 'error' %}notice-error{% else %}notice-success{% endif %}" role="status">{{ message }}</div>{% endfor %}{% endif %}
+        {% if access_error %}<div class="notice notice-error" role="alert"><strong>Revisa el acceso a proveedores.</strong><p>{{ access_error }}</p><p>Puedes consultar los resultados guardados. La ejecución necesita una configuración comprobada.</p></div>{% endif %}
+        {% if error_message %}<div class="notice notice-error" role="alert"><strong>No se pudo completar la operación.</strong><p>{{ error_message }}</p><p>Los datos guardados se conservan. Revisa el motivo antes de continuar.</p></div>{% endif %}
+        {% block content %}{% endblock %}
+      </main>
+      <footer class="workspace-footer">La aplicación investiga y prepara oportunidades. El equipo de ventas contacta fuera de ella.</footer>
+    </div>
+  </div>
+</body>
+</html>
+{% endlocaltime %}

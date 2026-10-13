@@ -1,0 +1,37 @@
+{% extends 'webapp/base.html' %}
+{% load prospecting_ui %}
+{% block title %}Campañas · Veryfi Prospecting{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div><h1>Tus campañas</h1><p>Del mercado que buscas a las oportunidades que vale la pena revisar.</p></div>
+  {% if campaigns %}<a class="button button-primary" href="{% url 'webapp:new_campaign' %}" data-idle-only {% if execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>{% endif %}
+</header>
+{% if execution.is_executing %}<div class="notice notice-info" role="status"><strong>Hay una investigación en curso.</strong><p>Puedes consultar sus avances. La revisión y las descargas estarán disponibles cuando termine.</p></div>{% endif %}
+{% if active_campaign %}
+<section class="active-campaign" aria-labelledby="active-title">
+  <div><span class="status status-{{ active_campaign.status }}">{{ active_campaign.status|label }}</span><h2 id="active-title">Retoma tu investigación</h2><p>{% for code in active_campaign.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %} · Hasta {{ active_campaign.max_companies }} empresas</p></div>
+  <a href="{% url 'webapp:campaign' active_campaign.id %}" class="button button-navy">Ver campaña</a>
+</section>
+{% endif %}
+{% if campaigns %}
+<section class="surface campaign-history" aria-labelledby="history-title">
+  <div class="section-heading"><h2 id="history-title">Historial de campañas</h2><p>Consulta resultados guardados, revisa oportunidades o continúa una investigación pendiente.</p></div>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Historial de campañas">
+    <table class="data-table"><thead><tr><th>Campaña</th><th>Mercado</th><th>Segmentos</th><th>Muestra</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody>
+      {% for saved in campaigns %}<tr>
+        <th scope="row"><a class="company-link" href="{% url 'webapp:campaign' saved.id %}">{{ saved.created_at|date:"d M Y" }}</a><span class="cell-note">{{ saved.created_at|date:"H:i" }} UTC · {{ saved.id|stringformat:"s"|slice:":8" }}</span></th>
+        <td>{% for code in saved.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td>{% for segment in saved.segments %}{{ segment|label }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td>Hasta {{ saved.max_companies }}</td><td><span class="status status-{{ saved.status }}">{{ saved.status|label }}</span></td>
+        <td><a href="{% url 'webapp:campaign' saved.id %}" class="table-action" aria-label="Abrir campaña del {{ saved.created_at|date:'d M Y' }}">Abrir</a></td>
+      </tr>{% endfor %}
+    </tbody></table>
+  </div>
+</section>
+{% else %}
+<section class="empty-onboarding" aria-labelledby="empty-title">
+  <div class="empty-intro"><h2 id="empty-title">La próxima oportunidad<br>empieza con una buena búsqueda.</h2><p>Elige un mercado. Veryfi Prospecting investiga empresas, explica su encaje y reúne contactos para que tu equipo decida.</p><a href="{% url 'webapp:new_campaign' %}" class="button button-primary">Preparar mi primera campaña</a><p class="quiet-note">Preparar y consultar no consume proveedores.</p></div>
+  <ol class="onboarding-steps"><li><strong>Define tu mercado</strong><p>Selecciona países, segmentos y cuántas empresas quieres investigar.</p></li><li><strong>Investiga con control</strong><p>Aprueba las operaciones y sus topes antes de consumir proveedores.</p></li><li><strong>Decide con evidencia</strong><p>Revisa el caso de uso, las personas y sus canales. Descarga los prospectos listos.</p></li></ol>
+</section>
+{% endif %}
+{% endblock %}

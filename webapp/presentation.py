@@ -28,6 +28,13 @@ LABELS = {
     "document_need": "Necesidad documental", "offer_match": "Encaje con Veryfi",
     "scale_potential": "Potencial de escala", "adoption_capacity": "Capacidad de adopción",
     "opportunity_timing": "Momento de la oportunidad",
+    "document_ocr_api": "OCR y API documental", "lens": "Lens", "antifraud": "Antifraude",
+    "validation_enrichment": "Validación y enriquecimiento",
+    "loyalty_whatsapp": "Soluciones de fidelización y WhatsApp",
+    "name": "Nombre", "title": "Cargo", "domain": "Dominio", "entity_name": "Entidad",
+    "entity_type": "Tipo de entidad", "operating_countries": "Países de operación", "segments": "Segmentos",
+    "size": "Tamaño", "current_employment": "Empleo actual", "relevant_function": "Función pertinente",
+    "geographic_scope": "Alcance geográfico",
 }
 READY = {"ready_preferred", "ready_alternative"}
 STOP_MESSAGES = {
@@ -141,7 +148,7 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
 
 
 def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None):
-    """Se ejecuta al descargar, en su propio hilo y con una conexión nueva, sin llamadas Streamlit."""
+    """Consulta al descargar con una conexión nueva, sin reutilizar una pantalla anterior."""
     current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path)
     if current.is_executing:
         raise ValueError("La campaña está ejecutándose; espera antes de exportar.")

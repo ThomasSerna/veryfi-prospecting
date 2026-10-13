@@ -1,71 +1,89 @@
-"""Verifica el arranque local sin claves, proveedores ni datos comerciales."""
+"""Verifica el arranque Django local sin claves, proveedores ni datos comerciales."""
 
+import os
 from pathlib import Path
 import socket
 import subprocess
 import sys
-import tomllib
 
+import django
 import pytest
-from streamlit.testing.v1 import AppTest
+from django.conf import settings
+from django.core.management import call_command, get_commands
+from django.core.management.base import CommandError
+from django.core.management.commands.runserver import Command as DjangoRunserver
+from django.test import Client, override_settings
+from django.urls import reverse
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webapp.settings")
+django.setup()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_initial_screen_without_external_network(monkeypatch, tmp_path):
     """La pantalla funciona y el bloqueo impide conexiones externas."""
-    original_connect = socket.socket.connect
-
-    def connect_locally(connection, address):
-        # asyncio necesita sockets internos de loopback en Windows.
-        if address[0] not in ("127.0.0.1", "::1"):
-            raise AssertionError("T00 debe ejecutarse sin conexiones externas.")
-        return original_connect(connection, address)
-
     def reject_connection(*args, **kwargs):
-        raise AssertionError("T00 debe ejecutarse sin conexiones externas.")
+        raise AssertionError("La interfaz debe ejecutarse sin conexiones externas.")
 
-    monkeypatch.setattr(socket.socket, "connect", connect_locally)
+    monkeypatch.setattr(socket.socket, "connect", reject_connection)
     monkeypatch.setattr(socket.socket, "connect_ex", reject_connection)
     monkeypatch.setattr(socket, "getaddrinfo", reject_connection)
+    for key in ("TAVILY_API_KEY", "ANTHROPIC_API_KEY", "HUNTER_API_KEY", "APOLLO_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
 
-    # Dirección sintética de documentación; se rechaza antes de abrir conexión.
     with socket.socket() as connection, pytest.raises(AssertionError):
         connection.connect(("203.0.113.1", 443))
 
-    import app as screen
-
-    monkeypatch.setattr(screen, "DB_PATH", tmp_path / "synthetic.sqlite3")
-    monkeypatch.setattr(screen, "ACCESS_PATH", tmp_path / "access.json")
-    monkeypatch.setattr(screen, "EXCLUSIONS_PATH", tmp_path / "exclusions.json")
-    app = AppTest.from_string("import app; app.main()").run()
-
-    assert not app.exception
-    assert app.title[0].value == "Veryfi Prospecting"
-    assert app.subheader[0].value == "Preparar una campaña"
-    assert not screen.DB_PATH.exists()
+    database_path = tmp_path / "synthetic.sqlite3"
+    with override_settings(PROSPECTING_DB_PATH=database_path, PROSPECTING_ACCESS_PATH=tmp_path / "access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=tmp_path / "exclusions.json"):
+        client = Client(SERVER_NAME="localhost")
+        response = client.get(reverse("webapp:campaigns"))
+        assert response.status_code == 200
+        assert "Veryfi Prospecting" in response.content.decode()
+        assert client.get(reverse("webapp:new_campaign")).status_code == 200
+    assert not database_path.exists()
 
 
-def test_streamlit_is_local_without_telemetry():
-    """La configuración versionada limita el servidor al equipo local."""
-    with (PROJECT_ROOT / ".streamlit" / "config.toml").open("rb") as config_file:
-        config = tomllib.load(config_file)
+def test_django_configuration_has_no_orm_or_authentication_and_is_local():
+    """El arranque documentado y el acceso web quedan limitados a loopback."""
+    assert all(database["ENGINE"] == "django.db.backends.dummy" for database in settings.DATABASES.values())
+    assert not any(app in settings.INSTALLED_APPS for app in ("django.contrib.auth", "django.contrib.admin"))
+    assert settings.ALLOWED_HOSTS == ["127.0.0.1", "localhost", "[::1]"]
+    assert settings.DEBUG is False
+    assert settings.SESSION_COOKIE_HTTPONLY is True
+    assert settings.SESSION_COOKIE_SAMESITE == "Strict"
+    assert settings.CSRF_COOKIE_SAMESITE == "Strict"
+    assert "runserver 127.0.0.1:8000 --noreload" in (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    client = Client(SERVER_NAME="localhost")
+    assert client.get("/", REMOTE_ADDR="203.0.113.1").status_code == 403
+    assert client.get("/", HTTP_HOST="example.com").status_code == 400
 
-    assert config["server"]["address"] == "127.0.0.1"
-    assert config["server"]["headless"] is True
-    assert config["browser"]["gatherUsageStats"] is False
-    assert config["client"]["disableDataExport"] is True
 
-
-def test_prospecting_import_does_not_load_streamlit():
-    """Importar el paquete no exige ni carga la interfaz en un proceso nuevo."""
+def test_prospecting_import_does_not_load_web_frameworks():
+    """Importar el negocio no exige ni carga la interfaz en un proceso nuevo."""
     subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import sys; import prospecting; assert 'streamlit' not in sys.modules",
-        ],
-        cwd=PROJECT_ROOT,
-        check=True,
-        timeout=10,
+        [sys.executable, "-c", "import sys; import prospecting; assert 'streamlit' not in sys.modules; "
+         "assert 'django' not in sys.modules"],
+        cwd=PROJECT_ROOT, check=True, timeout=10,
     )
+
+
+def test_runserver_defaults_to_loopback_and_disables_reloader(monkeypatch):
+    calls = []
+    monkeypatch.setattr(DjangoRunserver, "handle", lambda self, *args, **options: calls.append(options))
+    assert get_commands()["runserver"] == "webapp"
+    call_command("runserver")
+    assert len(calls) == 1
+    assert calls[0]["addrport"] == "127.0.0.1:8000" and calls[0]["use_reloader"] is False
+
+
+@pytest.mark.parametrize("address", ["0.0.0.0:8000", "192.168.1.2:8000", "[::]:8000"])
+def test_runserver_rejects_nonlocal_bindings_without_launching(monkeypatch, address):
+    def forbidden(*args, **kwargs):
+        pytest.fail("No debe arrancar un servidor que acepte acceso remoto.")
+
+    monkeypatch.setattr(DjangoRunserver, "handle", forbidden)
+    with pytest.raises(CommandError, match="127.0.0.1"):
+        call_command("runserver", address)

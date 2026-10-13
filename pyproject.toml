@@ -8,7 +8,6 @@ dependencies = [
     "anthropic==1.11.0",
     "django==5.2.18",
     "pydantic==2.13.5",
-    "streamlit==1.65.0",
 ]
 
 [dependency-groups]

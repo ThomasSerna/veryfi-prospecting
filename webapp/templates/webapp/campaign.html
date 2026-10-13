@@ -1,0 +1,36 @@
+{% extends 'webapp/base.html' %}
+{% load prospecting_ui %}
+{% block title %}Campaña · Veryfi Prospecting{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><span>{{ campaign.id|stringformat:"s"|slice:":8" }}</span>{% endblock %}
+{% block content %}
+<div id="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}">
+  <header class="page-heading"><div><h1>Investigación de prospectos</h1><p>{% for code in campaign.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %} · {% for segment in campaign.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p><p class="quiet-note">Preparada el {{ campaign.created_at|date:"d M Y · H:i" }} UTC · Hasta {{ campaign.max_companies }} empresas</p></div>{% if campaign.status != 'completed' %}<a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar investigación{% else %}Reanudar investigación{% endif %}</a>{% endif %}</header>
+  <div id="execution-feedback" role="status" aria-live="polite">{% if stop_reason %}<div class="notice notice-warning"><strong>{{ stop_reason|stop_message }}</strong><p class="literal-detail">Motivo registrado: {{ stop_reason }}</p></div>{% endif %}</div>
+  {% if view.exclusions_status != 'validated' %}<div class="notice notice-warning"><strong>La lista de exclusiones necesita confirmación.</strong><p>Está ausente o sin validar. El estado se conserva; no se supone que no existan exclusiones.</p></div>{% endif %}
+  <div class="campaign-workspace">
+    <section class="result-filters" aria-label="Filtrar empresas"><form method="get" class="filter-form"><div class="filter-fields">{% include 'webapp/_field.html' with field=filter_form.q %}{% include 'webapp/_filter.html' with field=filter_form.countries %}{% include 'webapp/_filter.html' with field=filter_form.segments %}{% include 'webapp/_filter.html' with field=filter_form.priorities %}{% include 'webapp/_filter.html' with field=filter_form.availability %}</div><div class="filter-actions"><button type="submit" class="button button-small button-navy">Aplicar filtros</button><a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Limpiar</a></div></form></section>
+    <div id="campaign-live">{% include 'webapp/_campaign_results.html' %}</div>
+  </div>
+  {% if campaign.status != 'completed' %}
+  <section id="authorization" class="surface authorization-section" aria-labelledby="authorization-title">
+    <details {% if campaign.status == 'created' %}open{% endif %}><summary><span><strong id="authorization-title">{% if campaign.status == 'created' %}Autorizar la investigación{% else %}Autorizar y reanudar{% endif %}</strong><small>Aprueba cada operación y su tope. Preparar la campaña no concede permisos de consumo.</small></span></summary>
+      {% if authorization_form %}
+      <form method="post" action="{% url 'webapp:execute' campaign.id %}" id="execution-form" data-idle-form>{% csrf_token %}
+        <p>Cada ejecución necesita una aprobación nueva del responsable del cupo. Durante la investigación no se pide aprobación entre empresas.</p>
+        <div class="notice notice-error execution-errors" role="alert" hidden></div>
+        {% if authorization_form.non_field_errors %}<div class="notice notice-error">{{ authorization_form.non_field_errors }}</div>{% endif %}
+        <fieldset {% if is_executing %}disabled{% endif %}>
+          <div class="form-grid">{% include 'webapp/_field.html' with field=authorization_form.responsible %}{% include 'webapp/_field.html' with field=authorization_form.reference %}</div>
+          <div class="operation-list">{% for row in operation_rows %}<div class="operation-row"><div class="operation-heading"><label class="checkbox-label" for="{{ row.allow.id_for_label }}">{{ row.allow }}<span><strong>{{ row.label }}</strong><small>{{ row.provider }} / {{ row.operation }} · Cuenta: {{ row.account_ref }}</small></span></label><p class="field-help">{% if row.key_present %}Clave local configurada; acceso y cupo según la comprobación guardada.{% else %}Falta configurar la clave del proveedor en el servidor. Solicita ayuda al responsable de la instalación.{% endif %}</p></div><div class="operation-limits">{% include 'webapp/_field.html' with field=row.cost %}{% include 'webapp/_field.html' with field=row.credits %}</div><p class="operation-balance">Saldo controlado: {{ row.account.cost.available|money }} · Créditos disponibles: {{ row.account.credits.available|default_if_none:'Desconocido' }}</p></div>{% endfor %}</div>
+          <div class="consent-field">{{ authorization_form.confirmed }}{{ authorization_form.confirmed.label_tag }}{{ authorization_form.confirmed.errors }}</div>
+          <div class="form-actions"><button type="submit" class="button button-primary" data-idle-only>{% if campaign.status == 'created' %}Autorizar y ejecutar{% else %}Autorizar y reanudar{% endif %}</button><p class="field-help">Los topes se validan antes de cada llamada.</p></div>
+        </fieldset>
+      </form>
+      {% else %}<div class="notice notice-info"><strong>El acceso a proveedores aún no está preparado.</strong><p>Un responsable de la instalación debe configurar las cuentas y los cupos comprobados en <code>data/provider-access.json</code>, y las claves en el entorno del servidor. Puedes consultar los resultados guardados sin claves.</p></div>{% endif %}
+    </details>
+  </section>
+  {% endif %}
+  <section class="campaign-actions" aria-label="Exportación y cierre"><div><h2>Comparte los resultados con ventas</h2><p>La descarga incluye la campaña completa, aunque hayas aplicado filtros. La revisión humana se conserva.</p></div><div class="export-actions"><a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-navy" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar prospectos listos</a><a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-secondary" data-idle-only {% if is_executing or not counts.total %}aria-disabled="true" tabindex="-1"{% endif %}>Todos los resultados</a></div><p class="quiet-note">“Listo” según las reglas y “Aceptado” por el equipo son decisiones distintas. El CSV de listos incluye canales actualmente utilizables.</p></section>
+  {% if campaign.status == 'running' or campaign.status == 'paused_budget' %}<form method="post" action="{% url 'webapp:close' campaign.id %}" class="close-campaign" data-idle-form>{% csrf_token %}<button class="text-link" type="submit" data-idle-only {% if is_executing %}disabled{% endif %}>Cerrar campaña conservando resultados</button><p class="quiet-note">Libera el espacio para otra campaña. Los resultados y el consumo permanecen guardados.</p></form>{% endif %}
+</div>
+{% endblock %}
