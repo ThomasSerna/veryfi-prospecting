@@ -28,7 +28,10 @@ from prospecting.models import (
 from prospecting.qualification import (
     classify, identity_confirmed, material_contradiction, parse_output, primary_support,
     QualificationError, allowed_roles, rubric_for, validate_output,
+    SEARCH_RESULT_CLAIM,
 )
+from prospecting.sources import is_search_hit
+from prospecting.text import clip
 
 Digest = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
 CaseId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]+$")]
@@ -161,6 +164,18 @@ class RecordedResponse(Contract):
     estimated_cost_usd: Money | None = None
 
 
+class SubmittedEvidence(Contract):
+    evidence_id: UUID
+    source_type: Text
+    kind: Text
+    url: Text | None
+    provider: Text | None
+    retrieved_at: Text
+    published_at: Text | None
+    claim: Text | None
+    excerpt: Text | None
+
+
 class RecordedReport(Contract):
     campaign_id: UUID
     company_id: UUID
@@ -210,6 +225,42 @@ def checked_file(root, reference):
     return path
 
 
+def submitted_evidence(source):
+    """Comprueba el bloque archivado; no reconstruye prompts con instrucciones actuales."""
+    messages = source.request_payload.get("messages")
+    if (not isinstance(messages, list) or len(messages) != 1 or not isinstance(messages[0], dict)
+            or messages[0].get("role") != "user" or not isinstance(messages[0].get("content"), str)):
+        return None
+    content = messages[0]["content"]
+    if content.count("<evidencia>") != 1 or content.count("</evidencia>") != 1:
+        return None
+    block = content.split("<evidencia>", 1)[1].split("</evidencia>", 1)[0]
+    try:
+        sent = [SubmittedEvidence.model_validate(json.loads(line)) for line in block.splitlines() if line.strip()]
+    except ValueError:
+        raise ValueError("El bloque de evidencia enviado no cumple el contrato archivado.") from None
+    ids = [item.evidence_id for item in sent]
+    if len(ids) != len(set(ids)) or set(ids) != set(source.selected_evidence_ids):
+        raise ValueError("La evidencia declarada no coincide con la enviada.")
+    facts = {item.id: item for item in source.evidence}
+    for item in sent:
+        fact = facts.get(item.evidence_id)
+        if fact is None:
+            raise ValueError("La evidencia enviada no existe en la instantánea.")
+        search = is_search_hit(fact)
+        expected = {"source_type": str(fact.source_type), "kind": "search_result" if search else str(fact.kind),
+                    "url": None if fact.url is None else str(fact.url), "provider": fact.provider,
+                    "retrieved_at": fact.retrieved_at.date().isoformat(),
+                    "published_at": None if fact.published_at is None else fact.published_at.date().isoformat()}
+        if any(getattr(item, name) != value for name, value in expected.items()):
+            raise ValueError("La procedencia enviada no coincide con la instantánea.")
+        for name, full in (("claim", SEARCH_RESULT_CLAIM if search else fact.claim), ("excerpt", fact.excerpt)):
+            fragment = getattr(item, name)
+            if clip(full, max(1, len(fragment) if fragment else len(full or ""))) != fragment:
+                raise ValueError("El fragmento enviado no corresponde a la evidencia archivada.")
+    return ids
+
+
 def load_snapshot(root, case):
     path = checked_file(root, case.artifact)
     data = read_json(path)
@@ -222,6 +273,7 @@ def load_snapshot(root, case):
     artifacts = {name: read_json(checked_file(path.parent, FileReference(path=name, sha256=sha)))
                  for name, sha in trace.artifacts.items()}
     source = TraceInput.model_validate(artifacts["input.json"])
+    submitted = None if source.request_payload is None else submitted_evidence(source)
     if source.origin != case.origin or source.trace_id != trace.trace_id:
         raise ValueError("El origen o identificador de la traza no coincide.")
     if (source.rubric_version != source.campaign.rubric_version
@@ -258,10 +310,12 @@ def load_snapshot(root, case):
         raise ValueError("La evaluación no corresponde al modelo/prompt capturado.")
     snapshot = Snapshot(schema_version="evaluation_snapshot_v1", origin="synthetic" if case.origin == "synthetic" else "saved_real",
                         campaign=source.campaign, company=source.company, evidence=source.evidence,
-                        assessment=assessment, selected_evidence_ids=source.selected_evidence_ids if source.request_payload is not None else None,
+                        assessment=assessment, selected_evidence_ids=submitted,
                         error_reason=report.reason if report is not None and report.status == "pending" else None,
                         duration_seconds=None if result is None else result.duration_seconds)
     mode = "replay" if response else "audit_only" if source.request_payload is None else "trace_without_response"
+    if source.request_payload is not None and submitted is None:
+        mode = "audit_only"
     if not trace.complete or trace.capture_errors:
         snapshot.error_reason = "capture_incomplete"
         mode = "incomplete_trace"
@@ -269,6 +323,7 @@ def load_snapshot(root, case):
                 "requested_model_id": source.requested_model_id,
                 "prompt_version": source.prompt_version, "capture_commit": source.commit,
                 "capture_code_hashes": source.code_hashes,
+                "submitted_evidence_verified": submitted is not None,
                 "submitted_messages": None if source.request_payload is None else source.request_payload.get("messages"),
                 "request_payload_sha256": None if source.request_payload is None else digest(source.request_payload)}
     return snapshot, response, mode, usage, metadata
@@ -480,7 +535,7 @@ def evaluate_manifest(path, candidate=None):
                  identity_confirmed=identity_confirmed(snapshot.company),
                  contradiction=any(fact.contradiction_ids for fact in selected if fact.id in {ref for item in criteria.values() for ref in item.evidence_ids}),
                  primary_support=primary_support(criteria, selected))
-            if response is not None or baseline is not None and baseline.priority == assessment.priority:
+            if mode == "replay" or baseline is not None and baseline.priority == assessment.priority:
                 expected = str(classify(gold, candidate["rubric"] if candidate else rubric_for(snapshot.campaign), excluded=priority == "excluded",
                                identity_confirmed=identity_confirmed(snapshot.company),
                                contradiction=any(fact.contradiction_ids for fact in snapshot.evidence if fact.id in cited),
@@ -496,8 +551,9 @@ def evaluate_manifest(path, candidate=None):
                      "expected_priority": expected, "criteria_comparison": comparisons,
                      "audits": [] if label is None else [item.model_dump(mode="json") for item in label.audits],
                      "products_agree": None if label is None or label.products_status != "resolved" or assessment is None else set(label.products) == set(assessment.products),
-                     "input_sha256": None if metadata.get("submitted_messages") is None else digest(metadata["submitted_messages"]),
-                     "context_reproducibility": "not_captured" if metadata.get("submitted_messages") is None else "exact_messages",
+                     "input_sha256": None if not metadata.get("submitted_evidence_verified") else digest(metadata["submitted_messages"]),
+                     "context_reproducibility": ("not_captured" if metadata.get("submitted_messages") is None else
+                                                 "exact_messages" if metadata.get("submitted_evidence_verified") else "unverified_format"),
                      "model_id": metadata.get("model_id") or (None if assessment is None else assessment.model_id),
                      "prompt_version": metadata.get("prompt_version") or (None if assessment is None else assessment.prompt_version),
                      "capture_metadata": metadata,

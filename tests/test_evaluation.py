@@ -403,3 +403,49 @@ def test_blind_context_and_pairing_use_exact_messages_instead_of_full_excerpt(tm
     changed["cases"][0]["input_sha256"] = "f" * 64
     with pytest.raises(ValueError, match="mismos casos"):
         evaluation.paired_comparison(baseline, changed)
+
+
+def test_replay_rejects_unsent_reference_despite_consistent_hashes(tmp_path, config):
+    path = write_synthetic_dataset(tmp_path, config, [{"case_id": "unsent"}])
+    add_trace(path)
+    unseen = str(uuid5(NAMESPACE_URL, "synthetic-unsent-evidence"))
+
+    def add_unsent(data):
+        fact = dict(data["evidence"][0], id=unseen)
+        data["evidence"].append(fact)
+        data["selected_evidence_ids"].append(unseen)
+        assert unseen not in json.dumps(data["request_payload"])
+
+    revise_trace(path, "input.json", add_unsent)
+    def cite_unsent(data):
+        raw = json.loads(data["text"])
+        raw["criteria"]["document_need"]["evidence_ids"] = [unseen]
+        data["text"] = json.dumps(raw)
+    revise_trace(path, "response.json", cite_unsent)
+    revise_trace(path, "result.json", lambda data: data["assessment"]["criteria"]["document_need"].update(evidence_ids=[unseen]))
+    with pytest.raises(ValueError, match="declarada no coincide"):
+        evaluation.evaluate_manifest(path)
+
+
+@pytest.mark.parametrize("field,value", [("source_type", "secondary"), ("claim", "Afirmación ajena sintética.")])
+def test_replay_rejects_snapshot_provenance_and_text_not_sent(tmp_path, config, field, value):
+    path = write_synthetic_dataset(tmp_path, config, [{"case_id": "provenance"}])
+    add_trace(path)
+    revise_trace(path, "input.json", lambda data: data["evidence"][0].update({field: value}))
+    with pytest.raises(ValueError, match="enviad"):
+        evaluation.evaluate_manifest(path)
+
+
+def test_unknown_archived_context_is_audit_only_without_rebuilding_prompt(tmp_path, config):
+    path = write_synthetic_dataset(tmp_path, config, [{"case_id": "old_format"}])
+    add_trace(path)
+    revise_trace(path, "input.json", lambda data: data["request_payload"]["messages"][0].update(content="Formato histórico sintético desconocido."))
+    source = evaluation.read_json(path.parent / "trace/input.json")
+    fingerprint = evaluation.digest({"provider": "anthropic", "operation": "messages",
+                                     "account_ref": "synthetic-account", "payload": source["request_payload"]})
+    revise_trace(path, "request.json", lambda data: data.update(request_fingerprint=fingerprint))
+    revise_trace(path, "result.json", lambda data: data["usage"].update(request_fingerprint=fingerprint))
+    row = evaluation.evaluate_manifest(path)["cases"][0]
+    assert row["mode"] == "audit_only" and row["context_reproducibility"] == "unverified_format"
+    assert row["input_sha256"] is None and row["evidence_scope"] == "available_only"
+    assert row["priority"] == "high"
