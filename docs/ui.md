@@ -29,7 +29,9 @@ repetirla ni borrar su reserva. Consulta [Orquestación](campaign.md) para los l
 `data/` está ignorado por Git. `provider-access.json` solo guarda cuentas, cupos y
 comprobaciones de acceso; las claves viven en variables de entorno. La aplicación
 no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y,
-cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Streamlit.
+cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Streamlit; con un
+`.env` local, `uv run --locked --env-file .env streamlit run app.py` las pasa al proceso.
+Si la interfaz indica «Falta configurar» con el `.env` presente, se inició sin `--env-file`.
 La interfaz indica únicamente si la variable local tiene un valor configurado,
 sin mostrarlo ni probarlo por red. Ese indicador no demuestra permisos ni saldo:
 las comprobaciones de acceso y cupo proceden del archivo local.

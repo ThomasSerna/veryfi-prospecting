@@ -35,6 +35,13 @@ Desde la raíz del repositorio:
 uv run --locked streamlit run app.py
 ```
 
+Si las claves están en un `.env` local (ignorado por Git), `uv` las pasa al proceso
+de Streamlit con `--env-file`; la aplicación por sí misma no lee ese archivo:
+
+```console
+uv run --locked --env-file .env streamlit run app.py
+```
+
 Abre [http://127.0.0.1:8501](http://127.0.0.1:8501). La pantalla puede abrirse sin
 claves y consultar campañas ya guardadas. Preparar una campaña guarda sus criterios
 sin llamar a proveedores; ejecutar o reanudar requiere cuentas y cupos comprobados,
