@@ -74,6 +74,24 @@ los informes anteriores. El [protocolo de evaluación](docs/t10-evaluation.md) d
 los formatos de entrada, las fichas de revisión sin predicción, los denominadores
 y la comparación de versiones.
 
+Para generar fichas sin predicción desde un conjunto preparado:
+
+```console
+uv run --locked --offline python evaluate_qualification.py data/evaluation/dataset-v1/manifest.json --prepare-blind data/evaluation/blind/dataset-v1
+```
+
+Los ejemplos requieren un manifiesto existente; el repositorio no incluye un
+conjunto real etiquetado. El replay comprueba la evidencia del payload original;
+las instantáneas históricas o formatos de contexto desconocidos se auditan con
+sus limitaciones. Una captura incompleta conserva la clasificación válida en las
+métricas y declara por separado la pérdida de trazabilidad.
+
+La interfaz no activa la captura opcional. Su
+[invocación desde Python](docs/t10-evaluation.md#invocación-de-captura-desde-el-pipeline)
+usa `qualify_company(..., evaluation_dir=...)`, la base y presupuesto compartidos
+y una autorización vigente. Solo permite capturas bajo el `data/` de este
+repositorio; el evaluador offline no inicia esas llamadas.
+
 Las instantáneas, las revisiones originales y los resultados por caso permanecen en
 `data/`, fuera de Git. Las métricas distinguen datos sintéticos, resultados reales
 guardados e inferencias nuevas, y separan la revisión académica de la atribuida a
