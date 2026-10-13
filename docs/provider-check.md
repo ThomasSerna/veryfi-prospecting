@@ -195,3 +195,60 @@ solicitud. Los datos de empresas y personas quedan en `data/` y no se reproducen
   anota con la referencia `hunter-equipo-plan-gratuito`, que ya tenía consumo de otra cuenta,
   y sobrestima el uso. Las 2 llamadas a Haiku se conciliaron con el uso que informó la API,
   aceptado por el responsable porque la consola aún no las mostraba.
+
+## Lote real de la T09
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-12 (America/Bogota): lote 1 a las 22:25 y lote 2 a las 22:57 |
+| Ejecución | Desde la interfaz (`uv run --locked --env-file .env streamlit run app.py`); dos campañas de 8 empresas con Colombia y México, `fintech_software` y `cpg_loyalty`, sin palabras clave ni lista de exclusiones (`missing`). Lote 1 en 110 s y lote 2 en 140 s; ambos terminaron `partial` |
+| Cuentas | `data/provider-access.json` con los paneles vistos por el responsable a las 21:58: Tavily 7 / 1.000 créditos y *pay as you go* desactivado; Hunter 49 de 50 disponibles; Anthropic, cupo prepago de USD 3. La cuenta de Hunter es la que T07 anotó como `hunter-equipo-plan-gratuito`; desde la T09 se registra como `hunter-cuenta-2` |
+| Autorización | Responsable del cupo, en la interfaz y para cada lote: Tavily `search` ≤ 50 créditos y `extract` ≤ 30 (`tavily-cuenta-2`, USD 0); Haiku `messages` ≤ USD 0,08 (`anthropic-equipo-prepago`); Hunter `domain_search` ≤ 16 créditos (`hunter-cuenta-2`, USD 0). Finder y Verifier, deshabilitados |
+
+| Operación | Lote | Llamadas | Sin respuesta (timeout) | Créditos reservados | Créditos conciliados | Costo reservado | Costo conciliado | Latencia de las respuestas |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Tavily Search | 1 | 19 | 1 | 19 | 19 | USD 0 | USD 0 | 1,1–4,6 s |
+| Tavily Extract | 1 | 11 | 1 | 11 | 2 | USD 0 | USD 0 | 0,4–1,7 s |
+| Haiku `messages` | 1 | 7 | 0 | — | — | USD 0,0140338 | USD 0,0059353 | 1,6–8,5 s |
+| Hunter Domain Search | 1 | 3 | 0 | 3 | 1 | USD 0 | USD 0 | 0,4–0,6 s |
+| Tavily Search | 2 | 19 | 1 | 19 | 19 | USD 0 | USD 0 | 1,4–4,4 s |
+| Tavily Extract | 2 | 14 | 3 | 14 | 5 | USD 0 | USD 0 | 0,4–1,7 s |
+| Haiku `messages` | 2 | 9 | 0 | — | — | USD 0,0205942 | USD 0,0086865 | 1,3–5,4 s |
+| Hunter Domain Search | 2 | 5 | 0 | 5 | 0 | USD 0 | USD 0 | 0,3–0,6 s |
+
+Las 8 búsquedas de descubrimiento de cada lote respondieron. Entre los dos lotes se corrigió el
+análisis inicial: la página que había localizado a cada empresa no se extraía porque la evidencia
+del nombre inferido la daba por leída. El lote 2 se ejecutó con esa corrección y sin el directorio
+de software que el lote 1 tomó por empresa. Los resultados están en
+[la evaluación de la T09](evaluation.md); las empresas y personas quedan en `data/`.
+
+### Conciliación
+
+- **Tavily**: el panel pasó de 7 a 28 créditos tras el lote 1 y a 52 tras el lote 2. El ledger de
+  `tavily-cuenta-2` confirma 52. Las respuestas informaron 20 y 23 créditos. De las 6 llamadas sin
+  respuesta, el panel cobró 1 por lote: se anotó a la búsqueda con timeout de cada lote y 0 a las
+  extracciones. Esa atribución por fila es una inferencia (una búsqueda básica cobra 1; la
+  extracción, 1 por cada 5 URLs exitosas); el total por cuenta es exacto.
+- **Hunter**: el panel pasó de 1 a 2 créditos tras el lote 1 y siguió en 2 tras el lote 2. De las 8
+  búsquedas, solo la que devolvió personas cobró 1 crédito: una Domain Search sin resultados no
+  consume crédito.
+- **Haiku**: la consola del 13 de octubre (UTC) mostró 43.133 tokens de entrada y 3.244 de salida,
+  exactamente los del lote 1, que se concilió con el costo estimado de esos tokens. Tras
+  el lote 2 la consola sumó 110.418 y 7.160 tokens ese día; los 67.285 y 3.916 restantes son
+  exactamente los del lote 2, conciliado del mismo modo.
+- **Uso fuera del ledger**: la consola del 12 de octubre (UTC) suma 43.428 y 3.820 tokens; el ledger
+  de esta base, 28.413 y 3.051. La diferencia (15.015 y 769 tokens, unos USD 0,0019) es uso de la
+  organización registrado en otra parte. Según el responsable, corresponde a pruebas de otro
+  integrante desde otra instancia; esta base no puede comprobarlo.
+- Los comprobantes están en `data/conciliaciones/` (`*-t09-lote1.json` y `*-t09-lote2.json`).
+
+### Observaciones y limitaciones
+
+- 6 de 63 llamadas a Tavily (9,5 %) no respondieron en el plazo del cliente, unos 10 s; las que
+  respondieron tardaron 4,6 s como máximo. Ninguna se repitió: dejaron pendientes la identidad de dos
+  empresas y los contactos de otras dos.
+- Hunter devolvió personas en 1 de 8 búsquedas con los cargos de la evaluación. Las empresas
+  reutilizadas del lote 1 volvieron a consultar Hunter porque la nueva evaluación propuso otros
+  cargos y cambió la huella de la solicitud.
+- La reserva de Haiku, acotada por los bytes del payload, fue unas 2,4 veces el costo estimado.
+- La fila de Hunter de la T07 con 3 créditos anotados sigue sin conciliar (sobrestima 2 créditos).

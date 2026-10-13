@@ -115,7 +115,9 @@ y las instantáneas de las pruebas del pipeline los fijan:
 - `Usage.request_fingerprint`: SHA-256 de proveedor, operación, cuenta, query o
   payload, método, endpoint y cabeceras. El payload de Haiku incluye el esquema
   JSON; el de contactos contiene los nombres de las clases `HaikuContacts`,
-  `HaikuContactCandidate` y `CitedContactFact`.
+  `HaikuContactCandidate` y `CitedContactFact`. La búsqueda de descubrimiento envía
+  `NON_BUSINESS_DOMAINS` en `exclude_domains`: ampliar esa lista cambia la huella, así que
+  los directorios nuevos van en `LOCAL_NON_BUSINESS_DOMAINS`, que solo se aplica localmente.
 - Claves de `RunItem.attempts`: `tavily_extract`, las de la ampliación de evidencia
   (`research:expansion`, `research:web_queries`, `research:pages`) y las de contactos
   (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,

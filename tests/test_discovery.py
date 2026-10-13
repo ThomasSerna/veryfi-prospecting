@@ -137,6 +137,7 @@ def test_parse_discards_unsafe_and_non_business_results():
     "https://www.getapp.com.co/directory/579/expenses-management/software",
     "https://www.capterra.mx/directory/30051/expense-management/software",
     "https://www.g2.com/categories/expense-management",
+    "https://www.comparasoftware.com/programas-de-fidelizacion",
 ])
 def test_software_directories_are_not_candidates(url):
     hits, discarded = parse_search(planned(), 0, search_response((url, "Directorio sintético")), uuid4(), RETRIEVED_AT)

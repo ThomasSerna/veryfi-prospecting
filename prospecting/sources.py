@@ -20,6 +20,9 @@ NON_BUSINESS_DOMAINS = (
     "getapp.com", "getapp.com.co", "getapp.com.mx", "capterra.com", "capterra.co",
     "capterra.mx", "g2.com", "softwareadvice.com", "trustradius.com",
 )
+# Directorios descartados solo localmente: la lista anterior viaja en `exclude_domains` y forma parte
+# de la huella persistida de la búsqueda de descubrimiento (docs/persistence.md), así que no se amplía.
+LOCAL_NON_BUSINESS_DOMAINS = ("comparasoftware.com",)
 
 _GENERIC_LABELS = {
     "www", "app", "web", "m", "es", "com", "co", "mx", "net", "org", "io", "la",
@@ -39,7 +42,7 @@ def within_domain(host: str, domain: str) -> bool:
 
 
 def is_non_business(host: str) -> bool:
-    return any(within_domain(host, domain) for domain in NON_BUSINESS_DOMAINS)
+    return any(within_domain(host, domain) for domain in NON_BUSINESS_DOMAINS + LOCAL_NON_BUSINESS_DOMAINS)
 
 
 def validate_public_url(value: object) -> str | None:

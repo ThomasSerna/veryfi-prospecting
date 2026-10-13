@@ -29,7 +29,9 @@ repetirla ni borrar su reserva. Consulta [Orquestación](campaign.md) para los l
 `data/` está ignorado por Git. `provider-access.json` solo guarda cuentas, cupos y
 comprobaciones de acceso; las claves viven en variables de entorno. La aplicación
 no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y,
-cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Streamlit.
+cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Streamlit; con un
+`.env` local, `uv run --locked --env-file .env streamlit run app.py` las pasa al proceso.
+Si la interfaz indica «Falta configurar» con el `.env` presente, se inició sin `--env-file`.
 La interfaz indica únicamente si la variable local tiene un valor configurado,
 sin mostrarlo ni probarlo por red. Ese indicador no demuestra permisos ni saldo:
 las comprobaciones de acceso y cupo proceden del archivo local.
@@ -154,9 +156,10 @@ SQLite. La exportación integrada de tablas de Streamlit está desactivada para
 mantener este camino seguro; no se exporta HTML arbitrario.
 
 Las pruebas de la interfaz, revisión, confirmación y CSV usan proveedores simulados
-y SQLite temporal, sin red. No demuestran que el nuevo flujo visual funcione con
-cuentas reales. La campaña real documentada en [Comprobación de proveedores](provider-check.md)
-se invocó desde Python y no produjo ninguna persona lista.
+y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde la interfaz
+y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
+Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
+canales solo se han verificado con datos sintéticos.
 
 ## Verificación del 12 de octubre de 2026
 

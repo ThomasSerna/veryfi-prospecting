@@ -226,6 +226,20 @@ def test_campaign_runs_every_stage_in_order_and_completes(world):
     assert_no_request_sent_twice(case)
 
 
+def test_initial_analysis_extracts_the_page_that_located_each_company(world):
+    case = world.setup()
+    start(case)
+    case.run()
+    first_extract = {}
+    for operation, payload in case.events:
+        if operation == "extract":
+            urls = json.loads(payload)["urls"]
+            first_extract.setdefault(urlsplit(urls[0]).hostname, urls)
+    # El nombre inferido cita la URL del resultado del buscador, pero esa página aún no se había leído.
+    assert {domain: urls[0] for domain, urls in first_extract.items()} == {
+        domain: f"https://{domain}/producto" for domain in WORLD}
+
+
 def test_second_click_and_rerun_reuse_the_campaign_without_new_calls(world):
     case = world.setup()
     first = start(case)

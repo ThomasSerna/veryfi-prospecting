@@ -203,7 +203,9 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
                     consumed={"web_queries": 1}, facts=facts)
         report["evidence_ids"] += [item.id for item in facts]
     facts = db.list_evidence(company_id)
-    read = {str(item.url) for item in facts if item.url is not None and not is_search_evidence(item)}
+    # Solo cuenta como leída una página observada; el nombre inferido cita la URL sin haberla leído.
+    read = {str(item.url) for item in facts if item.url is not None and item.kind == "observed"
+            and not is_search_evidence(item)}
     # Primero los resultados más recientes (los de la ampliación) y, entre ellos, por puesto.
     hits = sorted((item for item in facts if is_search_hit(item) and item.url is not None),
                   key=lambda item: (-item.retrieved_at.timestamp(), _rank(item), str(item.url)))
