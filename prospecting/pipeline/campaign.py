@@ -482,7 +482,9 @@ class _Run:
                 self.update(company_id, stage=RunStage.RESEARCHED)
                 continue
             company, evidence, now = self.db.get_company(company_id), self.db.list_evidence(company_id), utc_now()
-            fresh = {str(item.url) for item in evidence if item.url is not None and not is_search_evidence(item)
+            # El nombre inferido (`inference`) cita la URL del resultado sin haber leído la página.
+            fresh = {str(item.url) for item in evidence if item.url is not None and item.kind == "observed"
+                     and not is_search_evidence(item)
                      and now - timedelta(days=limits.cache.web_days) <= item.retrieved_at <= now}
             urls = [url for url in initial_urls(company, evidence, len(evidence) + 1) if url not in fresh]
             report = self.timed(company_id, lambda: extract_company_pages(

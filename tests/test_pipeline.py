@@ -585,6 +585,18 @@ def test_expansion_searches_own_domain_once_and_extracts_new_own_pages(tavily):
     assert len(case.calls) == calls
 
 
+def test_expansion_extracts_the_unread_page_that_located_the_company(tavily):
+    case = tavily.setup()
+    case.search = fixed_search
+    company_id = company_by_domain(case, discover(case).selected_company_ids, "nueva-uno.example")
+    case.search = expansion_search("nueva-uno.example", paths=())
+    calls = len(case.calls)
+    report = research(case, company_id)
+    assert [operation for operation, _ in case.calls[calls:]] == ["search", "extract"]
+    assert case.calls[-1][1]["urls"] == ["https://nueva-uno.example/producto"]
+    assert report.status == "researched" and report.requested_urls == ["https://nueva-uno.example/producto"]
+
+
 def test_expansion_without_new_sources_or_quota_makes_no_call(tavily, config):
     limits = config.defaults.model_dump(include=set(CampaignLimits.model_fields))
     limits["effort"]["insufficient_evidence"].update(web_queries=0)
