@@ -12,8 +12,8 @@ from uuid import UUID, uuid4, uuid5
 from pydantic import Field
 
 from prospecting.contacts import (
-    ContactError, apply_target_roles, complete_name, employment_ended, employment_fresh, fold_words, mentions,
-    merge_contact, nominal_channel_association, organization_matches, parse_source_date, phone_country_of, professional_email,
+    ContactError, apply_target_roles, complete_name, current_directory, employment_ended, employment_fresh, fold_words,
+    mentions, merge_contact, nominal_channel_association, organization_matches, parse_source_date, phone_country_of, professional_email,
     role_matches, target_roles,
 )
 from prospecting.haiku import CHARS_PER_TOKEN, MODEL_ID, prompt_json, structured_request
@@ -64,17 +64,26 @@ Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign))}."""
     available = campaign.limits.llm.max_input_tokens * CHARS_PER_TOKEN - overhead
     if available <= 0:
         raise ContactError("input_budget", "El prompt de contactos supera el límite de entrada.")
-    selected, pieces, used = [], [], 0
-    for item in sorted(evidence, key=lambda fact: (fact.source_type != "primary", str(fact.id))):
-        if item.company_id != company.id or item.kind != "observed" or is_search_evidence(item) or not item.excerpt:
-            continue
-        piece = prompt_json({"evidence_id": str(item.id), "excerpt": item.excerpt[:800], "source_type": item.source_type,
-                             "url": None if item.url is None else str(item.url), "published_at": str(item.published_at) if item.published_at else None})
-        if used + len(piece) + 2 <= available:
-            selected.append(item)
-            pieces.append(piece)
-            used += len(piece) + 2
-    user = prompt_json(context) + "\n<evidencia>\n" + "\n".join(pieces) + "\n</evidencia>"
+    usable = [item for item in evidence if item.company_id == company.id and item.kind == "observed"
+              and not is_search_evidence(item) and item.excerpt]
+    pieces = {item.id: prompt_json({"evidence_id": str(item.id), "excerpt": item.excerpt[:800], "source_type": item.source_type,
+                                    "url": None if item.url is None else str(item.url),
+                                    "published_at": str(item.published_at) if item.published_at else None})
+              for item in usable}
+    # Si no cabe todo, entran primero los fragmentos nominales (T09): directorios corporativos y
+    # menciones de cargos objetivo o personas conocidas, los más recientes antes.
+    nominal = target_roles(company, assessment, campaign) + [item.name for item in contacts if item.name]
+    chosen, used = set(), 0
+    for item in sorted(usable, key=lambda fact: (fact.source_type != "primary", not current_directory(fact),
+                                                 not any(mentions(fact.excerpt[:800], value) for value in nominal),
+                                                 -fact.retrieved_at.timestamp(), str(fact.id))):
+        if used + len(pieces[item.id]) + 2 <= available:
+            chosen.add(item.id)
+            used += len(pieces[item.id]) + 2
+    # Lo elegido se envía en el orden de siempre, así la huella no cambia cuando todo cabe.
+    selected = [item for item in sorted(usable, key=lambda fact: (fact.source_type != "primary", str(fact.id)))
+                if item.id in chosen]
+    user = prompt_json(context) + "\n<evidencia>\n" + "\n".join(pieces[item.id] for item in selected) + "\n</evidencia>"
     payload = structured_request(system, user, schema, campaign.limits.llm.max_output_tokens)
     return payload, selected
 

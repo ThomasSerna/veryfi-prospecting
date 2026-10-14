@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 import json
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 import pytest
@@ -503,6 +503,22 @@ def test_full_contacts_request_stays_within_the_token_limit_at_the_measured_rati
     schema = payload["output_config"]["format"]["schema"]
     size = len(payload["system"]) + len(payload["messages"][0]["content"]) + len(json.dumps(schema, ensure_ascii=False))
     assert size / 2.11 <= campaign.limits.llm.max_input_tokens
+
+
+def test_tight_budget_keeps_nominal_directory_fragment_over_earlier_ids(eligible):
+    """T09: al recortar, el fragmento nominal del directorio corporativo no depende del orden de los ids."""
+    company, campaign, assessment, contact, evidence = eligible
+    filler = [Evidence(id=UUID(int=index + 1), company_id=company.id, claim=f"Página sintética {index}.", excerpt="x" * 800,
+                       url=f"https://example.com/p{index}", retrieved_at=NOW, kind="observed", source_type="primary")
+              for index in range(60)]
+    # Del mismo tamaño que el relleno: no cabe en el espacio sobrante después de recortar.
+    nominal = evidence[0].model_copy(update={"id": UUID(int=2**128 - 1), "contact_id": None,
+                                             "excerpt": evidence[0].excerpt.ljust(800, "y")})
+    payload, selected = build_contacts_request(company, assessment, campaign, [*filler, nominal], [contact])
+    assert nominal.id in [item.id for item in selected] and len(selected) < 61
+    assert str(nominal.id) in payload["messages"][0]["content"]
+    # Lo que cabe se envía en el orden de siempre: primarias y luego id.
+    assert [item.id for item in selected] == sorted((item.id for item in selected), key=str)
 
 
 def test_api_schema_is_transformed_but_local_validation_keeps_its_limits(eligible):

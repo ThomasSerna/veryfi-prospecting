@@ -151,7 +151,7 @@ def _corporate(company: Company, fact: Evidence) -> bool:
     return company.domain is not None and host is not None and within_domain(host, company.domain)
 
 
-def _current_directory(fact: Evidence) -> bool:
+def current_directory(fact: Evidence) -> bool:
     return fact.url is not None and bool(re.search(r"/(?:team|equipo|leadership|directivos|directorio|people|contacto|contact|about|nosotros)(?:[/#?._-]|$)", str(fact.url).lower()))
 
 
@@ -161,7 +161,7 @@ def employment_fresh(fact: Evidence, company: Company, limits: CampaignLimits, n
     date = fact.updated_at or fact.published_at
     if date is not None:
         return _fresh(date, limits.freshness.employment_days, now)
-    return (fact.source_type == "primary" and _corporate(company, fact) and _current_directory(fact)
+    return (fact.source_type == "primary" and _corporate(company, fact) and current_directory(fact)
             and _fresh(fact.retrieved_at, limits.cache.web_days, now))
 
 
@@ -251,7 +251,7 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
                    nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value)
                    and _fresh(item.retrieved_at, limits.cache.web_days, now) and
                    (_fresh(item.updated_at or item.published_at, limits.freshness.email_days, now)
-                    if item.updated_at or item.published_at else _current_directory(item))
+                    if item.updated_at or item.published_at else current_directory(item))
                    for item in published)
     if channel.type in (ChannelType.LINKEDIN, ChannelType.OTHER):
         return channel.manual_confirmed_at is not None and _fresh(channel.manual_confirmed_at, limits.cache.contact_days, now) and any(
