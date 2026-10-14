@@ -1,7 +1,9 @@
 """Respuestas malformadas del SDK y consumo exclusivamente sintéticos, sin red."""
 
 from decimal import Decimal
+import json
 from types import SimpleNamespace
+from urllib.parse import quote, quote_plus
 
 import anthropic
 import httpx2
@@ -17,7 +19,7 @@ from prospecting.providers import ClaudeClient, ProviderError
 def sdk_case(database, config, make_campaign, monkeypatch):
     campaign = make_campaign()
     database.save_campaign(campaign)
-    case = SimpleNamespace(db=database, requests=[], reply={
+    case = SimpleNamespace(db=database, requests=[], status=200, reply={
         "id": "msg_sintetico", "type": "message", "role": "assistant", "model": MODEL_ID,
         "content": [{"type": "text", "text": "Respuesta exclusivamente sintética."}],
         "stop_reason": "end_turn", "stop_sequence": None,
@@ -27,7 +29,7 @@ def sdk_case(database, config, make_campaign, monkeypatch):
 
     def handler(request):
         case.requests.append(request)
-        return httpx2.Response(200, json=case.reply)
+        return httpx2.Response(case.status, json=case.reply)
 
     key = "clave-anthropic-exclusivamente-sintetica"
     monkeypatch.setenv("ANTHROPIC_API_KEY", key)
@@ -110,3 +112,23 @@ def test_valid_envelope_accepts_resolved_model_and_joins_text_blocks(sdk_case):
     assert call.estimated_cost_usd == Decimal("0.00027")
     saved = case.db.get_usage(call.request_id)
     assert saved.status == "succeeded" and saved.error_message is None
+
+
+@pytest.mark.parametrize("encode", [quote, quote_plus, lambda value: json.dumps(value)[1:-1]],
+                         ids=["url", "query", "json-ascii"])
+def test_sdk_http_errors_omit_encoded_input_and_preserve_safe_diagnostic(sdk_case, encode):
+    case = sdk_case
+    sensitive = [case.payload["messages"][0]["content"], "clave-anthropic-exclusivamente-sintetica"]
+    case.status = 401
+    case.reply = {"error": {"type": "authentication_error",
+        "message": "Fallo SDK sintético denied. " + " | ".join(map(encode, sensitive))}}
+    with pytest.raises(ProviderError) as error:
+        case.call()
+    assert error.value.kind == "http" and error.value.http_status == 401
+    saved = case.db.get_usage(case.reservation.request_id)
+    assert "Fallo SDK sintético denied." in error.value.message
+    assert saved.error_message == error.value.message and saved.outcome == "failed"
+    assert saved.request_fingerprint == case.reservation.request_fingerprint
+    assert saved.reserved_cost_usd == Decimal("0.01") and len(case.requests) == 1
+    for value in sensitive:
+        assert value not in saved.error_message and encode(value) not in saved.error_message

@@ -13,7 +13,7 @@ import socket
 import time
 from typing import Annotated, Callable, Generic, Literal, TypeVar
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, quote_plus, urlencode, urlsplit
 from urllib.request import (
     HTTPRedirectHandler, ProxyHandler, Request, build_opener,
 )
@@ -191,9 +191,14 @@ def _safe_message(message, key, request):
                 collect(item)
     collect(request.params)
     collect(request.payload)
-    for value in sorted(set(values), key=len, reverse=True):
-        if value:
-            text = text.replace(value, "[omitido]")
+    variants = {
+        encoded for value in values if value for encoded in (
+            value, quote(value, safe=""), quote(value), quote_plus(value),
+            json.dumps(value)[1:-1], json.dumps(value, ensure_ascii=False)[1:-1],
+        )
+    }
+    for value in sorted(variants, key=len, reverse=True):
+        text = text.replace(value, "[omitido]")
     text = re.sub(r"https?://[^\s\"'<>]+", "[URL omitida]", text)
     text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[correo omitido]", text)
     text = re.sub(r"\+?\d[\d ()-]{7,}\d", "[número omitido]", text)

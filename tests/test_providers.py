@@ -10,6 +10,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 from urllib.error import URLError
+from urllib.parse import quote, quote_plus
 from urllib.request import Request
 from uuid import uuid4
 
@@ -602,6 +603,41 @@ def test_error_body_does_not_leak_key_or_personal_payload(provider_case):
     assert SYNTHETIC_KEY not in visible
     assert "persona-exclusivamente-sintetica@example.com" not in visible
     assert "Fallo sintético literal" in visible
+
+
+@pytest.mark.parametrize("encode", [
+    lambda value: value,
+    lambda value: quote(value, safe=""),
+    quote,
+    quote_plus,
+    lambda value: json.dumps(value)[1:-1],
+    lambda value: json.dumps(value, ensure_ascii=False)[1:-1],
+], ids=["literal", "url", "url-path", "query", "json-ascii", "json-utf8"])
+@pytest.mark.parametrize("failure_kind", ["http", "transport"])
+def test_encoded_sensitive_inputs_are_omitted_from_errors_and_ledger(provider_case, encode, failure_kind):
+    case = provider_case
+    sensitive = ['persona-sintetica+prueba@example.com', 'Persona sintética "Prueba" / turno', SYNTHETIC_KEY]
+    case.request = case.request.model_copy(update={
+        "params": {"email": sensitive[0]}, "payload": {"name": sensitive[1]},
+    })
+    usage = case.reserve()
+    fingerprint = case.client.fingerprint(case.request)
+    detail = "Error sintético código denied: " + " | ".join(map(encode, sensitive))
+    if failure_kind == "http":
+        case.response = HttpResponse(status=403, headers={"Content-Type": "application/json"},
+                                     body=json.dumps({"message": detail}).encode("utf-8"))
+    else:
+        case.failure = URLError(detail)
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    saved = case.db.get_usage(usage.request_id)
+    assert error.value.kind == failure_kind
+    assert "Error sintético código denied:" in error.value.message
+    assert saved.error_message == error.value.message
+    for value in sensitive:
+        assert value not in saved.error_message and encode(value) not in saved.error_message
+    assert saved.request_fingerprint == fingerprint == case.client.fingerprint(case.request)
+    assert saved.reserved_cost_usd == Decimal("0.10")
 
 
 @pytest.mark.parametrize("detail", [
