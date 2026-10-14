@@ -1,4 +1,4 @@
-"""Dirección de las dependencias y capacidades prohibidas del paquete (§13, §15)."""
+"""Dirección de las dependencias y capacidades prohibidas del paquete y de la interfaz (§13, §15)."""
 
 import ast
 import importlib
@@ -11,6 +11,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = PROJECT_ROOT / "prospecting"
+INTERFACE = PROJECT_ROOT / "core"
 
 # Importaciones internas permitidas por módulo. Un módulo nuevo debe declararse aquí.
 ALLOWED = {
@@ -70,8 +71,12 @@ ALLOWED = {
         "prospecting.providers.hunter", "prospecting.providers.tavily", "prospecting.sources",
     },
 }
-# Interfaz, envío de mensajes y automatización de navegador quedan fuera del paquete (§1, §15).
-FORBIDDEN = {"streamlit", "smtplib", "twilio", "sendgrid", "slack_sdk", "telegram", "selenium", "playwright"}
+# Envío de mensajes y automatización de navegador quedan fuera del paquete y de la interfaz (§1, §15).
+FORBIDDEN = {"smtplib", "twilio", "sendgrid", "slack_sdk", "telegram", "selenium", "playwright"}
+# El paquete no depende de la interfaz: no importa Django, `core` ni Streamlit (§13).
+INTERFACE_FRAMEWORKS = {"core", "django", "streamlit"}
+# Lo único de `prospecting` que importa la interfaz; del pipeline, solo los nombres de su `__all__` (§13, §13.2).
+INTERFACE_ALLOWED = {"prospecting.pipeline", "prospecting.models", "prospecting.sources"}
 # Únicas operaciones de proveedor habilitadas: búsqueda, lectura y verificación.
 READ_OPERATIONS = {
     ("tavily", "search"), ("tavily", "extract"),
@@ -79,16 +84,16 @@ READ_OPERATIONS = {
 }
 
 
-def modules() -> dict[str, Path]:
+def modules(root: Path = PACKAGE) -> dict[str, Path]:
     found = {}
-    for path in sorted(PACKAGE.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
         parts = path.relative_to(PROJECT_ROOT).with_suffix("").parts
         found[".".join(parts[:-1] if parts[-1] == "__init__" else parts)] = path
     return found
 
 
-def trees() -> dict[str, ast.Module]:
-    return {name: ast.parse(path.read_text(encoding="utf-8")) for name, path in modules().items()}
+def trees(root: Path = PACKAGE) -> dict[str, ast.Module]:
+    return {name: ast.parse(path.read_text(encoding="utf-8")) for name, path in modules(root).items()}
 
 
 def imported(tree: ast.Module, module: str, known: dict[str, Path]) -> set[str]:
@@ -140,11 +145,29 @@ def assert_acyclic(parsed: dict[str, ast.Module], known: dict[str, Path]) -> Non
         visit(name)
 
 
-def prohibited(parsed: dict[str, ast.Module], known: dict[str, Path]) -> dict[str, list[str]]:
-    """Módulos de `FORBIDDEN` que importa cada módulo, sea cual sea la forma de la importación."""
-    used = {name: sorted({item.split(".")[0] for item in imported(tree, name, known)} & FORBIDDEN)
+def prohibited(parsed: dict[str, ast.Module], known: dict[str, Path],
+               forbidden: set[str] = FORBIDDEN) -> dict[str, list[str]]:
+    """Módulos de `forbidden` que importa cada módulo, sea cual sea la forma de la importación."""
+    used = {name: sorted({item.split(".")[0] for item in imported(tree, name, known)} & forbidden)
             for name, tree in parsed.items()}
     return {name: found for name, found in used.items() if found}
+
+
+def outside_public_api(parsed: dict[str, ast.Module], known: dict[str, Path],
+                       public: set[str]) -> dict[str, list[str]]:
+    """Lo que la interfaz importa de `prospecting` fuera de `INTERFACE_ALLOWED`, de `public` (el `__all__`
+    del pipeline) o con nombre privado."""
+    violations = {}
+    for name, tree in parsed.items():
+        found = {item for item in imported(tree, name, known)
+                 if item.split(".")[0] == "prospecting" and item not in INTERFACE_ALLOWED}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in INTERFACE_ALLOWED:
+                found.update(f"{node.module}.{alias.name}" for alias in node.names if alias.name.startswith("_")
+                             or (node.module == "prospecting.pipeline" and alias.name not in public))
+        if found:
+            violations[name] = sorted(found)
+    return violations
 
 
 def test_every_module_declares_its_allowed_dependencies():
@@ -177,7 +200,19 @@ def test_documented_structure_matches_the_package():
 
 
 def test_package_has_no_interface_messaging_or_browser_automation():
-    assert prohibited(trees(), modules()) == {}
+    assert prohibited(trees(), modules(), FORBIDDEN | INTERFACE_FRAMEWORKS) == {}
+
+
+def test_interface_imports_only_the_public_api_of_the_package():
+    """`core/` usa el `__all__` del pipeline, los contratos y la validación de URLs; nada interno (§13, §13.2)."""
+    parsed = trees(INTERFACE)
+    assert "core.views" in parsed
+    public = set(importlib.import_module("prospecting.pipeline").__all__)
+    assert outside_public_api(parsed, modules() | modules(INTERFACE), public) == {}
+
+
+def test_interface_has_no_messaging_or_browser_automation():
+    assert prohibited(trees(INTERFACE), modules() | modules(INTERFACE)) == {}
 
 
 def test_only_the_pipeline_reserves_spending():
@@ -226,6 +261,7 @@ sys.addaudithook(reject_side_effects)
 for name in sys.argv[2:]:
     __import__(name)
 assert 'streamlit' not in sys.modules
+assert 'django' not in sys.modules
 assert 'anthropic' not in sys.modules
 assert list(Path.cwd().iterdir()) == []
 """
@@ -252,7 +288,12 @@ KNOWN = {
     "prospecting.pipeline.discovery": Path("prospecting/pipeline/discovery.py"),
     "prospecting.pipeline.stage": Path("prospecting/pipeline/stage/__init__.py"),
     "prospecting.pipeline.stage.step": Path("prospecting/pipeline/stage/step.py"),
+    "prospecting.sources": Path("prospecting/sources.py"),
+    "core": Path("core/__init__.py"),
+    "core.execution": Path("core/execution.py"),
+    "core.views": Path("core/views.py"),
 }
+PUBLIC = {"execute_campaign", "read_campaign"}
 
 
 @pytest.mark.parametrize("source", [
@@ -346,3 +387,37 @@ def test_a_relative_import_beyond_the_package_fails_explicitly(name, source):
 def test_forbidden_modules_are_detected_next_to_relative_imports():
     tree = ast.parse("import selenium.webdriver as driver\nfrom smtplib import SMTP\nfrom . import models")
     assert prohibited({"prospecting.db": tree}, KNOWN) == {"prospecting.db": ["selenium", "smtplib"]}
+
+
+def test_the_package_cannot_import_the_interface_or_django():
+    tree = ast.parse("from django.http import HttpResponse\nfrom core import execution\nfrom . import models")
+    found = prohibited({"prospecting.db": tree}, KNOWN, FORBIDDEN | INTERFACE_FRAMEWORKS)
+    assert found == {"prospecting.db": ["core", "django"]}
+
+
+@pytest.mark.parametrize("source, target", [
+    ("from prospecting.pipeline.calls import reserve", "prospecting.pipeline.calls"),
+    ("from prospecting.pipeline import calls", "prospecting.pipeline.calls"),
+    ("from prospecting.pipeline import reserve_call", "prospecting.pipeline.reserve_call"),
+    ("from prospecting.pipeline import *", "prospecting.pipeline.*"),
+    ("import prospecting.db", "prospecting.db"),
+    ("from prospecting import db", "prospecting.db"),
+    ("from prospecting.contacts import derive_readiness", "prospecting.contacts"),
+    ("from prospecting.sources import _hostname", "prospecting.sources._hostname"),
+    ("import prospecting", "prospecting"),
+])
+def test_interface_imports_outside_the_public_api_are_rejected(source, target):
+    assert outside_public_api({"core.views": ast.parse(source)}, KNOWN, PUBLIC) == {"core.views": [target]}
+
+
+@pytest.mark.parametrize("source", [
+    "from prospecting.pipeline import execute_campaign, read_campaign",
+    "from prospecting.models import Campaign",
+    "from prospecting import models",
+    "from prospecting.sources import validate_public_url",
+    "from . import execution",
+    "from core.execution import start_execution",
+    "from django.http import HttpResponse",
+])
+def test_interface_imports_of_public_apis_and_its_own_modules_are_accepted(source):
+    assert outside_public_api({"core.views": ast.parse(source)}, KNOWN, PUBLIC) == {}
