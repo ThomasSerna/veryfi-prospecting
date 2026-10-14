@@ -356,7 +356,7 @@ Haiku recibe un catálogo breve de capacidades autorizadas de Veryfi, datos de c
 
 No usar su memoria como fuente de contactos, empresas o cargos actuales. No permitir que invente URLs ni referencias: cada `evidence_id` debe existir en el conjunto suministrado. La validación programática comprueba referencias y valores; la revisión de calidad comprueba que la fuente respalde la afirmación.
 
-Límite inicial por petición: aproximadamente 6.000 tokens de entrada y 1.000 de salida, con esfuerzo bajo cuando esté soportado. Partir/seleccionar evidencia antes de enviar páginas completas. Registrar modelo exacto, versión de prompt, uso y costo. Revisar parámetros actuales del modelo; no copiar configuraciones de modelos anteriores sin verificar [W4].
+Límite por petición: 9.000 tokens de entrada y 1.000 de salida, con esfuerzo bajo cuando esté soportado. El límite inicial de 6.000 tokens se elevó el 14 de octubre de 2026: las solicitudes reales medidas usaban unos 2,2 caracteres por token y llegaban a 8.200 tokens; aplicar 6.000 reales habría reducido la evidencia de cada calificación a unos cuatro fragmentos. Partir/seleccionar evidencia antes de enviar páginas completas. Registrar modelo exacto, versión de prompt, uso y costo. Revisar parámetros actuales del modelo; no copiar configuraciones de modelos anteriores sin verificar [W4].
 
 ### 12.2 Evaluación y decisiones en Python
 
