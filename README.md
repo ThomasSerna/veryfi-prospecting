@@ -65,6 +65,28 @@ por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reut
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
+## Demostración sin consumo
+
+Para recorrer la interfaz sin claves, sin red y sin tocar `data/`:
+
+```console
+uv run --locked --offline python demo.py
+```
+
+Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). La demostración crea en la carpeta
+temporal del sistema una base nueva con una campaña **exclusivamente sintética**: siete
+empresas ficticias (dominios `.example`), sus personas, evidencia y una lista de exclusiones,
+que cubren todos los estados comerciales. Las puntuaciones y la disponibilidad salen de las
+mismas reglas que con datos reales. Cada página muestra un aviso de demostración y los CSV
+descargados empiezan por `demo-sintetica-`. No son resultados reales ni sirven como
+evidencia de contactabilidad.
+
+El proceso quita las claves de proveedores de su entorno y no tiene archivo de acceso: la
+interfaz no puede ejecutar investigaciones. Revisar, confirmar canales y exportar funcionan
+sobre la base temporal. Detén el servidor con Ctrl+C (no con Ctrl+Break, aunque Django lo
+sugiera en Windows): al salir se borra la base. Si el proceso se cierra de forma abrupta,
+puede quedar una carpeta `veryfi-demo-*` con datos sintéticos en la carpeta temporal.
+
 ## Evaluación offline
 
 Desde la raíz, evalúa un manifiesto local con instantáneas y etiquetas versionadas:
@@ -153,6 +175,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `core/`: vistas, formularios, ejecución en el proceso, presentación y CSV seguro; usa las APIs públicas del pipeline.
 - `templates/`: plantilla base, páginas en `pages/` y fragmentos compartidos en `components/`.
 - `static/`: estilos en `css/`, JavaScript en `js/` y logotipo en `img/`.
+- `demo.py`: demostración local de la interfaz con una base temporal exclusivamente sintética.
 - `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.

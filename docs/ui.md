@@ -11,6 +11,11 @@ usa una sola instancia local con la base
 `data/prospecting.sqlite3`. La aplicación busca y lee información: no envía mensajes
 ni notificaciones para comprobar canales.
 
+Para mostrarla sin claves ni consumo, `uv run --locked --offline python demo.py` la inicia
+sobre una base temporal exclusivamente sintética, con un aviso fijo en cada página y CSV
+nombrados `demo-sintetica-…`; sin archivo de acceso, la ejecución queda bloqueada
+([README](../README.md#demostración-sin-consumo)).
+
 La migración de la interfaz a Django fue aprobada el 13 de octubre de 2026.
 Sustituye la interfaz Streamlit descrita en la arquitectura inicial de `IDEA.md`;
 el pipeline, sus contratos, reglas y persistencia permanecen iguales.
