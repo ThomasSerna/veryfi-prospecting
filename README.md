@@ -138,7 +138,10 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 ## Estructura y responsabilidades
 
 - `manage.py`: comandos y arranque del servicio Django local.
-- `webapp/`: formularios, vistas, ejecución en el proceso, plantillas, estilos y CSV seguro; usa las APIs públicas del pipeline.
+- `config/`: configuración global y rutas del proyecto Django; conserva el catálogo `veryfi.json`.
+- `core/`: vistas, formularios, ejecución en el proceso, presentación y CSV seguro; usa las APIs públicas del pipeline.
+- `templates/`: plantilla base, páginas en `pages/` y fragmentos compartidos en `components/`.
+- `static/`: estilos en `css/`, JavaScript en `js/` y logotipo en `img/`.
 - `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.

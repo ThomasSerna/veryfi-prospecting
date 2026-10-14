@@ -177,7 +177,22 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
 
-## Verificación de Django del 13 de octubre de 2026
+## Verificación de la reorganización del 13 de octubre de 2026
+
+- Django separa configuración global en `config/`, interfaz en `core/`, plantillas
+  en `templates/` y recursos en `static/`. Las vistas permanecen juntas y el
+  namespace público `webapp` se conserva; el paquete antiguo ya no existe.
+- `uv lock --check`, `uv run --locked python manage.py check` y la suite completa:
+  802 pruebas pasan sin red externa, incluidas tres comprobaciones de carga de
+  CSS, JavaScript y logotipo con `DEBUG=False` y sin crear una base.
+- La comparación del código confirma las mismas implementaciones y aserciones
+  anteriores, salvo las ubicaciones. Las plantillas solo cambian referencias;
+  CSS, JavaScript y logotipo conservan su contenido. `prospecting/`, el catálogo,
+  la persistencia y las dependencias no cambiaron.
+- Los comandos de ejecución siguen iguales. No se realizaron llamadas reales a
+  proveedores ni otra revisión visual: esta reorganización conserva el diseño.
+
+## Verificación de la migración a Django del 13 de octubre de 2026
 
 - `uv lock --check`, `uv run --locked python manage.py check` y la suite completa:
   799 pruebas pasan. Las pruebas de negocio conservan sus aserciones; se trasladaron
