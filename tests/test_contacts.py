@@ -744,3 +744,28 @@ def test_assistant_to_target_role_is_not_the_holder_even_when_previously_marked_
 @pytest.mark.parametrize("title", ["CTO", "CTO LATAM", "Chief Technology Officer", "Chief Technical Officer", "Director de tecnología"])
 def test_target_role_holders_keep_equivalences_and_qualifiers(title):
     assert role_matches(title, [TITLE])
+
+
+@pytest.mark.parametrize("countries,scope,expected", [
+    (["CO"], "Responsable de Chile", False),
+    (["CO"], "Responsable de Perú", False),
+    (["CO"], "Responsable de México", False),
+    (["CO"], "Alcance por comprobar", False),
+    (["CO"], "Equipo globalizado para Chile", False),
+    (["CO"], "Equipo latamizado", False),
+    (None, "Responsable de Colombia", False),
+    (["CO"], "Responsable de Colombia", True),
+    (["CO"], "Responsable LATAM con residencia en México", True),
+    (["CO"], "Responsable de Latinoamérica", True),
+    (["CO"], "Responsable global", True),
+    (["CO"], "Responsable mundial", True),
+])
+def test_declared_geographic_scope_needs_known_country_or_explicit_regional_role(eligible, countries, scope, expected):
+    company, campaign, assessment, contact, evidence = eligible
+    company = company.model_copy(update={"operating_countries": countries})
+    source = evidence[0].model_copy(update={"excerpt": f"{NAME}, {TITLE} de Empresa sintética. {scope}."})
+    contact = contact.model_copy(update={"geographic_scope": scope,
+        "provenance": contact.provenance | {"geographic_scope": [source.id]}})
+    assert validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW) is expected
+    assert (derive_readiness(assessment, [contact], [source, evidence[1]], campaign.limits, NOW, company)
+            == "ready_preferred") is expected

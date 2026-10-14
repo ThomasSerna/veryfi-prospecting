@@ -212,12 +212,12 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
         if not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence):
             return False
         scope = fold_words(contact.geographic_scope)
-        regional = any(word in scope for word in ("latam", "latinoamerica", "latin america", "global", "mundial"))
+        regional = any(mentions(scope, word) for word in ("latam", "latinoamerica", "latin america", "global", "mundial"))
         explicit = {code for code, names in {"CO": ("colombia", "co"), "MX": ("mexico", "mx"),
                                             "US": ("united states", "estados unidos", "us"),
                                             "ES": ("espana", "spain"), "AR": ("argentina",), "BR": ("brasil", "brazil")}.items()
                     if any(mentions(scope, name) for name in names)}
-        if not regional and explicit and company.operating_countries and not explicit.intersection(company.operating_countries):
+        if not regional and not explicit.intersection(company.operating_countries or []):
             return False
     facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
     if any(item.kind == "observed" and employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in facts):
