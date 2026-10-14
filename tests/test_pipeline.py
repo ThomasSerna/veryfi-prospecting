@@ -633,3 +633,21 @@ def test_unauthorized_or_expired_expansion_never_reaches_transport(tavily):
     assert research(case, company_id, deadline=0.0).stop_reason == "time_limit"
     assert len(case.calls) == calls
     assert "research:web_queries" not in case.db.get_run_item(case.campaign.id, company_id).attempts
+
+
+def test_disabled_expansion_operation_preserves_local_error_without_request_or_spend(tavily):
+    case, company_id = expansion_case(tavily)
+    ledger = case.db.list_usage()
+    consumed = case.db.get_run_item(case.campaign.id, company_id).consumed_limits
+
+    def forbidden(*args):
+        pytest.fail("Una operación deshabilitada no debe iniciar el transporte sintético.")
+
+    case.client = ProviderClient(case.budget, [], transport=forbidden)
+    report = research(case, company_id)
+    assert report.status == "pending" and report.stop_reason == "local_error"
+    assert report.error_message and report.request_ids == []
+    saved = case.db.get_run_item(case.campaign.id, company_id)
+    assert saved.error_message == f"local_error: {report.error_message}"
+    assert saved.consumed_limits == consumed and case.db.list_usage() == ledger
+    assert "research:web_queries" not in saved.attempts

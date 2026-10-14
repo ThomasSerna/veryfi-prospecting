@@ -187,7 +187,8 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
             key = EXPANSION_QUERIES_KEY if operation == SEARCH_OPERATION else EXPANSION_PAGES_KEY
             _checkpoint(db, campaign_id, company_id, error=f"{reason}: {error.message}",
                         attempts={key: amount for amount in spent.values()}, consumed=spent)
-            report["request_ids"].append(error.request_id)
+            if error.request_id is not None:
+                report["request_ids"].append(error.request_id)
             return None, ResearchReport(**base, **report, status="pending", stop_reason=reason,
                                         error_message=error.message)
         report["request_ids"].append(usage.request_id)
