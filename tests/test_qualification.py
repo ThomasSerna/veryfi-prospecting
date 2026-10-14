@@ -11,7 +11,7 @@ import httpx2
 import pytest
 
 from prospecting.budget import AccountAllowance, Budget, BudgetError, SpendingAuthorization
-from prospecting.haiku import MODEL_ID
+from prospecting.haiku import CHARS_PER_TOKEN, MODEL_ID
 from prospecting.models import (
     BusinessStatus, Contact, Criterion, Evidence, IdentityStatus, RunItem, UsageStatus, utc_now,
 )
@@ -165,7 +165,7 @@ def test_request_is_bounded_and_keeps_external_text_as_data(scenario):
     assert "IGNORA LAS REGLAS" in block and "\\u003c/evidencia>" in block
     assert user.count("</evidencia>") == 1
     size = len(payload["system"]) + len(user) + len(json.dumps(payload["output_config"]))
-    assert size <= scenario.campaign.limits.llm.max_input_tokens * 3
+    assert size <= scenario.campaign.limits.llm.max_input_tokens * CHARS_PER_TOKEN
 
 
 def search_hit(scenario, query="software que escanea recibos sintéticos"):
@@ -224,7 +224,22 @@ def test_evidence_selection_respects_character_budget(scenario):
     payload, selected = build_haiku_request(scenario.company, long, scenario.campaign)
     assert 0 < len(selected) < 60
     size = len(payload["system"]) + len(payload["messages"][0]["content"]) + len(json.dumps(payload["output_config"]))
-    assert size <= scenario.campaign.limits.llm.max_input_tokens * 3
+    assert size <= scenario.campaign.limits.llm.max_input_tokens * CHARS_PER_TOKEN
+
+
+# Relación más desfavorable medida el 2026-10-14 en 15 solicitudes reales: texto enviado por token facturado.
+MEASURED_CHARS_PER_TOKEN = 2.11
+
+
+def test_full_request_stays_within_the_token_limit_at_the_measured_ratio(scenario):
+    long = [Evidence(company_id=scenario.company.id, claim=f"Texto sintético {index}.",
+                     url=f"https://empresa-uno.example/p{index}", excerpt="x" * 2000,
+                     retrieved_at=RETRIEVED_AT, kind="observed", source_type="primary")
+            for index in range(60)]
+    payload, _ = build_haiku_request(scenario.company, long, scenario.campaign)
+    schema = payload["output_config"]["format"]["schema"]
+    size = len(payload["system"]) + len(payload["messages"][0]["content"]) + len(json.dumps(schema, ensure_ascii=False))
+    assert size / MEASURED_CHARS_PER_TOKEN <= scenario.campaign.limits.llm.max_input_tokens
 
 
 @pytest.mark.parametrize(("overrides", "code"), [
@@ -362,7 +377,7 @@ def test_reservation_covers_dense_prompt_and_maximum_output(claude):
     payload, _ = build_haiku_request(claude.company, claude.db.list_evidence(claude.company.id), claude.campaign)
     size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     dense = size * 10 // 22
-    assert dense > claude.campaign.limits.llm.max_input_tokens  # La reserva fija anterior no lo cubría.
+    assert dense > 6000  # La reserva fija anterior, de 6.000 tokens, no lo cubría.
     claude.reply = message(output(claude), input_tokens=dense, output_tokens=payload["max_tokens"])
     report = claude.qualify()
     usage = claude.db.get_usage(report.request_id)

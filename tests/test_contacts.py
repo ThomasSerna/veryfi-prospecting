@@ -492,6 +492,19 @@ def test_contact_search_summary_cannot_become_public_contact_facts(eligible):
     assert caught.value.code == "unknown_evidence"
 
 
+def test_full_contacts_request_stays_within_the_token_limit_at_the_measured_ratio(eligible):
+    """Con la relación más desfavorable medida el 2026-10-14 (2,11 caracteres por token facturado)."""
+    company, campaign, assessment, contact, _ = eligible
+    long = [Evidence(company_id=company.id, claim=f"Página sintética {index}.", excerpt="x" * 800,
+                     url=f"https://example.com/p{index}", retrieved_at=NOW, kind="observed", source_type="primary")
+            for index in range(60)]
+    payload, selected = build_contacts_request(company, assessment, campaign, long, [contact])
+    assert 0 < len(selected) < 60
+    schema = payload["output_config"]["format"]["schema"]
+    size = len(payload["system"]) + len(payload["messages"][0]["content"]) + len(json.dumps(schema, ensure_ascii=False))
+    assert size / 2.11 <= campaign.limits.llm.max_input_tokens
+
+
 def test_api_schema_is_transformed_but_local_validation_keeps_its_limits(eligible):
     company, campaign, assessment, contact, evidence = eligible
     payload, _ = build_contacts_request(company, assessment, campaign, evidence, [contact])

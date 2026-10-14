@@ -346,7 +346,7 @@ class BudgetLimits(Contract):
 
 
 class LlmLimits(Contract):
-    max_input_tokens: Annotated[Count, Field(le=6000)]
+    max_input_tokens: Annotated[Count, Field(le=9000)]
     max_output_tokens: Annotated[Count, Field(le=1000)]
 
 

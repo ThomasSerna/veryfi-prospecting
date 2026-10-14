@@ -182,6 +182,6 @@
       "variable_cost_waterfall": false,
       "paid_phone_enrichment": false
     },
-    "llm": {"max_input_tokens": 6000, "max_output_tokens": 1000}
+    "llm": {"max_input_tokens": 9000, "max_output_tokens": 1000}
   }
 }

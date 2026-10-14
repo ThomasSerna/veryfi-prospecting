@@ -8,7 +8,10 @@ import json
 
 
 MODEL_ID = "claude-haiku-5-5"
-CHARS_PER_TOKEN = 3
+# Caracteres de texto (sistema, mensaje y esquema) por token de entrada facturado. Medido el
+# 2026-10-14 en 15 solicitudes reales de calificación, reconstruidas por su huella: entre 2,11 y 2,26,
+# incluido el prompt que inyecta la salida estructurada. Con 3, las solicitudes superaban el límite.
+CHARS_PER_TOKEN = 2
 
 
 def prompt_json(value) -> str:
