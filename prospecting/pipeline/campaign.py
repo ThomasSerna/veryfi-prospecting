@@ -31,7 +31,7 @@ from prospecting.pipeline.calls import grant_for, seconds_left
 from prospecting.pipeline.contacts import find_contacts
 from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
-from prospecting.pipeline.research import extract_company_pages, research_company
+from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
 from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess, PROVIDER as HUNTER
 from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION, TAVILY_OPERATIONS
@@ -541,7 +541,9 @@ class _Run:
                 return
 
     def qualify_company(self, company_id: UUID) -> bool:
-        report = self.qualify(company_id, ("initial",))
+        item = self.db.get_run_item(self.campaign.id, company_id)
+        levels = ("initial", "insufficient_evidence") if item.attempts.get(EXPANSION_KEY, 0) else ("initial",)
+        report = self.qualify(company_id, levels)
         if report.status == "pending":
             return self.halt(report.reason)
         if report.priority == Priority.INSUFFICIENT_EVIDENCE:

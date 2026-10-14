@@ -13,7 +13,7 @@ import pytest
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
-from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, RunItem, RunStage, UsageStatus, utc_now
+from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, Evidence, RunItem, RunStage, UsageStatus, utc_now
 from prospecting.pipeline import close_campaign, run_campaign, start_campaign
 from prospecting.pipeline.campaign import BUDGET_STOPS, PROVIDER_STOPS
 from prospecting.pipeline.contacts import ContactReport
@@ -226,6 +226,53 @@ def test_campaign_runs_every_stage_in_order_and_completes(world):
     assert all(item.consumed_limits.active_seconds >= item.consumed_limits.contacts_active_seconds
                for item in items.values())
     assert_no_request_sent_twice(case)
+
+
+@pytest.mark.parametrize("expanded", [False, True])
+def test_resume_qualification_preserves_expansion_time_and_consumption(
+        world, make_company, make_assessment, monkeypatch, expanded):
+    from prospecting.pipeline import campaign as bridge
+    from prospecting.pipeline.research import EXPANSION_KEY
+
+    case = world.setup()
+    start(case)
+    company, facts = make_company(name="Alta Uno", domain="alta-uno.example", identity_status="confirmed",
+                                  operating_countries=["CO"], segments=["fintech_software"])
+    case.db.save_company(company, evidence=facts)
+    item = case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=company.id, stage="assessed",
+                                        attempts={EXPANSION_KEY: 1} if expanded else {},
+                                        consumed_limits={"active_seconds": 100.0, "web_queries": 1, "pages": 1}))
+    assessment = make_assessment(case.campaign.id, company.id, model_id="modelo-sintetico",
+                                 prompt_version=PROMPT_VERSION)
+    case.db.save_assessment(assessment)
+    case.db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    case.db.save_evidence(Evidence(company_id=company.id, claim="Fuente nueva sintética de la ampliación.",
+                                  url="https://alta-uno.example/producto", excerpt=page("https://alta-uno.example/producto"),
+                                  retrieved_at=utc_now(), kind="observed", source_type="primary"))
+    deadlines = []
+    qualify = bridge.qualify_company
+
+    def measured(*args, **kwargs):
+        deadlines.append(kwargs["deadline"] - bridge.time.monotonic())
+        return qualify(*args, **kwargs)
+
+    monkeypatch.setattr(bridge.time, "monotonic", lambda: 1000.0)
+    monkeypatch.setattr(bridge, "qualify_company", measured)
+    report = case.run()
+    saved = case.db.get_run_item(case.campaign.id, company.id)
+    assert deadlines == [35.0 if expanded else 0.0]
+    assert saved.consumed_limits.active_seconds == 100.0
+    assert saved.consumed_limits.web_queries >= 1 and saved.consumed_limits.pages >= 1
+    assert case.db.get_assessment(assessment.id) == assessment
+    if expanded:
+        assert report.status == "completed" and saved.business_status == "ready_preferred"
+        assert saved.attempts[EXPANSION_KEY] == 1
+        assert case.events[0][0] == "haiku:qualification"
+        assert not any("include_domains" in payload for _, payload in case.events)
+    else:
+        assert report.status == "partial" and saved.stop_reason == "assessment_pending:time_limit"
+        assert case.events == [] and case.db.list_usage() == []
+        assert saved.consumed_limits == item.consumed_limits and saved.attempts == item.attempts
 
 
 def test_initial_analysis_extracts_the_page_that_located_each_company(world):
