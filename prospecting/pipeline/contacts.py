@@ -290,8 +290,7 @@ class _ContactStage:
                 candidate = merge_contact(match, candidate, facts + source)
             if candidate.id not in selected and len(selected) >= self.effort.people:
                 continue
-            candidate, role_facts = apply_target_roles(candidate, self.roles, facts + source)
-            source += role_facts
+            candidate = apply_target_roles(candidate, self.roles)
             selected.add(candidate.id)
             saved.append((candidate, source))
         # La selección se persiste junto al resultado, sin reservar una persona por su nombre.

@@ -134,12 +134,12 @@ def role_matches(title: str | None, roles: list[str]) -> bool:
                for role in roles)
 
 
-def apply_target_roles(contact: Contact, roles: list[str], evidence: list[Evidence]) -> tuple[Contact, list[Evidence]]:
+def apply_target_roles(contact: Contact, roles: list[str]) -> Contact:
     if contact.title is None or not contact.provenance.get("title"):
-        return contact, []
+        return contact
     relevant = role_matches(contact.title, roles)
     return contact.model_copy(update={"relevant_function": relevant,
-                                      "provenance": contact.provenance | {"relevant_function": contact.provenance["title"]}}), []
+                                      "provenance": contact.provenance | {"relevant_function": contact.provenance["title"]}})
 
 
 def _fresh(value: datetime | None, days: int, now: datetime) -> bool:

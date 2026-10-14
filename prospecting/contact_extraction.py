@@ -187,7 +187,7 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
             except ValueError:
                 raise ContactError("invalid_channel", "El canal público no cumple formato o país comprobado.") from None
         contact = contact.model_copy(update={"channels": channels})
-        contact, _ = apply_target_roles(contact, target_roles(company, assessment, campaign), evidence)
+        contact = apply_target_roles(contact, target_roles(company, assessment, campaign))
         evidence.append(Evidence(company_id=company.id, contact_id=contact_id,
                                  claim=f"Extracción propuesta por {MODEL_ID}; prompt={CONTACTS_PROMPT_VERSION}; referencias y citas validadas por Python.",
                                  provider="anthropic", external_reference=str(request_id), retrieved_at=now,

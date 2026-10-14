@@ -355,10 +355,10 @@ def test_public_homonyms_are_not_fused_and_output_is_bounded(eligible):
 
 
 def test_role_relevance_is_deterministic_and_uses_observed_title(eligible):
-    _, _, _, contact, evidence = eligible
-    saved, _ = apply_target_roles(contact.model_copy(update={"relevant_function": None}), ["CTO"], evidence)
+    _, _, _, contact, _ = eligible
+    saved = apply_target_roles(contact.model_copy(update={"relevant_function": None}), ["CTO"])
     assert saved.relevant_function is True and saved.provenance["relevant_function"] == saved.provenance["title"]
-    saved, _ = apply_target_roles(contact, ["Marketing Director"], evidence)
+    saved = apply_target_roles(contact, ["Marketing Director"])
     assert saved.relevant_function is False
 
 
