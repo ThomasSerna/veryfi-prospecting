@@ -171,6 +171,22 @@ def test_prepare_criteria_and_refresh_preserve_one_campaign(ui_paths, client):
         assert db.list_campaigns() == campaigns and db.list_usage() == []
 
 
+@pytest.mark.parametrize("status", ["running", "paused_budget"])
+def test_unfinished_active_campaign_is_announced_and_blocks_preparing_another(ui_paths, client, make_campaign, status):
+    active = make_campaign(status=status)
+    with Database(ui_paths.db) as db:
+        db.save_campaign(active)
+    page = client.get(url("new_campaign"))
+    assert page.status_code == 200
+    assert "Hay una campaña sin terminar." in text(page) and url("campaign", active.id) in text(page)
+    assert re.search(r"<fieldset[^>]*\bdisabled\b", text(page))
+    response = prepare(client)
+    # Antes se abría la campaña activa sin avisar; ahora se explica y no se crea otra.
+    assert response.status_code == 409 and "Retómala o ciérrala" in text(response)
+    with Database(ui_paths.db) as db:
+        assert [item.id for item in db.list_campaigns()] == [active.id]
+
+
 @pytest.mark.parametrize("fields", [
     {"countries": []}, {"segments": []}, {"max_companies": "21"},
     {"countries": ["XX"]}, {"segments": ["inventado"]},

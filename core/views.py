@@ -155,11 +155,18 @@ def new_campaign(request):
         request.session["draft_id"] = str(uuid4())
     draft_id = UUID(request.session["draft_id"])
     form = CampaignForm(request.POST if request.method == "POST" else None, config=config, campaign_id=draft_id)
-    context.update(form=form, config=config, nav_active="new_campaign", is_executing=_global_busy(context))
+    # Solo hay una campaña activa por base (§13.3): otra sin terminar se anuncia en lugar de abrirse sin aviso.
+    active = context["active_campaign"]
+    blocking = active if active is not None and active.id != draft_id else None
+    context.update(form=form, config=config, nav_active="new_campaign", is_executing=_global_busy(context),
+                   blocking_campaign=blocking)
     if request.method == "POST" and form.is_valid():
         with execution.idle_action():
             if _global_busy(context):
                 raise execution.ExecutionBusy("Hay una investigación en curso. Espera antes de preparar otra campaña.")
+            if blocking is not None:
+                raise execution.ExecutionBusy("Hay una campaña sin terminar. Retómala o ciérrala conservando sus "
+                                              "resultados antes de preparar otra.")
             saved = prepare_campaign(_paths()[0], form.campaign)
         return redirect("webapp:campaign", campaign_id=saved.id)
     return render(request, "pages/new_campaign.html", context, status=400 if request.method == "POST" else 200)

@@ -4,11 +4,12 @@
 {% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><span>Nueva campaña</span>{% endblock %}
 {% block content %}
 <header class="page-heading"><div><h1>¿Dónde está tu próxima oportunidad?</h1><p>Define el mercado de esta campaña. Podrás revisar los topes antes de empezar a investigar.</p></div></header>
-{% if is_executing or execution.is_executing %}<div class="notice notice-info"><strong>Hay una investigación en curso.</strong><p>Espera a que termine para preparar otra campaña.</p></div>{% endif %}
+{% if is_executing or execution.is_executing %}<div class="notice notice-info"><strong>Hay una investigación en curso.</strong><p>Espera a que termine para preparar otra campaña.</p></div>
+{% elif blocking_campaign %}<div class="notice notice-warning" role="status"><strong>Hay una campaña sin terminar.</strong><p>Retómala o ciérrala conservando sus resultados antes de preparar otra. <a href="{% url 'webapp:campaign' blocking_campaign.id %}" class="text-link">Ver campaña</a></p></div>{% endif %}
 <div class="preparation-layout">
   <form method="post" class="surface preparation-form" data-idle-form>{% csrf_token %}{% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
     {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-    <fieldset {% if is_executing or execution.is_executing %}disabled{% endif %}>
+    <fieldset {% if is_executing or execution.is_executing or blocking_campaign %}disabled{% endif %}>
       <legend class="section-title">El mercado que quieres explorar</legend>
       <div class="form-grid">{% include 'components/_field.html' with field=form.countries %}{% include 'components/_field.html' with field=form.segments %}</div>
       <div class="form-divider"></div>
