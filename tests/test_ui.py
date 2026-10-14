@@ -6,6 +6,7 @@ from html import escape
 from html.parser import HTMLParser
 from io import StringIO
 import os
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -396,6 +397,28 @@ def test_results_prioritize_fit_and_stop_reasons_explain_the_next_action(ui_resu
     assert "no se repite" in stop_message("duplicate_request")
     assert "autoriza de nuevo" in stop_message("authorization_required")
     assert "evidencia" in stop_message("assessment_pending:invalid_response")
+
+
+@pytest.mark.parametrize("reason, tone, expected", [
+    ("preferred_channel_found", "info", "canal preferido"),
+    ("people_limit", "info", "máximo de personas"),
+    ("excluded_account", "info", "lista de exclusiones"),
+    (f"duplicate_of:{uuid4()}", "info", "duplicado confirmado"),
+    ("low_fit", "info", "encaje es bajo"),
+    ("identity_unverified", "warning", "confirmó su identidad"),
+    ("insufficient_evidence:unknown_need_or_match", "warning", "no permite decidir"),
+    ("motivo_sintetico_desconocido", "warning", "quedó pendiente"),
+])
+def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reason, tone, expected):
+    case = ui_results
+    with Database(case.paths.db) as db:
+        item = db.get_run_item(case.campaign.id, case.companies[0].id)
+        db.save_run_item(item.model_copy(update={"stop_reason": reason}))
+    shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    notice = re.search(r'<div class="notice notice-(\w+)"><strong>([^<]*)</strong><p class="literal-detail">'
+                       r'Motivo registrado: ([^<]*)</p>', shown)
+    assert notice is not None and notice[1] == tone and expected in notice[2] and notice[3] == escape(reason)
+    assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
 
 
 def test_csrf_is_required_and_read_only_routes_do_not_accept_writes(ui_paths):

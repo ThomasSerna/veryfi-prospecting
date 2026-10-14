@@ -61,6 +61,21 @@ STOP_MESSAGES = {
     "exclusion_review": "La exclusión necesita revisión humana antes de seguir investigando.",
     "duplicate_review": "La identidad o un posible duplicado necesita revisión antes de continuar.",
     "assessment_pending": "La calificación quedó pendiente. Revisa el fallo y la evidencia conservada.",
+    "no_target_roles": "La calificación no dejó cargos de los perfiles de esta campaña; no se buscaron personas.",
+    "contact_preconditions": "La empresa no cumple las condiciones para buscar contactos: identidad confirmada y prioridad alta o media.",
+    "domain_unknown": "No se pudo confirmar el dominio oficial; la identidad queda pendiente.",
+    "identity_unverified": "Ninguna página propia de la empresa confirmó su identidad; queda pendiente de revisión.",
+    "name_unconfirmed": "La página propia no confirmó el nombre de la empresa; la identidad queda pendiente.",
+    "country_unconfirmed": "No se confirmó la operación en los países de la campaña; la identidad queda pendiente.",
+}
+# Paradas previstas: la empresa terminó su plan con un resultado, no quedó pendiente ni falló.
+STOP_OUTCOMES = {
+    "preferred_channel_found": "Se encontró una persona pertinente con un canal preferido; la búsqueda de contactos terminó.",
+    "people_limit": "Se investigó el máximo de personas previsto para esta prioridad; la búsqueda de contactos terminó.",
+    "already_checked": "Los contactos ya se habían investigado y se reutilizaron sin repetir consultas.",
+    "excluded_account": "La empresa figura en la lista de exclusiones; no se investigó más.",
+    "duplicate_of": "Es un duplicado confirmado de otra empresa de esta campaña; se investiga una sola vez.",
+    "low_fit": "El encaje es bajo con evidencia suficiente; no se buscaron contactos.",
 }
 
 
@@ -72,9 +87,21 @@ def money(value):
     return "Desconocido" if value is None else f"USD {value:.6f}"
 
 
+def _stop_key(reason, messages):
+    return next((key for key in messages if reason == key or reason.startswith(key + "_") or reason.startswith(key + ":")), None)
+
+
 def stop_message(reason):
-    key = next((key for key in STOP_MESSAGES if reason == key or reason.startswith(key + "_") or reason.startswith(key + ":")), None)
-    return STOP_MESSAGES.get(key, "La investigación quedó pendiente. Revisa el error y los datos guardados antes de reanudar.")
+    for messages in (STOP_OUTCOMES, STOP_MESSAGES):
+        key = _stop_key(reason, messages)
+        if key is not None:
+            return messages[key]
+    return "La investigación quedó pendiente. Revisa el error y los datos guardados antes de reanudar."
+
+
+def stop_tone(reason):
+    """Una parada prevista se informa; las demás piden revisar antes de seguir."""
+    return "info" if _stop_key(reason, STOP_OUTCOMES) is not None else "warning"
 
 
 
