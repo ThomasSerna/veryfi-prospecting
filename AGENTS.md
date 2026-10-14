@@ -66,14 +66,15 @@ Lee estas secciones cuando la tarea toque el tema:
 - Ejecuta Python y pruebas con `uv run` e instala con `uv add`, no con `pip`, para que `pyproject.toml` y `uv.lock` no se desincronicen.
 - Usa los comandos de prueba, verificación y ejecución que definan `pyproject.toml` y `README.md`; si falta uno, propónlo en lugar de asumirlo.
 - Dependencias: libres si son paquetes oficiales (los que recomienda el proveedor del servicio) o ampliamente conocidos y la tarea los necesita. Confirma el nombre exacto en PyPI o en la documentación oficial, fija la versión exacta (`==`) y avisa qué instalas. pytest está aprobado como dependencia de desarrollo.
-- El stack de §13 manda sobre esa libertad: sin FastAPI, React, Redis, Celery, base vectorial ni ORM, y sin dependencias para funciones triviales.
-- Streamlit queda fijado a loopback (`server.address = "127.0.0.1"` en su configuración): su valor por defecto no lo fija y §15 lo exige.
+- El stack de §13 manda sobre esa libertad: sin FastAPI, React, Redis, Celery ni base vectorial; Django se usa sin su ORM, migraciones, autenticación ni admin, y sin dependencias para funciones triviales.
+- Django queda fijado a loopback (§15): `manage.py runserver` solo acepta 127.0.0.1 y arranca sin recargador, `ALLOWED_HOSTS` es local, `DEBUG = False` y `core/middleware.py` rechaza conexiones externas. No relajes estas restricciones ni expongas el servidor de desarrollo fuera del equipo.
 
 ## Código y pruebas
 
 - Idioma: identificadores (variables, funciones, columnas, enumeraciones, claves JSON) en inglés, con los nombres que IDEA.md ya define (`fit_score`, `stop_reason`, `ready_preferred`; §8, §10.3, §13.2). Comentarios, docstrings, texto de UI, documentación y commits en español.
 - Estructura: cada responsabilidad vive en el módulo que le asigna §13.1, y las importaciones siguen la dirección de §13, que comprueba `tests/test_architecture.py`. Crea un módulo cuando una tarea lo necesite, con ese nombre, y reutiliza lo existente.
 - Límites externos: valida con Pydantic las respuestas de proveedores y de Haiku. La UI no interpreta respuestas crudas, y solo `prospecting.pipeline` avanza etapas y reserva gasto antes de llamar a un proveedor (§13.2).
+- Interfaz: vive en `core/`, `templates/` y `static/` y usa las APIs públicas de `prospecting.pipeline`; `prospecting` no importa Django. El contenido externo pasa por el autoescape de las plantillas; no lo marques como seguro (`|safe`, `mark_safe`) (§15).
 - Identificadores persistidos: al mover o reorganizar código, conserva exactamente los valores de la lista de `docs/persistence.md`; `tests/test_persisted_identifiers.py` los fija. Cambiar uno es un cambio de conducta, con su propia versión y aprobación.
 - Las pruebas corren sin red, con fixtures sintéticos y una base temporal. Las que llaman a proveedores reales van aparte, explícitas y bajo la autorización de "Gasto".
 - Una integración "funciona" solo tras una llamada real autorizada; lo demás se informa como simulado. Ante un fallo de API (permiso, cuota, timeout, JSON inválido) conserva etapa y motivo y reporta el fallo literal, en vez de disimularlo con resultados ficticios (§17.3).

@@ -376,18 +376,25 @@ Todo contenido de páginas, PDFs y respuestas de proveedores es dato no confiabl
 
 ## 13. Arquitectura mínima
 
-**Python + Streamlit + SQLite**, en una aplicación local. Streamlit permite una interfaz de revisión usando el lenguaje que domina el equipo. SQLite conserva resultados, uso y estados; `session_state` solo conserva estado visual, no el presupuesto ni la única copia de una ejecución [W8].
+**Python + Django + SQLite**, en una aplicación local de una sola instancia. Django sirve la interfaz de revisión con plantillas renderizadas en el servidor y JavaScript local mínimo, en el lenguaje que domina el equipo; sustituyó a Streamlit por decisión aprobada el 13 de octubre de 2026. Se usa sin ORM, migraciones, cuentas de usuario ni panel de administración: SQLite, gestionada por `prospecting.db`, conserva resultados, uso y estados. La sesión firmada y la memoria del proceso solo guardan estado de presentación y de la ejecución en curso, nunca el presupuesto ni la única copia de una ejecución. El servidor es el de desarrollo de Django, limitado a loopback y no apto para producción [W8].
 
 Usar Pydantic para contratos en límites externos y validación de respuestas; `sqlite3`, `csv`, `json`, `datetime` y otras bibliotecas estándar para persistencia/exportación. Un cliente HTTP compartido y el SDK de Haiku que simplifique la integración. Incluir solamente dependencias necesarias y fijar versiones comprobadas.
 
-No introducir FastAPI, React, Redis, Celery, una base vectorial o un ORM en el MVP. Si el piloto exige sesiones simultáneas y trabajos remotos, evaluar entonces API, trabajador y base multiusuario con evidencia de necesidad.
+No introducir FastAPI, React, Redis, Celery, una base vectorial ni un ORM (tampoco el de Django) en el MVP. Si el piloto exige sesiones simultáneas y trabajos remotos, evaluar entonces API, trabajador y base multiusuario con evidencia de necesidad.
 
-Las importaciones van en una sola dirección: `models` ← `text`, `sources`, `haiku` ← módulos de negocio (`discovery`, `identity`, `qualification`, `contacts`, `contact_extraction`) ← `providers/` ← `pipeline/` ← `app.py`. `db` y `budget` solo se usan desde `providers/` y `pipeline/`. Los módulos de negocio no hacen red, no guardan datos ni reservan gasto; cada adaptador de `providers/` traduce entre el formato de un proveedor y los contratos de §13.2; `pipeline/` los combina con presupuesto y persistencia. Entre los módulos de negocio se permiten `identity → discovery`, para reutilizar `Candidate`, y `contact_extraction → contacts`, para aplicar las reglas comunes de personas y canales. Estas dependencias no habilitan ciclos ni acceso a proveedores, presupuesto o persistencia. `tests/test_architecture.py` comprueba esta dirección y que no haya ciclos.
+Las importaciones van en una sola dirección: `models` ← `text`, `sources`, `haiku` ← módulos de negocio (`discovery`, `identity`, `qualification`, `contacts`, `contact_extraction`) ← `providers/` ← `pipeline/` ← `core/`. `db` y `budget` solo se usan desde `providers/` y `pipeline/`. Los módulos de negocio no hacen red, no guardan datos ni reservan gasto; cada adaptador de `providers/` traduce entre el formato de un proveedor y los contratos de §13.2; `pipeline/` los combina con presupuesto y persistencia. Entre los módulos de negocio se permiten `identity → discovery`, para reutilizar `Candidate`, y `contact_extraction → contacts`, para aplicar las reglas comunes de personas y canales. Estas dependencias no habilitan ciclos ni acceso a proveedores, presupuesto o persistencia. La interfaz (`core/`) usa las APIs públicas de `prospecting.pipeline`, los contratos de `models` y la validación de URLs de `sources`; `prospecting` no importa Django ni `core`. `tests/test_architecture.py` comprueba esta dirección dentro de `prospecting` y que no haya ciclos; `tests/test_initialization.py` comprueba que importar `prospecting` no carga Django.
 
 ### 13.1 Estructura orientativa
 
 ```text
-app.py                         Interfaz, revisión y exportación
+manage.py                      Arranque del servicio Django local (solo 127.0.0.1)
+config/
+  settings.py                  Configuración local: loopback, sin ORM ni cuentas
+  urls.py                      Rutas del proyecto
+  veryfi.json                  Catálogo, perfiles, cargos y rúbrica versionada
+core/                          Interfaz Django: vistas, formularios, ejecución en hilo, presentación y CSV seguro
+templates/                     Plantilla base, páginas y fragmentos
+static/                        CSS, JavaScript y logotipo locales
 prospecting/
   models.py                    Contratos, enumeraciones y validación
   db.py                        SQLite, transacciones y consultas
@@ -412,8 +419,6 @@ prospecting/
     qualification.py           Calificación
     contacts.py                Personas y canales
     campaign.py                Orquestación de campaña, parada y reanudación
-config/
-  veryfi.json                  Catálogo, perfiles, cargos y rúbrica versionada
 tests/                         Pruebas sin red; fixtures sintéticas
 data/                          Base local, caché y exportaciones; fuera de Git
 docs/                          Registro de proveedores y evaluación
@@ -456,9 +461,9 @@ Las cinco primeras están en `prospecting.pipeline`: son las únicas que reserva
 
 Estados técnicos de campaña: `created`, `running`, `completed`, `partial`, `paused_budget`, `failed`. Las etapas de cada empresa se guardan después de cada operación completada.
 
-MVP: una campaña activa por base local, procesamiento secuencial y operación interactiva. No prometer trabajo en segundo plano al cerrar la aplicación. Persistir antes de mostrar resultados y recuperar desde la última etapa confirmada si se interrumpe.
+MVP: una campaña activa por base local, procesamiento secuencial y operación interactiva. La investigación corre en un hilo del proceso del servidor: sigue si se cierra la pestaña mientras el servidor esté abierto, pero detenerlo o reiniciarlo la interrumpe. No prometer trabajo con el servidor detenido, cola persistente ni reanudación automática. Persistir antes de mostrar resultados y recuperar desde la última etapa confirmada si se interrumpe.
 
-Un clic duplicado o un rerun de Streamlit debe reutilizar la campaña activa, no duplicarla. En SQLite, comprobar/iniciar ejecución y reservar consumo con transacciones. No mantener una transacción abierta durante una llamada de red.
+Un clic duplicado, el reenvío de un formulario o una recarga de la página deben reutilizar la campaña activa, no duplicarla. Mientras una investigación esté en curso, la interfaz rechaza las acciones que modifican o exportan resultados. En SQLite, comprobar/iniciar ejecución y reservar consumo con transacciones. No mantener una transacción abierta durante una llamada de red.
 
 Aplicar timeout por proveedor, como máximo dos intentos para errores transitorios y respeto a `Retry-After` dentro del tiempo restante. Diferenciar falta de permisos, cuota agotada, entrada inválida y resultado vacío. No usar una tabla genérica de HTTP para todos los proveedores sin revisar sus semánticas.
 
@@ -499,11 +504,11 @@ El indicador de gasto de la aplicación es una estimación controlada, no reempl
 ## 15. Seguridad y tratamiento de datos
 
 - Claves en variables de entorno o archivo local ignorado por Git, nunca en frontend, prompts, fixtures, capturas ni logs. El documento registra nombres de proveedores, no secretos.
-- MVP local en loopback, sin publicar una base de contactos o llaves. Si se habilita acceso remoto, primero implementar autenticación, permisos y almacenamiento apropiados.
+- MVP local en loopback, sin publicar una base de contactos o llaves. El servidor Django solo escucha en 127.0.0.1, sin recargador, con `ALLOWED_HOSTS` local, `DEBUG = False`, protección CSRF y rechazo de conexiones que no vengan de loopback; es el servidor de desarrollo de Django, no apto para producción [W8]. Si se habilita acceso remoto, primero implementar autenticación, permisos y almacenamiento apropiados.
 - Guardar solo datos profesionales necesarios. Conservar extractos mínimos de evidencia, no copias masivas de sitios ni PDFs internos completos en proveedores externos.
 - Respetar restricciones de acceso y fuentes. No sortear login/CAPTCHA ni automatizar LinkedIn. Registrar datos retirados/restringidos como no disponibles.
 - Controlar URLs antes de cualquier extracción: HTTP(S), destinos públicos, sin rutas locales, loopback, redes privadas o metadata cloud. Validar también redirecciones si el cliente realiza la descarga. Limitar tamaño, tipo de contenido y tiempo.
-- Escapar contenido externo al mostrarlo. No renderizar HTML arbitrario de fuentes ni instrucciones de páginas como controles de la app. Usar consultas SQL parametrizadas y exportación CSV segura.
+- Escapar contenido externo al mostrarlo, con el autoescape de las plantillas de Django; no marcar contenido externo como seguro. No renderizar HTML arbitrario de fuentes ni instrucciones de páginas como controles de la app. Usar consultas SQL parametrizadas y exportación CSV segura.
 - No dar al agente herramientas de envío. La prohibición debe existir en capacidades y pruebas, no solo en el prompt.
 - Antes de un piloto, acordar con Veryfi responsable de datos, fuentes permitidas, acceso, retención y eliminación. Como propuesta académica, revisar los datos al terminar la entrega y eliminar lo que no se necesite; no publicar contactos reales en el informe académico.
 
@@ -528,7 +533,7 @@ Distribución para tres desarrolladores:
 |---|---|---|
 | Dev 1 | Descubrimiento y evidencia | Tavily, identidad, fuentes y exclusiones; entrega `Company`/`Evidence` |
 | Dev 2 | Calificación e integración del flujo | Haiku, rúbrica, presupuesto/persistencia y contratos compartidos; responsable de integrar cambios |
-| Dev 3 | Contactos e interfaz | Proveedor de personas/canal, estados de contacto, Streamlit y CSV; empezar por una ruta viable |
+| Dev 3 | Contactos e interfaz | Proveedor de personas/canal, estados de contacto, interfaz Django y CSV; empezar por una ruta viable |
 | Documentación | Informe y evaluación | Trazabilidad con análisis de negocio, decisiones, métricas, validación y capturas sin datos personales |
 
 Repartir código por módulo después de acordar contratos; un responsable por módulo compartido:
@@ -537,7 +542,7 @@ Repartir código por módulo después de acordar contratos; un responsable por m
 |---|---|
 | Dev 1 | `discovery.py`, `identity.py`, `sources.py`, `text.py`, `providers/tavily.py`, `pipeline/discovery.py`, `pipeline/research.py` |
 | Dev 2 (contratos e integración) | `models.py`, `db.py`, `budget.py`, `haiku.py`, `qualification.py`, `providers/http.py`, `providers/claude.py`, `pipeline/__init__.py`, `pipeline/calls.py`, `pipeline/qualification.py`, `pipeline/campaign.py` |
-| Dev 3 | `contacts.py`, `contact_extraction.py`, `providers/hunter.py`, `pipeline/contacts.py`, `app.py` |
+| Dev 3 | `contacts.py`, `contact_extraction.py`, `providers/hunter.py`, `pipeline/contacts.py`, `manage.py`, `config/settings.py`, `config/urls.py`, `core/`, `templates/`, `static/` |
 
 Integrar diariamente, no dejar UI, gasto y contratos para el último día. Si la carga de Dev 2/3 crece, redistribuir tareas terminadas manteniendo dueño del contrato.
 
@@ -635,7 +640,7 @@ Pruebas unitarias/integración sin red por defecto; llamadas reales separadas y 
 | Canal alternativo | LinkedIn solo pasa a listo tras confirmación manual; no envía mensajes |
 | Datos incompletos | Resultado vacío, nombre parcial y evidencia contradictoria producen pendiente |
 | Fallos de proveedor | Permiso denegado, cuota, timeout y JSON inválido conservan etapa y motivo |
-| Reruns/reinicio | Repetir clic o reanudar no repite pasos confirmados ni borra el gasto |
+| Clics repetidos/reinicio | Repetir clic, reenviar el formulario o reanudar no repite pasos confirmados ni borra el gasto |
 | Entrada hostil | Texto de página que pide enviar datos, subir presupuesto o cambiar reglas no altera el flujo |
 | Salida/URL insegura | CSV no ejecuta fórmulas; rutas privadas/redirects y HTML arbitrario son rechazados |
 | Trazabilidad | Referencias de modelo inexistentes se rechazan; la ficha conserva evidencia al exportar |
@@ -710,6 +715,6 @@ Pendientes operativos, que no impiden comenzar: créditos efectivos por cuenta, 
 - **W5.** LinkedIn: [acceso Sales Navigator/SNAP](https://learn.microsoft.com/en-us/linkedin/sales/) y [restricciones de automatización](https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software?intendedLocale=en&lang=en-us).
 - **W6.** Exa: [búsqueda](https://exa.ai/docs/reference/search) y [precios](https://exa.ai/pricing).
 - **W7.** [Brave Search API](https://brave.com/search/api/).
-- **W8.** [Streamlit: estado de sesión](https://docs.streamlit.io/develop/concepts/architecture/session-state).
+- **W8.** [Django: `runserver`, servidor de desarrollo no apto para producción](https://docs.djangoproject.com/en/5.2/ref/django-admin/#runserver).
 
 Se verificó documentación pública, no se ejecutaron solicitudes con las credenciales del equipo, no se compraron servicios y no se midió todavía cobertura real de prospectos. Los próximos agentes deben completar esas verificaciones dentro del presupuesto; este archivo es el plan, no una afirmación de que la aplicación ya exista.
