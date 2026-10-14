@@ -459,7 +459,7 @@ resultados ni compensarla relajando las reglas del flujo.
 | Conjunto independiente | Selección congelada de hasta 20 empresas nuevas, cinco por celda CO/MX × FinTech/CPG; procedimiento, fecha y solapamientos comprobados | Pendiente; informar tamaño logrado y casos incompletos |
 | Referencias de Veryfi | Revisor y rol comprobados, fecha, procedencia, aceptación separada de criterios/productos y motivos; nuevas versiones para correcciones | Pendiente; la revisión académica o desde UI no acredita validación de Veryfi |
 | Calidad comercial | Evaluaciones reales y etiquetas comparables; métricas, intervalos, pérdidas, errores y costos atribuibles en `evaluation.md` | Pendiente; fixtures solo verifican el mecanismo |
-| MVP y T11 | Demostración documentada de al menos un prospecto real completo, informe reproducible y límites de producción | [Informe de entrega](delivery.md), README verificado y límites de producción listos (14 oct). El prospecto real sigue pendiente: T09 documentó cero listos y el lote de la entrega espera autorización. La demo sintética no lo sustituye |
+| MVP y T11 | Demostración documentada de al menos un prospecto real completo, informe reproducible y límites de producción | [Informe de entrega](delivery.md), README verificado y límites de producción listos (14 oct). El prospecto real sigue pendiente: T09 y el lote de la entrega (14 oct) terminaron con cero listos, por falta de evidencia de empleo vigente. La demo sintética no lo sustituye |
 | Catálogo, exclusiones y gasto | Confirmación documentada de Veryfi y conciliación del uso histórico, incluido el observado fuera del ledger | Pendiente; no activar nuevas fuentes ni multiplicar el cupo |
 
 Recuperar originales sin modificar la base existente y conservarlos inmutables
