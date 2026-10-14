@@ -112,6 +112,17 @@ uv run --locked pytest
 git check-ignore -v .env .env.local .venv/pyvenv.cfg data/prospecting.sqlite3 __pycache__/manage.pyc .pytest_cache/v/cache/nodeids local.sqlite3-wal
 ```
 
+Para comprobar el bloqueo de controles y la consulta de progreso ante respuestas
+400 y 409, ejecuta también el autochequeo de JavaScript con Node.js:
+
+```console
+node --test tests/js_execution.test.cjs
+```
+
+No requiere paquetes npm. Usa un DOM y respuestas exclusivamente sintéticos,
+sin conexiones externas; no sustituye una revisión visual en navegador. Node.js
+solo se necesita para este autochequeo, no para ejecutar la aplicación.
+
 Las pruebas bloquean conexiones externas y usan datos explícitamente sintéticos
 y bases temporales. Comprueban contratos, procedencia, relaciones, transacciones,
 historial, consumo decimal exacto y recuperación al reabrir SQLite. Comprueban
