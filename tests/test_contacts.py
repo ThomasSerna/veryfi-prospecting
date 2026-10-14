@@ -586,3 +586,92 @@ def test_public_other_entity_suspends_known_contact_without_reassigning_it(eligi
     assert len(contrary) == 1 and set(previous.employment_evidence_ids) <= set(contrary[0].contradiction_ids)
     assert contrary[0].kind == "observed" and "Otra entidad sintética" in contrary[0].excerpt
     assert derive_readiness(assessment, [updated], evidence + [manual] + facts, campaign.limits, NOW, company) == "qualified_no_contact"
+
+
+@pytest.mark.parametrize("field,value,publication", [
+    ("phone", "+573005550001", "Central general: +573005550001."),
+    ("email", EMAIL, f"Correo de Otra Persona Sintética: {EMAIL}."),
+    ("email", EMAIL, f"Otro titular sintético: {EMAIL}."),
+    ("whatsapp", "+573005550001", "WhatsApp de Otra Persona Sintética: +573005550001."),
+])
+def test_public_channel_without_nominal_route_stays_pending_even_when_previously_marked_direct(eligible, field, value, publication):
+    company, campaign, assessment, _, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None,
+                                          "excerpt": f"{NAME}, {TITLE} de Empresa sintética. {publication}"})
+    output = json.loads(public_output(source, email=None))
+    output["candidates"][0]["facts"].append({"field": field, "value": value, "quote": source.excerpt,
+                                            "evidence_id": str(source.id)})
+    [(contact, facts)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment,
+                                              campaign, [source], NOW, uuid4())
+    assert contact.channels[0].direct is None
+    assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) == "needs_channel_confirmation"
+    previously_ready = contact.model_copy(update={"channels": [contact.channels[0].model_copy(update={"direct": True})]})
+    assert not channel_is_usable(previously_ready.channels[0], previously_ready, facts, campaign.limits, NOW, company)
+
+
+@pytest.mark.parametrize("publication", [f"{NAME}, CTO de Empresa sintética, correo de Otra Persona Sintética: {EMAIL}.",
+                                         f"{NAME}, CTO de Empresa sintética, correo {EMAIL} de Otra Persona Sintética.",
+                                         f"{NAME}, CTO de Empresa sintética, Otro Miembro Sintético: {EMAIL}."])
+def test_other_named_email_owner_in_the_same_clause_is_not_the_candidate(eligible, publication):
+    company, campaign, assessment, _, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None, "excerpt": publication})
+    [(contact, facts)] = parse_contacts_output(public_output(source), "end_turn", company, assessment,
+                                              campaign, [source], NOW, uuid4())
+    assert contact.channels[0].direct is None
+    assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) != "ready_preferred"
+
+
+def test_central_extension_named_for_another_person_is_not_a_nominal_route(eligible):
+    company, campaign, assessment, _, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None,
+                                          "excerpt": f"{NAME}, CTO de Empresa sintética, central +573005550001, extensión 123 de Otra Persona Sintética."})
+    output = json.loads(public_output(source, email=None))
+    output["candidates"][0]["facts"].extend([
+        {"field": field, "value": value, "quote": source.excerpt, "evidence_id": str(source.id)}
+        for field, value in (("phone", "+573005550001"), ("extension", "123"))])
+    [(contact, facts)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment,
+                                              campaign, [source], NOW, uuid4())
+    assert contact.channels[0].direct is None
+    assert not channel_is_usable(contact.channels[0].model_copy(update={"direct": True}), contact, facts,
+                                 campaign.limits, NOW, company)
+
+
+@pytest.mark.parametrize("field,value,publication,extension", [
+    ("email", EMAIL, f"{NAME}, CTO de Empresa sintética. Correo profesional {EMAIL}.", None),
+    ("phone", "+573005550001", f"{NAME}, CTO de Empresa sintética. Teléfono nominal +573005550001.", None),
+    ("phone", "+573005550001", f"{NAME}, CTO de Empresa sintética, central +573005550001, extensión 123.", "123"),
+    ("whatsapp", "+573005550001", f"{NAME}, CTO de Empresa sintética, WhatsApp profesional +573005550001.", None),
+])
+def test_supported_public_nominal_channels_remain_ready(eligible, field, value, publication, extension):
+    company, campaign, assessment, _, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None, "excerpt": publication})
+    output = json.loads(public_output(source, email=None))
+    facts = output["candidates"][0]["facts"]
+    facts.append({"field": field, "value": value, "quote": source.excerpt, "evidence_id": str(source.id)})
+    if extension:
+        facts.append({"field": "extension", "value": extension, "quote": source.excerpt, "evidence_id": str(source.id)})
+    [(contact, facts)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment,
+                                              campaign, [source], NOW, uuid4())
+    assert contact.channels[0].direct is True
+    assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) == "ready_preferred"
+
+
+def test_email_verification_needs_structured_person_association(eligible):
+    company, campaign, _, contact, evidence = eligible
+    unbound = evidence[1].model_copy(update={"contact_id": None})
+    assert not channel_is_usable(contact.channels[0], contact, [unbound], campaign.limits, NOW, company)
+
+
+def test_public_fact_inherited_from_provider_does_not_become_a_structured_nominal_channel(eligible):
+    company, campaign, _, contact, evidence = eligible
+    inherited = evidence[1].model_copy(update={"claim": f"Hecho nominal publicado: email={EMAIL}",
+                                             "excerpt": f"{NAME}, CTO de Empresa sintética. Correo de Otra Persona: {EMAIL}.",
+                                             "external_reference": "synthetic-verification#contact:email"})
+    assert not channel_is_usable(contact.channels[0], contact, [inherited], campaign.limits, NOW, company)
+
+
+def test_hunter_structured_nominal_phone_remains_usable(eligible):
+    company, campaign, _, contact, evidence = eligible
+    [(observed, facts)] = parse_domain_search(company, domain_response(phone_number="+573005550001"), uuid4(), NOW)
+    phone = next(channel for channel in observed.channels if channel.type == "phone")
+    assert channel_is_usable(phone, observed, facts, campaign.limits, NOW, company)

@@ -14,7 +14,7 @@ from pydantic import Field
 
 from prospecting.contacts import (
     ContactError, apply_target_roles, complete_name, employment_fresh, fold_words, mentions,
-    merge_contact, organization_matches, parse_source_date, phone_country_of, professional_email,
+    merge_contact, nominal_channel_association, organization_matches, parse_source_date, phone_country_of, professional_email,
     role_matches, target_roles,
 )
 from prospecting.haiku import CHARS_PER_TOKEN, MODEL_ID, prompt_json, structured_request
@@ -168,7 +168,9 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
                 continue
             fact = next(item for item in evidence if item.claim.startswith(f"Hecho nominal publicado: {field}="))
             args = {"contact_id": contact_id, "type": field, "value": values[field].value, "evidence_ids": [fact.id],
-                    "retrieved_at": fact.retrieved_at, "professional": fact.source_type == "primary", "direct": True}
+                    "retrieved_at": fact.retrieved_at, "professional": fact.source_type == "primary",
+                    "direct": True if nominal_channel_association(fact.excerpt or fact.claim, candidate.name, values[field].value,
+                                                                 values["extension"].value if "extension" in values else None) else None}
             if field == "email" and fact.source_type == "primary":
                 args |= {"normalized_status": "published_professional", "published_evidence_ids": [fact.id],
                          "professional": professional_email(values[field].value, company.domain),

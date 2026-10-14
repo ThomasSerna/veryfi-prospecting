@@ -87,6 +87,40 @@ def phone_country_of(phone: str) -> str | None:
     return None
 
 
+def nominal_channel_association(text: str, name: str, value: str, extension: str | None = None) -> bool:
+    """Exige titular en la cláusula del canal o una continuación nominal inmediata."""
+    clauses = re.split(r"[.;!?]\s+|\n+", text)
+    for index, clause in enumerate(clauses):
+        if value not in clause:
+            continue
+        before, _, after = clause.partition(value)
+        labels = list(re.finditer(r"\b(?:correo|email|e-mail|teléfono|telefono|phone|whatsapp|central|conmutador|switchboard|recepción)\b", before, re.I))
+        label = labels[-1] if labels else None
+        owner = "" if label is None else re.sub(r"^\s*(?:(?:laboral|profesional|nominal|directo|general)\s*)*", "", before[label.end():], flags=re.I)
+        if label and (fold_words(label[0]) in ("central", "conmutador", "switchboard", "recepcion") or
+                      mentions(before[label.end():], "general")):
+            extension_match = None if not extension else re.search(
+                r"\b(?:extensión|extension|ext|anexo)\.?\s*[:#]?\s*" + re.escape(extension) +
+                r"\b(?:\s+(?:de|para|of|for)\s+([^,;]+))?", clause, re.I)
+            if (not extension_match or not mentions(clause, name) or
+                    extension_match[1] and not mentions(extension_match[1], name)):
+                continue
+        if label and fold_words(owner) and not mentions(owner, name):
+            continue
+        if label is None and ":" in before and not mentions(before.rsplit(":", 1)[0].rsplit(",", 1)[-1], name):
+            continue
+        owner_after = re.match(r"\s*(?:de|para|of|for)\s+(.+)", after, re.I)
+        if owner_after and not mentions(owner_after[1], name):
+            continue
+        if mentions(clause, name):
+            return True
+        if (index > 0 and mentions(clauses[index - 1], name) and
+                re.fullmatch(r"\s*(?:correo profesional|teléfono nominal|telefono nominal|whatsapp profesional)\s*:?\s*", before, re.I)
+                and re.fullmatch(r"[\s.,:;!?]*", after)):
+            return True
+    return False
+
+
 def role_matches(title: str | None, roles: list[str]) -> bool:
     if not title:
         return False
@@ -186,18 +220,20 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
     facts = _valid_refs(channel.evidence_ids, contact, evidence)
     if not facts or any(item.retrieved_at > now for item in facts):
         return False
+    structured = [item for item in facts if item.source_type == "provider" and item.provider == "hunter" and
+                  item.contact_id == contact.id and item.external_reference is not None and
+                  "#contact:" not in item.external_reference and not item.claim.startswith("Hecho nominal publicado:")]
     if channel.type == ChannelType.EMAIL:
         # El correo laboral pertenece al dominio confirmado de la empresa; sin dominio no hay canal (§10.2).
         if not professional_email(channel.value, company.domain):
             return False
         if channel.normalized_status == ChannelStatus.VERIFIED:
             if _fresh(channel.verified_at, limits.freshness.email_days, now) and any(
-                item.source_type == "provider" and item.kind == "observed" and
-                channel.value in (item.claim + " " + (item.excerpt or "")) for item in facts):
+                item.kind == "observed" and channel.value in (item.claim + " " + (item.excerpt or "")) for item in structured):
                 return True
         published = _valid_refs(channel.published_evidence_ids, contact, evidence)
         return any(item.source_type == "primary" and item.kind == "observed" and
-                   mentions(item.excerpt or item.claim, contact.name or "") and channel.value in (item.excerpt or item.claim)
+                   nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value)
                    and _fresh(item.retrieved_at, limits.cache.web_days, now) and
                    (_fresh(item.updated_at or item.published_at, limits.freshness.email_days, now)
                     if item.updated_at or item.published_at else _current_directory(item))
@@ -208,10 +244,12 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
     if channel.type == ChannelType.PHONE:
         return channel.phone_country == phone_country_of(channel.value) and phone_country_of(channel.value) is not None and any(
             item.kind == "observed" and channel.value in (item.excerpt or item.claim) and
+            (item in structured or
+             nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value, channel.extension)) and
             _fresh(item.retrieved_at, limits.cache.contact_days, now) for item in facts)
     return any(item.source_type == "primary" and item.kind == "observed" and
-               mentions(item.excerpt or item.claim, contact.name or "") and channel.value in (item.excerpt or item.claim) and
-               "whatsapp" in fold_words(item.excerpt or item.claim) and _fresh(item.retrieved_at, limits.cache.web_days, now)
+               nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value, channel.extension) and
+               mentions(item.excerpt or item.claim, "whatsapp") and _fresh(item.retrieved_at, limits.cache.web_days, now)
                for item in facts)
 
 
