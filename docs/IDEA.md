@@ -497,7 +497,7 @@ Implementación del control:
 6. Mantener un límite inicial por campaña de USD 2 y por empresa de USD 0,25, siempre subordinados al acumulado global. El límite puede reducir cantidad de resultados; nunca se elimina para cumplir una cuota de prospectos.
 7. Deshabilitar recargas, waterfall de costo variable y teléfonos enriquecidos de pago en el primer sprint. Usar topes del proveedor cuando estén disponibles.
 
-Referencia de costos para comprender órdenes de magnitud, no garantizar facturas: Tavily publica 1.000 créditos gratuitos mensuales; una búsqueda básica usa uno [W1]. Haiku 5.5 publica USD 0,10/M tokens de entrada y USD 0,50/M de salida para prompts de hasta 100.000 tokens [W4]. Con esos supuestos, 100 consultas de 6.000 tokens de entrada y 1.000 de salida serían USD 0,11 de inferencia, antes de otros consumos. El dato de contacto y la política de consulta pueden pesar más que la inferencia; medir el flujo completo.
+Referencia de costos para comprender órdenes de magnitud, no garantizar facturas: Tavily publica 1.000 créditos gratuitos mensuales; una búsqueda básica usa uno [W1]. Haiku 5.5 publica USD 0,10/M tokens de entrada y USD 0,50/M de salida para prompts de hasta 100.000 tokens [W4]. Con esos supuestos, 100 consultas al límite de 9.000 tokens de entrada y 1.000 de salida serían USD 0,14 de inferencia, antes de otros consumos. El dato de contacto y la política de consulta pueden pesar más que la inferencia; medir el flujo completo.
 
 El indicador de gasto de la aplicación es una estimación controlada, no reemplaza la facturación. Capturar consumo real al final de cada sesión de pruebas. Si un tercero cambia condiciones o falta acceso, detener y registrar la limitación.
 
