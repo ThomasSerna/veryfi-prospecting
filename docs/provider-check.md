@@ -291,4 +291,6 @@ las empresas y personas quedan en `data/`.
 - La reserva de Haiku volvió a ser unas 2,4 veces el costo conciliado.
 - Las solicitudes a Haiku usaron entre 3.388 y 8.721 tokens de entrada. El límite de 6.000 se
   aplica como presupuesto de caracteres, y 23 de las 31 llamadas registradas en esta base lo
-  superaron en tokens. El gasto sigue acotado por la reserva, que se calcula por bytes.
+  superaron en tokens. El gasto sigue acotado por la reserva, que se calcula por bytes. Tras el
+  lote se calibró la estimación en 2 caracteres por token y el límite pasó a 9.000 tokens, con
+  las mismas solicitudes ([calificación](qualification.md)).

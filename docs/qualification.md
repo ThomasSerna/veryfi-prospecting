@@ -10,8 +10,13 @@ campaña. Haiku propone y Python decide:
 - **Solicitud:** usa el modelo `claude-haiku-5-5` con el prompt versionado
   `haiku_assessment_v3`, *thinking* desactivado y *effort* `low`.
   - La salida es JSON con esquema. El límite de entrada es
-    `limits.llm.max_input_tokens` (unos 3 caracteres por token) y el de salida,
-    `limits.llm.max_output_tokens`.
+    `limits.llm.max_input_tokens` (9.000 tokens) y el de salida,
+    `limits.llm.max_output_tokens`. La evidencia se selecciona con 2 caracteres por token,
+    calibrados el 2026-10-14 con 15 solicitudes reales (de 2,11 a 2,26 caracteres por token
+    facturado, incluido el prompt de la salida estructurada). Hasta ese día se estimaban 3 y el
+    límite era de 6.000 tokens, por lo que las solicitudes llegaban a unos 8.200 tokens. Las
+    campañas preparadas antes conservan 6.000 en su instantánea: si se reanudan, sus solicitudes
+    nuevas se limitan a 12.000 caracteres.
   - El prompt limita cada justificación a 25 palabras, la explicación a dos frases y
     los datos pendientes a tres. Una versión nueva del prompt genera una evaluación
     nueva que revisa la anterior (`revision_of`); la anterior se conserva.

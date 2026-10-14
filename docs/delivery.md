@@ -31,7 +31,7 @@ la rúbrica y las reglas son propuestas pendientes de validación por Veryfi.
 | Al menos un prospecto real completo | **No cumplido** | Los dos lotes de T09 y el de la entrega terminaron con 0 personas listas |
 | Ningún registro listo incumple la regla de canal directo | Cumplido | 0 listos sin relajar reglas; pruebas de §18.1 |
 | UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo) |
-| Pruebas críticas en verde | Cumplido | 941 pruebas sin red; ver reproducibilidad |
+| Pruebas críticas en verde | Cumplido | 943 pruebas sin red; ver reproducibilidad |
 | Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido | [T09](#proveedores-reales-t09) y [lote de la entrega](#lote-real-de-la-entrega) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
@@ -56,7 +56,7 @@ sobre un clon limpio del repositorio:
 
 - `uv sync --locked`, `uv lock --check` y `manage.py check` sin errores.
 - `uv run --locked pytest`: **932 pruebas aprobadas en 51,9 s**, sin red y con bases temporales.
-  Tras corregir los mensajes de parada, la suite local suma 941 pruebas aprobadas.
+  Tras corregir los mensajes de parada y el límite de tokens, la suite local suma 943 pruebas aprobadas.
 - `node --test tests/js_execution.test.cjs`: 2 de 2.
 - `git check-ignore` confirma que `.env`, `.venv/`, `data/`, bases SQLite y cachés quedan fuera de Git.
 - `demo.py` responde en `127.0.0.1:8000` con el aviso de datos sintéticos.
@@ -121,8 +121,9 @@ Valores para planear; no son mediciones ni compromisos:
 - Un lote de 8 empresas como los observados consumiría del orden de 20 a 25 créditos de Tavily,
   USD 0,01 de Haiku y 0 a 2 créditos de Hunter Domain Search. Depende de las empresas, de los
   timeouts y de la cobertura de Hunter.
-- Con los precios publicados de Haiku 5.5, 100 solicitudes de 6.000 tokens de entrada y 1.000
-  de salida costarían unos USD 0,11 (IDEA §14). El dato de contacto puede pesar más que la inferencia.
+- Con los precios publicados de Haiku 5.5, 100 solicitudes al límite actual (9.000 tokens de
+  entrada y 1.000 de salida) costarían unos USD 0,14; las del lote de la entrega promediaron unos
+  USD 0,0009. El dato de contacto puede pesar más que la inferencia.
 - El indicador de gasto de la interfaz es una estimación controlada que no reemplaza la
   facturación: las reservas son cotas superiores hasta conciliar.
 - No hay línea base de investigación manual: no se estima ahorro de tiempo. La muestra no
@@ -149,9 +150,11 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
   para cargos) son reglas del prototipo, no garantías de los proveedores.
 - **Vigencia**: no hay revalidación periódica de cargos ni canales; la disponibilidad se
   recalcula al consultar con la fecha actual, sin nuevas llamadas.
-- **Tamaño de las solicitudes a Haiku**: el límite de 6.000 tokens de entrada se aplica como
-  presupuesto de caracteres. 23 de las 31 llamadas registradas lo superaron en tokens (máximo
-  8.721). El gasto sigue acotado por la reserva, pero el límite de IDEA §12.1 no se cumple en tokens.
+- **Tamaño de las solicitudes a Haiku**: el límite de entrada se controla con una estimación de
+  2 caracteres por token, calibrada con 15 solicitudes reales, no con un conteo exacto del
+  proveedor. Con el límite de 9.000 tokens deja un margen de alrededor del 5 % sobre la relación
+  más desfavorable medida. Antes del 14 de octubre se estimaban 3 caracteres por token y 23 de
+  31 llamadas superaron el límite de entonces, 6.000 tokens.
 - **Observabilidad**: no hay monitoreo, alertas ni registro centralizado de errores.
 - **Contacto**: la aplicación nunca envía mensajes ni verifica canales escribiendo a nadie.
   LinkedIn se confirma solo manualmente; no se automatiza ni se extraen perfiles.
@@ -198,8 +201,6 @@ En orden de prioridad según la evidencia disponible:
 4. **Identidad en CPG**: los sitios promocionales rara vez confirman nombre y país.
 5. **Plazo de Tavily**: en T09 el 9,5 % de las llamadas no respondió en unos 10 s; en el lote
    de la entrega, ninguna. Vigilarlo antes de cambiar el plazo.
-6. **Tamaño de las solicitudes a Haiku**: calibrar la conversión de caracteres a tokens para
-   respetar el límite de entrada.
 
 ## Datos locales al cerrar la entrega
 
