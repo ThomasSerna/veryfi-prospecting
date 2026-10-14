@@ -9,7 +9,7 @@ import pytest
 from prospecting.db import Database
 from prospecting.models import BusinessStatus, CampaignStatus, RunItem
 from prospecting.pipeline import campaign as bridge
-from webapp import execution
+from core import execution
 
 from test_ui import client, confirmation, prepare, text, ui_access, ui_paths, ui_results, url
 

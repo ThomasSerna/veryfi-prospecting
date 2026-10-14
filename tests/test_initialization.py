@@ -15,7 +15,7 @@ from django.core.management.commands.runserver import Command as DjangoRunserver
 from django.test import Client, override_settings
 from django.urls import reverse
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webapp.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +61,30 @@ def test_django_configuration_has_no_orm_or_authentication_and_is_local():
     assert client.get("/", HTTP_HOST="example.com").status_code == 400
 
 
+@pytest.mark.parametrize("asset, marker", [
+    ("css/app.css", b"--navy"),
+    ("js/app.js", b"'use strict'"),
+    ("img/veryfi-logo.svg", b"<svg"),
+])
+def test_root_templates_and_static_assets_load_without_debug_or_database(tmp_path, asset, marker):
+    """La nueva ubicación carga plantillas, etiquetas y recursos sin crear datos."""
+    database_path = tmp_path / "synthetic.sqlite3"
+    with override_settings(DEBUG=False, PROSPECTING_DB_PATH=database_path,
+                           PROSPECTING_ACCESS_PATH=tmp_path / "access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=tmp_path / "exclusions.json"):
+        client = Client(SERVER_NAME="localhost")
+        page = client.get(reverse("webapp:campaigns"))
+        assert page.status_code == 200
+        assert f"/static/{asset}" in page.content.decode()
+        response = client.get(f"/static/{asset}")
+        try:
+            assert response.status_code == 200
+            assert marker in b"".join(response.streaming_content)
+        finally:
+            response.close()
+    assert not database_path.exists()
+
+
 def test_prospecting_import_does_not_load_web_frameworks():
     """Importar el negocio no exige ni carga la interfaz en un proceso nuevo."""
     subprocess.run(
@@ -73,7 +97,7 @@ def test_prospecting_import_does_not_load_web_frameworks():
 def test_runserver_defaults_to_loopback_and_disables_reloader(monkeypatch):
     calls = []
     monkeypatch.setattr(DjangoRunserver, "handle", lambda self, *args, **options: calls.append(options))
-    assert get_commands()["runserver"] == "webapp"
+    assert get_commands()["runserver"] == "core"
     call_command("runserver")
     assert len(calls) == 1
     assert calls[0]["addrport"] == "127.0.0.1:8000" and calls[0]["use_reloader"] is False

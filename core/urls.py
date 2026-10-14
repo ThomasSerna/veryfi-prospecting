@@ -1,13 +1,12 @@
-"""Rutas del servicio local y estáticos sin activar pantallas de depuración."""
+"""Rutas de la interfaz; conserva sus nombres públicos y el namespace existente."""
 
-from django.contrib.staticfiles.views import serve
-from django.urls import include, path, re_path
+from django.urls import path
 
-from webapp import views
+from core import views
 
 app_name = "webapp"
 
-patterns = [
+urlpatterns = [
     path("", views.campaigns, name="campaigns"),
     path("campaigns/new/", views.new_campaign, name="new_campaign"),
     path("campaigns/<uuid:campaign_id>/", views.campaign, name="campaign"),
@@ -19,6 +18,3 @@ patterns = [
     path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/review/", views.review, name="review"),
     path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/confirm/", views.confirm_channel, name="confirm_channel"),
 ]
-
-urlpatterns = [path("", include((patterns, app_name), namespace=app_name)),
-               re_path(r"^static/(?P<path>.*)$", serve, {"insecure": True})]

@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from prospecting.models import Campaign, CampaignFilters
 from prospecting.pipeline import AuthorizationInput, provider_operations
-from webapp.presentation import label
+from core.presentation import label
 
 
 class CampaignForm(forms.Form):

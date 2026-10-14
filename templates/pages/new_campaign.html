@@ -1,4 +1,4 @@
-{% extends 'webapp/base.html' %}
+{% extends 'base.html' %}
 {% load prospecting_ui %}
 {% block title %}Nueva campaña · Veryfi Prospecting{% endblock %}
 {% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><span>Nueva campaña</span>{% endblock %}
@@ -10,11 +10,11 @@
     {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
     <fieldset {% if is_executing or execution.is_executing %}disabled{% endif %}>
       <legend class="section-title">El mercado que quieres explorar</legend>
-      <div class="form-grid">{% include 'webapp/_field.html' with field=form.countries %}{% include 'webapp/_field.html' with field=form.segments %}</div>
+      <div class="form-grid">{% include 'components/_field.html' with field=form.countries %}{% include 'components/_field.html' with field=form.segments %}</div>
       <div class="form-divider"></div>
       <h2>Afina la búsqueda</h2>
-      {% include 'webapp/_field.html' with field=form.keywords %}
-      {% include 'webapp/_field.html' with field=form.max_companies %}
+      {% include 'components/_field.html' with field=form.keywords %}
+      {% include 'components/_field.html' with field=form.max_companies %}
       <div class="form-actions"><button type="submit" class="button button-primary" data-idle-only>Preparar campaña</button><a href="{% url 'webapp:campaigns' %}" class="text-link">Volver a campañas</a></div>
     </fieldset>
   </form>

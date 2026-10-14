@@ -14,7 +14,7 @@ import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webapp.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from prospecting.budget import AccountAllowance
@@ -24,7 +24,7 @@ from prospecting.models import CampaignStatus, Channel, Contact, Evidence, RunIt
 from prospecting.pipeline import ProviderAccess, read_campaign
 from prospecting.pipeline import campaign as bridge
 from prospecting.sources import validate_public_url
-from webapp.presentation import stop_message
+from core.presentation import stop_message
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def ui_paths(tmp_path, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     paths = SimpleNamespace(db=tmp_path / "synthetic.sqlite3", access=tmp_path / "provider-access.json",
                             exclusions=tmp_path / "exclusions.json")
-    from webapp import execution
+    from core import execution
 
     monkeypatch.setattr(execution, "_active_campaign_id", None)
     monkeypatch.setattr(execution, "_reports", {})

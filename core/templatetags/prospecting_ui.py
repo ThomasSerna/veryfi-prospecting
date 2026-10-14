@@ -3,7 +3,7 @@
 from django import template
 
 from prospecting.sources import validate_public_url
-from webapp.presentation import label as present_label, money as present_money, stop_message
+from core.presentation import label as present_label, money as present_money, stop_message
 
 register = template.Library()
 register.filter("stop_message", stop_message)

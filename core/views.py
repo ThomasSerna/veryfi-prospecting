@@ -17,9 +17,9 @@ from prospecting.pipeline import (
     confirm_alternative_channel, finish_campaign, list_saved_campaigns, load_provider_access,
     prepare_campaign, read_campaign, review_company,
 )
-from webapp import execution
-from webapp.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
-from webapp.presentation import READY, download_csv
+from core import execution
+from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
+from core.presentation import READY, download_csv
 
 
 def _paths():
@@ -42,7 +42,7 @@ def _base():
 
 
 def _error_response(request, error, status=400):
-    return render(request, "webapp/error.html", {"message": execution.error_message(error)}, status=status)
+    return render(request, "pages/error.html", {"message": execution.error_message(error)}, status=status)
 
 
 def _handled(view):
@@ -140,7 +140,7 @@ def campaigns(request):
     context = _base()
     context["execution"] = execution.snapshot(context["active_campaign"].id if context["active_campaign"] else None)
     context["execution"]["is_executing"] = _global_busy(context)
-    return render(request, "webapp/campaigns.html", context)
+    return render(request, "pages/campaigns.html", context)
 
 
 @require_http_methods(["GET", "POST"])
@@ -162,19 +162,19 @@ def new_campaign(request):
                 raise execution.ExecutionBusy("Hay una investigación en curso. Espera antes de preparar otra campaña.")
             saved = prepare_campaign(_paths()[0], form.campaign)
         return redirect("webapp:campaign", campaign_id=saved.id)
-    return render(request, "webapp/new_campaign.html", context, status=400 if request.method == "POST" else 200)
+    return render(request, "pages/new_campaign.html", context, status=400 if request.method == "POST" else 200)
 
 
 @require_GET
 @_handled
 def campaign(request, campaign_id):
-    return render(request, "webapp/campaign.html", _campaign_context(request, campaign_id))
+    return render(request, "pages/campaign.html", _campaign_context(request, campaign_id))
 
 
 @require_GET
 @_handled
 def company(request, campaign_id, company_id):
-    return render(request, "webapp/company.html", _company_context(request, campaign_id, company_id))
+    return render(request, "pages/company.html", _company_context(request, campaign_id, company_id))
 
 
 @require_GET
@@ -182,7 +182,7 @@ def status(request, campaign_id):
     try:
         context = _campaign_context(request, campaign_id)
         return JsonResponse(context["execution"] | {"status": context["campaign"].status,
-                            "html": render_to_string("webapp/_campaign_results.html", context, request=request)})
+                            "html": render_to_string("components/_campaign_results.html", context, request=request)})
     except (ValueError, OSError, sqlite3.Error, ValidationError) as error:
         return JsonResponse({"error_message": execution.error_message(error), "is_executing": execution.snapshot(campaign_id)["is_executing"]}, status=503)
     except Http404:
@@ -237,7 +237,7 @@ def close(request, campaign_id):
 def review(request, campaign_id, company_id):
     form = ReviewForm(request.POST)
     if not form.is_valid():
-        return render(request, "webapp/company.html", _company_context(request, campaign_id, company_id, review_form=form), status=400)
+        return render(request, "pages/company.html", _company_context(request, campaign_id, company_id, review_form=form), status=400)
     with execution.idle_action():
         context = _company_context(request, campaign_id, company_id)
         _require_idle(context["view"])
@@ -250,7 +250,7 @@ def review(request, campaign_id, company_id):
 def confirm_channel(request, campaign_id, company_id):
     form = ConfirmationForm(request.POST)
     if not form.is_valid():
-        return render(request, "webapp/company.html", _company_context(request, campaign_id, company_id, confirmation_form=form), status=400)
+        return render(request, "pages/company.html", _company_context(request, campaign_id, company_id, confirmation_form=form), status=400)
     with execution.idle_action():
         context = _company_context(request, campaign_id, company_id)
         _require_idle(context["view"])

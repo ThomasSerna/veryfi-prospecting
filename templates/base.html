@@ -7,15 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>{% block title %}Veryfi Prospecting{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'webapp/app.css' %}">
-  <script src="{% static 'webapp/app.js' %}" defer></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/app.js' %}" defer></script>
 </head>
 <body data-running="{% if is_executing or execution.is_executing %}true{% else %}false{% endif %}" {% if campaign %}data-status-url="{% url 'webapp:status' campaign.id %}"{% elif active_campaign %}data-status-url="{% url 'webapp:status' active_campaign.id %}"{% elif execution.campaign_id and execution.campaign_id != 'None' %}data-status-url="{% url 'webapp:status' execution.campaign_id %}"{% endif %}>
   <a class="skip-link" href="#main">Saltar al contenido</a>
   <div class="app-shell">
     <aside class="sidebar" id="navigation" aria-label="Navegación principal">
       <a href="{% url 'webapp:campaigns' %}" class="brand" aria-label="Veryfi Prospecting, inicio">
-        <img src="{% static 'webapp/veryfi-logo.svg' %}" alt="Veryfi" width="112" height="42">
+        <img src="{% static 'img/veryfi-logo.svg' %}" alt="Veryfi" width="112" height="42">
         <span>Prospecting</span>
       </a>
       <a href="{% url 'webapp:new_campaign' %}" class="button button-primary sidebar-create" data-idle-only {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>
