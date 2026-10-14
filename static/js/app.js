@@ -220,7 +220,7 @@
         });
         const result = await response.json();
         if (!response.ok) {
-          setBusy(false);
+          setBusy(result.is_executing === true);
           showFeedback(result.error_message || 'No se pudo iniciar la investigación. Revisa la autorización y los topes.', 'error');
           if (errors && result.errors) {
             Object.entries(result.errors).forEach(([name, messages]) => {
@@ -236,6 +236,7 @@
             errors.tabIndex = -1;
             errors.focus();
           }
+          if (busy) poll();
           return;
         }
         showFeedback('Investigación en curso. Puedes consultar el avance y las empresas que se van guardando.');
