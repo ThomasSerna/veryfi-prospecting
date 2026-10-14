@@ -457,6 +457,8 @@ def test_budget_pause_stops_without_traffic_and_resumes_with_a_new_session(world
     assert report.status == CampaignStatus.PAUSED_BUDGET and report.stop_reason == "budget_exceeded"
     assert [operation for operation, _ in case.events] == ["search", "extract", "extract"]
     assert case.db.get_active_campaign().id == case.campaign.id
+    # La empresa que alcanzó el tope conserva su motivo en SQLite, aunque se reinicie la interfaz.
+    assert [item.stop_reason for item in case.by_domain().values()].count("budget_exceeded") == 1
     calls = len(case.events)
     assert case.run().status == CampaignStatus.PAUSED_BUDGET and len(case.events) == calls
     case.session(tavily_credits="100")
@@ -464,6 +466,16 @@ def test_budget_pause_stops_without_traffic_and_resumes_with_a_new_session(world
     assert resumed.status == CampaignStatus.COMPLETED
     assert [operation for operation, _ in case.events[:calls]] == ["search", "extract", "extract"]
     assert_no_request_sent_twice(case)
+
+
+def test_budget_pause_during_expansion_keeps_the_company_reason(world):
+    # Un crédito para el descubrimiento y cuatro extracciones iniciales: la ampliación ya no cabe.
+    case = world.setup(tavily_credits="5")
+    start(case)
+    report = case.run()
+    assert report.status == CampaignStatus.PAUSED_BUDGET and report.stop_reason == "budget_exceeded"
+    assert not any("include_domains" in payload for _, payload in case.events)
+    assert case.by_domain()["dudosa-cuatro.example"].stop_reason == "budget_exceeded"
 
 
 def test_exhausted_company_cap_closes_that_company_without_pausing_the_campaign(world):
@@ -499,7 +511,7 @@ def test_company_and_campaign_time_limits_make_no_calls(world):
     report = case.run()
     assert [operation for operation, _ in case.events] == ["search"]
     assert report.status == CampaignStatus.PARTIAL
-    assert all(item.stage == RunStage.DISCOVERED for item in case.by_domain().values())
+    assert all((item.stage, item.stop_reason) == (RunStage.DISCOVERED, "time_limit") for item in case.by_domain().values())
     case = world.setup(active_seconds=0)
     case.events.clear()
     start(case)

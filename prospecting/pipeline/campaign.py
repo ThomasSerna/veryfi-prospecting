@@ -517,6 +517,8 @@ class _Run:
                 account_ref=self.tavily_account_ref, deadline=self.company_deadline(company_id, ("initial",)),
                 authorization=grant_for(self.authorizations, TAVILY, EXTRACT_OPERATION, self.tavily_account_ref)))
             if report.stop_reason not in _EXTRACTION_SETTLED:
+                # La empresa conserva en SQLite por qué no avanzó; la parada global solo vive en memoria (§9).
+                self.update(company_id, stop_reason=report.stop_reason)
                 self.notify(company_id)
                 if self.halt(report.stop_reason):
                     return
@@ -555,6 +557,7 @@ class _Run:
                     account_ref=self.tavily_account_ref, authorizations=self.authorizations,
                     deadline=self.company_deadline(company_id, levels)))
                 if research.status == "pending":
+                    self.update(company_id, stop_reason=research.stop_reason)
                     return self.halt(research.stop_reason)
                 identity = self.identity(company_id)
                 report = self.qualify(company_id, levels)
