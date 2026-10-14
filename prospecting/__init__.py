@@ -1,1 +1,1 @@
-"""Paquete de prospección independiente de la interfaz Streamlit."""
+"""Paquete de prospección independiente de la interfaz Django."""

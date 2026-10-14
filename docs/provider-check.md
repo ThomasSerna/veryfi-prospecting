@@ -201,7 +201,7 @@ solicitud. Los datos de empresas y personas quedan en `data/` y no se reproducen
 | Campo | Valor observado |
 |---|---|
 | Fecha | 2026-10-12 (America/Bogota): lote 1 a las 22:25 y lote 2 a las 22:57 |
-| Ejecución | Desde la interfaz (`uv run --locked --env-file .env streamlit run app.py`); dos campañas de 8 empresas con Colombia y México, `fintech_software` y `cpg_loyalty`, sin palabras clave ni lista de exclusiones (`missing`). Lote 1 en 110 s y lote 2 en 140 s; ambos terminaron `partial` |
+| Ejecución | Desde la interfaz Streamlit de entonces, retirada el 13 de octubre al migrar a Django; dos campañas de 8 empresas con Colombia y México, `fintech_software` y `cpg_loyalty`, sin palabras clave ni lista de exclusiones (`missing`). Lote 1 en 110 s y lote 2 en 140 s; ambos terminaron `partial` |
 | Cuentas | `data/provider-access.json` con los paneles vistos por el responsable a las 21:58: Tavily 7 / 1.000 créditos y *pay as you go* desactivado; Hunter 49 de 50 disponibles; Anthropic, cupo prepago de USD 3. La cuenta de Hunter es la que T07 anotó como `hunter-equipo-plan-gratuito`; desde la T09 se registra como `hunter-cuenta-2` |
 | Autorización | Responsable del cupo, en la interfaz y para cada lote: Tavily `search` ≤ 50 créditos y `extract` ≤ 30 (`tavily-cuenta-2`, USD 0); Haiku `messages` ≤ USD 0,08 (`anthropic-equipo-prepago`); Hunter `domain_search` ≤ 16 créditos (`hunter-cuenta-2`, USD 0). Finder y Verifier, deshabilitados |
 

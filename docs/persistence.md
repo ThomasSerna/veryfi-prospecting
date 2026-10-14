@@ -2,7 +2,7 @@
 
 Abrir la pantalla no crea una base. Si ya existe, consulta el historial y los
 resultados; preparar una campaña crea un borrador y la base si falta.
-La capa de datos puede utilizarse desde Python, sin Streamlit ni claves:
+La capa de datos puede utilizarse desde Python, sin Django ni claves:
 
 ```python
 from pathlib import Path
@@ -91,9 +91,9 @@ confirmación no demuestra identidad ni empleo por sí sola.
 `data/provider-access.json` contiene `ProviderAccess`: cupos iniciales comprobados
 y referencias de acceso. No contiene claves ni permisos. Cada ejecución crea
 autorizaciones frescas después de abrir `Budget`; el consumo permanece en `Usage`
-y sigue descontándose de los cupos al reiniciar. `session_state` solo mantiene
-selección, filtros y estado visual. Este flujo no cambia el esquema SQLite ni
-requiere migraciones.
+y sigue descontándose de los cupos al reiniciar. La sesión firmada de Django solo
+guarda el borrador de la campaña en preparación (`draft_id`); los filtros viajan en
+la URL. Este flujo no cambia el esquema SQLite ni requiere migraciones.
 
 La base se crea únicamente cuando la ruta no existe. Reabrir una base compatible
 conserva checkpoints y uso; un esquema incompatible, incompleto o corrupto genera

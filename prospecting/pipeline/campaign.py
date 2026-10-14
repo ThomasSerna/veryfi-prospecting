@@ -57,7 +57,7 @@ _EXTRACTION_SETTLED = {
     "invalid_response", "duplicate_request",
 }
 _HUMAN_REVIEW = ("exclusion_review", "duplicate_review")
-# Una ejecución a la vez por proceso (§13.3): Streamlit atiende todas sus sesiones en un solo proceso.
+# Una ejecución a la vez por proceso (§13.3): el servidor Django local investiga en un hilo de ese proceso.
 _EXECUTION = threading.Lock()
 _FINAL = {Priority.EXCLUDED: BusinessStatus.EXCLUDED, Priority.LOW: BusinessStatus.LOW_FIT}
 
@@ -333,7 +333,7 @@ def confirm_alternative_channel(db_path: Path, campaign_id: UUID, contact_id: UU
 def start_campaign(db: Database, campaign: Campaign) -> tuple[Campaign, bool]:
     """Activa una campaña nueva; si ya hay una activa, o esta ya existe, la devuelve sin crear otra (§13.3).
 
-    Un clic duplicado o un rerun de Streamlit reutiliza la campaña en lugar de duplicarla.
+    Un clic duplicado, el reenvío del formulario o una recarga reutilizan la campaña en lugar de duplicarla.
     """
     with db.transaction():
         existing = db.get_active_campaign() or db.get_campaign(campaign.id)
