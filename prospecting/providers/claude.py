@@ -134,21 +134,34 @@ class ClaudeClient:
         except anthropic.APIError as cause:
             self._fail(ProviderError("transport", _safe_message(str(cause), key, request), **context), "unknown")
         raw = getattr(response, "usage", None)
-        tokens = TokenUsage(
-            input_tokens=getattr(raw, "input_tokens", None),
-            output_tokens=getattr(raw, "output_tokens", None),
-            cache_read_tokens=getattr(raw, "cache_read_input_tokens", None),
-            cache_write_tokens=getattr(raw, "cache_creation_input_tokens", None),
-        )
-        cost = claude_cost(payload.get("model", ""), tokens)
+        values = {
+            "input_tokens": getattr(raw, "input_tokens", None),
+            "output_tokens": getattr(raw, "output_tokens", None),
+            "cache_read_tokens": getattr(raw, "cache_read_input_tokens", None),
+            "cache_write_tokens": getattr(raw, "cache_creation_input_tokens", None),
+        }
+        tokens = TokenUsage(**{name: value for name, value in values.items()
+                               if type(value) is int and value >= 0})
+        cost = None
+        try:
+            tokens = TokenUsage(**values)
+            cost = claude_cost(payload.get("model", ""), tokens)
+            if not isinstance(response.content, list):
+                raise ValueError("El contenido de la respuesta debe ser una lista.")
+            text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+            call = ClaudeCall(
+                request_id=request_id, model=response.model, provider_message_id=response.id,
+                stop_reason=response.stop_reason, text=text, tokens=tokens, estimated_cost_usd=cost,
+            )
+        except (AttributeError, TypeError, ValueError):
+            self._fail(ProviderError("schema", "La respuesta no cumple el esquema esperado.", **context),
+                       "unknown", tokens=tokens, estimated_cost_usd=cost)
         self.budget.record_result(request_id, Observation(outcome="succeeded", tokens=tokens, estimated_cost_usd=cost))
-        text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
-        return ClaudeCall(
-            request_id=request_id, model=response.model, provider_message_id=response.id,
-            stop_reason=response.stop_reason, text=text, tokens=tokens, estimated_cost_usd=cost,
-        )
+        return call
 
-    def _fail(self, error, outcome, *, no_send=False):
-        self.budget.record_result(error.request_id, Observation(outcome=outcome, error_message=error.message), no_send=no_send)
+    def _fail(self, error, outcome, *, no_send=False, tokens=None, estimated_cost_usd=None):
+        self.budget.record_result(error.request_id, Observation(
+            outcome=outcome, error_message=error.message, tokens=tokens,
+            estimated_cost_usd=estimated_cost_usd), no_send=no_send)
         error.no_send = no_send
         raise error from None
