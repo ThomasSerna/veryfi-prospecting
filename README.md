@@ -54,6 +54,9 @@ claves en variables de entorno y autorización explícita por operación, cuenta
 Detén el servidor con Ctrl+C. El servidor se limita a `127.0.0.1`, no requiere
 autenticación y usa recursos estáticos locales, sin telemetría ni fuentes remotas.
 No requiere `migrate`: Django no administra los datos de prospección con su ORM.
+Es el servidor de desarrollo de Django en una instancia local, no apto para producción;
+los límites de uso y las condiciones para un piloto están en
+[Entrega y condiciones del piloto](docs/delivery.md).
 
 Usa una sola instancia local de la aplicación con `data/prospecting.sqlite3`.
 El procesamiento es secuencial, en un hilo de ese proceso: continúa al cerrar la
@@ -204,6 +207,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
+- `docs/delivery.md`: estado de la entrega, resultados medidos, límites de producción y condiciones del piloto.
 - `docs/t10-evaluation.md`: protocolo, formatos y reproducción de evaluaciones independientes.
 - `PRODUCT.md` y `DESIGN.md`: contexto de ventas y decisiones visuales de la interfaz.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
