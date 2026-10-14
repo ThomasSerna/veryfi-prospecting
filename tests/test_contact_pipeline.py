@@ -96,7 +96,7 @@ def contact_case(database, config, make_campaign, make_company, make_assessment,
     def model_reply(**payload):
         case.model_calls.append(payload)
         if hasattr(case, "model_override"):
-            text = case.model_override
+            text = case.model_override(payload) if callable(case.model_override) else case.model_override
         else:
             user = payload["messages"][0]["content"]
             context = json.loads(user.split("\n")[0])
@@ -345,12 +345,13 @@ def test_high_priority_bounds_people_and_second_department_query(contact_case):
                     "first_name": "Persona Sintética", "last_name": f"Candidato{index}", "position": "Product Manager"}
                    for index in range(10)]}}
     report = case.find()
-    assert report.business_status == "qualified_no_contact" and len(case.db.list_contacts(case.company.id)) == 3
+    # Los candidatos se conservan pendientes con su procedencia; sin empleo vigente ninguno ocupa el cupo.
+    assert report.business_status == "qualified_no_contact" and len(case.db.list_contacts(case.company.id)) == 10
     assert len(case.calls) == 2 and case.calls[0][1]["job_titles"] == "Product Manager"
     assert case.calls[1][1]["department"] == "product" and "job_titles" not in case.calls[1][1]
     run = case.db.get_run_item(case.campaign.id, case.company.id)
-    assert run.consumed_limits.people_queries == 2
-    assert sum(key.startswith("contacts:person:") for key in run.attempts) == 3
+    assert run.consumed_limits.people_queries == 2 and run.consumed_limits.enrichments == 0
+    assert sum(key.startswith("contacts:person:") for key in run.attempts) == 0
 
 
 def test_first_useful_domain_result_stops_high_priority(contact_case):
@@ -482,8 +483,72 @@ def test_cached_eligible_person_has_priority_over_new_unresolved_candidate(conta
         "value": "otra-persona@empresa-sintetica.example", "type": "personal", "first_name": "Otra Persona",
         "last_name": "Sintética", "position": "Product Manager"}]}}
     report = case.find()
-    assert report.business_status == "ready_preferred" and report.contact_ids == [cached.id]
+    assert report.business_status == "ready_preferred"
+    # El candidato nuevo se conserva pendiente con su procedencia, sin ocupar cupo ni enriquecerse.
+    pending = next(item for item in case.db.list_contacts(case.company.id) if item.id != cached.id)
+    assert set(report.contact_ids) == {cached.id, pending.id} and pending.name == "Otra Persona Sintética"
     assert [operation for operation, _, _ in case.calls] == ["domain_search", "email_finder"]
+    assert case.calls[1][1]["full_name"] == "Persona Sintética Uno"
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert {key for key in run.attempts if key.startswith("contacts:person:")} == {f"contacts:person:{cached.id}"}
+
+
+OFF_TARGET = {"value": "contador@empresa-sintetica.example", "type": "personal", "first_name": "Contador Sintético",
+              "last_name": "Dos", "position": "Accountant"}
+
+
+def public_reply(case):
+    """Extracción sintética de la persona pertinente citando la página de equipo suministrada."""
+    def reply(payload):
+        user = payload["messages"][0]["content"]
+        sources = [json.loads(piece) for piece in user.split("<evidencia>\n")[1].split("\n</evidencia>")[0].splitlines()]
+        source = next(item for item in sources if "Persona Sintética Uno" in item["excerpt"])
+        return json.dumps({"candidates": [{"contact_id": None, "name": "Persona Sintética Uno", "facts": [
+            {"field": field, "value": value, "evidence_id": source["evidence_id"], "quote": source["excerpt"]}
+            for field, value in (("name", "Persona Sintética Uno"), ("title", "Product Manager"),
+                                 ("employment", case.company.name), ("email", "persona@empresa-sintetica.example"))]}]})
+    return reply
+
+
+def test_off_target_first_candidate_does_not_block_later_relevant_person(contact_case):
+    """T09: un cargo fuera del perfil hallado primero no ocupa el cupo ni desplaza a la persona pertinente."""
+    case = contact_case
+    case.replies["domain_search"] = {"data": {"domain": case.company.domain, "organization": case.company.name,
+                                              "emails": [OFF_TARGET]}}
+    case.model_override = public_reply(case)
+    report = case.find(tavily_account_ref="tavily-synthetic", claude=case.claude, claude_account_ref="claude-synthetic")
+    assert report.status == "checked" and report.business_status == "ready_preferred"
+    assert [operation for operation, _, _ in case.calls] == ["domain_search", "search", "search", "extract"]
+    assert not any("Contador" in params.get("query", "") for _, params, _ in case.calls)
+    people = {item.name: item for item in case.db.list_contacts(case.company.id)}
+    assert people["Contador Sintético Dos"].relevant_function is False
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert {key for key in run.attempts if key.startswith("contacts:person:")} == {
+        f"contacts:person:{people['Persona Sintética Uno'].id}"}
+    limits = run.consumed_limits
+    assert (limits.people_queries, limits.web_queries, limits.pages, limits.enrichments) == (1, 2, 1, 0)
+
+
+def test_previously_selected_off_target_person_does_not_hold_the_quota(contact_case):
+    """Al reanudar, una selección antigua de un cargo fuera del perfil no impide investigar a la persona idónea."""
+    case = contact_case
+    off_id = uuid4()
+    source = Evidence(company_id=case.company.id, contact_id=off_id, claim="Directorio corporativo exclusivamente sintético",
+                      url=f"https://{case.company.domain}/equipo", retrieved_at=utc_now(), kind="observed", source_type="primary",
+                      excerpt=f"Contador Sintético Dos es Accountant de {case.company.name}.")
+    case.db.save_contact(Contact(id=off_id, company_id=case.company.id, name="Contador Sintético Dos", title="Accountant",
+                                 name_complete=True, current_employment=True, relevant_function=False,
+                                 identity_status="confirmed", employment_evidence_ids=[source.id],
+                                 provenance={field: [source.id] for field in ("name", "title", "relevant_function")}),
+                         evidence=[source])
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    case.db.save_run_item(run.model_copy(update={"attempts": {f"contacts:person:{off_id}": 1}}))
+    cached = seed_contact(case)
+    report = case.find()
+    assert report.business_status == "ready_preferred"
+    assert [operation for operation, _, _ in case.calls] == ["domain_search", "email_finder"]
+    assert case.calls[1][1]["full_name"] == "Persona Sintética Uno"
+    assert f"contacts:person:{cached.id}" in case.db.get_run_item(case.campaign.id, case.company.id).attempts
 
 
 def test_uncertain_request_is_not_repeated_by_a_new_campaign(contact_case, make_campaign, make_assessment):

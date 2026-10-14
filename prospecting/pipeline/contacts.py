@@ -11,7 +11,7 @@ from pydantic import Field, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, target_roles,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_matches, target_roles,
     validate_contact,
 )
 from prospecting.db import Database
@@ -120,12 +120,20 @@ ENRICHMENTS_KEY = "contacts:hunter_enrichments"
 _HUNTER_DEGRADED = ("permission_denied", "rate_limited", "quota_exceeded", "local_error")
 
 
+def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
+    """Orden de investigación (T09): seleccionadas, nombre completo, cargo pertinente y su prioridad, canal verificado."""
+    position = next((index for index, role in enumerate(roles) if role_matches(contact.title, [role])), len(roles))
+    return (contact.id not in selected, contact.name_complete is not True, contact.relevant_function is not True,
+            position, not any(channel.normalized_status == ChannelStatus.VERIFIED for channel in contact.channels),
+            str(contact.id))
+
+
 class _ContactStage:
     """Una ejecución de la etapa de contactos de una empresa, organizada por fases.
 
-    `run` es siempre el último RunItem guardado. La selección de personas se anota en
-    `run.attempts` y se persiste con el siguiente checkpoint, junto al resultado que la
-    produjo. Cada fase devuelve un ContactReport cuando la etapa termina, o None para seguir.
+    `run` es siempre el último RunItem guardado. Los candidatos se guardan todos con su
+    procedencia; el cupo de personas (`contacts:person:`) solo lo ocupa quien supera la
+    validación al investigarla. Cada fase devuelve un ContactReport cuando la etapa termina, o None para seguir.
     """
 
     def __init__(self, db, budget, client, campaign, company, run, assessment, *, hunter_access, authorizations,
@@ -162,8 +170,7 @@ class _ContactStage:
             counters[name] += amount
         counters["active_seconds"] += elapsed
         counters["contacts_active_seconds"] += elapsed
-        selection = {key: value for key, value in self.run.attempts.items() if key.startswith(PERSON_KEY)}
-        changes = {"attempts": current.attempts | selection | (attempts or {}),
+        changes = {"attempts": current.attempts | (attempts or {}),
                    "consumed_limits": type(current.consumed_limits).model_validate(counters),
                    "updated_at": utc_now()} | (updates or {})
         with self.db.transaction():
@@ -175,6 +182,15 @@ class _ContactStage:
                 self.evidence_ids.append(fact.id)
             self.run = self.db.save_run_item(current.model_copy(update=changes))
         self.tick = now_tick
+
+    def selected(self) -> set[UUID]:
+        """Personas que ocupan el cupo; una selección antigua de un cargo fuera del perfil no lo ocupa (T09)."""
+        ids = {UUID(key.split(":")[-1]) for key in self.run.attempts if key.startswith(PERSON_KEY)}
+        return ids - {item.id for item in self.db.list_contacts(self.company.id) if item.relevant_function is False}
+
+    def ranked_people(self):
+        selected = self.selected()
+        return sorted(self.people(), key=lambda item: _rank(item, self.roles, selected))
 
     def people(self):
         now = utc_now()
@@ -269,16 +285,15 @@ class _ContactStage:
                         aggregates=aggregates, facts=facts)
 
     def save_candidates(self, parsed):
-        """Fusiona candidatos con personas conocidas y respeta el cupo de personas del nivel."""
+        """Fusiona candidatos con personas conocidas y los conserva todos con su procedencia (T09).
+
+        Guardar no ocupa el cupo de personas: un candidato fuera del perfil o sin validar no
+        desplaza a uno idóneo encontrado después. Los topes de llamadas no cambian.
+        """
         facts = self.facts()
         known = self.db.list_contacts(self.company.id)
-        selected = {UUID(key.split(":")[-1]) for key in self.run.attempts if key.startswith(PERSON_KEY)}
-        def rank(pair):
-            contact = pair[0]
-            return (contact.name_complete is not True, contact.title not in self.roles,
-                    not any(channel.normalized_status == "verified" for channel in contact.channels))
         saved = []
-        for candidate, source in sorted(parsed, key=rank):
+        for candidate, source in parsed:
             match = next((old for old in known if old.id == candidate.id or any(
                 a.type == b.type and a.type in ("email", "linkedin") and a.value == b.value
                 for a in old.channels for b in candidate.channels)), None)
@@ -288,14 +303,7 @@ class _ContactStage:
                     channel.model_copy(update={"contact_id": match.id}) for channel in candidate.channels]})
                 source = [item.model_copy(update={"contact_id": match.id}) if item.contact_id == old_id else item for item in source]
                 candidate = merge_contact(match, candidate, facts + source)
-            if candidate.id not in selected and len(selected) >= self.effort.people:
-                continue
-            candidate = apply_target_roles(candidate, self.roles)
-            selected.add(candidate.id)
-            saved.append((candidate, source))
-        # La selección se persiste junto al resultado, sin reservar una persona por su nombre.
-        for candidate, _ in saved:
-            self.run.attempts[f"{PERSON_KEY}{candidate.id}"] = 1
+            saved.append((apply_target_roles(candidate, self.roles), source))
         return saved, []
 
     # Fases, de menor a mayor esfuerzo (§9).
@@ -345,14 +353,14 @@ class _ContactStage:
         """Un canal preferido ya guardado termina la etapa; las personas válidas ocupan su cupo."""
         if self.readiness() == BusinessStatus.READY_PREFERRED:
             return self.finish("preferred_channel_found")
-        existing_eligible = [item for item in self.people() if validate_contact(
+        existing_eligible = [item for item in self.ranked_people() if validate_contact(
             item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now())]
         if existing_eligible:
-            selected = {key.split(":")[-1] for key in self.run.attempts if key.startswith(PERSON_KEY)}
+            selected = self.selected()
             additions = {}
             for item in existing_eligible:
-                if str(item.id) not in selected and len(selected) < self.effort.people:
-                    selected.add(str(item.id))
+                if item.id not in selected and len(selected) < self.effort.people:
+                    selected.add(item.id)
                     additions[f"{PERSON_KEY}{item.id}"] = 1
             self.checkpoint(attempts=additions)
         return None
@@ -406,7 +414,9 @@ class _ContactStage:
         if self.tavily_account_ref is None or stored_public or self.run.attempts.get(HAIKU_KEY, 0):
             return None
         queries = [f'"{company.name}" {" ".join(self.roles[:4])} equipo directorio {" ".join(campaign.countries)}']
-        queries += [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.people() if item.name]
+        # Por prioridad de cargo; una persona fuera del perfil no gasta consultas nominales (T09).
+        queries += [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.ranked_people()
+                    if item.name and item.relevant_function is not False]
         queries += [f'"{company.name}" equipo producto ingeniería marketing contacto profesional']
         for query in list(dict.fromkeys(queries))[:effort.web_queries]:
             request = contact_search_request(query, self.tavily_account_ref)
@@ -475,7 +485,7 @@ class _ContactStage:
 
     def _enrich_people(self):
         """Finder y Verifier solo sobre personas pertinentes y vigentes, dentro del cupo de enriquecimientos."""
-        for contact in self.people():
+        for contact in self.ranked_people():
             report = self._enrich(contact)
             if report is not None:
                 return report
@@ -483,13 +493,14 @@ class _ContactStage:
 
     def _enrich(self, contact):
         company, access = self.company, self.hunter_access
-        selected = {key.split(":")[-1] for key in self.run.attempts if key.startswith(PERSON_KEY)}
-        if str(contact.id) not in selected:
+        # Solo una persona validada ocupa el cupo; validar no consume llamadas (T09).
+        if not validate_contact(contact, company, self.assessment, self.facts(), self.campaign.limits, utc_now()):
+            return None
+        selected = self.selected()
+        if contact.id not in selected:
             if len(selected) >= self.effort.people:
                 return None
             self.checkpoint(attempts={f"{PERSON_KEY}{contact.id}": 1})
-        if not validate_contact(contact, company, self.assessment, self.facts(), self.campaign.limits, utc_now()):
-            return None
         if any(channel_is_usable(channel, contact, self.facts(), self.campaign.limits, utc_now(), company)
                and channel.type in ("email", "phone", "whatsapp") for channel in contact.channels):
             return self.finish("preferred_channel_found")
