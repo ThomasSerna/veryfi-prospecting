@@ -371,6 +371,17 @@ class _ContactStage:
             request = domain_search_request(company, self.roles, access.search_account_ref,
                                             departments=target_departments(self.roles) if index else None)
             try:
+                fingerprint = self.client.fingerprint(request)
+                if self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0):
+                    handled = next((row for row in self.db.list_usage(
+                        campaign_id=self.campaign.id, company_id=company.id, provider="hunter")
+                        if row.status in (UsageStatus.FAILED, UsageStatus.RECONCILED) and
+                        (row.operation, row.account_ref, row.request_fingerprint, row.outcome) ==
+                        (request.operation, request.account_ref, fingerprint, "failed")), None)
+                    if handled is not None:
+                        self.requests.append(handled.request_id)
+                        self.warnings.append(f"Hunter: {handled.error_message}")
+                        return None
                 self.perform(request, HunterDomainSearchResponse, credits=1,
                              count_key=DOMAIN_SEARCH_KEY, cap=self.effort.people_queries,
                              consumed={"people_queries": 1}, funding=access.funding_source,
@@ -379,6 +390,9 @@ class _ContactStage:
             except (BudgetError, ProviderError) as error:
                 if _contact_error_reason(error) not in _HUNTER_DEGRADED:
                     raise
+                prior = self.db.get_usage(error.request_id) if error.request_id is not None else None
+                if prior is not None and prior.status == UsageStatus.FAILED and prior.outcome == "failed":
+                    self.checkpoint(attempts={f"{PROCESSED_KEY}{prior.request_fingerprint}": 1})
                 self.warnings.append(f"Hunter: {_contact_error_reason(error)}: {error}")
                 self.degraded_error = error
                 return None

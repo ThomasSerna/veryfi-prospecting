@@ -385,6 +385,59 @@ def test_unavailable_hunter_can_complete_through_authorized_public_route(contact
     assert report.warnings and "Sin permiso sintetico" in report.warnings[0]
 
 
+@pytest.mark.parametrize("status", [401, 429])
+@pytest.mark.parametrize("priority", ["medium", "high"])
+def test_handled_hunter_failure_resumes_public_route_without_another_domain_search(
+        contact_case, make_assessment, status, priority):
+    case = contact_case
+    assessment = make_assessment(case.campaign.id, case.company.id, priority=priority,
+                                 target_roles=["Product Manager"])
+    case.db.save_assessment(assessment)
+    item = case.db.get_run_item(case.campaign.id, case.company.id)
+    case.db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    case.replies["domain_search"] = HttpResponse(status=status, headers={"Content-Type": "application/json"},
+        body=b'{"errors":[{"id":"synthetic_error","details":"Fallo Hunter sintetico conservado"}]}')
+    args = {"tavily_account_ref": "tavily-synthetic", "claude": case.claude,
+            "claude_account_ref": "claude-synthetic"}
+    hunter_only = [grant for grant in case.grants if grant.provider == "hunter"]
+    first = case.find(authorizations=hunter_only, **args)
+    assert first.status == "pending" and first.stop_reason == "authorization_required"
+    [usage] = case.db.list_usage()
+    assert usage.outcome == "failed" and usage.status == "failed"
+    saved = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert saved.attempts[f"contacts:processed:{usage.request_fingerprint}"] == 1
+    assert [operation for operation, _, _ in case.calls] == ["domain_search"]
+    resumed = case.find(**args)
+    assert resumed.status == "checked" and resumed.business_status == "ready_preferred"
+    assert any("Fallo Hunter sintetico conservado" in warning for warning in resumed.warnings)
+    assert [operation for operation, _, _ in case.calls].count("domain_search") == 1
+    assert case.db.get_usage(usage.request_id) == usage
+    assert case.db.get_run_item(case.campaign.id, case.company.id).attempts["contacts:domain_search"] == 1
+    before = len(case.calls)
+    assert case.find(**args).status == "already_checked" and len(case.calls) == before
+
+
+@pytest.mark.parametrize("marked_processed", [False, True])
+def test_uncertain_hunter_failure_blocks_same_campaign_even_after_public_authorization(contact_case, marked_processed):
+    case = contact_case
+    case.replies["domain_search"] = TimeoutError()
+    args = {"tavily_account_ref": "tavily-synthetic", "claude": case.claude,
+            "claude_account_ref": "claude-synthetic"}
+    first = case.find(authorizations=[grant for grant in case.grants if grant.provider == "hunter"], **args)
+    assert first.status == "pending" and first.stop_reason == "timeout"
+    [usage] = case.db.list_usage()
+    saved = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert usage.status == "uncertain" and f"contacts:processed:{usage.request_fingerprint}" not in saved.attempts
+    if marked_processed:
+        case.db.save_run_item(saved.model_copy(update={"attempts": saved.attempts | {
+            f"contacts:processed:{usage.request_fingerprint}": 1}}))
+    resumed = case.find(**args)
+    assert resumed.status == "pending"
+    assert resumed.stop_reason == ("request_uncertain" if marked_processed else "timeout")
+    assert [operation for operation, _, _ in case.calls] == ["domain_search"]
+    assert case.db.get_usage(usage.request_id) == usage
+
+
 def test_existing_corporate_directory_is_used_without_rebuying_web_data(contact_case):
     case = contact_case
     case.db.save_evidence(Evidence(company_id=case.company.id, claim="Directorio corporativo sintético",
