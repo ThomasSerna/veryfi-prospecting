@@ -34,3 +34,6 @@ dist/
 # IDEs
 .idea/
 .vscode/
+
+# Agents
+.impeccable/
