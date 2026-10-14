@@ -342,13 +342,15 @@ def test_demo_notice_and_csv_name_appear_only_in_demo_mode(ui_results, client, t
     assert disposition.endswith(f'resultados-{case.campaign.id}.csv"')
 
 
-def test_validated_exclusions_do_not_display_missing_list_warning(ui_results, client):
-    checked = ExclusionList(version="synthetic-v1", validation_status="validated", source_reference="Lista sintética",
-                            observed_at=utc_now(), entries=[])
-    ui_results.paths.exclusions.write_text(checked.model_dump_json(), encoding="utf-8")
+@pytest.mark.parametrize("status", [None, "pending", "validated"])
+def test_exclusion_list_warning_appears_only_until_the_list_is_validated(ui_results, client, status):
+    if status is not None:
+        checked = ExclusionList(version="synthetic-v1", validation_status=status, source_reference="Lista sintética",
+                                observed_at=utc_now(), entries=[])
+        ui_results.paths.exclusions.write_text(checked.model_dump_json(), encoding="utf-8")
     response = client.get(url("campaign", ui_results.campaign.id))
     assert response.status_code == 200
-    assert "Lista de exclusiones ausente" not in text(response)
+    assert ("La lista de exclusiones necesita confirmación." in text(response)) is (status != "validated")
 
 
 def test_budget_reservation_is_not_added_again_to_pending(ui_results, client):

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -44,6 +45,22 @@ def test_initial_screen_without_external_network(monkeypatch, tmp_path):
         assert "Veryfi Prospecting" in response.content.decode()
         assert client.get(reverse("webapp:new_campaign")).status_code == 200
     assert not database_path.exists()
+
+
+def test_secrets_and_local_data_stay_out_of_git():
+    """Las claves y los datos reales solo viven en `.env` y `data/`, ignorados por Git (§15)."""
+    ignored = set((PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines())
+    assert {".env", ".env.*", "!.env.example", "/data/", ".venv/"} <= ignored
+    example = [line for line in (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert example and all(re.fullmatch(r"[A-Z][A-Z0-9_]*=", line) for line in example)
+
+
+def test_external_content_is_never_marked_safe():
+    """El autoescape de Django protege el contenido externo; ninguna plantilla ni vista lo desactiva (§15)."""
+    sources = [*(PROJECT_ROOT / "templates").rglob("*.html"), *(PROJECT_ROOT / "core").rglob("*.py")]
+    assert sources
+    unsafe = re.compile(r"\|\s*safe(?:seq)?\b|mark_safe|SafeString|autoescape\s+off")
+    assert [path.name for path in sources if unsafe.search(path.read_text(encoding="utf-8"))] == []
 
 
 def test_django_configuration_has_no_orm_or_authentication_and_is_local():

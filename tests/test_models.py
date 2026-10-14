@@ -62,6 +62,31 @@ def test_configuration_keeps_proposed_rubric_and_catalog(config):
     assert VeryfiConfig.model_validate_json(config.model_dump_json()) == config
 
 
+def test_default_limits_keep_the_documented_initial_values(config):
+    """Topes iniciales de IDEA §7.1, §7.3, §9, §10.2, §12.1 y §14; cambiarlos debe ser explícito."""
+    defaults = config.defaults
+    assert {level: (item.web_queries, item.pages, item.people, item.enrichments_per_provider, item.people_queries,
+                    item.active_seconds) for level, item in defaults.effort.items()} == {
+        "initial": (2, 3, 0, 0, 0, 90), "insufficient_evidence": (1, 2, 0, 0, 0, 45),
+        "medium": (2, 2, 1, 1, 1, 90), "high": (4, 4, 3, 3, 2, 180),
+        "low": (0, 0, 0, 0, 0, 0), "excluded": (0, 0, 0, 0, 0, 0),
+    }
+    assert (defaults.active_seconds, defaults.max_companies) == (2700, 20)
+    assert (defaults.email_verifications_per_channel, defaults.evidence_expansions_per_company) == (1, 1)
+    discovery = defaults.discovery
+    assert (discovery.web_queries, discovery.results_per_query, discovery.raw_candidates,
+            discovery.target_per_country_segment) == (8, 10, 60, 5)
+    budget = defaults.budget
+    assert [budget.global_usd, budget.operating_usd, budget.uncertainty_usd, budget.campaign_usd,
+            budget.company_usd] == [Decimal(value) for value in ("20", "15", "5", "2", "0.25")]
+    assert budget.allocation.model_dump() == {"llm_usd": Decimal("3"), "web_usd": Decimal("2"),
+                                              "contacts_usd": Decimal("10"), "uncertainty_usd": Decimal("5")}
+    assert not (budget.automatic_topups or budget.variable_cost_waterfall or budget.paid_phone_enrichment)
+    assert (defaults.cache.web_days, defaults.cache.contact_days) == (7, 30)
+    assert (defaults.freshness.email_days, defaults.freshness.employment_days) == (30, 180)
+    assert (defaults.llm.max_input_tokens, defaults.llm.max_output_tokens) == (9000, 1000)
+
+
 @pytest.mark.parametrize("change", [
     {"schema_version": True},
     {"schema_version": "1"},
