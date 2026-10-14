@@ -494,6 +494,22 @@ def test_unconfirmed_identity_and_exclusion_never_call_haiku(claude):
     assert report.priority == "excluded" and claude.requests == []
 
 
+def test_exclusion_precedes_reusing_a_saved_model_assessment(claude):
+    first = claude.qualify()
+    item = claude.db.get_run_item(claude.campaign.id, claude.company.id)
+    claude.db.save_run_item(item.model_copy(update={"business_status": BusinessStatus.EXCLUDED,
+                                                   "stop_reason": "excluded_account"}))
+    ledger = claude.db.list_usage()
+    saved = claude.db.get_assessment(first.assessment_id)
+    excluded = claude.qualify()
+    assert excluded.priority == "excluded" and not excluded.called_model
+    assert claude.qualify().assessment_id == excluded.assessment_id
+    assert claude.db.get_assessment(excluded.assessment_id).revision_of == first.assessment_id
+    assert claude.db.get_assessment(first.assessment_id) == saved
+    assert claude.db.get_run_item(claude.campaign.id, claude.company.id).business_status == "excluded"
+    assert len(claude.requests) == 1 and claude.db.list_usage() == ledger
+
+
 def test_missing_key_or_authorization_never_reaches_provider(claude, monkeypatch):
     stranger = claude.grant.model_copy(update={"source_reference": "Permiso no registrado"})
     report = claude.qualify(authorization=stranger)

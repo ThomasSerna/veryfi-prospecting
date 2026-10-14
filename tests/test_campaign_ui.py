@@ -1,15 +1,19 @@
 """Puente local T08 con campañas, contactos y permisos exclusivamente sintéticos, sin red."""
 
 from datetime import timedelta
+import csv
+from io import StringIO
 import sqlite3
 from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
+from core.presentation import download_csv
 from prospecting.budget import AccountAllowance
 from prospecting.db import Database
-from prospecting.models import BusinessStatus, CampaignStatus, Channel, Contact, Evidence, RunItem, Usage, utc_now
+from prospecting.identity import ExclusionList
+from prospecting.models import BusinessStatus, CampaignStatus, Channel, Contact, Evidence, RunItem, RunStage, Usage, utc_now
 from prospecting.pipeline import (
     AuthorizationInput, ProviderAccess, execute_campaign, finish_campaign, list_saved_campaigns,
     load_provider_access, prepare_campaign, provider_operations, read_campaign, review_company,
@@ -255,7 +259,8 @@ def test_read_recalculates_freshness_without_overwriting_persisted_checkpoint(
     now = utc_now()
     path = tmp_path / "synthetic.sqlite3"
     campaign = prepare_campaign(path, make_campaign())
-    company, company_evidence = make_company(domain="example.com", identity_status="confirmed")
+    company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
+                                             operating_countries=["CO", "MX"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
     source = Evidence(company_id=company.id, contact_id=contact_id, claim="Directorio profesional sintético",
@@ -280,6 +285,42 @@ def test_read_recalculates_freshness_without_overwriting_persisted_checkpoint(
         db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id,
                                                "business_status": BusinessStatus.READY_PREFERRED}))
     assert read_campaign(path, campaign.id).companies[0].business_status == "ready_preferred"
+    exclusion_path = tmp_path / "synthetic-exclusions.json"
+    exclusions = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética posterior al resultado", "observed_at": now,
+        "entries": [{"id": "h1", "name": company.name, "domains": [company.domain], "scope": "entity",
+                     "reason": "current_customer", "source_reference": "Fila sintética"}],
+    })
+    exclusion_path.write_text(exclusions.model_dump_json(), encoding="utf-8")
+    with Database(path) as db:
+        db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.COMPLETED}))
+        item = db.get_run_item(campaign.id, company.id)
+        stored = db.save_run_item(item.model_copy(update={"stage": RunStage.COMPLETED}))
+        previous_evidence, previous_usage = db.list_evidence(company.id), db.list_usage()
+    excluded = read_campaign(path, campaign.id, exclusions_path=exclusion_path).companies[0]
+    assert excluded.business_status == "excluded" and not excluded.contacts[0].eligible
+    assert excluded.contacts[0].usable_channels == [] and excluded.run_item == stored
+    assert list(csv.DictReader(StringIO(download_csv(
+        path, campaign.id, exclusions_path=exclusion_path).decode("utf-8-sig")))) == []
+    [row] = csv.DictReader(StringIO(download_csv(
+        path, campaign.id, exclusions_path=exclusion_path, include_all=True).decode("utf-8-sig")))
+    assert row["business_status"] == "excluded" and row["stored_business_status"] == "ready_preferred"
+    with Database(path) as db:
+        assert db.get_run_item(campaign.id, company.id) == stored
+        assert db.list_assessments(campaign.id, company.id) == [assessment]
+        assert db.list_evidence(company.id) == previous_evidence and db.list_usage() == previous_usage
+    for country, expected in (("MX", "ready_preferred"), ("CO", "excluded")):
+        entry = exclusions.entries[0].model_copy(update={"scope": "country", "countries": [country]})
+        exclusion_path.write_text(exclusions.model_copy(update={"entries": [entry]}).model_dump_json(), encoding="utf-8")
+        assert read_campaign(path, campaign.id, exclusions_path=exclusion_path).companies[0].business_status == expected
+    entry = exclusions.entries[0].model_copy(update={"domains": ["otra-empresa.example"]})
+    exclusion_path.write_text(exclusions.model_copy(update={"entries": [entry]}).model_dump_json(), encoding="utf-8")
+    pending = read_campaign(path, campaign.id, exclusions_path=exclusion_path).companies[0]
+    assert pending.business_status == "insufficient_evidence" and not pending.contacts[0].eligible
+    assert pending.contacts[0].usable_channels == [] and pending.run_item == stored
+    assert list(csv.DictReader(StringIO(download_csv(
+        path, campaign.id, exclusions_path=exclusion_path).decode("utf-8-sig")))) == []
     with Database(path) as db:
         item = db.get_run_item(campaign.id, company.id)
         db.save_run_item(item.model_copy(update={"business_status": BusinessStatus.EXCLUDED}))

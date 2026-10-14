@@ -207,9 +207,6 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                                    priority=modeled[-1].priority, fit_score=modeled[-1].fit_score,
                                    coverage=modeled[-1].coverage))
 
-    if modeled and not fresh:
-        return reuse()
-
     def pending(reason, message, **extra):
         db.save_run_item(run_item.model_copy(update={
             "stop_reason": f"assessment_pending:{reason}", "error_message": message,
@@ -233,6 +230,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         return without_model(Priority.EXCLUDED, "confirmed_exclusion",
                              "Exclusión confirmada antes de investigar; no se consultó a Haiku.",
                              run_item.stop_reason)
+    if modeled and not fresh:
+        return reuse()
     if not identity_confirmed(company):
         return without_model(
             Priority.INSUFFICIENT_EVIDENCE, "identity_unconfirmed",

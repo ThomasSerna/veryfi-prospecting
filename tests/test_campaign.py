@@ -13,9 +13,11 @@ import pytest
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
-from prospecting.models import CampaignLimits, CampaignStatus, RunStage, UsageStatus, utc_now
+from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, RunItem, RunStage, UsageStatus, utc_now
 from prospecting.pipeline import close_campaign, run_campaign, start_campaign
 from prospecting.pipeline.campaign import BUDGET_STOPS, PROVIDER_STOPS
+from prospecting.pipeline.contacts import ContactReport
+from prospecting.qualification import PROMPT_VERSION
 from prospecting.providers import ClaudeClient, HttpResponse, ProviderClient
 from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess
 from prospecting.providers.tavily import TAVILY_OPERATIONS
@@ -499,6 +501,101 @@ def test_exclusion_review_is_not_expanded_and_ends_as_insufficient_evidence(worl
     assert alta.stage == RunStage.COMPLETED and "research:expansion" not in alta.attempts
     assert all("alta-uno.example" not in payload for operation, payload in case.events if operation.startswith("haiku"))
     assert report.exclusions_status == "validated"
+
+
+@pytest.mark.parametrize("stage", ["discovered", "researched", "assessed", "contacts_checked"])
+def test_new_exclusion_stops_resumed_company_before_any_provider(
+        world, make_company, make_assessment, stage):
+    case = world.setup()
+    start(case)
+    company, facts = make_company(name="Alta Uno", domain="alta-uno.example", identity_status="confirmed",
+                                  operating_countries=["CO"], segments=["fintech_software"])
+    case.db.save_company(company, evidence=facts)
+    item = case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=company.id, stage=stage,
+                                        business_status="qualified_no_contact", review_status="accepted",
+                                        review_reason="Revisión sintética", reviewed_at=utc_now()))
+    assessment = make_assessment(case.campaign.id, company.id, priority="high", target_roles=["Product Manager"])
+    case.db.save_assessment(assessment)
+    case.db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    excluded = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética posterior a la calificación", "observed_at": utc_now(),
+        "entries": [{"id": "h1", "name": company.name, "domains": [company.domain], "scope": "entity",
+                     "reason": "current_customer", "source_reference": "Fila sintética"}],
+    })
+    report = case.run(exclusions=excluded)
+    saved = case.db.get_run_item(case.campaign.id, company.id)
+    assert report.status == "completed" and saved.stage == "completed"
+    assert saved.business_status == "excluded" and saved.stop_reason == "excluded_account"
+    assert saved.last_assessment_id == assessment.id and saved.review_status == "accepted"
+    assert case.db.list_assessments(case.campaign.id, company.id) == [assessment]
+    assert any(fact.provider == "veryfi_exclusions" for fact in case.db.list_evidence(company.id))
+    assert case.events == [] and case.db.list_usage() == []
+
+
+@pytest.mark.parametrize("country,status", [("CO", "excluded"), ("MX", "ready_preferred")])
+def test_resumed_exclusions_use_only_countries_of_current_campaign(
+        world, make_company, make_assessment, country, status):
+    case = world.setup()
+    start(case)
+    company, facts = make_company(name="Alta Uno", domain="alta-uno.example", identity_status="confirmed",
+                                  operating_countries=["CO", "MX"], segments=["fintech_software"])
+    case.db.save_company(company, evidence=facts)
+    item = case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=company.id, stage="assessed"))
+    assessment = make_assessment(case.campaign.id, company.id, priority="high", target_roles=["Product Manager"],
+                                 model_id="modelo-sintetico", prompt_version=PROMPT_VERSION)
+    case.db.save_assessment(assessment)
+    case.db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    exclusions = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética por país", "observed_at": utc_now(),
+        "entries": [{"id": "h1", "name": company.name, "domains": [company.domain], "scope": "country",
+                     "countries": [country], "reason": "current_customer", "source_reference": "Fila sintética"}],
+    })
+    assert case.run(exclusions=exclusions).status == "completed"
+    assert case.db.get_run_item(case.campaign.id, company.id).business_status == status
+    assert case.db.get_company(company.id) == company
+    assert bool(case.events) == (country == "MX")
+
+
+def test_new_ambiguous_exclusion_stops_resumed_contacts_without_spending(world, make_company, make_assessment):
+    case = world.setup()
+    start(case)
+    company, facts = make_company(name="Alta Uno", domain="alta-uno.example", identity_status="confirmed")
+    case.db.save_company(company, evidence=facts)
+    item = case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=company.id, stage="assessed"))
+    assessment = make_assessment(case.campaign.id, company.id, priority="high", target_roles=["Product Manager"])
+    case.db.save_assessment(assessment)
+    case.db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    exclusions = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética ambigua", "observed_at": utc_now(),
+        "entries": [{"id": "h1", "name": company.name, "domains": ["otra-empresa.example"], "scope": "entity",
+                     "reason": "current_customer", "source_reference": "Fila sintética"}],
+    })
+    assert case.run(exclusions=exclusions).status == "completed"
+    saved = case.db.get_run_item(case.campaign.id, company.id)
+    assert saved.business_status == "insufficient_evidence" and saved.stop_reason == "exclusion_review"
+    assert saved.last_assessment_id == assessment.id and case.db.get_company(company.id) == company
+    assert case.events == [] and case.db.list_usage() == []
+
+
+def test_skipped_contacts_preserve_an_exclusion_from_the_stage(world, monkeypatch):
+    from prospecting.pipeline import campaign as bridge
+
+    case = world.setup()
+    start(case)
+
+    def exclude_before_contacts(db, budget, client, campaign_id, company_id, **kwargs):
+        item = db.get_run_item(campaign_id, company_id)
+        db.save_run_item(item.model_copy(update={"business_status": BusinessStatus.EXCLUDED, "stop_reason": "excluded_account"}))
+        return ContactReport(campaign_id=campaign_id, company_id=company_id, status="skipped",
+                             business_status="excluded", stop_reason="contact_preconditions")
+
+    monkeypatch.setattr(bridge, "find_contacts", exclude_before_contacts)
+    assert case.run().status == "completed"
+    eligible = [item for domain, item in case.by_domain().items() if domain != "baja-tres.example"]
+    assert {(item.business_status, item.stop_reason) for item in eligible} == {("excluded", "excluded_account")}
 
 
 def test_unavailable_provider_stops_the_pass_and_keeps_the_literal_reason(world):

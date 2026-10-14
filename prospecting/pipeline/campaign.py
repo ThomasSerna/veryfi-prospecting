@@ -19,7 +19,10 @@ from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, Funding
 from prospecting.contacts import channel_is_usable, derive_readiness, validate_contact
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
-from prospecting.identity import ExclusionList, ExclusionStatus, exclusions_status, load_exclusions
+from prospecting.identity import (
+    ExclusionList, ExclusionMatch, ExclusionStatus, exclusion_evidence, exclusions_status, load_exclusions,
+    match_exclusion,
+)
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract,
     Evidence, Money, Priority, RunItem, RunStage, Text, utc_now,
@@ -201,23 +204,32 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
         with db.transaction():
             for item in db.list_run_items(campaign_id):
                 company = db.get_company(item.company_id)
+                match = _exclusion_match(company, campaign, exclusions)
+                excluded = item.business_status == BusinessStatus.EXCLUDED or match is not None and match.strength == "confirmed"
                 assessment = None if item.last_assessment_id is None else db.get_assessment(item.last_assessment_id)
                 evidence, contacts = db.list_evidence(company.id), db.list_contacts(company.id)
                 results = []
                 for contact in contacts:
-                    eligible = item.business_status != BusinessStatus.EXCLUDED and assessment is not None and validate_contact(
+                    eligible = not excluded and match is None and assessment is not None and validate_contact(
                         contact, company, assessment, evidence, campaign.limits, now)
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
                     results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable))
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company)
-                if item.business_status == BusinessStatus.EXCLUDED:
+                if excluded:
                     status = BusinessStatus.EXCLUDED
+                elif match is not None:
+                    status = BusinessStatus.INSUFFICIENT_EVIDENCE
                 companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
                                                evidence=evidence, contacts=results, business_status=status))
         return CampaignView(campaign=campaign, companies=companies, budget=budget,
                             is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions))
+
+
+def _exclusion_match(company: Company, campaign: Campaign, exclusions: ExclusionList | None) -> ExclusionMatch | None:
+    countries = [country for country in company.operating_countries or [] if country in campaign.countries]
+    return match_exclusion(company.domain, [company.name, *(company.aliases or [])], countries, exclusions)
 
 
 def _approve(budget: Budget, access: ProviderAccess, approvals: list[AuthorizationInput], campaign_id: UUID
@@ -466,6 +478,19 @@ class _Run:
                 if failures:
                     self.failed = discovery.stop_reason or failures[0]
                 return discovery
+        for item in self.db.list_run_items(self.campaign.id):
+            if item.stage == RunStage.COMPLETED:
+                continue
+            match = _exclusion_match(self.db.get_company(item.company_id), self.campaign, self.exclusions)
+            if item.business_status == BusinessStatus.EXCLUDED or match is not None:
+                confirmed = item.business_status == BusinessStatus.EXCLUDED or match.strength == "confirmed"
+                with self.db.transaction():
+                    if match is not None:
+                        self.db.save_evidence(exclusion_evidence(item.company_id, match, self.exclusions))
+                    self.complete(item.company_id, BusinessStatus.EXCLUDED if confirmed else BusinessStatus.INSUFFICIENT_EVIDENCE,
+                                  item.stop_reason if item.business_status == BusinessStatus.EXCLUDED else
+                                  "excluded_account" if confirmed else "exclusion_review")
+                self.notify(item.company_id)
         for stage in (self.initial_pass, self.qualification_pass, self.contacts_pass):
             if self.paused or self.out_of_time():
                 break
@@ -568,9 +593,11 @@ class _Run:
                 self.complete(company_id, report.business_status, report.stop_reason)
             elif report.status == "skipped":
                 company = self.db.get_company(company_id)
-                self.complete(company_id, derive_readiness(
+                item = self.db.get_run_item(self.campaign.id, company_id)
+                state = BusinessStatus.EXCLUDED if item.business_status == BusinessStatus.EXCLUDED else derive_readiness(
                     assessment, self.db.list_contacts(company_id), self.db.list_evidence(company_id),
-                    self.campaign.limits, utc_now(), company), report.stop_reason)
+                    self.campaign.limits, utc_now(), company)
+                self.complete(company_id, state, item.stop_reason if state == BusinessStatus.EXCLUDED else report.stop_reason)
             self.notify(company_id)
             if report.status == "pending" and not exhausted and self.halt(report.stop_reason):
                 return
