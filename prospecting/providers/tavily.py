@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, Field, StrictStr
 
 from prospecting.discovery import COUNTRIES, RESEARCH_QUERY_VERSION, PlannedQuery, SearchHit
 from prospecting.models import Company, DiscoveryLimits, Evidence, utc_now
@@ -44,44 +44,38 @@ TAVILY_OPERATIONS = [
 ]
 
 
-class _ProviderModel(BaseModel):
-    """Respuesta externa: ignora campos nuevos y valida estrictamente los usados."""
-
-    model_config = ConfigDict(extra="ignore")
-
-
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 NonNegativeNumber = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
 
 
-class TavilyUsage(_ProviderModel):
+class TavilyUsage(BaseModel):
     credits: NonNegativeNumber | None = None
 
 
-class TavilySearchResult(_ProviderModel):
+class TavilySearchResult(BaseModel):
     url: StrictStr
     title: StrictStr | None = None
     content: StrictStr | None = None
     score: Number | None = None
 
 
-class TavilySearchResponse(_ProviderModel):
+class TavilySearchResponse(BaseModel):
     results: Annotated[list[TavilySearchResult], Field(max_length=20)]
     usage: TavilyUsage | None = None
     request_id: StrictStr | None = None
 
 
-class TavilyExtractResult(_ProviderModel):
+class TavilyExtractResult(BaseModel):
     url: StrictStr
     raw_content: StrictStr | None = None
 
 
-class TavilyFailedResult(_ProviderModel):
+class TavilyFailedResult(BaseModel):
     url: StrictStr
     error: StrictStr | None = None
 
 
-class TavilyExtractResponse(_ProviderModel):
+class TavilyExtractResponse(BaseModel):
     results: Annotated[list[TavilyExtractResult], Field(max_length=20)]
     failed_results: Annotated[list[TavilyFailedResult], Field(max_length=20)] = Field(default_factory=list)
     usage: TavilyUsage | None = None

@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4, uuid5
 
 from pydantic import (
-    AfterValidator, BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator,
+    AfterValidator, BaseModel, Field, StrictBool, StrictInt, StrictStr, model_validator,
 )
 
 from prospecting.contacts import (
@@ -74,11 +74,7 @@ def _source_date(value: str) -> str:
 SourceDate = Annotated[StrictStr, AfterValidator(_source_date)]
 
 
-class _HunterModel(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-
-class HunterSource(_HunterModel):
+class HunterSource(BaseModel):
     uri: StrictStr | None = None
     domain: StrictStr | None = None
     extracted_on: SourceDate | None = None
@@ -86,12 +82,12 @@ class HunterSource(_HunterModel):
     still_on_page: StrictBool | None = None
 
 
-class HunterVerification(_HunterModel):
+class HunterVerification(BaseModel):
     date: SourceDate | None = None
     status: StrictStr | None = None
 
 
-class HunterPerson(_HunterModel):
+class HunterPerson(BaseModel):
     id: StrictInt | StrictStr | None = None
     value: StrictStr | None = None
     type: StrictStr | None = None
@@ -106,7 +102,7 @@ class HunterPerson(_HunterModel):
     sources: Annotated[list[HunterSource], Field(max_length=20)] = Field(default_factory=list)
 
 
-class HunterDomainData(_HunterModel):
+class HunterDomainData(BaseModel):
     domain: StrictStr | None = None
     organization: StrictStr | None = None
     webmail: StrictBool | None = None
@@ -115,11 +111,11 @@ class HunterDomainData(_HunterModel):
     emails: Annotated[list[HunterPerson], Field(max_length=10)] = Field(default_factory=list)
 
 
-class HunterDomainSearchResponse(_HunterModel):
+class HunterDomainSearchResponse(BaseModel):
     data: HunterDomainData | None = None
 
 
-class HunterFinderData(_HunterModel):
+class HunterFinderData(BaseModel):
     id: StrictInt | StrictStr | None = None
     first_name: StrictStr | None = None
     last_name: StrictStr | None = None
@@ -133,11 +129,11 @@ class HunterFinderData(_HunterModel):
     sources: Annotated[list[HunterSource], Field(max_length=20)] = Field(default_factory=list)
 
 
-class HunterFinderResponse(_HunterModel):
+class HunterFinderResponse(BaseModel):
     data: HunterFinderData | None = None
 
 
-class HunterVerifierData(_HunterModel):
+class HunterVerifierData(BaseModel):
     email: StrictStr | None = None
     status: StrictStr | None = None
     webmail: StrictBool | None = None
@@ -146,7 +142,7 @@ class HunterVerifierData(_HunterModel):
     sources: Annotated[list[HunterSource], Field(max_length=20)] = Field(default_factory=list)
 
 
-class HunterVerifierResponse(_HunterModel):
+class HunterVerifierResponse(BaseModel):
     data: HunterVerifierData | None = None
 
 
