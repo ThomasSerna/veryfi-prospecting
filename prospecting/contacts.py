@@ -127,6 +127,8 @@ def role_matches(title: str | None, roles: list[str]) -> bool:
     equivalents = {"cto": "chief technology officer", "director de tecnologia": "chief technology officer",
                    "chief technical officer": "chief technology officer"}
     observed = fold_words(title)
+    if re.search(r"\b(?:assistant\s+to|asistente(?:\s+ejecutiv[oa])?\s+(?:de|del))\b", observed):
+        return False
     return any(mentions(observed, role) or
                equivalents.get(fold_words(role), fold_words(role)) == equivalents.get(observed, observed)
                for role in roles)
@@ -204,7 +206,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
                     item.source_type == "provider" and item.contact_id == contact.id)
                    for item in facts):
             return False
-    if assessment.target_roles and not role_matches(contact.title, assessment.target_roles):
+    if not role_matches(contact.title, assessment.target_roles or [contact.title]):
         return False
     if contact.geographic_scope:
         if not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence):

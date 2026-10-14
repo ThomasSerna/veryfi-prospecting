@@ -11,7 +11,7 @@ from prospecting.contact_extraction import (
     CONTACTS_PROMPT_VERSION, HaikuContacts, build_contacts_request, parse_contacts_output,
 )
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, target_roles,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_matches, target_roles,
     validate_contact,
 )
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
@@ -721,3 +721,26 @@ def test_explicit_departure_without_title_is_preserved_as_negative_employment(el
     output["candidates"][0]["facts"] = [fact for fact in output["candidates"][0]["facts"] if fact["field"] != "title"]
     [(contact, _)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment, campaign, [source], NOW, uuid4())
     assert contact.current_employment is False and contact.identity_status == "pending"
+
+
+@pytest.mark.parametrize("title", ["Executive Assistant to CTO", "Assistant to the Chief Technology Officer",
+                                  "Asistente de CTO", "Asistente del CTO", "Asistente ejecutiva del CTO"])
+@pytest.mark.parametrize("targets", [[TITLE], []])
+def test_assistant_to_target_role_is_not_the_holder_even_when_previously_marked_relevant(eligible, title, targets):
+    company, campaign, assessment, contact, evidence = eligible
+    assessment = assessment.model_copy(update={"target_roles": targets})
+    source = evidence[0].model_copy(update={"excerpt": evidence[0].excerpt.replace(TITLE, title)})
+    previous = contact.model_copy(update={"title": title, "relevant_function": True})
+    assert not role_matches(title, [TITLE])
+    assert not validate_contact(previous, company, assessment, [source, evidence[1]], campaign.limits, NOW)
+    assert derive_readiness(assessment, [previous], [source, evidence[1]], campaign.limits, NOW, company) == "qualified_no_contact"
+    source = source.model_copy(update={"contact_id": None})
+    [(candidate, facts)] = parse_contacts_output(public_output(source, title=title), "end_turn", company, assessment,
+                                                campaign, [source], NOW, uuid4())
+    assert candidate.relevant_function is False
+    assert derive_readiness(assessment, [candidate], facts, campaign.limits, NOW, company) == "qualified_no_contact"
+
+
+@pytest.mark.parametrize("title", ["CTO", "CTO LATAM", "Chief Technology Officer", "Chief Technical Officer", "Director de tecnología"])
+def test_target_role_holders_keep_equivalences_and_qualifiers(title):
+    assert role_matches(title, [TITLE])

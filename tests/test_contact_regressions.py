@@ -69,19 +69,22 @@ def test_reopened_ambiguous_direct_channel_is_pending_in_ui_and_primary_csv(tmp_
         assert db.get_run_item(campaign.id, company.id) == item
 
 
-def test_reopened_contact_marked_current_with_nominal_departure_is_not_ready(tmp_path, make_campaign, make_company, make_assessment):
+@pytest.mark.parametrize("title,record", [("CTO", "Persona Sintética Uno dejó de ser CTO de"),
+                                          ("Executive Assistant to CTO", "Persona Sintética Uno es Executive Assistant to CTO de")])
+def test_reopened_contact_with_contradictory_professional_facts_is_not_ready(tmp_path, make_campaign, make_company,
+                                                                          make_assessment, title, record):
     path, now = tmp_path / "synthetic-former-contact.sqlite3", utc_now()
     campaign = make_campaign(status="completed")
     company, evidence = make_company(domain="example.com", identity_status="confirmed", segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
     fact = Evidence(company_id=company.id, contact_id=contact_id, claim="Salida laboral exclusivamente sintética.",
-                    excerpt=f"Persona Sintética Uno dejó de ser CTO de {company.name}, correo profesional persona@example.com.",
+                    excerpt=f"{record} {company.name}, correo profesional persona@example.com.",
                     url="https://example.com/team", retrieved_at=now, kind="observed", source_type="primary")
     channel = Channel(contact_id=contact_id, type="email", value="persona@example.com", evidence_ids=[fact.id],
                       retrieved_at=now, professional=True, direct=True, normalized_status="published_professional",
                       published_evidence_ids=[fact.id])
-    contact = Contact(id=contact_id, company_id=company.id, name="Persona Sintética Uno", title="CTO",
+    contact = Contact(id=contact_id, company_id=company.id, name="Persona Sintética Uno", title=title,
                       name_complete=True, identity_status="confirmed", current_employment=True, relevant_function=True,
                       provenance={field: [fact.id] for field in ("name", "title", "relevant_function")},
                       employment_evidence_ids=[fact.id], channels=[channel])
