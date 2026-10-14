@@ -246,3 +246,62 @@ entrega MVP/T11: demo real completa, catálogo y exclusiones confirmados y gasto
 histórico conciliado. La captura explícita desde el pipeline ya está documentada;
 no autoriza consumo ni altera las reglas de reutilización de evaluaciones.
 T10 sigue pendiente hasta resolver esos requisitos comerciales y de evidencia.
+
+## Lote real de la entrega (T11)
+
+Campaña del 14 de octubre de 2026 desde la interfaz Django, con Colombia y México,
+`fintech_software` y `cpg_loyalty`, 8 empresas, sin palabras clave y sin lista de exclusiones
+validada (`missing`). Hunter solo con Domain Search. Misma rúbrica (`rubric_v1`) y prompt
+(`haiku_assessment_v3`) que T09. El 13 de octubre el código de contactos, identidad y
+ampliación recibió correcciones, por lo que la comparación con T09 no es controlada. Llamadas y conciliación en
+[Comprobación de proveedores](provider-check.md#lote-real-de-la-entrega-t11).
+
+| Medida | Valor |
+|---|---|
+| Identidad confirmada | 6 / 8; las otras dos por `identity_unverified` y `country_unconfirmed` |
+| Empresas reutilizadas de lotes anteriores | 3 / 8, sin duplicarlas |
+| Prioridad | 4 `medium`, 1 `low`, 3 `insufficient_evidence`; ninguna `high` |
+| Estado comercial | 4 `qualified_no_contact`, 2 `insufficient_evidence`, 1 `low_fit`, 1 sin estado final |
+| Búsquedas de Hunter con personas | 2 / 4 |
+| Personas con identidad y cargo pertinentes y correo verificado por Hunter | 3 (1 nueva y 2 ya conocidas desde T07) |
+| Personas listas | **0** |
+| Llamadas sin respuesta | 0 / 43 |
+| Exportación | Todos los resultados: 9 filas, ninguna celda con fórmula sin neutralizar; prospectos listos: vacía |
+
+Las cuatro empresas de prioridad media son FinTech (una también CPG). En CPG, una quedó con encaje
+bajo y otra con evidencia insuficiente. Por país confirmado: 1 solo de Colombia, 3 solo de México
+y 2 de ambos; dos quedaron sin identidad confirmada.
+
+- **Por qué no hay personas listas**: las tres personas encontradas tienen nombre completo, cargo
+  pertinente y correo verificado, pero ninguna fuente aporta evidencia fechada de empleo vigente
+  ni un directorio corporativo actual. La regla de IDEA §10 lo exige; no se relajó.
+- **Contactos pendientes**: en la empresa de la persona nueva, la extracción pública con Haiku citó
+  un texto que no estaba literalmente en la fuente y se rechazó (`unsupported_quote`). La etapa de
+  contactos quedó pendiente y la campaña, `partial`.
+- **Sin estado final**: una empresa quedó en la etapa de calificación con identidad sin verificar.
+  Reanudar la campaña exigiría una autorización nueva.
+
+### Métricas (IDEA §18.2)
+
+| Métrica | Valor |
+|---|---|
+| Cobertura de contacto | 0 / 4 empresas calificadas |
+| Canal preferido | No calculable: 0 empresas listas |
+| Precisión de empresas y pertinencia de personas | Sin medir: requiere la revisión de Veryfi |
+| Costo por prospecto aceptado | No calculable: 0 aceptados |
+| Tiempo automático | Unos 100 s para 8 empresas |
+| Gasto del lote | 21 créditos de Tavily, 2 de Hunter y USD 0,0094070 de Haiku |
+
+### Frente a T09
+
+- Hunter encontró personas en 2 de 4 búsquedas, frente a 1 de 8 en T09, y ninguna llamada quedó
+  sin respuesta, frente al 9,5 %. La muestra no permite atribuir estas diferencias a un cambio.
+- El resultado comercial no cambió: el criterio de al menos un prospecto real completo sigue
+  **sin cumplirse**. El cuello de botella ya no es solo encontrar personas o canales: falta
+  evidencia de que la persona sigue en el puesto.
+- **Siguiente mejora**: obtener evidencia de empleo vigente con procedencia, por ejemplo
+  directorios y páginas de equipo corporativas actuales o fuentes fechadas del proveedor, sin
+  relajar las reglas de listo.
+
+El acumulado conciliado queda en 73 créditos de Tavily (de 1.000 gratuitos), 4 de Hunter (de 50) y
+USD 0,0283956 de Haiku en este ledger, más unos USD 0,0019 de otra instancia: muy por debajo de USD 20.

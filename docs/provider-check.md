@@ -252,3 +252,43 @@ de software que el lote 1 tomó por empresa. Los resultados están en
   cargos y cambió la huella de la solicitud.
 - La reserva de Haiku, acotada por los bytes del payload, fue unas 2,4 veces el costo estimado.
 - La fila de Hunter de la T07 con 3 créditos anotados sigue sin conciliar (sobrestima 2 créditos).
+
+## Lote real de la entrega (T11)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-10-14 (America/Bogota), de 07:47 a 07:49 |
+| Ejecución | Desde la interfaz Django (`uv run --locked --env-file .env python manage.py runserver 127.0.0.1:8000 --noreload`); campaña `fd1660c9` con Colombia, México, `fintech_software` y `cpg_loyalty`, 8 empresas, sin palabras clave ni lista de exclusiones (`missing`). Terminó `partial`, con unos 100 s de llamadas |
+| Cuentas | `data/provider-access.json` actualizado con los paneles vistos por el responsable a las 07:39–07:40: Tavily 52 / 1.000 créditos y *pay as you go* desactivado; Hunter 48 restantes de 50; consola de Anthropic con USD 0,02 en 30 días y saldo de la organización de USD 4,98. El cupo de Haiku pasó de USD 3 a USD 2,9981 para descontar el uso fuera del ledger de T09 |
+| Autorización | Responsable del cupo, en el chat y en la interfaz: Tavily `search` ≤ 50 créditos y `extract` ≤ 30 (`tavily-cuenta-2`, USD 0); Haiku `messages` ≤ USD 0,08 (`anthropic-equipo-prepago`); Hunter `domain_search` ≤ 16 créditos (`hunter-cuenta-2`, USD 0). Finder y Verifier, deshabilitados |
+
+| Operación | Llamadas | Sin respuesta (timeout) | Créditos reservados | Créditos conciliados | Costo reservado | Costo conciliado | Latencia de las respuestas |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Tavily Search | 17 (8 de descubrimiento) | 0 | 17 | 17 | USD 0 | USD 0 | 1,6–3,8 s |
+| Tavily Extract | 12 | 0 | 12 | 4 | USD 0 | USD 0 | 0,4–1,9 s |
+| Haiku `messages` | 10 | 0 | — | — | USD 0,0226414 | USD 0,0094070 | 1,7–10,8 s |
+| Hunter Domain Search | 4 | 0 | 4 | 2 | USD 0 | USD 0 | 0,4–0,8 s |
+
+Ningún consumo superó su tope. Los resultados están en [la evaluación](evaluation.md#lote-real-de-la-entrega-t11);
+las empresas y personas quedan en `data/`.
+
+### Conciliación
+
+- **Tavily**: el panel pasó de 52 a 73 créditos (08:23). La suma de las respuestas, 17 de búsqueda
+  y 4 de extracción, coincide con el salto de 21; el ledger de `tavily-cuenta-2` confirma 73.
+- **Hunter**: el panel pasó de 2 a 4 créditos usados (08:24). Dos de las cuatro búsquedas
+  devolvieron personas y se anotó 1 crédito a cada una; las otras dos, 0. La respuesta no informa
+  créditos: la atribución por fila es una inferencia, pero el total por cuenta es exacto.
+- **Haiku**: 72.970 tokens de entrada y 4.220 de salida por el precio publicado. Se concilió con el
+  uso que informó la API, sin captura de la consola, porque el responsable lo aceptó, como en T07.
+  El ledger acumula USD 0,0283956.
+- Los comprobantes están en `data/conciliaciones/` (`*-2026-10-14-t11.json`). Antes del lote y de
+  la conciliación se guardaron copias de la base en `data/backups/`.
+
+### Observaciones y limitaciones
+
+- Ninguna llamada quedó sin respuesta, frente al 9,5 % de T09.
+- La reserva de Haiku volvió a ser unas 2,4 veces el costo conciliado.
+- Las solicitudes a Haiku usaron entre 3.388 y 8.721 tokens de entrada. El límite de 6.000 se
+  aplica como presupuesto de caracteres, y 23 de las 31 llamadas registradas en esta base lo
+  superaron en tokens. El gasto sigue acotado por la reserva, que se calcula por bytes.
