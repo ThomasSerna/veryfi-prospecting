@@ -16,7 +16,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 import demo
-from core.presentation import download_csv
+from core.presentation import download_csv, stop_message
 from prospecting.contacts import fold_words
 from prospecting.models import BusinessStatus, utc_now
 from prospecting.pipeline import campaign as bridge
@@ -49,6 +49,12 @@ def test_demo_reaches_every_business_status_through_the_real_rules(seeded):
                                 reason="Confirmación sintética durante la prueba; no se envió nada.", confirmed=True)
     after = {item.company.id: item.business_status for item in current(seeded).companies}
     assert after[pending.company.id] == "ready_alternative"
+
+
+def test_every_demo_stop_reason_has_its_own_message(seeded):
+    reasons = [item.run_item.stop_reason for item in current(seeded).companies]
+    assert None not in reasons
+    assert [reason for reason in reasons if "quedó pendiente" in stop_message(reason)] == []
 
 
 def test_demo_only_creates_new_files_outside_local_data(tmp_path):
