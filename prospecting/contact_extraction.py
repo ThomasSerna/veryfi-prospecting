@@ -6,14 +6,13 @@ y aplica las reglas de `prospecting.contacts`. Sin red ni base de datos.
 
 from datetime import datetime
 import json
-import re
 from typing import Annotated, Literal
 from uuid import UUID, uuid4, uuid5
 
 from pydantic import Field
 
 from prospecting.contacts import (
-    ContactError, apply_target_roles, complete_name, employment_fresh, fold_words, mentions,
+    ContactError, apply_target_roles, complete_name, employment_ended, employment_fresh, fold_words, mentions,
     merge_contact, nominal_channel_association, organization_matches, parse_source_date, phone_country_of, professional_email,
     role_matches, target_roles,
 )
@@ -155,7 +154,8 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
             if field == "employment":
                 employment_ids.append(derived.id)
         employment = next((item for item in evidence if item.id in employment_ids), None)
-        former = "employment" in values and bool(re.search(r"\b(?:former|previous|ex|anterior|hasta|fue|was)\b", fold_words(values["employment"].quote)))
+        former = "employment" in values and employment_ended(
+            values["employment"].quote, candidate.name, values["title"].value if "title" in values else None)
         current = False if former or entity_contradicted else True if employment is not None and employment_fresh(employment, company, campaign.limits, now) else None
         contact = Contact(id=contact_id, company_id=company.id, name=candidate.name, title=values["title"].value if "title" in values else None,
                           name_complete=complete_name(candidate.name), current_employment=current,

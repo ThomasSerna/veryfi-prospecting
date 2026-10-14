@@ -163,6 +163,17 @@ def employment_fresh(fact: Evidence, company: Company, limits: CampaignLimits, n
             and _fresh(fact.retrieved_at, limits.cache.web_days, now))
 
 
+def employment_ended(text: str, name: str, title: str | None) -> bool:
+    """Solo una salida o un cargo anterior atribuidos a la persona contradicen vigencia."""
+    subject, role = re.escape(fold_words(name)), re.escape(fold_words(title or ""))
+    words = fold_words(text)
+    former = r"(?:former|previous|ex|anterior|antiguo)\s+" + role + r"\b"
+    departure = (r"(?:dejo\s+de\s+(?:ser|trabajar)|ya\s+no\s+(?:es|trabaja)|dejo\s+(?:el\s+puesto|la\s+empresa)|"
+                 r"renuncio|salio\s+de|se\s+retiro|left|departed|resigned|no\s+longer|ceased\s+to)\b")
+    return bool(re.search(r"(?<!\w)" + subject + r"\s+(?:(?:es|is|era|was|fue)\s+)?(?:" + former + "|" + departure + ")",
+                          words) or re.search(r"\b" + former + r"\s+" + subject + r"(?!\w)", words))
+
+
 def _valid_refs(ids: list[UUID], contact: Contact, evidence: list[Evidence]) -> list[Evidence]:
     by_id = {item.id: item for item in evidence}
     if not ids or any(id not in by_id for id in ids):
@@ -207,6 +218,8 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
         if not regional and explicit and company.operating_countries and not explicit.intersection(company.operating_countries):
             return False
     facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
+    if any(item.kind == "observed" and employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in facts):
+        return False
     return bool(facts) and any(item.kind == "observed" and not is_search_evidence(item) and
                               employment_fresh(item, company, limits, now) for item in facts)
 

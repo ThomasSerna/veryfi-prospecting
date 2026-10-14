@@ -67,3 +67,46 @@ def test_reopened_ambiguous_direct_channel_is_pending_in_ui_and_primary_csv(tmp_
     with Database(path) as db:
         assert db.get_contact(contact.id) == contact
         assert db.get_run_item(campaign.id, company.id) == item
+
+
+def test_reopened_contact_marked_current_with_nominal_departure_is_not_ready(tmp_path, make_campaign, make_company, make_assessment):
+    path, now = tmp_path / "synthetic-former-contact.sqlite3", utc_now()
+    campaign = make_campaign(status="completed")
+    company, evidence = make_company(domain="example.com", identity_status="confirmed", segments=["fintech_software"])
+    assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
+    contact_id = uuid4()
+    fact = Evidence(company_id=company.id, contact_id=contact_id, claim="Salida laboral exclusivamente sintética.",
+                    excerpt=f"Persona Sintética Uno dejó de ser CTO de {company.name}, correo profesional persona@example.com.",
+                    url="https://example.com/team", retrieved_at=now, kind="observed", source_type="primary")
+    channel = Channel(contact_id=contact_id, type="email", value="persona@example.com", evidence_ids=[fact.id],
+                      retrieved_at=now, professional=True, direct=True, normalized_status="published_professional",
+                      published_evidence_ids=[fact.id])
+    contact = Contact(id=contact_id, company_id=company.id, name="Persona Sintética Uno", title="CTO",
+                      name_complete=True, identity_status="confirmed", current_employment=True, relevant_function=True,
+                      provenance={field: [fact.id] for field in ("name", "title", "relevant_function")},
+                      employment_evidence_ids=[fact.id], channels=[channel])
+    item = RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed",
+                   last_assessment_id=assessment.id, business_status="ready_preferred")
+    with Database(path) as db:
+        db.save_campaign(campaign)
+        db.save_company(company, evidence=evidence)
+        db.save_run_item(item.model_copy(update={"last_assessment_id": None}))
+        db.save_assessment(assessment)
+        db.save_run_item(item)
+        db.save_contact(contact, evidence=[fact])
+    [result] = read_campaign(path, campaign.id).companies
+    assert result.business_status == "qualified_no_contact"
+    assert not result.contacts[0].eligible and result.contacts[0].usable_channels == []
+    view = read_campaign(path, campaign.id)
+    assert list(csv.DictReader(StringIO(export_csv(view).decode("utf-8-sig")))) == []
+    [row] = csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig")))
+    assert row["contact_eligible"] == row["contact_ready"] == "False"
+    assert str(fact.id) in row["sources"]
+    with override_settings(PROSPECTING_DB_PATH=path, PROSPECTING_ACCESS_PATH=tmp_path / "missing-access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=tmp_path / "missing-exclusions.json"):
+        response = Client(SERVER_NAME="localhost").get(reverse("webapp:company", kwargs={
+            "campaign_id": campaign.id, "company_id": company.id}))
+    assert response.status_code == 200 and "Calificada sin contacto" in response.content.decode("utf-8")
+    with Database(path) as db:
+        assert db.get_contact(contact.id) == contact
+        assert db.get_run_item(campaign.id, company.id) == item

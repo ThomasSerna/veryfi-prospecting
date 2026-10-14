@@ -675,3 +675,49 @@ def test_hunter_structured_nominal_phone_remains_usable(eligible):
     [(observed, facts)] = parse_domain_search(company, domain_response(phone_number="+573005550001"), uuid4(), NOW)
     phone = next(channel for channel in observed.channels if channel.type == "phone")
     assert channel_is_usable(phone, observed, facts, campaign.limits, NOW, company)
+
+
+@pytest.mark.parametrize("employment", [
+    f"{NAME} dejó de ser CTO de Empresa sintética.",
+    f"{NAME} ya no es CTO de Empresa sintética.",
+    f"{NAME}, ex CTO de Empresa sintética.",
+    f"{NAME} was former CTO de Empresa sintética.",
+    f"Former CTO {NAME} de Empresa sintética.",
+    f"{NAME} resigned as CTO de Empresa sintética.",
+])
+def test_nominal_departure_blocks_extraction_and_previously_current_contact(eligible, employment):
+    company, campaign, assessment, contact, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None, "excerpt": employment})
+    [(candidate, facts)] = parse_contacts_output(public_output(source, email=None), "end_turn", company, assessment,
+                                                campaign, [source], NOW, uuid4())
+    assert candidate.current_employment is False
+    assert derive_readiness(assessment, [candidate], facts, campaign.limits, NOW, company) == "qualified_no_contact"
+    source = source.model_copy(update={"contact_id": contact.id})
+    assert not validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW)
+
+
+@pytest.mark.parametrize("employment", [
+    f"{NAME} fue nombrado CTO de Empresa sintética.",
+    f"{NAME} was appointed CTO de Empresa sintética.",
+    f"{NAME}, CTO de Empresa sintética. Otra Persona Sintética dejó de ser CTO de Empresa sintética.",
+    f"{NAME}, CTO de Empresa sintética, Otra Persona Sintética dejó de ser CTO de Empresa sintética.",
+])
+def test_appointment_and_another_person_departure_keep_nominal_current_employment(eligible, employment):
+    company, campaign, assessment, contact, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None, "excerpt": employment})
+    [(candidate, facts)] = parse_contacts_output(public_output(source, email=None), "end_turn", company, assessment,
+                                                campaign, [source], NOW, uuid4())
+    assert candidate.current_employment is True
+    assert validate_contact(candidate, company, assessment, facts, campaign.limits, NOW)
+    source = source.model_copy(update={"contact_id": contact.id})
+    assert validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW)
+
+
+def test_explicit_departure_without_title_is_preserved_as_negative_employment(eligible):
+    company, campaign, assessment, _, evidence = eligible
+    source = evidence[0].model_copy(update={"contact_id": None,
+                                          "excerpt": f"{NAME} dejó de trabajar en Empresa sintética."})
+    output = json.loads(public_output(source, email=None))
+    output["candidates"][0]["facts"] = [fact for fact in output["candidates"][0]["facts"] if fact["field"] != "title"]
+    [(contact, _)] = parse_contacts_output(json.dumps(output), "end_turn", company, assessment, campaign, [source], NOW, uuid4())
+    assert contact.current_employment is False and contact.identity_status == "pending"
