@@ -34,6 +34,13 @@ candidato seleccionado, `Company`, `Evidence` y `RunItem` en la etapa `discovere
 el resto de candidatos solo aparece en el informe. Si la campaña ya tiene empresas
 guardadas, la función no vuelve a llamar.
 
+Límites actuales frente a IDEA §7.1: las consultas son siempre de plantilla, porque
+Haiku no reformula consultas aunque falten resultados. El informe con las
+combinaciones que no alcanzaron la meta (`DiscoveryReport.combinations`) y los
+candidatos descartados por exclusión vive solo en memoria: la interfaz muestra el
+motivo de parada, no ese detalle. Lo que persiste es el `RunItem` de cada empresa
+seleccionada y la evidencia que la localizó.
+
 Cada empresa queda con identidad `pending`, nombre inferido (evidencia `inference`)
 y dominio respaldado por los resultados observados. País de operación y segmento
 quedan desconocidos. La evidencia guarda la URL, `provider="tavily"`, la referencia

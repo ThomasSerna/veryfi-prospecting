@@ -31,7 +31,7 @@ la rúbrica y las reglas son propuestas pendientes de validación por Veryfi.
 | Al menos un prospecto real completo | **No cumplido** | Los dos lotes de T09 y el de la entrega terminaron con 0 personas listas |
 | Ningún registro listo incumple la regla de canal directo | Cumplido | 0 listos sin relajar reglas; pruebas de §18.1 |
 | UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo) |
-| Pruebas críticas en verde | Cumplido | 943 pruebas sin red; ver reproducibilidad |
+| Pruebas críticas en verde | Cumplido | 960 pruebas sin red tras la revisión de T01–T11; ver reproducibilidad |
 | Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido | [T09](#proveedores-reales-t09) y [lote de la entrega](#lote-real-de-la-entrega) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
@@ -56,7 +56,8 @@ sobre un clon limpio del repositorio:
 
 - `uv sync --locked`, `uv lock --check` y `manage.py check` sin errores.
 - `uv run --locked pytest`: **932 pruebas aprobadas en 51,9 s**, sin red y con bases temporales.
-  Tras corregir los mensajes de parada y el límite de tokens, la suite local suma 943 pruebas aprobadas.
+  Tras corregir los mensajes de parada y el límite de tokens, la suite local suma 943 pruebas aprobadas,
+  y 960 después de la [revisión de T01–T11](evaluation.md#revisión-de-t01t11-y-cierre-técnico-de-la-t09).
 - `node --test tests/js_execution.test.cjs`: 2 de 2.
 - `git check-ignore` confirma que `.env`, `.venv/`, `data/`, bases SQLite y cachés quedan fuera de Git.
 - `demo.py` responde en `127.0.0.1:8000` con el aviso de datos sintéticos.
@@ -161,9 +162,10 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
 - **Datos personales**: el tratamiento de contactos profesionales en cada país, su base legal,
   retención y eliminación no se han acordado con Veryfi (IDEA §15).
 
-Limitaciones conocidas de la interfaz, observadas en T09: interactuar con la página durante
-una ejecución la interrumpe de forma segura y preparar otra campaña con una activa abre la
-activa sin avisar.
+En T09, con la interfaz Streamlit de entonces, interactuar con la página interrumpía la
+ejecución y preparar otra campaña abría la activa sin avisar. Con Django la investigación corre
+en un hilo del servidor y la interacción no la interrumpe. Desde el 14 de octubre, «Nueva
+campaña» avisa de la campaña sin terminar y no crea otra.
 
 La demostración reveló que la ficha de una empresa lista, excluida o de encaje bajo mostraba
 el aviso genérico «La investigación quedó pendiente…». Se corrigió el 14 de octubre: las
@@ -195,6 +197,8 @@ En orden de prioridad según la evidencia disponible:
    Buscar esa evidencia con procedencia (directorios y páginas de equipo corporativas actuales o
    fuentes fechadas) y evaluar una fuente adicional (Apollo, T12, o X-Ray Search, T13) frente a
    esta línea base, sin relajar las reglas de listo ni ampliar el presupuesto implícitamente.
+   La selección de candidatos que pedía la T09 se corrigió el 14 de octubre, pero solo se ha
+   verificado con datos sintéticos.
 2. **Cierre comercial de T10**: revisión atribuible de Veryfi, conjunto independiente de hasta
    20 empresas nuevas y conclusión sustentada.
 3. **Lista de exclusiones y catálogo** confirmados por Veryfi.

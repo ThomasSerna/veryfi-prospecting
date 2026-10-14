@@ -30,7 +30,7 @@ software más. Cada uno falla si se revierte la lógica que protege.
 | Fallos de proveedor | `test_campaign.py::test_unavailable_provider_stops_the_pass_and_keeps_the_literal_reason`, `test_providers.py::test_invalid_response_is_persisted_without_releasing_cost`, `test_discovery.py::test_tavily_errors_have_specific_reasons` |
 | Reruns y reinicio | `test_campaign.py`: `test_second_click_and_rerun_reuse_the_campaign_without_new_calls`, `test_interrupted_run_resumes_from_saved_steps_without_repeating_sent_calls` |
 | Entrada hostil | `test_pipeline.py::test_hostile_search_content_is_data_only`, `test_qualification.py::test_hostile_evidence_cannot_raise_priority_or_budget` |
-| Salida o URL insegura | `test_export.py::test_dangerous_text_is_neutralized_without_losing_content`, `test_providers.py::test_redirect_is_not_followed_and_cannot_receive_credentials`, `test_ui.py::test_hostile_external_text_is_rendered_only_as_plain_text` |
+| Salida o URL insegura | `test_export.py::test_dangerous_text_is_neutralized_without_losing_content`, `test_providers.py::test_redirect_is_not_followed_and_cannot_receive_credentials`, `test_ui.py::test_hostile_external_text_is_escaped_and_private_source_is_not_a_link` |
 | Trazabilidad | `test_qualification.py::test_invalid_references_are_rejected`, `test_export.py::test_primary_has_only_current_eligible_people_and_preserves_sources_and_identifiers` |
 | Reorganización altera datos guardados | `test_persisted_identifiers.py`: `test_request_fingerprints_do_not_change`, `test_sqlite_schema_does_not_change` |
 | Dependencias invertidas | `test_architecture.py`: `test_internal_imports_follow_the_declared_direction`, `test_internal_imports_have_no_cycles` |
@@ -305,3 +305,40 @@ y 2 de ambos; dos quedaron sin identidad confirmada.
 
 El acumulado conciliado queda en 73 créditos de Tavily (de 1.000 gratuitos), 4 de Hunter (de 50) y
 USD 0,0283956 de Haiku en este ledger, más unos USD 0,0019 de otra instancia: muy por debajo de USD 20.
+
+## Revisión de T01–T11 y cierre técnico de la T09
+
+Revisión del 14 de octubre de 2026 (America/Bogota) de las historias T01–T11 frente a IDEA §17.2.
+Solo usa datos sintéticos: no hubo llamadas reales ni se repitió ningún lote.
+
+- **Valoración de la prueba local del 12 de octubre.** El usuario consideró satisfactorios el
+  descubrimiento y la afinidad empresarial obtenidos con Tavily y Haiku en esa prueba. Es una
+  observación de esa muestra, no una validación general de precisión comercial.
+- **Priorización de cargos.** Cada perfil de `config/veryfi.json` lista sus cargos con variantes
+  en español e inglés, y los cargos de la evaluación se limitan a los perfiles de la empresa.
+  Hunter Domain Search busca primero por esos cargos y, en el segundo intento de prioridad alta,
+  por departamentos. La búsqueda pública usa los cuatro primeros cargos. Las personas se
+  investigan por nombre completo, cargo pertinente y posición de su cargo en la lista.
+- **Cupo de personas.** La selección de la T06 seguía sin corregir: un candidato poco pertinente
+  hallado primero ocupaba el cupo, y los idóneos que aparecían después se descartaban sin
+  guardarse. Ahora todos los candidatos se guardan con su procedencia y el cupo solo lo ocupa
+  quien supera la validación. No cambian topes, consultas ni créditos, y las llamadas hechas
+  siguen contabilizadas. `test_off_target_first_candidate_does_not_block_later_relevant_person`
+  reproduce el caso que pedía la T09; fallaba antes de la corrección.
+- **Fragmentos para Haiku.** Al recortar la evidencia para extraer personas, el orden dependía
+  del identificador de cada fragmento. Ahora entran primero las páginas de equipo o directorio y
+  los fragmentos que mencionan cargos objetivo o personas conocidas. Si todo cabe, la solicitud
+  y su huella no cambian (`test_tight_budget_keeps_nominal_directory_fragment_over_earlier_ids`).
+- **Sin validar con proveedores.** Estas correcciones no cambian por sí solas el resultado del
+  lote de la entrega: allí las tres personas pertinentes carecían de evidencia de empleo
+  vigente, y la regla de listo la sigue exigiendo.
+
+La revisión corrigió además otros puntos:
+
+- el motivo de parada se guarda por empresa en el análisis inicial y en la ampliación;
+- «Nueva campaña» avisa de una campaña sin terminar;
+- los errores HTTP de Claude tienen mensaje propio en la interfaz;
+- nuevas pruebas cubren el aviso de exclusiones, los topes por defecto, los archivos ignorados
+  por Git y el autoescape.
+
+La suite queda en 960 pruebas en verde.

@@ -116,6 +116,9 @@ tiempo del descubrimiento solo cuenta dentro de la sesión que lo ejecuta.
   cupo o permisos nuevos. Si la reserva solo supera el tope de una empresa, `Budget` lo
   informa como `company_budget_exceeded`: esa empresa se detiene y las demás continúan; en
   contactos se cierra con el resultado comercial derivado (por ejemplo, `qualified_no_contact`).
+  La empresa donde se detuvo guarda el motivo literal en su `stop_reason`, también durante el
+  análisis inicial y la ampliación. Si se agota su tiempo en esas etapas, queda pendiente con
+  `time_limit`.
 - **Proveedor no disponible** (`permission_denied`, `quota_exceeded`, `rate_limited`, error
   local, HTTP 401/403/429 de Haiku): se detiene la pasada en curso. La empresa conserva su
   etapa, `stop_reason` y el mensaje literal del error.

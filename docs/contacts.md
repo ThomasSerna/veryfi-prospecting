@@ -44,6 +44,17 @@ El orden de trabajo es:
 6. Guardar contactos y evidencia con cada resultado, conservar el consumo y
    detenerse al primer correo, teléfono o WhatsApp profesional utilizable.
 
+Todos los candidatos devueltos se guardan con su procedencia, también los que
+superan el cupo o tienen un cargo fuera del perfil (`relevant_function=False`):
+quedan pendientes y explican por qué no resultaron elegibles. El cupo de personas
+(`contacts:person:`) solo lo ocupa quien supera `validate_contact` al investigarla,
+así un candidato poco pertinente hallado primero no desplaza a uno idóneo hallado
+después. Las personas se recorren por nombre completo, cargo pertinente, posición de
+su cargo en la lista de la empresa y canal verificado; las búsquedas nominales en la
+web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes:
+consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
+no se recuperan.
+
 La prioridad media permite 1 persona, 1 búsqueda Hunter, hasta 1 enriquecimiento
 Hunter, 2 consultas web, 2 páginas y 90 segundos adicionales. La alta permite
 hasta 3 personas, 2 búsquedas Hunter, 3 enriquecimientos, 4 consultas web, 4 páginas
@@ -128,7 +139,11 @@ valores iniciales del prototipo, reducidos según la configuración guardada de
 la campaña.
 
 La extracción pública usa `contacts_extraction_v1` con el mismo Haiku que la
-calificación. Cada hecho cita un `evidence_id` suministrado y una cita literal
+calificación. Si toda la evidencia vigente cabe en el límite de entrada, se envía
+completa y en el mismo orden de siempre, con la misma huella. Si hay que recortar,
+entran primero las fuentes primarias de directorios o páginas de equipo, luego las
+que mencionan un cargo objetivo o una persona conocida, y las más recientes antes,
+para no perder información nominal. Cada hecho cita un `evidence_id` suministrado y una cita literal
 asociada nominalmente a la persona. Python rechaza referencias inexistentes,
 resúmenes del buscador usados como prueba, citas ajenas al fragmento y homónimos
 ambiguos. Los candidatos incompletos conservan sus hechos conocidos como pendientes.
@@ -158,9 +173,11 @@ utilizable; `ready_alternative`, un canal alternativo confirmado. Un canal pendi
 produce `needs_channel_confirmation`; al agotarse el esfuerzo sin persona/canal
 utilizable, `qualified_no_contact`. Los fallos técnicos se registran aparte.
 
-No se ejecutaron llamadas reales a Hunter durante esta implementación. Las pruebas
-sin red usan credenciales y datos declarados sintéticos; no demuestran cobertura,
-acceso ni consumo de la cuenta del equipo. La clave pública `test-api-key` devuelve
+Las pruebas sin red usan credenciales y datos declarados sintéticos; no demuestran
+cobertura, acceso ni consumo de la cuenta del equipo. Las llamadas reales a Hunter
+de T07, T09 y la entrega están en [Comprobación de proveedores](provider-check.md);
+la selección del cupo y la prioridad de fragmentos descritas arriba (14 de octubre)
+solo se han verificado con datos sintéticos. La clave pública `test-api-key` devuelve
 datos ficticios y no sirve para una demostración de prospectos reales.
 
 Los teléfonos se comprueban automáticamente solo para prefijos y longitudes de
