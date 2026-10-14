@@ -53,6 +53,10 @@ STOP_MESSAGES = {
     "permission_denied": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
     "quota_exceeded": "El proveedor agotó la cuota. Comprueba el saldo y registra la conciliación.",
     "rate_limited": "El proveedor limitó las solicitudes. Conserva el resultado y revisa el plazo de reintento.",
+    # Claude informa sus fallos con el código HTTP literal.
+    "http_401": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
+    "http_403": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
+    "http_429": "El proveedor limitó las solicitudes. Conserva el resultado y revisa el plazo de reintento.",
     "timeout": "El proveedor no respondió dentro del plazo. La reserva se conserva hasta conciliar.",
     "invalid_response": "La respuesta del proveedor no cumple el contrato. La empresa queda pendiente.",
     "qualification_unavailable": "La calificación no está disponible. Revisa la configuración de Haiku y su autorización.",
@@ -95,7 +99,10 @@ def stop_message(reason):
     for messages in (STOP_OUTCOMES, STOP_MESSAGES):
         key = _stop_key(reason, messages)
         if key is not None:
-            return messages[key]
+            # Un motivo compuesto (`etapa:motivo`) añade la explicación del motivo interno cuando la tiene.
+            inner = reason[len(key) + 1:] if reason.startswith(key + ":") else ""
+            detail = _stop_key(inner, STOP_MESSAGES) if inner else None
+            return messages[key] if detail is None else f"{messages[key]} {STOP_MESSAGES[detail]}"
     return "La investigación quedó pendiente. Revisa el error y los datos guardados antes de reanudar."
 
 

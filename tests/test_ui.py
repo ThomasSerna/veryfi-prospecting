@@ -437,6 +437,17 @@ def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reas
     assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
 
 
+@pytest.mark.parametrize("reason, expected", [
+    ("http_401", "rechazó el acceso"), ("http_403", "rechazó el acceso"), ("http_429", "limitó las solicitudes"),
+    ("assessment_pending:http_401", "rechazó el acceso"), ("assessment_pending:http_429", "limitó las solicitudes"),
+    ("assessment_pending:company_budget_exceeded", "tope de esta empresa"),
+])
+def test_claude_http_errors_and_pending_assessments_explain_their_cause(reason, expected):
+    message = stop_message(reason)
+    assert expected in message
+    assert message.startswith("La calificación quedó pendiente.") is reason.startswith("assessment_pending:")
+
+
 def test_csrf_is_required_and_read_only_routes_do_not_accept_writes(ui_paths):
     client = Client(SERVER_NAME="localhost", enforce_csrf_checks=True)
     response = client.get(url("new_campaign"))
