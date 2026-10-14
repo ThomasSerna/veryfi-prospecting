@@ -19,7 +19,7 @@ from prospecting.models import (
     BusinessStatus, ChannelStatus, ChannelType, Contact, Contract, Evidence, IdentityStatus, Priority,
     RunItem, RunStage, Text, UsageStatus, utc_now,
 )
-from prospecting.pipeline.calls import observed_credits, reserve_claude, reserve_credits, seconds_left
+from prospecting.pipeline.calls import grant_for, observed_credits, reserve_claude, reserve_credits, seconds_left
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.hunter import (
     HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
@@ -150,10 +150,6 @@ class _ContactStage:
 
     # Estado, checkpoints y llamadas comunes a todas las fases.
 
-    def grant(self, provider, operation, account):
-        return next((item for item in self.grants if
-                     (item.provider, item.operation, item.account_ref) == (provider, operation, account)), None)
-
     def facts(self):
         return self.db.list_evidence(self.company.id)
 
@@ -241,7 +237,7 @@ class _ContactStage:
             return
         if seconds_left(self.deadline) <= 0:
             raise BudgetError("time_limit", "Se agotó el tiempo de contactos antes de llamar.")
-        grant = self.grant(request.provider, request.operation, request.account_ref)
+        grant = grant_for(self.grants, request.provider, request.operation, request.account_ref)
         usage = reserve_credits(self.budget, request, fingerprint, Decimal(credits), funding_source=funding,
                                 authorization=grant, **self.base)
         self.requests.append(usage.request_id)
@@ -457,7 +453,7 @@ class _ContactStage:
             return None
         if seconds_left(self.deadline) <= 0:
             raise BudgetError("time_limit", "Se agotó el tiempo antes de extraer contactos.")
-        grant = self.grant(CLAUDE_PROVIDER, CLAUDE_OPERATION, account)
+        grant = grant_for(self.grants, CLAUDE_PROVIDER, CLAUDE_OPERATION, account)
         usage = reserve_claude(self.budget, fingerprint, payload, account_ref=account,
                                funding_source=self.claude_funding_source, authorization=grant, **self.base)
         self.requests.append(usage.request_id)
