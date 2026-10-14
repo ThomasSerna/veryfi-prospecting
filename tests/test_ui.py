@@ -254,6 +254,28 @@ def test_confirmation_of_ineligible_person_does_not_modify_channel(ui_results, c
         assert db.get_contact(case.contact.id) == original
 
 
+@pytest.mark.parametrize("confirmed_domain", [True, False])
+def test_manual_confirmation_respects_current_exclusions_without_mutating_saved_result(ui_results, client, confirmed_domain):
+    case = ui_results
+    company = case.companies[0]
+    exclusions = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética posterior a la investigación", "observed_at": utc_now(),
+        "entries": [{"id": "synthetic-entry", "name": company.name,
+                     "domains": [company.domain if confirmed_domain else "otra-empresa.example"], "scope": "entity",
+                     "reason": "current_customer", "source_reference": "Exclusión exclusivamente sintética"}],
+    })
+    case.paths.exclusions.write_text(exclusions.model_dump_json(), encoding="utf-8")
+    with Database(case.paths.db) as db:
+        item, facts, usage = db.get_run_item(case.campaign.id, company.id), db.list_evidence(company.id), db.list_usage()
+    response = client.post(url("confirm_channel", case.campaign.id, company.id), confirmation(case, confirmed="on"))
+    assert response.status_code == 400
+    with Database(case.paths.db) as db:
+        assert db.get_contact(case.contact.id) == case.contact
+        assert db.get_run_item(case.campaign.id, company.id) == item
+        assert db.list_evidence(company.id) == facts and db.list_usage() == usage
+
+
 def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results, client):
     case = ui_results
     with bridge._EXECUTION:

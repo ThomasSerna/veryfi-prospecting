@@ -255,8 +255,11 @@ def confirm_channel(request, campaign_id, company_id):
         context = _company_context(request, campaign_id, company_id)
         _require_idle(context["view"])
         contact_id = form.cleaned_data["contact_id"]
-        if not any(person.contact.id == contact_id for person in context["result"].contacts):
+        person = next((person for person in context["result"].contacts if person.contact.id == contact_id), None)
+        if person is None:
             raise Http404("La persona no pertenece a esta empresa.")
+        if not person.eligible:
+            raise ValueError("La persona no es elegible según la evidencia y las exclusiones actuales.")
         confirm_alternative_channel(_paths()[0], campaign_id, contact_id, form.cleaned_data["channel_type"],
                                     form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=form.cleaned_data["confirmed"])
     return redirect("webapp:company", campaign_id=campaign_id, company_id=company_id)
