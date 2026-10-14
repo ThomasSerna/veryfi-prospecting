@@ -31,7 +31,7 @@ la rúbrica y las reglas son propuestas pendientes de validación por Veryfi.
 | Al menos un prospecto real completo | **No cumplido** | T09 terminó con 0 personas listas; el lote real de la entrega está pendiente de autorización |
 | Ningún registro listo incumple la regla de canal directo | Cumplido | 0 listos sin relajar reglas; pruebas de §18.1 |
 | UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo) |
-| Pruebas críticas en verde | Cumplido | 932 pruebas sin red; ver reproducibilidad |
+| Pruebas críticas en verde | Cumplido | 941 pruebas sin red; ver reproducibilidad |
 | Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido | [Gasto](#proveedores-reales-t09) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
@@ -56,6 +56,7 @@ sobre un clon limpio del repositorio:
 
 - `uv sync --locked`, `uv lock --check` y `manage.py check` sin errores.
 - `uv run --locked pytest`: **932 pruebas aprobadas en 51,9 s**, sin red y con bases temporales.
+  Tras corregir los mensajes de parada, la suite local suma 941 pruebas aprobadas.
 - `node --test tests/js_execution.test.cjs`: 2 de 2.
 - `git check-ignore` confirma que `.env`, `.venv/`, `data/`, bases SQLite y cachés quedan fuera de Git.
 - `demo.py` responde en `127.0.0.1:8000` con el aviso de datos sintéticos.
@@ -140,13 +141,14 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
 - **Datos personales**: el tratamiento de contactos profesionales en cada país, su base legal,
   retención y eliminación no se han acordado con Veryfi (IDEA §15).
 
-Limitaciones conocidas de la interfaz, observadas con la demostración:
+Limitaciones conocidas de la interfaz, observadas en T09: interactuar con la página durante
+una ejecución la interrumpe de forma segura y preparar otra campaña con una activa abre la
+activa sin avisar.
 
-- La ficha de una empresa lista con canal preferido (`preferred_channel_found`) o excluida
-  (`excluded_account`) muestra el aviso genérico «La investigación quedó pendiente…» porque
-  esos motivos no tienen mensaje propio. El estado comercial y el CSV son correctos.
-- Las limitaciones de T09 siguen vigentes: interactuar con la página durante una ejecución la
-  interrumpe de forma segura y preparar otra campaña con una activa abre la activa sin avisar.
+La demostración reveló que la ficha de una empresa lista, excluida o de encaje bajo mostraba
+el aviso genérico «La investigación quedó pendiente…». Se corrigió el 14 de octubre: las
+paradas previstas tienen mensaje propio en tono informativo y los pendientes de identidad,
+mensajes específicos. Otros motivos técnicos poco frecuentes conservan el texto genérico.
 
 ## Condiciones mínimas para un piloto
 
@@ -176,8 +178,6 @@ En orden de prioridad según la evidencia disponible:
 3. **Lista de exclusiones y catálogo** confirmados por Veryfi.
 4. **Identidad en CPG**: los sitios promocionales rara vez confirman nombre y país.
 5. **Plazo de Tavily**: el 9,5 % de las llamadas no respondió en unos 10 s.
-6. **Mensajes de parada en la ficha**: dar texto propio a los motivos de las empresas listas
-   y excluidas.
 
 ## Datos locales al cerrar la entrega
 
