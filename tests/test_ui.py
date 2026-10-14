@@ -6,6 +6,7 @@ from html import escape
 from html.parser import HTMLParser
 from io import StringIO
 import os
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -310,6 +311,21 @@ def test_download_rechecks_freshness_at_request_and_keeps_modes_separate(ui_resu
     assert client.get(url("export", case.campaign.id), {"mode": "inventado"}).status_code == 400
 
 
+@pytest.mark.parametrize("demo", [True, False])
+def test_demo_notice_and_csv_name_appear_only_in_demo_mode(ui_results, client, tmp_path, demo):
+    case = ui_results
+    with override_settings(PROSPECTING_DEMO=demo):
+        pages = [client.get(url("campaigns")), client.get(url("campaign", case.campaign.id)),
+                 client.get(url("company", case.campaign.id, case.companies[0].id))]
+        with override_settings(PROSPECTING_CONFIG_PATH=tmp_path / "configuracion-ausente.json"):
+            pages.append(client.get(url("new_campaign")))
+        disposition = client.get(url("export", case.campaign.id), {"mode": "all"})["Content-Disposition"]
+    assert [page.status_code for page in pages] == [200, 200, 200, 503]
+    assert [("Demostración con datos exclusivamente sintéticos." in text(page)) for page in pages] == [demo] * 4
+    assert ('filename="demo-sintetica-resultados-' in disposition) is demo
+    assert disposition.endswith(f'resultados-{case.campaign.id}.csv"')
+
+
 def test_validated_exclusions_do_not_display_missing_list_warning(ui_results, client):
     checked = ExclusionList(version="synthetic-v1", validation_status="validated", source_reference="Lista sintética",
                             observed_at=utc_now(), entries=[])
@@ -381,6 +397,28 @@ def test_results_prioritize_fit_and_stop_reasons_explain_the_next_action(ui_resu
     assert "no se repite" in stop_message("duplicate_request")
     assert "autoriza de nuevo" in stop_message("authorization_required")
     assert "evidencia" in stop_message("assessment_pending:invalid_response")
+
+
+@pytest.mark.parametrize("reason, tone, expected", [
+    ("preferred_channel_found", "info", "canal preferido"),
+    ("people_limit", "info", "máximo de personas"),
+    ("excluded_account", "info", "lista de exclusiones"),
+    (f"duplicate_of:{uuid4()}", "info", "duplicado confirmado"),
+    ("low_fit", "info", "encaje es bajo"),
+    ("identity_unverified", "warning", "confirmó su identidad"),
+    ("insufficient_evidence:unknown_need_or_match", "warning", "no permite decidir"),
+    ("motivo_sintetico_desconocido", "warning", "quedó pendiente"),
+])
+def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reason, tone, expected):
+    case = ui_results
+    with Database(case.paths.db) as db:
+        item = db.get_run_item(case.campaign.id, case.companies[0].id)
+        db.save_run_item(item.model_copy(update={"stop_reason": reason}))
+    shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    notice = re.search(r'<div class="notice notice-(\w+)"><strong>([^<]*)</strong><p class="literal-detail">'
+                       r'Motivo registrado: ([^<]*)</p>', shown)
+    assert notice is not None and notice[1] == tone and expected in notice[2] and notice[3] == escape(reason)
+    assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
 
 
 def test_csrf_is_required_and_read_only_routes_do_not_accept_writes(ui_paths):

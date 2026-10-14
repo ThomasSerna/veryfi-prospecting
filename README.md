@@ -27,6 +27,11 @@ Si ya tienes el repositorio, ejecuta los dos últimos comandos desde su raíz.
 pytest. No hace falta activar el entorno ni instalar paquetes con pip.
 La instalación necesita Internet para descargar Python y las dependencias.
 
+En Windows, clona el repositorio en una ruta corta, de unos 100 caracteres como máximo
+(por ejemplo, `C:\src\veryfi-prospecting`), o habilita las rutas largas del sistema. El SDK
+de Anthropic instala archivos con nombres largos: si la ruta completa supera 260 caracteres,
+la instalación queda incompleta y las pruebas de calificación fallan con `ModuleNotFoundError`.
+
 ## Ejecución
 
 Desde la raíz del repositorio:
@@ -49,6 +54,9 @@ claves en variables de entorno y autorización explícita por operación, cuenta
 Detén el servidor con Ctrl+C. El servidor se limita a `127.0.0.1`, no requiere
 autenticación y usa recursos estáticos locales, sin telemetría ni fuentes remotas.
 No requiere `migrate`: Django no administra los datos de prospección con su ORM.
+Es el servidor de desarrollo de Django en una instancia local, no apto para producción;
+los límites de uso y las condiciones para un piloto están en
+[Entrega y condiciones del piloto](docs/delivery.md).
 
 Usa una sola instancia local de la aplicación con `data/prospecting.sqlite3`.
 El procesamiento es secuencial, en un hilo de ese proceso: continúa al cerrar la
@@ -64,6 +72,28 @@ La configuración local de acceso se guarda en `data/provider-access.json`, igno
 por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reutilizables.
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
+
+## Demostración sin consumo
+
+Para recorrer la interfaz sin claves, sin red y sin tocar `data/`:
+
+```console
+uv run --locked --offline python demo.py
+```
+
+Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). La demostración crea en la carpeta
+temporal del sistema una base nueva con una campaña **exclusivamente sintética**: siete
+empresas ficticias (dominios `.example`), sus personas, evidencia y una lista de exclusiones,
+que cubren todos los estados comerciales. Las puntuaciones y la disponibilidad salen de las
+mismas reglas que con datos reales. Cada página muestra un aviso de demostración y los CSV
+descargados empiezan por `demo-sintetica-`. No son resultados reales ni sirven como
+evidencia de contactabilidad.
+
+El proceso quita las claves de proveedores de su entorno y no tiene archivo de acceso: la
+interfaz no puede ejecutar investigaciones. Revisar, confirmar canales y exportar funcionan
+sobre la base temporal. Detén el servidor con Ctrl+C (no con Ctrl+Break, aunque Django lo
+sugiera en Windows): al salir se borra la base. Si el proceso se cierra de forma abrupta,
+puede quedar una carpeta `veryfi-demo-*` con datos sintéticos en la carpeta temporal.
 
 ## Evaluación offline
 
@@ -153,6 +183,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `core/`: vistas, formularios, ejecución en el proceso, presentación y CSV seguro; usa las APIs públicas del pipeline.
 - `templates/`: plantilla base, páginas en `pages/` y fragmentos compartidos en `components/`.
 - `static/`: estilos en `css/`, JavaScript en `js/` y logotipo en `img/`.
+- `demo.py`: demostración local de la interfaz con una base temporal exclusivamente sintética.
 - `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
@@ -176,6 +207,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
+- `docs/delivery.md`: estado de la entrega, resultados medidos, límites de producción y condiciones del piloto.
 - `docs/t10-evaluation.md`: protocolo, formatos y reproducción de evaluaciones independientes.
 - `PRODUCT.md` y `DESIGN.md`: contexto de ventas y decisiones visuales de la interfaz.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.

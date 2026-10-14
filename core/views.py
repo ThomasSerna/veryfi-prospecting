@@ -279,6 +279,8 @@ def export(request, campaign_id):
                                account_allowances=None if base["access"] is None else base["access"].account_allowances,
                                exclusions_path=_paths()[2])
     response = HttpResponse(content, content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{"resultados" if mode == "all" else "prospectos-listos"}-{campaign_id}.csv"'
+    prefix = "demo-sintetica-" if settings.PROSPECTING_DEMO else ""
+    name = "resultados" if mode == "all" else "prospectos-listos"
+    response["Content-Disposition"] = f'attachment; filename="{prefix}{name}-{campaign_id}.csv"'
     response["Cache-Control"] = "no-store"
     return response
