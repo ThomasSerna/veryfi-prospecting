@@ -27,6 +27,11 @@ Si ya tienes el repositorio, ejecuta los dos últimos comandos desde su raíz.
 pytest. No hace falta activar el entorno ni instalar paquetes con pip.
 La instalación necesita Internet para descargar Python y las dependencias.
 
+En Windows, clona el repositorio en una ruta corta, de unos 100 caracteres como máximo
+(por ejemplo, `C:\src\veryfi-prospecting`), o habilita las rutas largas del sistema. El SDK
+de Anthropic instala archivos con nombres largos: si la ruta completa supera 260 caracteres,
+la instalación queda incompleta y las pruebas de calificación fallan con `ModuleNotFoundError`.
+
 ## Ejecución
 
 Desde la raíz del repositorio:
