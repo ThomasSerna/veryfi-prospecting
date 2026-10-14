@@ -22,7 +22,8 @@ TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
     "DIRS": [BASE_DIR / "templates"],
     "APP_DIRS": True,
-    "OPTIONS": {"context_processors": ["django.template.context_processors.request"]},
+    "OPTIONS": {"context_processors": ["django.template.context_processors.request",
+                                       "core.context_processors.demo_mode"]},
 }]
 DATABASES = {}
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
@@ -39,6 +40,8 @@ PROSPECTING_DB_PATH = Path(os.environ.get("PROSPECTING_DB_PATH", BASE_DIR / "dat
 PROSPECTING_ACCESS_PATH = Path(os.environ.get("PROSPECTING_ACCESS_PATH", BASE_DIR / "data" / "provider-access.json"))
 PROSPECTING_EXCLUSIONS_PATH = Path(os.environ.get("PROSPECTING_EXCLUSIONS_PATH", BASE_DIR / "data" / "exclusions.json"))
 PROSPECTING_CONFIG_PATH = Path(os.environ.get("PROSPECTING_CONFIG_PATH", BASE_DIR / "config" / "veryfi.json"))
+# Solo `demo.py` lo activa, junto con una base sintética temporal.
+PROSPECTING_DEMO = os.environ.get("PROSPECTING_DEMO") == "1"
 LOGGING = {"version": 1, "disable_existing_loggers": False, "loggers": {
     "django.request": {"handlers": [], "propagate": False},
 }}

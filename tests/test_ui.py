@@ -310,6 +310,21 @@ def test_download_rechecks_freshness_at_request_and_keeps_modes_separate(ui_resu
     assert client.get(url("export", case.campaign.id), {"mode": "inventado"}).status_code == 400
 
 
+@pytest.mark.parametrize("demo", [True, False])
+def test_demo_notice_and_csv_name_appear_only_in_demo_mode(ui_results, client, tmp_path, demo):
+    case = ui_results
+    with override_settings(PROSPECTING_DEMO=demo):
+        pages = [client.get(url("campaigns")), client.get(url("campaign", case.campaign.id)),
+                 client.get(url("company", case.campaign.id, case.companies[0].id))]
+        with override_settings(PROSPECTING_CONFIG_PATH=tmp_path / "configuracion-ausente.json"):
+            pages.append(client.get(url("new_campaign")))
+        disposition = client.get(url("export", case.campaign.id), {"mode": "all"})["Content-Disposition"]
+    assert [page.status_code for page in pages] == [200, 200, 200, 503]
+    assert [("Demostración con datos exclusivamente sintéticos." in text(page)) for page in pages] == [demo] * 4
+    assert ('filename="demo-sintetica-resultados-' in disposition) is demo
+    assert disposition.endswith(f'resultados-{case.campaign.id}.csv"')
+
+
 def test_validated_exclusions_do_not_display_missing_list_warning(ui_results, client):
     checked = ExclusionList(version="synthetic-v1", validation_status="validated", source_reference="Lista sintética",
                             observed_at=utc_now(), entries=[])

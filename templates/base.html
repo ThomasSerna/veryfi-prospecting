@@ -47,6 +47,7 @@
         <span class="topbar-note">Veryfi · Latinoamérica</span>
       </header>
       <main id="main" class="main-content" tabindex="-1">
+        {% if demo_mode %}<div class="notice notice-warning" role="note"><strong>Demostración con datos exclusivamente sintéticos.</strong><p>No son empresas ni personas reales y no hay proveedores conectados.</p></div>{% endif %}
         {% if messages %}{% for message in messages %}<div class="notice {% if message.tags == 'error' %}notice-error{% else %}notice-success{% endif %}" role="status">{{ message }}</div>{% endfor %}{% endif %}
         {% if access_error %}<div class="notice notice-error" role="alert"><strong>Revisa el acceso a proveedores.</strong><p>{{ access_error }}</p><p>Puedes consultar los resultados guardados. La ejecución necesita una configuración comprobada.</p></div>{% endif %}
         {% if error_message %}<div class="notice notice-error" role="alert"><strong>No se pudo completar la operación.</strong><p>{{ error_message }}</p><p>Los datos guardados se conservan. Revisa el motivo antes de continuar.</p></div>{% endif %}
