@@ -116,13 +116,13 @@ Reglas de interpretación:
 
 1. **Configurar.** Seleccionar Colombia/México, uno o ambos segmentos y hasta 20 empresas. Ver límites, proveedores disponibles y presupuesto restante antes de ejecutar.
 2. **Investigar.** Mostrar etapa, empresas procesadas, consumo y resultados parciales. No pedir aprobación entre empresas.
-3. **Revisar.** Tabla filtrable por país, segmento, prioridad y disponibilidad de canal. Al abrir una ficha, mostrar caso de uso, puntuación desglosada, evidencia y contactos.
+3. **Revisar.** Tabla filtrable por país, segmento, prioridad y disponibilidad de canal. Al abrir una ficha, mostrar caso de uso, puntuación desglosada, evidencia y contactos. La ficha lista a todas las personas encontradas, ordenadas por un porcentaje de match determinístico con su desglose (§10.3), para que ventas elija a quién contactar.
 4. **Corregir.** Marcar aceptado, rechazado o pendiente con motivo. Confirmar manualmente mensajería en LinkedIn cuando sea el único canal. No enviar nada para comprobarlo.
 5. **Exportar.** Exportación principal de prospectos listos, y otra opción explícita para todos los resultados con su estado.
 
 La pantalla debe distinguir «listo según reglas» de «aceptado por Veryfi». La revisión humana es posterior al flujo automático; no hace falta revisar cada empresa antes de investigar.
 
-Para exportación: una fila por persona, repetir los datos de la empresa y conservar identificadores. Las empresas sin personas solo aparecerán en la exportación de todos los resultados, con campos vacíos y su motivo. El CSV incluirá enlace/fuente, fechas, estado del canal, puntuación, revisión y advertencias relevantes. Proteger las celdas de texto contra fórmulas de hoja de cálculo.
+Para exportación: una fila por persona, repetir los datos de la empresa y conservar identificadores. Las empresas sin personas solo aparecerán en la exportación de todos los resultados, con campos vacíos y su motivo. El CSV incluirá enlace/fuente, fechas, estado del canal, puntuación, porcentaje de match de cada persona, revisión y advertencias relevantes. Proteger las celdas de texto contra fórmulas de hoja de cálculo.
 
 ## 7. Flujo de investigación
 
@@ -229,12 +229,12 @@ La prioridad decide cuánto investigar, no autoriza gasto ilimitado. Todos los n
 | Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Hasta 3 personas; hasta 3 enriquecimientos por proveedor habilitado | 180 s adicionales |
 | Prioridad baja/excluida | Ninguna adicional | Ninguna adicional | Ninguno | Detener |
 
-En búsqueda de personas, permitir como máximo dos consultas al proveedor especializado para prioridad media y alta: la primera por cargos y la segunda por departamentos, solo si la primera no dejó un canal preferido (Hunter Domain Search en el MVP; Apollo solo si se habilita después). Los cargos son todos los de los perfiles del segmento de la empresa, primero los elegidos en la evaluación. Los límites de personas y enriquecimientos permanecen vigentes. Cada llamada a Hunter Finder/Verifier y cada verificación de correo consume el cupo correspondiente; máximo una verificación por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
+En búsqueda de personas, permitir como máximo dos consultas al proveedor especializado para prioridad media y alta: la primera sin filtro de cargo, para obtener a todas las personas nominales del dominio, y la segunda por cargos, solo si la primera no dejó un canal preferido (Hunter Domain Search en el MVP; Apollo solo si se habilita después). Cada consulta trae hasta 10 personas: el plan Free de Hunter no permite pasar de 10 entre `limit` y `offset`. Los cargos son todos los de los perfiles del segmento de la empresa, primero los elegidos en la evaluación. Los límites de personas y enriquecimientos permanecen vigentes. Cada llamada a Hunter Finder/Verifier y cada verificación de correo consume el cupo correspondiente; máximo una verificación por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
 
 Secuencia de menor a mayor esfuerzo:
 
 1. Revisar evidencia ya obtenida, páginas corporativas y canales laborales publicados.
-2. Consultar Hunter Domain Search sobre el dominio confirmado, filtrando por función y cargos del perfil, si la cuenta tiene acceso y cupo; complementar candidatos con búsqueda web pública mediante Tavily cuando haga falta.
+2. Consultar Hunter Domain Search sobre el dominio confirmado, primero sin filtro de cargo y después por los cargos del perfil, si la cuenta tiene acceso y cupo; complementar candidatos con búsqueda web pública mediante Tavily cuando haga falta.
 3. Verificar nombre completo, entidad, cargo actual, pertinencia y procedencia. Enriquecer solamente candidatos con identidad y función pertinentes; preferir correo corporativo y no solicitar emails personales.
 4. Si falta correo, usar Hunter Email Finder con nombre y dominio confirmados. Reutilizar las verificaciones vigentes incluidas en la respuesta y usar Verifier solo cuando corresponda y haya cupo; no fabricar direcciones.
 5. Usar teléfono directo/extensión o WhatsApp profesional publicado cuando haya asociación explícita a la persona.
@@ -283,6 +283,8 @@ Vigencia inferida de Hunter: sin evidencia fechada del puesto, una persona con i
 - `excluded`: exclusión confirmada.
 
 Las interrupciones técnicas no son estados comerciales: registrar aparte la ejecución y `stop_reason`. Una empresa puede estar calificada y haber quedado sin contacto por falta de cuota.
+
+Porcentaje de match de contactos: Python ordena a todas las personas encontradas de cada empresa con un puntaje de 0 a 100 que suma cargo, canal, identidad y vigencia del empleo, según las reglas de §10.1 y §10.2, sin IA. Los pesos están versionados en `config/contact_match.json`; la propuesta inicial del equipo (`contact_match_v1`) prioriza la pertinencia del cargo. Se calcula al consultar, no altera estos estados ni la condición de listo, y un dato pendiente suma 0 sin contarse como incumplimiento. Una identidad contradicha, un empleo no vigente o un alcance geográfico incompatible llevan a la persona al final.
 
 ## 11. Proveedores y estrategia de integración
 
@@ -394,6 +396,7 @@ config/
   settings.py                  Configuración local: loopback, sin ORM ni cuentas
   urls.py                      Rutas del proyecto
   veryfi.json                  Catálogo, perfiles, cargos y rúbrica versionada
+  contact_match.json           Pesos versionados del porcentaje de match de contactos
 core/                          Interfaz Django: vistas, formularios, ejecución en hilo, presentación y CSV seguro
 templates/                     Plantilla base, páginas y fragmentos
 static/                        CSS, JavaScript y logotipo locales
