@@ -11,7 +11,7 @@ from pydantic import Field, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_matches, target_roles,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_position, target_roles,
     validate_contact,
 )
 from prospecting.db import Database
@@ -123,9 +123,8 @@ _HUNTER_DEGRADED = ("permission_denied", "rate_limited", "quota_exceeded", "loca
 
 def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
     """Orden de investigación (T09): seleccionadas, nombre completo, cargo pertinente y su prioridad, canal verificado."""
-    position = next((index for index, role in enumerate(roles) if role_matches(contact.title, [role])), len(roles))
     return (contact.id not in selected, contact.name_complete is not True, contact.relevant_function is not True,
-            position, not any(channel.normalized_status == ChannelStatus.VERIFIED for channel in contact.channels),
+            role_position(contact.title, roles), not any(channel.normalized_status == ChannelStatus.VERIFIED for channel in contact.channels),
             str(contact.id))
 
 

@@ -6,14 +6,17 @@ Toda fuente de personas entrega `Contact`, `Channel` y `Evidence` y pasa por est
 """
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 import re
-from typing import Literal
+from typing import Annotated, Literal, Self
 import unicodedata
 from uuid import UUID
 
+from pydantic import Field, StrictBool, StrictInt, model_validator
+
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignLimits, Channel, ChannelStatus, ChannelType,
-    Company, Contact, Evidence, IdentityStatus, Priority,
+    Company, Contact, Contract, Evidence, IdentityStatus, Priority, Text,
 )
 from prospecting.sources import is_search_evidence, url_host, within_domain
 
@@ -135,6 +138,11 @@ def role_matches(title: str | None, roles: list[str]) -> bool:
                for role in roles)
 
 
+def role_position(title: str | None, roles: list[str]) -> int:
+    """Posición del primer cargo objetivo que encaja con el título; sin encaje, al final."""
+    return next((index for index, role in enumerate(roles) if role_matches(title, [role])), len(roles))
+
+
 def apply_target_roles(contact: Contact, roles: list[str]) -> Contact:
     if contact.title is None or not contact.provenance.get("title"):
         return contact
@@ -213,18 +221,28 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
             return False
     if not role_matches(contact.title, roles or assessment.target_roles or [contact.title]):
         return False
-    if contact.geographic_scope:
-        if not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence):
-            return False
-        scope = fold_words(contact.geographic_scope)
-        regional = any(mentions(scope, word) for word in ("latam", "latinoamerica", "latin america", "global", "mundial"))
-        explicit = {code for code, names in {"CO": ("colombia", "co"), "MX": ("mexico", "mx"),
-                                            "US": ("united states", "estados unidos", "us"),
-                                            "ES": ("espana", "spain"), "AR": ("argentina",), "BR": ("brasil", "brazil")}.items()
-                    if any(mentions(scope, name) for name in names)}
-        if not regional and not explicit.intersection(company.operating_countries or []):
-            return False
+    if contact.geographic_scope and (not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence)
+                                     or not _scope_covers(contact.geographic_scope, company)):
+        return False
     return employment_basis(contact, company, evidence, limits, now) is not None
+
+
+def _scope_covers(scope: str, company: Company) -> bool:
+    """Un alcance regional o que nombra un país de operación de la empresa."""
+    scope = fold_words(scope)
+    regional = any(mentions(scope, word) for word in ("latam", "latinoamerica", "latin america", "global", "mundial"))
+    explicit = {code for code, names in {"CO": ("colombia", "co"), "MX": ("mexico", "mx"),
+                                        "US": ("united states", "estados unidos", "us"),
+                                        "ES": ("espana", "spain"), "AR": ("argentina",), "BR": ("brasil", "brazil")}.items()
+                if any(mentions(scope, name) for name in names)}
+    return regional or bool(explicit.intersection(company.operating_countries or []))
+
+
+def _employment_contradicted(contact: Contact, evidence: list[Evidence]) -> bool:
+    """Empleo marcado como no vigente o una salida nominal observada de la persona."""
+    return contact.current_employment is False or bool(contact.name) and any(
+        item.contact_id == contact.id and item.kind == "observed" and
+        employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in evidence)
 
 
 def _employment_from_evidence(contact: Contact, company: Company, evidence: list[Evidence],
@@ -244,10 +262,7 @@ def hunter_employment_signal(contact: Contact, company: Company, evidence: list[
 
     No prueba el puesto; la interfaz lo advierte y pide confirmarlo antes de contactar (§10.2).
     """
-    if contact.current_employment is False or not contact.name:
-        return False
-    if any(item.contact_id == contact.id and item.kind == "observed" and
-           employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in evidence):
+    if not contact.name or _employment_contradicted(contact, evidence):
         return False
     if not any(channel.type == ChannelType.EMAIL and channel.normalized_status == ChannelStatus.VERIFIED and
                _fresh(channel.verified_at, limits.freshness.email_days, now) and
@@ -332,6 +347,118 @@ def derive_readiness(assessment: Assessment, contacts: list[Contact], evidence: 
     if any(channel.normalized_status != ChannelStatus.INVALID for contact in eligible for channel in contact.channels):
         return BusinessStatus.NEEDS_CHANNEL_CONFIRMATION
     return BusinessStatus.QUALIFIED_NO_CONTACT
+
+
+# Porcentaje de match: ordena a las personas para que ventas elija; no decide elegibilidad,
+# listo ni gasto. El código fija componentes y niveles; config/contact_match.json, sus puntos.
+MatchComponentName = Literal["role", "channel", "identity", "employment"]
+MATCH_LEVELS = {
+    "role": ("selected_role", "profile_role", "outside_profile", "unknown"),
+    "channel": ("preferred_usable", "alternative_usable", "preferred_unconfirmed", "alternative_unconfirmed", "none"),
+    "identity": ("confirmed_complete", "complete_pending", "incomplete"),
+    "employment": ("evidence", "hunter_signal", "unverified"),
+}
+# Dato desconocido: suma 0 y se muestra pendiente, nunca como «no cumple».
+PENDING_LEVELS = frozenset({"unknown", "none", "incomplete", "unverified"})
+BlockedReason = Literal["identity_contradicted", "employment_ended", "scope_mismatch"]
+_PREFERRED = (ChannelType.EMAIL, ChannelType.PHONE, ChannelType.WHATSAPP)
+Points = Annotated[StrictInt, Field(ge=0, le=100)]
+
+
+class MatchComponentConfig(Contract):
+    weight: Annotated[StrictInt, Field(gt=0, le=100)]
+    levels: dict[Text, Points]
+
+
+class ContactMatchConfig(Contract):
+    """Pesos versionados: cambiar un número exige cambiar `version` (docs/contacts.md)."""
+
+    version: Text
+    validation_status: Literal["proposed", "validated"]
+    source_reference: Text
+    components: dict[MatchComponentName, MatchComponentConfig]
+
+    @model_validator(mode="after")
+    def validate_points(self) -> Self:
+        if set(self.components) != set(MATCH_LEVELS):
+            raise ValueError("El match necesita los componentes role, channel, identity y employment.")
+        if sum(item.weight for item in self.components.values()) != 100:
+            raise ValueError("Los pesos del match deben sumar 100.")
+        for name, item in self.components.items():
+            if set(item.levels) != set(MATCH_LEVELS[name]):
+                raise ValueError(f"El componente {name} necesita exactamente los niveles {', '.join(MATCH_LEVELS[name])}.")
+            if max(item.levels.values()) != item.weight:
+                raise ValueError(f"El nivel más alto de {name} debe valer su peso, sin superarlo.")
+            if any(points for level, points in item.levels.items() if level in PENDING_LEVELS):
+                raise ValueError("Un dato pendiente no suma puntos.")
+        return self
+
+
+class MatchComponent(Contract):
+    name: MatchComponentName
+    level: Text
+    points: Points
+    weight: Points
+    pending: StrictBool
+
+
+class ContactMatch(Contract):
+    version: Text
+    score: Points
+    components: list[MatchComponent]
+    blocked_reason: BlockedReason | None = None
+
+
+def load_contact_match(path: Path) -> ContactMatchConfig:
+    """Falla si el archivo falta o no es válido: nunca se usan pesos por defecto."""
+    return ContactMatchConfig.model_validate_json(Path(path).read_text(encoding="utf-8"))
+
+
+def contact_match(contact: Contact, company: Company, assessment: Assessment, evidence: list[Evidence],
+                  limits: CampaignLimits, now: datetime, roles: list[str], config: ContactMatchConfig) -> ContactMatch:
+    """Match determinístico, sin red ni IA, con las mismas reglas de persona y canal (§10)."""
+    selected = [role for role in assessment.target_roles if role in roles]
+    if not contact.title or not contact.provenance.get("title"):
+        role = "unknown"
+    elif role_matches(contact.title, selected):
+        role = "selected_role"
+    elif role_matches(contact.title, roles):
+        role = "profile_role"
+    else:
+        role = "outside_profile"
+    usable = [item for item in contact.channels if channel_is_usable(item, contact, evidence, limits, now, company)]
+    candidates = [item for item in contact.channels
+                  if item.normalized_status != ChannelStatus.INVALID and item.professional is not False]
+    if any(item.type in _PREFERRED for item in usable):
+        channel = "preferred_usable"
+    elif usable:
+        channel = "alternative_usable"
+    elif any(item.type in _PREFERRED for item in candidates):
+        channel = "preferred_unconfirmed"
+    elif candidates:
+        channel = "alternative_unconfirmed"
+    else:
+        channel = "none"
+    identity = ("confirmed_complete" if contact.identity_status == IdentityStatus.CONFIRMED and contact.name_complete is True
+                else "complete_pending" if contact.name_complete is True else "incomplete")
+    employment = employment_basis(contact, company, evidence, limits, now) or "unverified"
+    components = [MatchComponent(name=name, level=level, points=config.components[name].levels[level],
+                                 weight=config.components[name].weight, pending=level in PENDING_LEVELS)
+                  for name, level in (("role", role), ("channel", channel), ("identity", identity),
+                                      ("employment", employment))]
+    # Solo un alcance respaldado que excluye los países de la empresa bloquea; uno sin fuente queda pendiente.
+    scoped = bool(contact.geographic_scope and _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence))
+    blocked = ("identity_contradicted" if contact.identity_status == IdentityStatus.CONTRADICTED
+               else "employment_ended" if _employment_contradicted(contact, evidence)
+               else "scope_mismatch" if scoped and not _scope_covers(contact.geographic_scope, company) else None)
+    return ContactMatch(version=config.version, score=sum(item.points for item in components),
+                        components=components, blocked_reason=blocked)
+
+
+def match_sort_key(match: ContactMatch | None, eligible: bool, contact: Contact, roles: list[str]):
+    """Mayor match primero y bloqueadas al final; empates por elegibilidad, cargo, nombre e id."""
+    return (match is None, match is not None and match.blocked_reason is not None, -(match.score if match else 0),
+            not eligible, role_position(contact.title, roles), fold_words(contact.name or ""), str(contact.id))
 
 
 def merge_contact(old: Contact, new: Contact, evidence: list[Evidence]) -> Contact:

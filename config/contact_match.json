@@ -1,0 +1,11 @@
+{
+  "version": "contact_match_v1",
+  "validation_status": "proposed",
+  "source_reference": "Decisión del equipo del 15 de octubre de 2026: priorizar la pertinencia del cargo",
+  "components": {
+    "role": {"weight": 50, "levels": {"selected_role": 50, "profile_role": 35, "outside_profile": 0, "unknown": 0}},
+    "channel": {"weight": 25, "levels": {"preferred_usable": 25, "alternative_usable": 18, "preferred_unconfirmed": 10, "alternative_unconfirmed": 7, "none": 0}},
+    "identity": {"weight": 15, "levels": {"confirmed_complete": 15, "complete_pending": 8, "incomplete": 0}},
+    "employment": {"weight": 10, "levels": {"evidence": 10, "hunter_signal": 6, "unverified": 0}}
+  }
+}
