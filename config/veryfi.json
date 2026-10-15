@@ -156,7 +156,7 @@
     "effort": {
       "initial": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 90},
       "insufficient_evidence": {"web_queries": 1, "pages": 2, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 45},
-      "medium": {"web_queries": 2, "pages": 2, "people": 1, "enrichments_per_provider": 1, "people_queries": 1, "active_seconds": 90},
+      "medium": {"web_queries": 2, "pages": 2, "people": 1, "enrichments_per_provider": 1, "people_queries": 2, "active_seconds": 90},
       "high": {"web_queries": 4, "pages": 4, "people": 3, "enrichments_per_provider": 3, "people_queries": 2, "active_seconds": 180},
       "low": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0},
       "excluded": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0}

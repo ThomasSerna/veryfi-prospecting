@@ -18,13 +18,20 @@ from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 
+def one_hunter_query(campaign):
+    """Reduce la prioridad media a una búsqueda Hunter: estas rutas no prueban la segunda, que tiene su propia prueba."""
+    limits = campaign.limits.model_copy(deep=True)
+    limits.effort["medium"] = limits.effort["medium"].model_copy(update={"people_queries": 1})
+    return campaign.model_copy(update={"limits": limits})
+
+
 @pytest.fixture
 def contact_case(database, config, make_campaign, make_company, make_assessment, monkeypatch):
     """Una cuenta ficticia por bolsa y un transporte inyectado para todas las operaciones."""
     from prospecting.providers import ProviderClient
     for variable in ("HUNTER_API_KEY", "TAVILY_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.setenv(variable, "clave-exclusivamente-sintetica")
-    campaign = make_campaign()
+    campaign = one_hunter_query(make_campaign())
     company, sources = make_company(name="Empresa Sintética", domain="empresa-sintetica.example",
                                     operating_countries=["CO"], segments=["fintech_software"],
                                     identity_status="confirmed", identity_key="entidad-sintetica|CO")
@@ -294,7 +301,7 @@ def test_exhausted_empty_search_is_reused_between_campaigns(contact_case, make_c
     case = contact_case
     assert case.find().business_status == "qualified_no_contact"
     previous_calls = len(case.calls)
-    case.campaign = make_campaign()
+    case.campaign = one_hunter_query(make_campaign())
     case.db.save_campaign(case.campaign)
     case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=case.company.id, stage="assessed"))
     assessment = make_assessment(case.campaign.id, case.company.id, priority="medium", target_roles=["Product Manager"])
@@ -356,6 +363,34 @@ def test_high_priority_bounds_people_and_second_department_query(contact_case):
     run = case.db.get_run_item(case.campaign.id, case.company.id)
     assert run.consumed_limits.people_queries == 2 and run.consumed_limits.enrichments == 0
     assert sum(key.startswith("contacts:person:") for key in run.attempts) == 0
+
+
+def default_medium_limits(case, make_campaign):
+    """Restituye los topes por defecto de la prioridad media: dos búsquedas Hunter."""
+    case.campaign = case.campaign.model_copy(update={"limits": make_campaign().limits})
+    case.db.save_campaign(case.campaign)
+
+
+def test_medium_priority_adds_department_search_when_first_finds_no_ready_channel(contact_case, make_campaign):
+    case = contact_case
+    default_medium_limits(case, make_campaign)
+    assert case.find().business_status == "qualified_no_contact"
+    assert [operation for operation, _, _ in case.calls] == ["domain_search", "domain_search"]
+    assert "job_titles" in case.calls[0][1] and case.calls[1][1]["department"].startswith("product")
+    assert case.db.get_run_item(case.campaign.id, case.company.id).consumed_limits.people_queries == 2
+
+
+def test_medium_priority_skips_department_search_after_ready_channel(contact_case, make_campaign):
+    case = contact_case
+    default_medium_limits(case, make_campaign)
+    day = utc_now().date().isoformat()
+    case.replies["domain_search"] = {"data": {"domain": case.company.domain, "organization": case.company.name, "emails": [{
+        "value": "persona@empresa-sintetica.example", "type": "personal", "first_name": "Persona Sintética",
+        "last_name": "Uno", "position": "Product Manager", "verification": {"status": "valid", "date": day},
+        "sources": [{"uri": "https://directorio-sintetico.example/equipo", "last_seen_on": day, "still_on_page": True}]}]}}
+    report = case.find()
+    assert report.business_status == "ready_preferred" and report.stop_reason == "preferred_channel_found"
+    assert [operation for operation, _, _ in case.calls] == ["domain_search"]
 
 
 def test_first_useful_domain_result_stops_high_priority(contact_case):

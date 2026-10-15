@@ -366,7 +366,7 @@ class CampaignLimits(Contract):
         caps = {
             "initial": (2, 3, 0, 0, 0, 90),
             "insufficient_evidence": (1, 2, 0, 0, 0, 45),
-            "medium": (2, 2, 1, 1, 1, 90),
+            "medium": (2, 2, 1, 1, 2, 90),
             "high": (4, 4, 3, 3, 2, 180),
             "low": (0, 0, 0, 0, 0, 0),
             "excluded": (0, 0, 0, 0, 0, 0),
