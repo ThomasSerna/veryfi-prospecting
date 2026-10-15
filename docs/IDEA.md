@@ -1,6 +1,6 @@
 # Veryfi Prospecting: descubrimiento y calificación de clientes potenciales
 
-Versión 1.4 — 12 de octubre de 2026. Fechas en America/Bogota.
+Versión 1.5 — 15 de octubre de 2026. Fechas en America/Bogota.
 
 Documento de producto, plan de implementación y guía para agentes de código del proyecto de Sistemas de Información para Veryfi. Recoge las decisiones tomadas con el equipo. Las reglas numéricas de calificación, las metas de evaluación y la arquitectura son propuestas iniciales para implementar y validar; no representan criterios comerciales ya certificados por Veryfi.
 
@@ -147,7 +147,7 @@ La vuelta de ampliación se permite una sola vez por empresa. Cada paso revisa l
 
 ### 7.1 Descubrimiento
 
-Usar Tavily Search como primera opción. Construir consultas combinando país, perfil y señal de necesidad: gestión de gastos con recibos, plataformas de pagos con facturas, promociones con tickets o programas de puntos por compras. Empezar con plantillas; Haiku solo reformula cuando los resultados sean insuficientes y quede presupuesto.
+Usar Tavily Search como primera opción. Construir consultas combinando país, perfil y señal de necesidad: gestión de gastos con recibos, plataformas de pagos con facturas, promociones con tickets o programas de puntos por compras. Empezar con plantillas; Haiku solo reformula cuando los resultados sean insuficientes y quede presupuesto. La reformulación con Haiku no está implementada en el MVP: el descubrimiento usa solo plantillas, y el informe de combinaciones que no alcanzan su meta vive en memoria, sin mostrarse en la interfaz.
 
 Fuentes candidatas: páginas de producto, centros de ayuda, campañas y sus condiciones, directorios sectoriales públicos, asociaciones FinTech, noticias corporativas y vacantes. Los directorios y noticias generan candidatos; confirmar identidad y actividad en una fuente primaria cuando sea posible.
 
@@ -161,7 +161,7 @@ Resolver nombre, dominio oficial, país de operación y segmento. El dominio es 
 
 Aplicar una lista local de clientes actuales, oportunidades en curso y exclusiones suministrada por Veryfi. Guardar motivo, fuente y alcance de la exclusión: entidad, país o grupo. Si esa lista aún no existe, mostrar «exclusiones comerciales no validadas»; no afirmar que se comprobó ausencia de relación previa.
 
-Excluir antes del enriquecimiento: entidades inequívocamente fuera del país/segmento elegido, dominios no empresariales, duplicados confirmados y cuentas explícitamente excluidas. Identidad ambigua pasa a pendiente. Un tamaño desconocido o pequeño no produce exclusión automática.
+Excluir antes del enriquecimiento: entidades inequívocamente fuera del país/segmento elegido, dominios no empresariales, duplicados confirmados y cuentas explícitamente excluidas. Identidad ambigua pasa a pendiente. Un tamaño desconocido o pequeño no produce exclusión automática. En la implementación, una empresa sin operación comprobada en los países de la campaña queda pendiente (`country_unconfirmed`), no excluida: un ccTLD extranjero solo añade una advertencia, y sin identidad confirmada no se buscan personas.
 
 ### 7.3 Evidencia
 
@@ -356,7 +356,7 @@ Haiku recibe un catálogo breve de capacidades autorizadas de Veryfi, datos de c
 
 No usar su memoria como fuente de contactos, empresas o cargos actuales. No permitir que invente URLs ni referencias: cada `evidence_id` debe existir en el conjunto suministrado. La validación programática comprueba referencias y valores; la revisión de calidad comprueba que la fuente respalde la afirmación.
 
-Límite por petición: 9.000 tokens de entrada y 1.000 de salida, con esfuerzo bajo cuando esté soportado. El límite inicial de 6.000 tokens se elevó el 14 de octubre de 2026: las solicitudes reales medidas usaban unos 2,2 caracteres por token y llegaban a 8.200 tokens; aplicar 6.000 reales habría reducido la evidencia de cada calificación a unos cuatro fragmentos. Partir/seleccionar evidencia antes de enviar páginas completas. Registrar modelo exacto, versión de prompt, uso y costo. Revisar parámetros actuales del modelo; no copiar configuraciones de modelos anteriores sin verificar [W4].
+Límite por petición: 9.000 tokens de entrada y 1.000 de salida, con esfuerzo bajo cuando esté soportado. El límite inicial de 6.000 tokens se elevó el 14 de octubre de 2026: las solicitudes reales medidas usaban unos 2,2 caracteres por token y, en el lote de la entrega, ocuparon entre 3.388 y 8.721 tokens de entrada (`docs/provider-check.md`); aplicar 6.000 reales habría reducido la evidencia de cada calificación a unos cuatro fragmentos. Partir/seleccionar evidencia antes de enviar páginas completas. Registrar modelo exacto, versión de prompt, uso y costo. Revisar parámetros actuales del modelo; no copiar configuraciones de modelos anteriores sin verificar [W4].
 
 ### 12.2 Evaluación y decisiones en Python
 
@@ -427,7 +427,7 @@ pyproject.toml                 Dependencias y configuración de pruebas
 README.md                      Instalación, ejecución y demostración
 ```
 
-Es la estructura del repositorio tras la refactorización R01–R10 (§17.2); si difieren, el árbol del repositorio manda. Una fuente nueva de empresas, evidencia o personas añade `providers/<proveedor>.py` y una fase en la etapa correspondiente, y entrega los contratos y reglas existentes. No añadir capas de repositorios, factorías ni interfaces genéricas de conectores sin necesidad concreta.
+Es la estructura del repositorio tras la refactorización R01–R08 y R10 (§17.2; R09 sigue aplazada); si difieren, el árbol del repositorio manda. Una fuente nueva de empresas, evidencia o personas añade `providers/<proveedor>.py` y una fase en la etapa correspondiente, y entrega los contratos y reglas existentes. No añadir capas de repositorios, factorías ni interfaces genéricas de conectores sin necesidad concreta.
 
 ### 13.2 Contratos compartidos
 
@@ -442,7 +442,7 @@ Es la estructura del repositorio tras la refactorización R01–R10 (§17.2); si
 | `RunItem` | campaign_id, company_id, etapa, resultado comercial, intentos, límites consumidos, stop_reason, revisión y motivo |
 | `Usage` | request_id local, campaña/empresa, proveedor/operación, huella de solicitud, reserva, uso/tokens/créditos, costo estimado/final, estado, fechas |
 
-No es necesario crear una tabla por cada clase. Opción concreta: tablas `campaigns`, `companies`, `evidence`, `assessments`, `contacts`, `run_items`, `usage` y `exclusions`; canales como JSON validado dentro de `contacts`. Claves foráneas e índices para campaña/empresa y restricciones únicas sobre identidades confirmadas. Campos consultados se mantienen como columnas; desgloses y configuración pueden ser JSON.
+No es necesario crear una tabla por cada clase. Opción concreta: tablas `campaigns`, `companies`, `evidence`, `assessments`, `contacts`, `run_items` y `usage`; canales como JSON validado dentro de `contacts`. La lista de exclusiones no tiene tabla: se lee de un JSON local versionado (`data/exclusions.json`, fuera de Git), y cada coincidencia se guarda como `Evidence` de la empresa con la versión de la lista y la entrada. Las confirmadas por dominio incluyen motivo y alcance; las que solo coinciden por nombre quedan para revisión humana. Claves foráneas e índices para campaña/empresa y restricciones únicas sobre identidades confirmadas. Campos consultados se mantienen como columnas; desgloses y configuración pueden ser JSON.
 
 Contrato funcional:
 
@@ -465,7 +465,7 @@ MVP: una campaña activa por base local, procesamiento secuencial y operación i
 
 Un clic duplicado, el reenvío de un formulario o una recarga de la página deben reutilizar la campaña activa, no duplicarla. Mientras una investigación esté en curso, la interfaz rechaza las acciones que modifican o exportan resultados. En SQLite, comprobar/iniciar ejecución y reservar consumo con transacciones. No mantener una transacción abierta durante una llamada de red.
 
-Aplicar timeout por proveedor, como máximo dos intentos para errores transitorios y respeto a `Retry-After` dentro del tiempo restante. Diferenciar falta de permisos, cuota agotada, entrada inválida y resultado vacío. No usar una tabla genérica de HTTP para todos los proveedores sin revisar sus semánticas.
+Aplicar timeout por proveedor. No se reintenta automáticamente una llamada enviada: un fallo transitorio deja la etapa pendiente con su motivo y su reserva hasta conciliar, y reanudar exige una autorización nueva; `Retry-After` se conserva en el error para informar el plazo. Esta decisión, del 14 de octubre de 2026, sustituye el máximo inicial de dos intentos. Diferenciar falta de permisos, cuota agotada, entrada inválida y resultado vacío. No usar una tabla genérica de HTTP para todos los proveedores sin revisar sus semánticas.
 
 Guardar huella de entrada y request_id. Reutilizar respuestas confirmadas, pero no asumir que una API de terceros es idempotente. Ante timeout de una llamada facturable, conservar reserva y conciliar antes de repetir; no liberar dinero por no haber recibido respuesta. Una reserva incierta nunca se vuelve cero silenciosamente.
 
@@ -717,4 +717,4 @@ Pendientes operativos, que no impiden comenzar: créditos efectivos por cuenta, 
 - **W7.** [Brave Search API](https://brave.com/search/api/).
 - **W8.** [Django: `runserver`, servidor de desarrollo no apto para producción](https://docs.djangoproject.com/en/5.2/ref/django-admin/#runserver).
 
-Se verificó documentación pública, no se ejecutaron solicitudes con las credenciales del equipo, no se compraron servicios y no se midió todavía cobertura real de prospectos. Los próximos agentes deben completar esas verificaciones dentro del presupuesto; este archivo es el plan, no una afirmación de que la aplicación ya exista.
+La versión inicial (10 de octubre) solo verificó documentación pública. Después se ejecutaron llamadas reales con las cuentas del equipo, dentro de los topes autorizados y sin comprar servicios; su gasto y conciliación están en `docs/provider-check.md`. La cobertura medida y sus límites están en `docs/evaluation.md` y `docs/delivery.md`. Este archivo fija el plan y las decisiones; el estado de la implementación se documenta en esos archivos.
