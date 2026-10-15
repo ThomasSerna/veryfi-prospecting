@@ -66,8 +66,9 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         assessment = None if run.last_assessment_id is None else db.get_assessment(run.last_assessment_id)
         evidence = db.list_evidence(contact.company_id)
         now = utc_now()
+        roles = None if assessment is None else target_roles(company, assessment, campaign)
         if (assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED
-                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now)):
+                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now, roles)):
             raise ValueError("La persona necesita identidad, cargo y empleo pertinente vigentes antes de confirmar un canal.")
         channel = next((item for item in contact.channels
                         if (item.type, item.value) == (channel_type, channel_value)), None)
@@ -90,7 +91,7 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
             raise ValueError("El canal conserva evidencia contradictoria o con fecha futura; no se puede confirmar.")
         db.save_contact(updated, evidence=[fact])
         readiness = derive_readiness(assessment, db.list_contacts(company.id), db.list_evidence(company.id),
-                                     campaign.limits, now, company)
+                                     campaign.limits, now, company, roles)
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 
@@ -200,7 +201,7 @@ class _ContactStage:
 
     def readiness(self):
         return derive_readiness(self.assessment, self.people(), self.facts(), self.campaign.limits, utc_now(),
-                                self.company)
+                                self.company, self.roles)
 
     def finish(self, reason, *, status="checked", message=None):
         state = self.readiness()
@@ -354,7 +355,7 @@ class _ContactStage:
         if self.readiness() == BusinessStatus.READY_PREFERRED:
             return self.finish("preferred_channel_found")
         existing_eligible = [item for item in self.ranked_people() if validate_contact(
-            item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now())]
+            item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles)]
         if existing_eligible:
             selected = self.selected()
             additions = {}
@@ -494,7 +495,7 @@ class _ContactStage:
     def _enrich(self, contact):
         company, access = self.company, self.hunter_access
         # Solo una persona validada ocupa el cupo; validar no consume llamadas (T09).
-        if not validate_contact(contact, company, self.assessment, self.facts(), self.campaign.limits, utc_now()):
+        if not validate_contact(contact, company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles):
             return None
         selected = self.selected()
         if contact.id not in selected:

@@ -104,8 +104,7 @@ def test_only_read_operations_with_bearer_and_bounded_timeout():
 
 def test_requests_preserve_full_names_and_restrict_to_confirmed_domain(eligible):
     company, campaign, assessment, contact, _ = eligible
-    assert target_roles(company, assessment, campaign) == [TITLE]
-    roles = target_roles(company, assessment, campaign)
+    roles = [TITLE]
     request = domain_search_request(company, roles, "synthetic")
     assert request.params == {"domain": "example.com", "type": "personal", "limit": 10, "offset": 0, "job_titles": "CTO"}
     fallback = domain_search_request(company, roles, "synthetic", departments=target_departments(roles))
@@ -416,6 +415,30 @@ def test_role_relevance_is_deterministic_and_uses_observed_title(eligible):
     assert saved.relevant_function is True and saved.provenance["relevant_function"] == saved.provenance["title"]
     saved = apply_target_roles(contact, ["Marketing Director"])
     assert saved.relevant_function is False
+
+
+def test_target_roles_put_assessment_choices_first_and_keep_every_profile_role(eligible):
+    company, campaign, assessment, _, _ = eligible
+    profile = {role for item in campaign.config_snapshot.profiles if item.segment == "fintech_software"
+               for role in item.target_roles}
+    roles = target_roles(company, assessment, campaign)
+    assert roles[0] == TITLE and set(roles) == profile and len(roles) == len(set(roles))
+    other = company.model_copy(update={"segments": ["cpg_loyalty"]})
+    assert TITLE not in target_roles(other, assessment, campaign)
+
+
+def test_profile_role_not_chosen_by_the_assessment_counts_only_with_profile_roles(eligible):
+    """Un cargo de los perfiles vale aunque Haiku no lo eligiera; uno ajeno nunca (§10.1)."""
+    company, campaign, assessment, contact, evidence = eligible
+    roles = target_roles(company, assessment, campaign)
+    for title, expected in (("Head of Product", True), ("Sales Manager", False)):
+        source = evidence[0].model_copy(update={"excerpt": f"{NAME}, {title} de Empresa sintética, correo {EMAIL}."})
+        person = contact.model_copy(update={"title": title})
+        facts = [source, evidence[1]]
+        assert not validate_contact(person, company, assessment, facts, campaign.limits, NOW)
+        assert validate_contact(person, company, assessment, facts, campaign.limits, NOW, roles) is expected
+        ready = derive_readiness(assessment, [person], facts, campaign.limits, NOW, company, roles)
+        assert (ready == "ready_preferred") is expected
 
 
 def test_future_source_dates_block_even_a_corporate_directory(eligible):

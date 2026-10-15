@@ -278,8 +278,10 @@ def test_automatic_lead_saving_blocks_finder_and_verifier(contact_case):
 
 def test_missing_persisted_result_never_repeats_sent_operation(contact_case):
     case = contact_case
+    from prospecting.contacts import target_roles
     from prospecting.providers.hunter import domain_search_request
-    request = domain_search_request(case.company, ["Product Manager"], case.access.search_account_ref)
+    roles = target_roles(case.company, case.assessment, case.campaign)
+    request = domain_search_request(case.company, roles, case.access.search_account_ref)
     usage = Usage(campaign_id=case.campaign.id, company_id=case.company.id, provider="hunter", operation="domain_search",
                   account_ref=case.access.search_account_ref, request_fingerprint=case.client.fingerprint(request),
                   reserved_credits="1", reserved_cost_usd="0", funding_source="free_credit", status="succeeded", outcome="succeeded")
@@ -347,8 +349,10 @@ def test_high_priority_bounds_people_and_second_department_query(contact_case):
     report = case.find()
     # Los candidatos se conservan pendientes con su procedencia; sin empleo vigente ninguno ocupa el cupo.
     assert report.business_status == "qualified_no_contact" and len(case.db.list_contacts(case.company.id)) == 10
-    assert len(case.calls) == 2 and case.calls[0][1]["job_titles"] == "Product Manager"
-    assert case.calls[1][1]["department"] == "product" and "job_titles" not in case.calls[1][1]
+    # Primero el cargo elegido en la evaluación y después el resto de cargos del perfil.
+    assert len(case.calls) == 2 and case.calls[0][1]["job_titles"].startswith("Product Manager,")
+    assert "CTO" in case.calls[0][1]["job_titles"].split(",")
+    assert case.calls[1][1]["department"].startswith("product,") and "job_titles" not in case.calls[1][1]
     run = case.db.get_run_item(case.campaign.id, case.company.id)
     assert run.consumed_limits.people_queries == 2 and run.consumed_limits.enrichments == 0
     assert sum(key.startswith("contacts:person:") for key in run.attempts) == 0
@@ -673,7 +677,7 @@ EXPECTED_PERSISTED = {
             ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
             ("tavily", "search", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
             ("tavily", "extract", "tavily-synthetic", "succeeded", "1", "0", "free_credit", True),
-            ("anthropic", "messages", "claude-synthetic", "succeeded", "0", "0.0009145", "prepaid", True),
+            ("anthropic", "messages", "claude-synthetic", "succeeded", "0", "0.0009542", "prepaid", True),
         ],
         "evidence": [
             *COMPANY_FACTS, ("<id>", "provider", "inference", False), ("<id>#1.1", "primary", "observed", False),
@@ -682,7 +686,8 @@ EXPECTED_PERSISTED = {
             *[("contacts_search:<id>:0", "secondary", "observed", True)] * 2,
         ],
         "searches": [
-            {"query": '"Empresa Sintética" Product Manager equipo directorio CO'} | PUBLIC_SEARCH,
+            {"query": '"Empresa Sintética" Product Manager Gerente de Producto Head of Product Responsable de Producto '
+                      'equipo directorio CO'} | PUBLIC_SEARCH,
             {"query": '"Empresa Sintética" equipo producto ingeniería marketing contacto profesional'} | PUBLIC_SEARCH,
         ],
     },

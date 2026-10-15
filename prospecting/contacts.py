@@ -38,12 +38,12 @@ def parse_source_date(value: str | None) -> datetime | None:
 
 
 def target_roles(company: Company, assessment: Assessment, campaign: Campaign) -> list[str]:
-    """Reutiliza cargos de la evaluación, restringidos a los perfiles de la empresa."""
+    """Todos los cargos de los perfiles de la empresa, primero los elegidos en la evaluación."""
     allowed = list(dict.fromkeys(role for profile in campaign.config_snapshot.profiles
                                 if profile.segment in (company.segments or []) and profile.segment in campaign.segments
                                 for role in profile.target_roles))
     selected = [role for role in assessment.target_roles if role in allowed]
-    return selected or allowed
+    return list(dict.fromkeys(selected + allowed))
 
 
 def fold_words(value: str) -> str:
@@ -188,8 +188,12 @@ def _valid_refs(ids: list[UUID], contact: Contact, evidence: list[Evidence]) -> 
 
 
 def validate_contact(contact: Contact, company: Company, assessment: Assessment,
-                     evidence: list[Evidence], limits: CampaignLimits, now: datetime) -> bool:
-    """La identidad y el empleo no se deducen del email ni del momento de consulta."""
+                     evidence: list[Evidence], limits: CampaignLimits, now: datetime,
+                     roles: list[str] | None = None) -> bool:
+    """La identidad y el empleo no se deducen del email ni del momento de consulta.
+
+    `roles` son los cargos de los perfiles (`target_roles`); sin ellos solo valen los elegidos en la evaluación.
+    """
     if (company.id != contact.company_id or assessment.company_id != company.id or
             company.identity_status != IdentityStatus.CONFIRMED or
             assessment.priority not in (Priority.HIGH, Priority.MEDIUM) or
@@ -207,7 +211,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
                     item.source_type == "provider" and item.contact_id == contact.id)
                    for item in facts):
             return False
-    if not role_matches(contact.title, assessment.target_roles or [contact.title]):
+    if not role_matches(contact.title, roles or assessment.target_roles or [contact.title]):
         return False
     if contact.geographic_scope:
         if not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence):
@@ -310,14 +314,15 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
 
 
 def derive_readiness(assessment: Assessment, contacts: list[Contact], evidence: list[Evidence],
-                     limits: CampaignLimits, now: datetime, company: Company) -> BusinessStatus:
+                     limits: CampaignLimits, now: datetime, company: Company,
+                     roles: list[str] | None = None) -> BusinessStatus:
     if assessment.priority == Priority.EXCLUDED:
         return BusinessStatus.EXCLUDED
     if assessment.priority == Priority.LOW:
         return BusinessStatus.LOW_FIT
     if assessment.priority == Priority.INSUFFICIENT_EVIDENCE or company.identity_status != IdentityStatus.CONFIRMED:
         return BusinessStatus.INSUFFICIENT_EVIDENCE
-    eligible = [contact for contact in contacts if validate_contact(contact, company, assessment, evidence, limits, now)]
+    eligible = [contact for contact in contacts if validate_contact(contact, company, assessment, evidence, limits, now, roles)]
     usable = [channel for contact in eligible for channel in contact.channels
               if channel_is_usable(channel, contact, evidence, limits, now, company)]
     if any(channel.type in (ChannelType.EMAIL, ChannelType.PHONE, ChannelType.WHATSAPP) for channel in usable):
