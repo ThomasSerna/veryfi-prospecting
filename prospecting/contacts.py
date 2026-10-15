@@ -7,6 +7,7 @@ Toda fuente de personas entrega `Contact`, `Channel` y `Evidence` y pasa por est
 
 from datetime import UTC, datetime, timedelta
 import re
+from typing import Literal
 import unicodedata
 from uuid import UUID
 
@@ -193,7 +194,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
             company.identity_status != IdentityStatus.CONFIRMED or
             assessment.priority not in (Priority.HIGH, Priority.MEDIUM) or
             contact.identity_status != IdentityStatus.CONFIRMED or contact.name_complete is not True or
-            contact.current_employment is not True or contact.relevant_function is not True or
+            contact.current_employment is False or contact.relevant_function is not True or
             not contact.name or not contact.title):
         return False
     for field in ("name", "title", "relevant_function"):
@@ -219,11 +220,51 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
                     if any(mentions(scope, name) for name in names)}
         if not regional and not explicit.intersection(company.operating_countries or []):
             return False
+    return employment_basis(contact, company, evidence, limits, now) is not None
+
+
+def _employment_from_evidence(contact: Contact, company: Company, evidence: list[Evidence],
+                              limits: CampaignLimits, now: datetime) -> bool:
+    if contact.current_employment is not True:
+        return False
     facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
     if any(item.kind == "observed" and employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in facts):
         return False
     return bool(facts) and any(item.kind == "observed" and not is_search_evidence(item) and
                               employment_fresh(item, company, limits, now) for item in facts)
+
+
+def hunter_employment_signal(contact: Contact, company: Company, evidence: list[Evidence],
+                             limits: CampaignLimits, now: datetime) -> bool:
+    """Vigencia inferida: buzón nominal verificado vigente y fuente de Hunter aún publicada y vista hace poco.
+
+    No prueba el puesto; la interfaz lo advierte y pide confirmarlo antes de contactar (§10.2).
+    """
+    if contact.current_employment is False or not contact.name:
+        return False
+    if any(item.contact_id == contact.id and item.kind == "observed" and
+           employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in evidence):
+        return False
+    if not any(channel.type == ChannelType.EMAIL and channel.normalized_status == ChannelStatus.VERIFIED and
+               _fresh(channel.verified_at, limits.freshness.email_days, now) and
+               channel_is_usable(channel, contact, evidence, limits, now, company) for channel in contact.channels):
+        return False
+    return any(item.provider == "hunter" and item.source_type == "provider" and item.kind == "observed" and
+               item.contact_id == contact.id and item.retrieved_at <= now and
+               re.search(r"#\d+:source:\d+$", item.external_reference or "") and
+               "still_on_page=True" in (item.excerpt or "") and
+               _fresh(item.updated_at, limits.freshness.employment_days, now) and
+               _valid_refs([item.id], contact, evidence) for item in evidence)
+
+
+def employment_basis(contact: Contact, company: Company, evidence: list[Evidence],
+                     limits: CampaignLimits, now: datetime) -> Literal["evidence", "hunter_signal"] | None:
+    """Base de la vigencia del empleo: evidencia del puesto o, en su defecto, la señal de Hunter (§10.2)."""
+    if _employment_from_evidence(contact, company, evidence, limits, now):
+        return "evidence"
+    if hunter_employment_signal(contact, company, evidence, limits, now):
+        return "hunter_signal"
+    return None
 
 
 def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidence],

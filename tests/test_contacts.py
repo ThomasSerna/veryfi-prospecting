@@ -11,8 +11,8 @@ from prospecting.contact_extraction import (
     CONTACTS_PROMPT_VERSION, HaikuContacts, build_contacts_request, parse_contacts_output,
 )
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_matches, target_roles,
-    validate_contact,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, employment_basis, merge_contact, role_matches,
+    target_roles, validate_contact,
 )
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
 from prospecting.providers.hunter import (
@@ -131,6 +131,62 @@ def test_hunter_preserves_source_dates_and_never_infers_current_employment(eligi
     assert source.published_at == datetime(2024, 1, 1, tzinfo=UTC)
     assert source.source_type == "provider"
     assert all(item.provider and item.external_reference and item.retrieved_at for item in evidence)
+
+
+def hunter_candidate(company, **changes):
+    [(contact, evidence)] = parse_domain_search(company, domain_response(**changes), uuid4(), NOW)
+    return apply_target_roles(contact, [TITLE]), evidence
+
+
+def test_verified_hunter_mailbox_and_recent_source_infer_current_employment(eligible):
+    """La vigencia se infiere al validar, sin marcar el empleo como comprobado (§10.2)."""
+    company, campaign, assessment, _, _ = eligible
+    contact, evidence = hunter_candidate(company)
+    assert contact.current_employment is None
+    assert employment_basis(contact, company, evidence, campaign.limits, NOW) == "hunter_signal"
+    assert validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
+    assert derive_readiness(assessment, [contact], evidence, campaign.limits, NOW, company) == "ready_preferred"
+
+
+@pytest.mark.parametrize("changes", [
+    {"sources": []},
+    {"sources": [{"uri": "https://example.com/team", "last_seen_on": "2026-10-11", "still_on_page": False}]},
+    {"sources": [{"uri": "https://example.com/team", "still_on_page": True}]},
+    {"verification": {"status": "accept_all", "date": "2026-10-11"}},
+    {"verification": {"status": "unknown", "date": "2026-10-11"}},
+    {"verification": {"status": "valid", "date": "2026-09-01"}},
+    {"value": "persona@otro-dominio.example"},
+])
+def test_hunter_signal_needs_fresh_verified_mailbox_and_source_still_published(eligible, changes):
+    company, campaign, assessment, _, _ = eligible
+    contact, evidence = hunter_candidate(company, **changes)
+    assert employment_basis(contact, company, evidence, campaign.limits, NOW) is None
+    assert not validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
+
+
+def test_hunter_signal_respects_employment_window_and_future_dates(eligible):
+    company, campaign, assessment, _, _ = eligible
+    days = campaign.limits.freshness.employment_days
+    # last_seen_on es una fecha (medianoche UTC) y NOW es mediodía: el límite exacto cae medio día antes.
+    for age, expected in ((days - 1, True), (days, False), (-1, False)):
+        seen = (NOW - timedelta(days=age)).date().isoformat()
+        contact, evidence = hunter_candidate(company, sources=[
+            {"uri": "https://example.com/team", "last_seen_on": seen, "still_on_page": True}])
+        assert validate_contact(contact, company, assessment, evidence, campaign.limits, NOW) is expected
+
+
+def test_hunter_signal_never_overrides_departure_contradiction_or_negative_employment(eligible):
+    company, campaign, assessment, _, _ = eligible
+    contact, evidence = hunter_candidate(company)
+    assert not validate_contact(contact.model_copy(update={"current_employment": False}), company, assessment,
+                                evidence, campaign.limits, NOW)
+    departure = Evidence(company_id=company.id, contact_id=contact.id, claim="Noticia sintética.",
+                         excerpt=f"{NAME} dejó la empresa en septiembre.", url="https://example.com/news",
+                         retrieved_at=NOW, kind="observed", source_type="secondary")
+    assert not validate_contact(contact, company, assessment, evidence + [departure], campaign.limits, NOW)
+    contradicted = [item.model_copy(update={"contradiction_ids": [uuid4()]}) if "source:" in item.external_reference
+                    else item for item in evidence]
+    assert not validate_contact(contact, company, assessment, contradicted, campaign.limits, NOW)
 
 
 @pytest.mark.parametrize("changes", [{"last_name": None}, {"last_name": "S."}, {"verification": {"status": "valid", "date": None}}])
