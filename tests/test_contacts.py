@@ -319,9 +319,10 @@ def test_generic_phone_and_unannounced_whatsapp_are_not_usable(eligible):
 
 def test_employment_dates_and_contradictions_block_readiness(eligible):
     company, campaign, assessment, contact, evidence = eligible
-    source = evidence[0].model_copy(update={"url": "https://example.com/news", "published_at": NOW - timedelta(days=181)})
+    days = campaign.limits.freshness.employment_days
+    source = evidence[0].model_copy(update={"url": "https://example.com/news", "published_at": NOW - timedelta(days=days + 1)})
     assert not validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW)
-    source = source.model_copy(update={"published_at": NOW - timedelta(days=180)})
+    source = source.model_copy(update={"published_at": NOW - timedelta(days=days)})
     assert validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW)
     source = source.model_copy(update={"contradiction_ids": [uuid4()]})
     assert not validate_contact(contact, company, assessment, [source, evidence[1]], campaign.limits, NOW)

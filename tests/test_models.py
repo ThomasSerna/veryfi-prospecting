@@ -82,8 +82,8 @@ def test_default_limits_keep_the_documented_initial_values(config):
     assert budget.allocation.model_dump() == {"llm_usd": Decimal("3"), "web_usd": Decimal("2"),
                                               "contacts_usd": Decimal("10"), "uncertainty_usd": Decimal("5")}
     assert not (budget.automatic_topups or budget.variable_cost_waterfall or budget.paid_phone_enrichment)
-    assert (defaults.cache.web_days, defaults.cache.contact_days) == (7, 30)
-    assert (defaults.freshness.email_days, defaults.freshness.employment_days) == (30, 180)
+    assert (defaults.cache.web_days, defaults.cache.contact_days) == (30, 30)
+    assert (defaults.freshness.email_days, defaults.freshness.employment_days) == (30, 365)
     assert (defaults.llm.max_input_tokens, defaults.llm.max_output_tokens) == (9000, 1000)
 
 

@@ -161,9 +161,10 @@ def test_manual_access_cannot_replace_professional_identity_or_employment(manual
     assert case.db.get_run_item(case.campaign.id, case.company.id) == case.run
 
 
-@pytest.mark.parametrize("days", [-181, 1])
-def test_stale_or_future_employment_blocks_manual_confirmation(manual_case, days):
+@pytest.mark.parametrize("age", ["stale", "future"])
+def test_stale_or_future_employment_blocks_manual_confirmation(manual_case, age):
     case = manual_case
+    days = -(case.campaign.limits.freshness.employment_days + 1) if age == "stale" else 1
     source = case.source.model_copy(update={"id": uuid4(), "published_at": utc_now() + timedelta(days=days)})
     saved = case.db.save_contact(case.contact.model_copy(update={"employment_evidence_ids": [source.id]}), evidence=[source])
     with pytest.raises(ValueError, match="vigentes"):
