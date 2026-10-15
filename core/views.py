@@ -66,7 +66,7 @@ def _campaign_view(campaign_id, base):
     if not any(item.id == campaign_id for item in base["campaigns"]):
         raise Http404("La campaña no existe.")
     return read_campaign(db_path, campaign_id, account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                         exclusions_path=exclusions_path)
+                         exclusions_path=exclusions_path, contact_match_path=Path(settings.PROSPECTING_CONTACT_MATCH_PATH))
 
 
 def _global_busy(base):
@@ -284,7 +284,8 @@ def export(request, campaign_id):
         _require_idle(view)
         content = download_csv(_paths()[0], campaign_id, include_all=mode == "all",
                                account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                               exclusions_path=_paths()[2])
+                               exclusions_path=_paths()[2],
+                               contact_match_path=Path(settings.PROSPECTING_CONTACT_MATCH_PATH))
     response = HttpResponse(content, content_type="text/csv; charset=utf-8")
     prefix = "demo-sintetica-" if settings.PROSPECTING_DEMO else ""
     name = "resultados" if mode == "all" else "prospectos-listos"

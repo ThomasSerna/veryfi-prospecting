@@ -16,7 +16,10 @@ from uuid import UUID
 from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
-from prospecting.contacts import channel_is_usable, derive_readiness, employment_basis, target_roles, validate_contact
+from prospecting.contacts import (
+    ContactMatch, ContactMatchConfig, channel_is_usable, contact_match, derive_readiness, employment_basis, load_contact_match,
+    match_sort_key, target_roles, validate_contact,
+)
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
 from prospecting.identity import (
@@ -128,6 +131,8 @@ class ContactResult(Contract):
     usable_channels: list[Channel]
     # Solo para mostrar: "hunter_signal" es vigencia inferida, pendiente de confirmar antes de contactar (§10.2).
     employment_basis: Literal["evidence", "hunter_signal"] | None = None
+    # Ordena para que ventas elija; no cambia eligible, canales utilizables ni disponibilidad.
+    match: ContactMatch | None = None
 
 
 class CompanyResult(Contract):
@@ -145,6 +150,8 @@ class CampaignView(Contract):
     budget: BudgetSnapshot
     is_executing: StrictBool
     exclusions_status: ExclusionStatus
+    # None: falta un config/contact_match.json válido y las personas se muestran sin porcentaje.
+    contact_match_version: Text | None = None
 
 
 def provider_operations(access: ProviderAccess) -> list[tuple[str, str, str]]:
@@ -193,10 +200,24 @@ def prepare_campaign(db_path: Path, campaign: Campaign) -> Campaign:
         return db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.CREATED}))
 
 
+def _contact_match_config(path: Path | None) -> ContactMatchConfig | None:
+    """Sin un archivo válido no hay match: la interfaz lo avisa y nunca se inventan pesos."""
+    if path is None:
+        return None
+    try:
+        return load_contact_match(path)
+    except (OSError, UnicodeError, ValueError):
+        return None
+
+
 def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[AccountAllowance] | None = None,
-                  exclusions_path: Path | None = None) -> CampaignView:
-    """Lectura para la UI/CSV; recalcula persona, canales y disponibilidad con la fecha actual."""
+                  exclusions_path: Path | None = None, contact_match_path: Path | None = None) -> CampaignView:
+    """Lectura para la UI/CSV; recalcula persona, canales, disponibilidad y match con la fecha actual.
+
+    Devuelve todas las personas guardadas de cada empresa, ordenadas por match.
+    """
     exclusions = None if exclusions_path is None else load_exclusions(exclusions_path)
+    weights = _contact_match_config(contact_match_path)
     with _saved_database(db_path) as db:
         campaign = db.get_campaign(campaign_id)
         if campaign is None:
@@ -218,8 +239,11 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
                     basis = employment_basis(contact, company, evidence, campaign.limits, now) if eligible else None
+                    ranking = None if weights is None or assessment is None else contact_match(
+                        contact, company, assessment, evidence, campaign.limits, now, roles, weights)
                     results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable,
-                                                 employment_basis=basis))
+                                                 employment_basis=basis, match=ranking))
+                results.sort(key=lambda item: match_sort_key(item.match, item.eligible, item.contact, roles or []))
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company, roles)
                 if excluded:
@@ -229,7 +253,8 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
                                                evidence=evidence, contacts=results, business_status=status))
         return CampaignView(campaign=campaign, companies=companies, budget=budget,
-                            is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions))
+                            is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions),
+                            contact_match_version=None if weights is None else weights.version)
 
 
 def _exclusion_match(company: Company, campaign: Campaign, exclusions: ExclusionList | None) -> ExclusionMatch | None:
