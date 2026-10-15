@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import django
+from django.test import Client, override_settings
+from django.urls import reverse
 import pytest
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -80,3 +82,34 @@ def test_missing_or_invalid_weights_show_people_without_inventing_a_match(people
     assert all(person.match is None for person in result.contacts)
     assert result.business_status == read_campaign(people.path, people.campaign.id,
                                                     contact_match_path=MATCH_PATH).companies[0].business_status
+
+
+def page(people, name, match_path=MATCH_PATH, **kwargs):
+    with override_settings(PROSPECTING_DB_PATH=people.path, PROSPECTING_ACCESS_PATH=people.tmp_path / "missing-access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=people.tmp_path / "missing-exclusions.json",
+                           PROSPECTING_CONTACT_MATCH_PATH=match_path):
+        response = Client(SERVER_NAME="localhost").get(reverse(name, kwargs={"campaign_id": people.campaign.id} | kwargs))
+    assert response.status_code == 200
+    return response.content.decode("utf-8")
+
+
+def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(people):
+    html = page(people, "webapp:company", company_id=people.company.id)
+    assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
+    assert "100 %</strong> de match" in html and "25 %</strong> de match" in html
+    assert "Descartada por regla: su identidad tiene contradicciones" in html
+    assert html.count("Cómo se calculó el match") == 3 and "Cargo fuera de los perfiles" in html
+    assert "contact_match_v1" in html and "El porcentaje de match no está disponible" not in html
+
+
+def test_company_page_warns_when_weights_are_invalid(people):
+    broken = people.tmp_path / "contact_match.json"
+    broken.write_text('{"version": "contact_match_v9"}', encoding="utf-8")
+    html = page(people, "webapp:company", broken, company_id=people.company.id)
+    assert "El porcentaje de match no está disponible" in html and "de match</span>" not in html
+    assert all(name in html for name in (READY, SALES, CONTRADICTED))
+
+
+def test_campaign_table_shows_people_count_and_best_match(people):
+    html = page(people, "webapp:campaign")
+    assert "<th class=\"numeric\">Contactos</th>" in html and "Mejor match 100 %" in html

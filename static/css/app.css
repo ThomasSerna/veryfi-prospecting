@@ -297,6 +297,15 @@ details[open] > summary::after { transform: rotate(225deg); }
 .contact-detail > header h3 { font-size: 20px; overflow-wrap: anywhere; }
 .contact-detail > header p { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 .contact-detail > p { font-size: 13px; }
+.contact-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.match-score { display: inline-block; padding: 4px 8px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; line-height: 1.4; color: var(--ink); background: var(--white); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.match-score strong { font-size: 13px; }
+.match-blocked { color: var(--muted); background: var(--soft); }
+.match-details { margin: 4px 0 14px; }
+.match-breakdown { margin: 4px 0 0; }
+.match-breakdown div { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.match-breakdown dd { margin: 0; }
+.pending-tag { color: var(--warning); font-size: 11px; font-weight: 600; }
 .channel-detail { padding: 18px 0; border-top: 1px solid var(--line); }
 .channel-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
 .channel-value { margin-top: 10px; font-size: 14px; overflow-wrap: anywhere; }
@@ -384,6 +393,9 @@ details[open] > summary::after { transform: rotate(225deg); }
   .preparation-form { padding: 25px; }
   .empty-onboarding { padding: 30px 25px; }
   .contact-detail > header { flex-direction: column; }
+  .contact-badges { justify-content: flex-start; margin-bottom: 10px; }
+  .match-breakdown div { grid-template-columns: minmax(0, 1fr) auto; }
+  .match-breakdown dt { grid-column: 1 / -1; }
   .review-panel form fieldset { display: block; }
   .review-panel .button { width: 100%; }
   .export-actions { flex-direction: column; align-items: stretch; }

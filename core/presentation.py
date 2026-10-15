@@ -39,6 +39,24 @@ LABELS = {
     "size": "Tamaño", "current_employment": "Empleo actual", "relevant_function": "Función pertinente",
     "geographic_scope": "Alcance geográfico",
 }
+MATCH_LABELS = {
+    "role": "Cargo", "channel": "Canal", "identity": "Identidad", "employment": "Vigencia del empleo",
+    "role:selected_role": "Cargo elegido en la calificación", "role:profile_role": "Otro cargo de los perfiles",
+    "role:outside_profile": "Cargo fuera de los perfiles", "role:unknown": "Cargo pendiente",
+    "channel:preferred_usable": "Correo, teléfono o WhatsApp utilizable",
+    "channel:alternative_usable": "Canal alternativo confirmado",
+    "channel:preferred_unconfirmed": "Correo, teléfono o WhatsApp sin comprobar",
+    "channel:alternative_unconfirmed": "LinkedIn u otro canal sin confirmar", "channel:none": "Sin canal profesional",
+    "identity:confirmed_complete": "Nombre completo e identidad confirmada",
+    "identity:complete_pending": "Nombre completo; identidad sin confirmar",
+    "identity:incomplete": "Nombre incompleto o pendiente",
+    "employment:evidence": "Vigente según evidencia del puesto",
+    "employment:hunter_signal": "Inferida de Hunter; confirmar antes de contactar",
+    "employment:unverified": "Sin comprobar",
+    "identity_contradicted": "su identidad tiene contradicciones",
+    "employment_ended": "una fuente indica que ya no ocupa el puesto",
+    "scope_mismatch": "su alcance geográfico no cubre los países de la empresa",
+}
 READY = {"ready_preferred", "ready_alternative"}
 STOP_MESSAGES = {
     "budget_exceeded": "Se agotó el presupuesto disponible. Revisa el consumo y concilia antes de reanudar.",
@@ -88,6 +106,12 @@ STOP_OUTCOMES = {
 
 def label(value):
     return "Pendiente" if value is None else LABELS.get(value, str(value))
+
+
+def match_label(value):
+    """Componentes, niveles y bloqueos del match; el texto de un nivel depende de su componente."""
+    key = f"{value.name}:{value.level}" if hasattr(value, "level") else str(value)
+    return MATCH_LABELS.get(key, key)
 
 
 def money(value):
