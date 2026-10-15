@@ -17,8 +17,7 @@ from prospecting.contacts import (
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
 from prospecting.providers.hunter import (
     HUNTER_OPERATIONS, HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
-    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
-    verifier_request,
+    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, verifier_request,
 )
 
 
@@ -105,10 +104,11 @@ def test_only_read_operations_with_bearer_and_bounded_timeout():
 def test_requests_preserve_full_names_and_restrict_to_confirmed_domain(eligible):
     company, campaign, assessment, contact, _ = eligible
     roles = [TITLE]
+    # Primero todas las personas nominales del dominio, sin filtro de cargo ni paginación.
     request = domain_search_request(company, roles, "synthetic")
-    assert request.params == {"domain": "example.com", "type": "personal", "limit": 10, "offset": 0, "job_titles": "CTO"}
-    fallback = domain_search_request(company, roles, "synthetic", departments=target_departments(roles))
-    assert fallback.params["department"] == "it" and "job_titles" not in fallback.params
+    assert request.params == {"domain": "example.com", "type": "personal", "limit": 10, "offset": 0}
+    targeted = domain_search_request(company, roles, "synthetic", by_roles=True)
+    assert targeted.params == request.params | {"job_titles": "CTO"}
     assert finder_request(contact, company, "synthetic").params["full_name"] == NAME
     assert finder_request(contact, company, "synthetic").params["max_duration"] == 6
     assert verifier_request(EMAIL, "synthetic").params == {"email": EMAIL}

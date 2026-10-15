@@ -23,8 +23,7 @@ from prospecting.pipeline.calls import grant_for, observed_credits, reserve_clau
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.hunter import (
     HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
-    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, target_departments,
-    verifier_request,
+    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, verifier_request,
 )
 from prospecting.providers.tavily import (
     SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,
@@ -366,13 +365,16 @@ class _ContactStage:
         return None
 
     def _search_hunter(self):
-        """Domain Search por cargos y, en el segundo intento, por departamentos."""
+        """Domain Search de todas las personas del dominio y, en el segundo intento, por cargos objetivo.
+
+        La consulta amplia trae candidatos de cualquier cargo para ordenarlos por match; la segunda
+        alcanza cargos objetivo que no estuvieran entre los 10 primeros.
+        """
         access, company = self.hunter_access, self.company
         if access is None or "domain_search" not in access.enabled_operations:
             return None
         for index in range(self.effort.people_queries):
-            request = domain_search_request(company, self.roles, access.search_account_ref,
-                                            departments=target_departments(self.roles) if index else None)
+            request = domain_search_request(company, self.roles, access.search_account_ref, by_roles=bool(index))
             try:
                 fingerprint = self.client.fingerprint(request)
                 if self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0):

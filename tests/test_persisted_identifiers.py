@@ -22,7 +22,7 @@ from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
 from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ClaudeClient, ProviderClient
 from prospecting.providers.hunter import (
     HUNTER_OPERATIONS, HunterDomainSearchResponse, domain_search_request, finder_request, parse_domain_search,
-    target_departments, verifier_request,
+    verifier_request,
 )
 from prospecting.providers.tavily import TAVILY_OPERATIONS, company_search_request, extract_request, search_request
 from prospecting.qualification import build_haiku_request, unknown_criteria
@@ -106,9 +106,9 @@ def fingerprints(config) -> dict[str, str]:
             ["https://empresa-uno.example/producto"], extract_query(current), ACCOUNT)),
         "tavily_company_search": client.fingerprint(company_search_request(
             company(), expansion_query(company(), current), ACCOUNT)),
-        "hunter_domain_roles": client.fingerprint(domain_search_request(company(), ["Product Manager"], ACCOUNT)),
-        "hunter_domain_departments": client.fingerprint(domain_search_request(
-            company(), ["Product Manager"], ACCOUNT, departments=target_departments(["Product Manager", "CTO"]))),
+        "hunter_domain_broad": client.fingerprint(domain_search_request(company(), ["Product Manager"], ACCOUNT)),
+        "hunter_domain_roles": client.fingerprint(domain_search_request(
+            company(), ["Product Manager"], ACCOUNT, by_roles=True)),
         "hunter_finder": client.fingerprint(finder_request(contact(), company(), ACCOUNT)),
         "hunter_verifier": client.fingerprint(verifier_request("persona@empresa-uno.example", ACCOUNT)),
         "haiku_assessment": ClaudeClient.fingerprint(haiku, ACCOUNT),
@@ -121,8 +121,9 @@ EXPECTED_FINGERPRINTS = {
     "tavily_search_last": "fc242ce31da2306567a247424a85d7d8504676f6ef2882d52694abbb74c07387",
     "tavily_extract": "e07e6d049bdc92127ed965084c09e7494dca1cba5c5073aa903e40968b4c2823",
     "tavily_company_search": "5d36ec882ff69fdaa130850da1565389d4015986f9829fdda6da3ae49d119f46",
+    # Cambio intencionado: la primera búsqueda pide todas las personas del dominio; la de cargos conserva su huella.
+    "hunter_domain_broad": "65efd2f4e81895f6f9c151e4ad3847d33053823aa4c00e01bb811c3498b2a563",
     "hunter_domain_roles": "75821173a121c6ef99b3491a2280a8b507d1c636f4c4aea34fea8a64652f8ae7",
-    "hunter_domain_departments": "9f6184b7ee6b0286f02e6481f4138500581e8cacb3611eaf94597f03210c6877",
     "hunter_finder": "8054608a83cf35292d9a3808652a2c5ff6e9ca5d90682f6f05f420668b578074",
     "hunter_verifier": "f48a0492f034a45888630bab111e202620df20717f4c8a537c1de2ebece036e7",
     "haiku_assessment": "e1b5c09b97919ae2006a8ee23d53d4151b71e552aefc70d2cda6ec8f83fc05fb",

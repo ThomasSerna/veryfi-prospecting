@@ -346,7 +346,7 @@ def high_priority(case):
     case.db.save_run_item(run.model_copy(update={"last_assessment_id": assessment.id}))
 
 
-def test_high_priority_bounds_people_and_second_department_query(contact_case):
+def test_high_priority_bounds_people_and_second_role_query(contact_case):
     case = contact_case
     high_priority(case)
     case.replies["domain_search"] = {"data": {"domain": case.company.domain, "organization": case.company.name,
@@ -356,10 +356,10 @@ def test_high_priority_bounds_people_and_second_department_query(contact_case):
     report = case.find()
     # Los candidatos se conservan pendientes con su procedencia; sin empleo vigente ninguno ocupa el cupo.
     assert report.business_status == "qualified_no_contact" and len(case.db.list_contacts(case.company.id)) == 10
-    # Primero el cargo elegido en la evaluación y después el resto de cargos del perfil.
-    assert len(case.calls) == 2 and case.calls[0][1]["job_titles"].startswith("Product Manager,")
-    assert "CTO" in case.calls[0][1]["job_titles"].split(",")
-    assert case.calls[1][1]["department"].startswith("product,") and "job_titles" not in case.calls[1][1]
+    # Primero todas las personas del dominio; después los cargos, el elegido en la evaluación antes que el resto.
+    assert len(case.calls) == 2 and not {"job_titles", "department"} & set(case.calls[0][1])
+    assert case.calls[1][1]["job_titles"].startswith("Product Manager,")
+    assert "CTO" in case.calls[1][1]["job_titles"].split(",") and "department" not in case.calls[1][1]
     run = case.db.get_run_item(case.campaign.id, case.company.id)
     assert run.consumed_limits.people_queries == 2 and run.consumed_limits.enrichments == 0
     assert sum(key.startswith("contacts:person:") for key in run.attempts) == 0
@@ -371,16 +371,24 @@ def default_medium_limits(case, make_campaign):
     case.db.save_campaign(case.campaign)
 
 
-def test_medium_priority_adds_department_search_when_first_finds_no_ready_channel(contact_case, make_campaign):
+def test_medium_priority_adds_role_search_when_broad_search_finds_no_ready_channel(contact_case, make_campaign):
     case = contact_case
     default_medium_limits(case, make_campaign)
     assert case.find().business_status == "qualified_no_contact"
     assert [operation for operation, _, _ in case.calls] == ["domain_search", "domain_search"]
-    assert "job_titles" in case.calls[0][1] and case.calls[1][1]["department"].startswith("product")
+    assert "job_titles" not in case.calls[0][1] and case.calls[1][1]["job_titles"].startswith("Product Manager")
     assert case.db.get_run_item(case.campaign.id, case.company.id).consumed_limits.people_queries == 2
 
 
-def test_medium_priority_skips_department_search_after_ready_channel(contact_case, make_campaign):
+def test_single_people_query_is_the_broad_domain_search(contact_case):
+    """Con una sola búsqueda permitida se piden todas las personas del dominio, sin filtro de cargo."""
+    case = contact_case
+    case.find()
+    [params] = [params for operation, params, _ in case.calls if operation == "domain_search"]
+    assert params == {"domain": case.company.domain, "type": "personal", "limit": "10", "offset": "0"}
+
+
+def test_medium_priority_skips_role_search_after_ready_channel(contact_case, make_campaign):
     case = contact_case
     default_medium_limits(case, make_campaign)
     day = utc_now().date().isoformat()

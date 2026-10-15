@@ -146,22 +146,6 @@ class HunterVerifierResponse(BaseModel):
     data: HunterVerifierData | None = None
 
 
-def target_departments(roles: list[str]) -> list[str]:
-    departments = []
-    for role in roles:
-        text = fold_words(role)
-        for words, department in (
-            (("producto", "product"), "product"),
-            (("ingenier", "engineering", "technology", "tecnologia", "cto"), "it"),
-            (("marketing", "brand", "marca", "loyalty", "fidelizacion", "crm", "consumer"), "marketing"),
-            (("payable", "pagar", "financi"), "finance"),
-            (("accounts", "cuentas"), "management"),
-        ):
-            if any(word in text for word in words) and department not in departments:
-                departments.append(department)
-    return departments
-
-
 def _confirmed_domain(company: Company) -> str:
     if company.identity_status != IdentityStatus.CONFIRMED or company.domain is None:
         raise ContactError("identity_unconfirmed", "Hunter necesita el dominio de una entidad confirmada.")
@@ -169,11 +153,13 @@ def _confirmed_domain(company: Company) -> str:
 
 
 def domain_search_request(company: Company, roles: list[str], account_ref: str, *,
-                          departments: list[str] | None = None) -> ProviderRequest:
+                          by_roles: bool = False) -> ProviderRequest:
+    """Sin `by_roles`, todas las personas nominales del dominio; con él, solo los cargos objetivo.
+
+    En el plan Free `limit + offset` no puede superar 10: no hay paginación posible.
+    """
     params = {"domain": _confirmed_domain(company), "type": "personal", "limit": 10, "offset": 0}
-    if departments:
-        params["department"] = ",".join(dict.fromkeys(departments))
-    elif roles:
+    if by_roles and roles:
         params["job_titles"] = ",".join(dict.fromkeys(roles))
     return ProviderRequest(provider=PROVIDER, operation="domain_search", account_ref=account_ref, params=params)
 
