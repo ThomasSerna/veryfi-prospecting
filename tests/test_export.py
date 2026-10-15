@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from core.presentation import CSV_FIELDS, csv_text, download_csv, export_csv
+from core.presentation import CSV_FIELDS, HUNTER_EMPLOYMENT_WARNING, csv_text, download_csv, export_csv
 from prospecting.db import Database
 from prospecting.models import BusinessStatus, Channel, Contact, Evidence, RunItem, RunStage, utc_now
 from prospecting.pipeline import prepare_campaign, read_campaign, review_company
@@ -101,6 +101,17 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
     assert row["review_status"] == "pending" and row["review_reason"] == ""
     assert 'coma, comillas " y salto\nde línea.' in row["warnings"]
     assert all(len(parsed) == len(CSV_FIELDS) for parsed in csv.reader(StringIO(content.decode("utf-8-sig"))))
+
+
+def test_employment_inferred_from_hunter_is_exported_with_its_warning(csv_case, make_hunter_contact):
+    case = csv_case
+    contact, evidence = make_hunter_contact(case.company, case.now)
+    with Database(case.path) as db:
+        db.save_contact(contact, evidence=evidence)
+    exported = {row["contact_id"]: row for row in rows(export_csv(read_campaign(case.path, case.campaign.id)))}
+    assert exported[str(contact.id)]["contact_ready"] == "True"
+    assert HUNTER_EMPLOYMENT_WARNING in exported[str(contact.id)]["warnings"]
+    assert HUNTER_EMPLOYMENT_WARNING not in exported[str(case.contacts[0].id)]["warnings"]
 
 
 def test_all_results_keeps_pending_people_and_company_without_people(csv_case):

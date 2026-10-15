@@ -16,7 +16,7 @@ from uuid import UUID
 from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
-from prospecting.contacts import channel_is_usable, derive_readiness, validate_contact
+from prospecting.contacts import channel_is_usable, derive_readiness, employment_basis, validate_contact
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
 from prospecting.identity import (
@@ -126,6 +126,8 @@ class ContactResult(Contract):
     contact: Contact
     eligible: StrictBool
     usable_channels: list[Channel]
+    # Solo para mostrar: "hunter_signal" es vigencia inferida, pendiente de confirmar antes de contactar (§10.2).
+    employment_basis: Literal["evidence", "hunter_signal"] | None = None
 
 
 class CompanyResult(Contract):
@@ -214,7 +216,9 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                         contact, company, assessment, evidence, campaign.limits, now)
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
-                    results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable))
+                    basis = employment_basis(contact, company, evidence, campaign.limits, now) if eligible else None
+                    results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable,
+                                                 employment_basis=basis))
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company)
                 if excluded:

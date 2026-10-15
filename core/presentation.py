@@ -7,6 +7,9 @@ import json
 from prospecting.pipeline import CampaignView, read_campaign
 
 
+HUNTER_EMPLOYMENT_WARNING = ("Vigencia del puesto inferida de Hunter (correo verificado y fuente vista hace poco); "
+                             "confirmar antes de contactar.")
+
 LABELS = {
     "CO": "Colombia", "MX": "México",
     "fintech_software": "FinTech y software", "cpg_loyalty": "Consumo masivo y fidelización",
@@ -172,7 +175,9 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "contact_provenance": json.dumps({} if contact is None else contact.model_dump(mode="json")["provenance"], ensure_ascii=False),
                 "review_status": item.review_status, "review_reason": item.review_reason,
                 "reviewed_at": None if item.reviewed_at is None else item.reviewed_at.isoformat(),
-                "warnings": " | ".join(warning for channel in channels for warning in channel.warnings),
+                "warnings": " | ".join(
+                    ([HUNTER_EMPLOYMENT_WARNING] if person is not None and person.employment_basis == "hunter_signal" else [])
+                    + [warning for channel in channels for warning in channel.warnings]),
             }
             row.update({kind: " | ".join(channel.value for channel in channels if channel.type == kind)
                         for kind in ("email", "phone", "whatsapp", "linkedin", "other")})

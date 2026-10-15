@@ -206,6 +206,26 @@ def make_assessment():
 
 
 @pytest.fixture
+def make_hunter_contact():
+    """Persona sintética solo de Hunter: correo verificado y fuente vigente, sin evidencia del puesto."""
+    from prospecting.contacts import apply_target_roles
+    from prospecting.providers.hunter import HunterDomainSearchResponse, parse_domain_search
+
+    def build(company, now, *, title="CTO", local="persona-hunter"):
+        day = now.date().isoformat()
+        response = HunterDomainSearchResponse.model_validate({"data": {
+            "domain": company.domain, "organization": company.name, "emails": [{
+                "value": f"{local}@{company.domain}", "type": "personal", "first_name": "Persona",
+                "last_name": "Sintética Hunter", "position": title, "verification": {"status": "valid", "date": day},
+                "sources": [{"uri": "https://directorio-sintetico.example/equipo", "last_seen_on": day,
+                             "still_on_page": True}]}]}})
+        [(contact, evidence)] = parse_domain_search(company, response, uuid4(), now)
+        return apply_target_roles(contact, [title]), evidence
+
+    return build
+
+
+@pytest.fixture
 def database(tmp_path):
     """Toda base de pruebas es temporal y separada de data/."""
     from prospecting.db import Database

@@ -259,6 +259,17 @@ def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_act
     assert result.run_item.review_status == "pending"
 
 
+def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client, make_hunter_contact):
+    case = ui_results
+    contact, evidence = make_hunter_contact(case.companies[0], case.now)
+    with Database(case.paths.db) as db:
+        db.save_contact(contact, evidence=evidence)
+    shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    assert "Persona pertinente; vigencia inferida de Hunter" in shown
+    assert "Inferido de Hunter; por confirmar" in shown and "confírmalo, por ejemplo en LinkedIn" in shown
+    assert "Persona pertinente y vigente" in shown
+
+
 def test_confirmation_of_ineligible_person_does_not_modify_channel(ui_results, client):
     case = ui_results
     with Database(case.paths.db) as db:
