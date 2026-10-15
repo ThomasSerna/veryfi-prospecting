@@ -118,6 +118,9 @@ y las instantáneas de las pruebas del pipeline los fijan:
   `HaikuContactCandidate` y `CitedContactFact`. La búsqueda de descubrimiento envía
   `NON_BUSINESS_DOMAINS` en `exclude_domains`: ampliar esa lista cambia la huella, así que
   los directorios nuevos van en `LOCAL_NON_BUSINESS_DOMAINS`, que solo se aplica localmente.
+  Domain Search pide primero todas las personas del dominio, sin `job_titles`, y después
+  por cargos: la consulta por cargos conserva su huella anterior y su caché sigue
+  reutilizable; la amplia tiene huella propia.
 - Claves de `RunItem.attempts`: `tavily_extract`, las de la ampliación de evidencia
   (`research:expansion`, `research:web_queries`, `research:pages`) y las de contactos
   (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,
@@ -130,3 +133,7 @@ y las instantáneas de las pruebas del pipeline los fijan:
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `research_queries_v1`, `haiku_assessment_v3`,
   `contacts_extraction_v1`, `rubric_v1` y el esquema SQLite `user_version=1`.
+
+El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
+recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera
+datos guardados ([Personas y canales](contacts.md#porcentaje-de-match)).

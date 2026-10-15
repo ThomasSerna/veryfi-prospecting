@@ -143,6 +143,13 @@ muestra encaje, cobertura, criterios y fuentes, caso de uso, contactos, adverten
 y motivos de detención. El encaje no es una probabilidad de compra. Datos desconocidos
 se muestran separados de cero.
 
+La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
+match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. La
+tabla de la campaña muestra cuántas personas tiene cada empresa y su mejor match. El match
+ordena la revisión; «listo» sigue dependiendo de las reglas de persona y canal. Si falta
+un `config/contact_match.json` válido, la ficha lo avisa y muestra a las personas sin
+porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
+
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
 son independientes. Guarda aceptado, rechazado o pendiente con motivo y fecha; esto
 no recalifica ni cambia la rúbrica. Las correcciones están disponibles cuando la
@@ -168,7 +175,9 @@ visuales no cambian la exportación de la campaña.
 El CSV tiene una fila por persona; cuando se exporta todo, una empresa sin personas
 conserva una fila con esos campos vacíos. Incluye IDs, estados técnicos y comerciales,
 score y cobertura, criterios, canales, fuentes con fechas, revisión, advertencias y
-motivos. Un valor desconocido queda vacío, nunca se convierte en cero.
+motivos. También incluye el porcentaje de match de cada persona, su versión, el motivo
+de descarte y el desglose; las filas de cada empresa siguen ese orden. Un valor
+desconocido queda vacío, nunca se convierte en cero.
 
 La descarga usa UTF-8 con BOM, `csv` estándar y todos los campos entrecomillados.
 Los textos con prefijos peligrosos para hojas de cálculo se neutralizan anteponiendo

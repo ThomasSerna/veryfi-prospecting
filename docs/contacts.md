@@ -25,11 +25,13 @@ El orden de trabajo es:
 
 1. Reutilizar personas, canales y evidencia guardados. Si ya existe un canal
    preferido utilizable, terminar sin nuevas llamadas.
-2. Consultar Domain Search sobre el dominio confirmado, primero por cargos y,
-   si queda un segundo intento, por departamentos relacionados. `type="personal"`
-   significa un correo nominal del dominio profesional; las direcciones genéricas
-   no cuentan como canal de una persona. Cada consulta pide como máximo 10 resultados,
-   con `offset=0`, sin recorrer páginas.
+2. Consultar Domain Search sobre el dominio confirmado, primero sin filtro de cargo
+   (todas las personas nominales del dominio) y, si queda un segundo intento, por los
+   cargos objetivo, para alcanzar a quienes no estuvieran entre los primeros resultados.
+   `type="personal"` significa un correo nominal del dominio profesional; las direcciones
+   genéricas no cuentan como canal de una persona. Cada consulta pide como máximo 10
+   resultados, con `offset=0`, sin recorrer páginas: en el plan Free de Hunter
+   `limit + offset` no puede superar 10.
 3. Complementar con búsquedas y extracción de URLs públicas mediante Tavily,
    dentro del cupo. Si se proporcionó Haiku y su autorización, extraer hechos
    nominales citados de evidencia nueva o ya disponible. Las páginas de LinkedIn
@@ -55,7 +57,7 @@ web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes
 consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
 no se recuperan.
 
-La prioridad media permite 1 persona, 2 búsquedas Hunter (la segunda, por departamentos,
+La prioridad media permite 1 persona, 2 búsquedas Hunter (la segunda, por cargos,
 solo si la primera no dejó un canal preferido), hasta 1 enriquecimiento Hunter, 2 consultas
 web, 2 páginas y 90 segundos adicionales. La alta permite
 hasta 3 personas, 2 búsquedas Hunter, 3 enriquecimientos, 4 consultas web, 4 páginas
@@ -184,11 +186,62 @@ utilizable; `ready_alternative`, un canal alternativo confirmado. Un canal pendi
 produce `needs_channel_confirmation`; al agotarse el esfuerzo sin persona/canal
 utilizable, `qualified_no_contact`. Los fallos técnicos se registran aparte.
 
+## Porcentaje de match
+
+`read_campaign` devuelve a todas las personas guardadas de cada empresa, también a las
+que no superan `validate_contact`, ordenadas por un porcentaje de match determinístico
+de 0 a 100 para que ventas elija a quién contactar. `contact_match` lo calcula al leer,
+sin red, IA ni persistencia, con las reglas de esta página. No cambia `eligible`, los
+canales utilizables, `derive_readiness` ni el estado comercial: ordena la revisión y no
+es una probabilidad de respuesta ni de compra.
+
+Cada persona suma cuatro componentes. El código fija los niveles; `config/contact_match.json`,
+sus puntos. La versión `contact_match_v1` (propuesta del equipo, 15 de octubre) prioriza
+la pertinencia del cargo:
+
+| Componente | Peso | Niveles y puntos |
+|---|---:|---|
+| Cargo | 50 | Elegido en la calificación, 50; otro cargo de los perfiles del segmento, 35; fuera de los perfiles, 0; sin cargo con fuente, 0 (pendiente) |
+| Canal | 25 | Correo, teléfono o WhatsApp que supera `channel_is_usable`, 25; LinkedIn u otro canal confirmado, 18; correo, teléfono o WhatsApp sin comprobar, 10; LinkedIn u otro canal sin confirmar, 7; ninguno, 0 (pendiente) |
+| Identidad | 15 | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 (pendiente) |
+| Vigencia del empleo | 10 | Evidencia del puesto, 10; inferida de Hunter, 6; sin comprobar, 0 (pendiente) |
+
+Un dato pendiente suma 0, pero se muestra como pendiente y no como incumplimiento. Un
+canal `invalid` o marcado como no profesional no suma. Tres reglas descartan a la persona
+(`blocked_reason`) y la llevan al final sin ocultar su desglose: identidad `contradicted`,
+empleo no vigente o salida nominal (`employment_ended`) y un alcance geográfico respaldado
+que no cubre los países de la empresa (`scope_mismatch`). El orden es: con match, no
+descartadas, mayor puntaje, elegibles, posición del cargo en `target_roles`, nombre e id;
+no depende del orden de guardado.
+
+La ficha muestra el porcentaje, su desglose y la versión; la tabla de la campaña, el
+número de personas y el mejor match no descartado. El CSV añade `contact_match`,
+`contact_match_version`, `contact_match_blocked` y `contact_match_detail`.
+
+### Configurar los pesos
+
+1. Edita `config/contact_match.json`. Los `weight` de los cuatro componentes suman 100;
+   en cada componente, el nivel más alto vale su peso y ninguno lo supera; los niveles
+   pendientes (`unknown`, `none`, `incomplete`, `unverified`) valen 0. Los nombres de
+   componentes y niveles los fija el código.
+2. Cambia `version` (por ejemplo, `contact_match_v2`) y registra su huella en
+   `CONFIG_FINGERPRINTS` de `tests/test_contact_match.py`. La prueba falla si cambian los
+   puntos y se conserva la versión.
+3. Recarga la ficha. El match se recalcula al consultar, también en campañas ya
+   guardadas, sin llamadas ni gasto; la ficha y el CSV indican la versión usada.
+4. Para probar otra combinación sin tocar el archivo versionado, apunta la variable
+   `PROSPECTING_CONTACT_MATCH_PATH` a otro JSON antes de iniciar el servidor.
+
+Si el archivo falta o no es válido, la aplicación no usa pesos por defecto: muestra a las
+personas sin porcentaje, avisa en la ficha y deja vacías las columnas del CSV.
+
 Las pruebas sin red usan credenciales y datos declarados sintéticos; no demuestran
 cobertura, acceso ni consumo de la cuenta del equipo. Las llamadas reales a Hunter
 de T07, T09 y la entrega están en [Comprobación de proveedores](provider-check.md);
 la selección del cupo y la prioridad de fragmentos descritas arriba (14 de octubre)
-solo se han verificado con datos sintéticos. La clave pública `test-api-key` devuelve
+solo se han verificado con datos sintéticos. La búsqueda amplia de Domain Search y el
+porcentaje de match (15 de octubre) tampoco se han probado con llamadas reales: la primera
+consulta amplia necesita autorización del responsable del cupo. La clave pública `test-api-key` devuelve
 datos ficticios y no sirve para una demostración de prospectos reales.
 
 Los teléfonos se comprueban automáticamente solo para prefijos y longitudes de
