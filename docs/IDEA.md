@@ -169,7 +169,7 @@ Guardar hechos atómicos, cada uno con texto breve, URL o referencia de proveedo
 
 No tratar el resumen del buscador como confirmación definitiva de cargo o canal: sirve para localizar la fuente. Un dato de proveedor puede usarse como tal, identificándolo, aunque no traiga URL pública; conservar referencia de registro y estado que devolvió.
 
-Reutilizar evidencia vigente entre ejecuciones. Valor inicial de caché: siete días para páginas/búsquedas y treinta días para datos de contacto. Consultar una página hoy no convierte en actual una noticia antigua. Si hay contradicciones o indicios de cambio de cargo, suspender la condición de listo y revisar.
+Reutilizar evidencia vigente entre ejecuciones. Valor inicial de caché: treinta días para páginas/búsquedas y treinta días para datos de contacto. Consultar una página hoy no convierte en actual una noticia antigua. Si hay contradicciones o indicios de cambio de cargo, suspender la condición de listo y revisar.
 
 ## 8. Calificación explicable
 
@@ -229,7 +229,7 @@ La prioridad decide cuánto investigar, no autoriza gasto ilimitado. Todos los n
 | Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Hasta 3 personas; hasta 3 enriquecimientos por proveedor habilitado | 180 s adicionales |
 | Prioridad baja/excluida | Ninguna adicional | Ninguna adicional | Ninguno | Detener |
 
-En búsqueda de personas, permitir como máximo una consulta al proveedor especializado para prioridad media y dos para alta (Hunter Domain Search en el MVP; Apollo solo si se habilita después). Los límites de personas y enriquecimientos permanecen vigentes. Cada llamada a Hunter Finder/Verifier y cada verificación de correo consume el cupo correspondiente; máximo una verificación por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
+En búsqueda de personas, permitir como máximo dos consultas al proveedor especializado para prioridad media y alta: la primera por cargos y la segunda por departamentos, solo si la primera no dejó un canal preferido (Hunter Domain Search en el MVP; Apollo solo si se habilita después). Los cargos son todos los de los perfiles del segmento de la empresa, primero los elegidos en la evaluación. Los límites de personas y enriquecimientos permanecen vigentes. Cada llamada a Hunter Finder/Verifier y cada verificación de correo consume el cupo correspondiente; máximo una verificación por candidato/canal salvo que el proveedor devuelva procesamiento pendiente. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
 
 Secuencia de menor a mayor esfuerzo:
 
@@ -268,7 +268,9 @@ La publicación corporativa de un email prueba que se ofrece como contacto, no g
 
 Conservar estado original del proveedor y un estado normalizado: `verified`, `published_professional`, `accept_all`, `unknown`, `invalid` o `manual_confirmed`. `accept_all`/`unknown` no son por sí solos verificados. Si además existe publicación nominal corporativa vigente, conservar ambos hechos y la advertencia; una verificación `invalid` bloquea ese canal hasta resolverla.
 
-Frescura propuesta: verificación de email hasta 30 días; evidencia fechada del puesto preferiblemente dentro de 180 días, o directorio corporativo actual consultado. Si la fuente no permite estimar vigencia, marcar incertidumbre y requerir revisión antes de listo. Estos plazos son reglas del prototipo, no garantías del proveedor.
+Frescura propuesta: verificación de email hasta 30 días; evidencia fechada del puesto preferiblemente dentro de 365 días, o directorio corporativo actual consultado. Si la fuente no permite estimar vigencia, marcar incertidumbre y requerir revisión antes de listo. Estos plazos son reglas del prototipo, no garantías del proveedor.
+
+Vigencia inferida de Hunter: sin evidencia fechada del puesto, una persona con identidad, nombre completo y cargo pertinente confirmados también se considera vigente si tiene un correo nominal del dominio confirmado verificado `valid` dentro de los 30 días y Hunter informa una fuente con `still_on_page` y `last_seen_on` dentro del plazo de vigencia del puesto. Un empleo marcado como no vigente, una salida nominal o evidencia contradictoria la anulan. La interfaz y el CSV la muestran como inferida: el buzón y la fuente no prueban el cargo actual, que ventas confirma antes de contactar.
 
 ### 10.3 Estados de negocio
 

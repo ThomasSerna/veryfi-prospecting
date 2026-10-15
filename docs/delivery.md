@@ -147,8 +147,9 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
   global; T09 ya registró uso de Anthropic fuera de este ledger. Los cupos se cargan a mano
   en `data/provider-access.json` y cada ejecución exige autorización nueva.
 - **Reglas comerciales**: catálogo, rúbrica, umbrales y cargos son propuestas; la lista de
-  exclusiones de Veryfi no existe aún. Los plazos de vigencia (30 días para correos, 180
-  para cargos) son reglas del prototipo, no garantías de los proveedores.
+  exclusiones de Veryfi no existe aún. Los plazos de vigencia (30 días para correos, 365
+  para cargos) son reglas del prototipo, no garantías de los proveedores. La vigencia
+  inferida de Hunter (correo verificado y fuente vista recientemente) no prueba el cargo.
 - **Vigencia**: no hay revalidación periódica de cargos ni canales; la disponibilidad se
   recalcula al consultar con la fecha actual, sin nuevas llamadas.
 - **Tamaño de las solicitudes a Haiku**: el límite de entrada se controla con una estimación de

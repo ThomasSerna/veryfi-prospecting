@@ -55,8 +55,9 @@ web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes
 consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
 no se recuperan.
 
-La prioridad media permite 1 persona, 1 búsqueda Hunter, hasta 1 enriquecimiento
-Hunter, 2 consultas web, 2 páginas y 90 segundos adicionales. La alta permite
+La prioridad media permite 1 persona, 2 búsquedas Hunter (la segunda, por departamentos,
+solo si la primera no dejó un canal preferido), hasta 1 enriquecimiento Hunter, 2 consultas
+web, 2 páginas y 90 segundos adicionales. La alta permite
 hasta 3 personas, 2 búsquedas Hunter, 3 enriquecimientos, 4 consultas web, 4 páginas
 y 180 segundos. Finder y Verifier comparten el cupo de enriquecimientos; una
 verificación también incrementa su contador específico. El máximo inicial es una
@@ -67,7 +68,7 @@ siguen vigentes; esos máximos no obligan a agotarlos.
 `skipped`), `business_status`, identificadores de contactos, evidencias y solicitudes,
 `stop_reason`, `error_message` y `warnings`. Un rerun recupera el resultado guardado;
 una solicitud enviada con resultado faltante o consumo incierto exige revisión y
-no se repite. Las cachés de resultados usan inicialmente 7 días para web y 30 para
+no se repite. Las cachés de resultados usan inicialmente 30 días para web y 30 para
 contactos; reutilizar no vuelve actual una verificación ni un empleo caducados.
 
 ## Acceso a Hunter
@@ -126,17 +127,27 @@ report = find_contacts(
 
 Una persona utilizable tiene nombre completo, entidad confirmada, cargo respaldado,
 función pertinente y empleo vigente sin contradicciones pendientes. Los cargos
-proceden de los perfiles de la campaña y de la evaluación seleccionada. Un título
+son todos los de los perfiles de la campaña para el segmento de la empresa
+(`target_roles`), primero los elegidos en la evaluación seleccionada; ese orden guía
+las búsquedas y la prioridad entre candidatos. Un título
 o el indicador de autoridad del proveedor no asignan automáticamente un papel de
 compra; `buying_role` permanece `unknown` sin respaldo específico.
 
 Hunter proporciona candidatos y fuentes del correo. Las fechas `extracted_on`,
 `last_seen_on` y `verification.date` se conservan con su significado; ninguna se
 convierte en fecha del puesto. Para validar empleo se necesita evidencia fechada
-dentro de 180 días o un directorio corporativo actual consultado dentro de la
-caché web de 7 días. Una fuente sin vigencia estimable exige revisión. Estos son
+dentro de 365 días o un directorio corporativo actual consultado dentro de la
+caché web de 30 días. Una fuente sin vigencia estimable exige revisión. Estos son
 valores iniciales del prototipo, reducidos según la configuración guardada de
 la campaña.
+
+Sin esa evidencia, `employment_basis` admite la vigencia inferida de Hunter
+(`hunter_signal`): correo nominal del dominio confirmado verificado `valid` dentro de
+`email_days` y una fuente de Hunter con `still_on_page=True` y `last_seen_on` dentro
+de `employment_days`. `current_employment=False`, una salida nominal o una fuente
+contradictoria la anulan. Se calcula al validar, sin cambiar `current_employment` ni
+hacer llamadas, así que también se aplica a contactos ya guardados. La ficha y el CSV
+la muestran como inferida y piden confirmar el cargo antes de contactar.
 
 La extracción pública usa `contacts_extraction_v1` con el mismo Haiku que la
 calificación. Si toda la evidencia vigente cabe en el límite de entrada, se envía
