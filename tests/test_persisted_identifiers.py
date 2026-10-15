@@ -126,7 +126,8 @@ EXPECTED_FINGERPRINTS = {
     "hunter_finder": "8054608a83cf35292d9a3808652a2c5ff6e9ca5d90682f6f05f420668b578074",
     "hunter_verifier": "f48a0492f034a45888630bab111e202620df20717f4c8a537c1de2ebece036e7",
     "haiku_assessment": "e1b5c09b97919ae2006a8ee23d53d4151b71e552aefc70d2cda6ec8f83fc05fb",
-    "haiku_contacts": "d4dea5e2d34b3ee2706a2fa85237c139e399c5f5b94a5310a257f9f9d5db45b2",
+    # Cambio intencionado: "Cargos pertinentes" enumera todos los cargos de los perfiles; la plantilla no cambia.
+    "haiku_contacts": "cecdc874cdbeba008f7a499068d54eb004bae128e67196a20491c511c67dd062",
 }
 
 
