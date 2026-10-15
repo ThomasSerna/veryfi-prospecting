@@ -157,13 +157,14 @@ CSV_FIELDS = (
     "countries", "segments", "stage", "business_status", "stored_business_status", "stop_reason", "error_message",
     "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
     "contact_name", "title", "buying_role", "contact_eligible", "contact_ready",
+    "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
     "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
 )
 
 
 def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
-    """Una fila por persona; recibe una lectura reciente del pipeline, nunca respuestas crudas."""
+    """Una fila por persona, en el orden de match de la lectura; recibe una lectura reciente, nunca respuestas crudas."""
     output = StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=CSV_FIELDS, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
     writer.writeheader()
@@ -174,6 +175,7 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
         for person in people or ([None] if include_all else []):
             company, item, assessment = result.company, result.run_item, result.assessment
             contact = None if person is None else person.contact
+            match = None if person is None else person.match
             channels = [] if person is None else contact.channels if include_all else person.usable_channels
             sources = [fact.model_dump(mode="json") for fact in result.evidence
                        if fact.contact_id is None or contact is not None and fact.contact_id == contact.id]
@@ -193,6 +195,12 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "buying_role": None if contact is None else contact.buying_role,
                 "contact_eligible": None if person is None else person.eligible,
                 "contact_ready": None if person is None else person.eligible and bool(person.usable_channels),
+                # Sin match la celda queda vacía, nunca 0.
+                "contact_match": None if match is None else match.score,
+                "contact_match_version": None if match is None else match.version,
+                "contact_match_blocked": None if match is None else match.blocked_reason,
+                "contact_match_detail": None if match is None else json.dumps(
+                    [item.model_dump(mode="json") for item in match.components], ensure_ascii=False),
                 "channels": json.dumps([channel.model_dump(mode="json") for channel in channels], ensure_ascii=False),
                 "sources": json.dumps(sources, ensure_ascii=False),
                 "company_provenance": json.dumps(company.model_dump(mode="json")["provenance"], ensure_ascii=False),

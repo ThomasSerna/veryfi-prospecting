@@ -1,5 +1,8 @@
 """Todas las personas de cada empresa, ordenadas por match en la lectura, la ficha y el CSV. Datos sintéticos."""
 
+import csv
+from io import StringIO
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +16,7 @@ import pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
+from core.presentation import export_csv
 from prospecting.db import Database
 from prospecting.models import Channel, Contact, Evidence, RunItem, utc_now
 from prospecting.pipeline import read_campaign
@@ -113,3 +117,31 @@ def test_company_page_warns_when_weights_are_invalid(people):
 def test_campaign_table_shows_people_count_and_best_match(people):
     html = page(people, "webapp:campaign")
     assert "<th class=\"numeric\">Contactos</th>" in html and "Mejor match 100 %" in html
+
+
+def csv_rows(content):
+    return list(csv.DictReader(StringIO(content.decode("utf-8-sig"))))
+
+
+def test_csv_rows_follow_match_order_and_leave_missing_match_empty(people):
+    view = read_campaign(people.path, people.campaign.id, contact_match_path=MATCH_PATH)
+    rows = csv_rows(export_csv(view, include_all=True))
+    assert [(row["contact_name"], row["contact_match"], row["contact_match_blocked"]) for row in rows] == [
+        (READY, "100", ""), (SALES, "25", ""), (CONTRADICTED, "68", "identity_contradicted")]
+    assert {row["contact_match_version"] for row in rows} == {"contact_match_v1"}
+    assert json.loads(rows[1]["contact_match_detail"])[0] == {
+        "name": "role", "level": "outside_profile", "points": 0, "weight": 50, "pending": False}
+    # La exportación principal sigue limitada a personas listas.
+    assert [row["contact_name"] for row in csv_rows(export_csv(view))] == [READY]
+    plain = csv_rows(export_csv(read_campaign(people.path, people.campaign.id), include_all=True))
+    assert len(plain) == 3 and all(row["contact_match"] == row["contact_match_detail"] == "" for row in plain)
+
+
+def test_csv_download_uses_the_configured_weights(people):
+    with override_settings(PROSPECTING_DB_PATH=people.path, PROSPECTING_ACCESS_PATH=people.tmp_path / "missing-access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=people.tmp_path / "missing-exclusions.json",
+                           PROSPECTING_CONTACT_MATCH_PATH=MATCH_PATH):
+        response = Client(SERVER_NAME="localhost").get(
+            reverse("webapp:export", kwargs={"campaign_id": people.campaign.id}), {"mode": "all"})
+    assert response.status_code == 200
+    assert [row["contact_match"] for row in csv_rows(response.content)] == ["100", "25", "68"]
