@@ -197,6 +197,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `prospecting/contact_extraction.py`: extracción de contactos públicos con Haiku y validación de sus citas.
 - `prospecting/pipeline/`: etapas que reservan gasto, llaman a proveedores y guardan resultados, un módulo por etapa (descubrimiento e identidad, extracción y ampliación de evidencia, calificación y contactos), las llamadas con reserva compartidas en `calls.py` y la orquestación de campañas en `campaign.py`.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
+- `config/contact_match.json`: pesos versionados del porcentaje de match que ordena a las personas de cada empresa; `PROSPECTING_CONTACT_MATCH_PATH` permite usar otro archivo ([cómo configurarlos](docs/contacts.md#configurar-los-pesos)).
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, clientes, descubrimiento, calificación, contactos y orquestación con datos sintéticos.
 - `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
 - `docs/persistence.md`: contratos de datos y persistencia local en SQLite.
