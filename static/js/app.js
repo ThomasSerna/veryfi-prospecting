@@ -4,6 +4,7 @@
   const body = document.body;
   const menu = document.querySelector('.menu-toggle');
   const sidebar = document.getElementById('navigation');
+  const workspace = document.getElementById('workspace-main');
   const mobile = window.matchMedia('(max-width: 760px)');
 
   function closeNavigation() {
@@ -13,6 +14,7 @@
       menu.setAttribute('aria-label', 'Abrir navegación');
     }
     if (sidebar) sidebar.inert = mobile.matches;
+    if (workspace) workspace.inert = false;
   }
 
   if (menu && sidebar) {
@@ -23,6 +25,7 @@
       menu.setAttribute('aria-expanded', String(open));
       menu.setAttribute('aria-label', open ? 'Cerrar navegación' : 'Abrir navegación');
       sidebar.inert = mobile.matches && !open;
+      if (workspace) workspace.inert = mobile.matches && open;
       if (open) sidebar.querySelector('a')?.focus();
     });
     document.addEventListener('keydown', event => {
@@ -38,20 +41,111 @@
   }
 
   document.addEventListener('click', event => {
-    const disabled = event.target.closest('a[aria-disabled="true"]');
-    if (disabled) event.preventDefault();
+    const disabled = event.target?.closest?.('a[aria-disabled="true"]');
+    if (disabled) {
+      event.preventDefault();
+      return;
+    }
+    const copyBtn = event.target?.closest?.('[data-copy-channel]');
+    if (copyBtn && navigator?.clipboard?.writeText) {
+      const value = copyBtn.dataset.copyChannel || '';
+      const original = copyBtn.dataset.originalLabel || copyBtn.textContent;
+      copyBtn.dataset.originalLabel = original;
+      navigator.clipboard.writeText(value).then(() => {
+        copyBtn.dataset.copied = 'true';
+        copyBtn.textContent = '¡Copiado!';
+        window.setTimeout(() => {
+          copyBtn.dataset.copied = 'false';
+          copyBtn.textContent = original;
+        }, 1800);
+      }).catch(() => {});
+    }
   });
 
-  const filters = Array.from(document.querySelectorAll('.filter-choice details'));
-  filters.forEach(filter => filter.addEventListener('toggle', () => {
-    if (filter.open) filters.forEach(other => { if (other !== filter) other.open = false; });
-  }));
-  document.addEventListener('click', event => filters.forEach(filter => {
-    if (filter.open && !filter.contains(event.target)) filter.open = false;
-  }));
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') filters.forEach(filter => { filter.open = false; });
-  });
+  function setupFilterChoices(root = document) {
+    if (!root.querySelectorAll) return;
+    const choices = Array.from(root.querySelectorAll('.filter-choice'));
+    const detailsList = choices.map(choice => choice.querySelector('details')).filter(Boolean);
+
+    choices.forEach(choice => {
+      const summaryText = choice.querySelector('[data-filter-summary]');
+      const checkboxes = Array.from(choice.querySelectorAll('input[type="checkbox"]'));
+      function syncChoice() {
+        const selected = checkboxes.filter(input => input.checked);
+        choice.dataset.active = String(selected.length > 0);
+        if (!summaryText) return;
+        if (selected.length === 0) summaryText.textContent = 'Todos';
+        else if (selected.length === 1) {
+          const label = selected[0].closest('label');
+          summaryText.textContent = label ? label.textContent.trim() : '1 seleccionado';
+        } else {
+          summaryText.textContent = `${selected.length} seleccionados`;
+        }
+      }
+      checkboxes.forEach(input => input.addEventListener('change', syncChoice));
+    });
+
+    detailsList.forEach(filter => filter.addEventListener('toggle', () => {
+      if (filter.open) detailsList.forEach(other => { if (other !== filter) other.open = false; });
+    }));
+    document.addEventListener('click', event => detailsList.forEach(filter => {
+      if (filter.open && !filter.contains(event.target)) filter.open = false;
+    }));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') detailsList.forEach(filter => { filter.open = false; });
+    });
+  }
+  setupFilterChoices();
+
+  function setupOperationRows() {
+    const rows = Array.from(document.querySelectorAll('[data-operation-row]'));
+    if (!rows.length) return;
+
+    function fillSuggested(row) {
+      const costInput = row.querySelector('input[name^="cost_"]');
+      const creditsInput = row.querySelector('input[name^="credits_"]');
+      const suggestedCost = row.dataset.suggestedCost;
+      const suggestedCredits = row.dataset.suggestedCredits;
+      const costZero = !costInput || !costInput.value || Number(costInput.value) === 0;
+      const creditsZero = !creditsInput || !creditsInput.value || Number(creditsInput.value) === 0;
+      if (costZero && creditsZero) {
+        if (costInput && suggestedCost !== undefined) costInput.value = suggestedCost;
+        if (creditsInput && suggestedCredits !== undefined) creditsInput.value = suggestedCredits;
+      }
+    }
+
+    rows.forEach(row => {
+      const checkbox = row.querySelector('input[type="checkbox"][name^="allow_"]');
+      if (!checkbox) return;
+      row.dataset.selected = String(checkbox.checked);
+      checkbox.addEventListener('change', () => {
+        row.dataset.selected = String(checkbox.checked);
+        if (checkbox.checked) fillSuggested(row);
+      });
+    });
+
+    const applyButton = document.querySelector('[data-apply-suggested]');
+    if (applyButton) {
+      applyButton.addEventListener('click', () => {
+        const anyChecked = rows.some(row => row.querySelector('input[type="checkbox"][name^="allow_"]')?.checked);
+        rows.forEach(row => {
+          const checkbox = row.querySelector('input[type="checkbox"][name^="allow_"]');
+          if (!checkbox || checkbox.disabled) return;
+          if (!anyChecked) {
+            checkbox.checked = true;
+            row.dataset.selected = 'true';
+          }
+          if (checkbox.checked) {
+            const costInput = row.querySelector('input[name^="cost_"]');
+            const creditsInput = row.querySelector('input[name^="credits_"]');
+            if (costInput && row.dataset.suggestedCost !== undefined) costInput.value = row.dataset.suggestedCost;
+            if (creditsInput && row.dataset.suggestedCredits !== undefined) creditsInput.value = row.dataset.suggestedCredits;
+          }
+        });
+      });
+    }
+  }
+  setupOperationRows();
 
   const tabsRoot = document.querySelector('[data-tabs]');
   if (tabsRoot) {
@@ -119,7 +213,12 @@
     if (body.dataset.running === 'true' && body.dataset.statusUrl) {
       const check = async () => {
         try {
-          const response = await fetch(body.dataset.statusUrl, { headers: { 'Accept': 'application/json' }, cache: 'no-store', credentials: 'same-origin' });
+          const separator = body.dataset.statusUrl.includes('?') ? '&' : '?';
+          const response = await fetch(`${body.dataset.statusUrl}${separator}compact=1`, {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
           if (response.ok && !(await response.json()).is_executing) { window.location.reload(); return; }
         } catch (_error) { /* La consulta no altera resultados; un fallo se vuelve a comprobar. */ }
         window.setTimeout(check, 2000);
@@ -174,6 +273,37 @@
     feedback.append(notice);
   }
 
+  function applyLiveSnapshot(html) {
+    if (typeof DOMParser !== 'undefined' && live.querySelector) {
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      const currentScroll = live.querySelector('.results-section .table-scroll');
+      const scrollLeft = currentScroll ? currentScroll.scrollLeft : 0;
+      const budgetDetailsOpen = Boolean(live.querySelector('.budget-details')?.open);
+
+      ['overview', 'results', 'budget'].forEach(sectionName => {
+        const currentSection = live.querySelector(`[data-live-section="${sectionName}"]`);
+        const nextSection = parsed.querySelector(`[data-live-section="${sectionName}"]`);
+        if (currentSection && nextSection) currentSection.replaceWith(nextSection);
+      });
+
+      const currentFilters = live.querySelector('[data-live-filters]');
+      const nextFilters = parsed.querySelector('[data-live-filters]');
+      if (currentFilters && nextFilters) {
+        currentFilters.hidden = nextFilters.hidden;
+      }
+
+      const nextBudgetDetails = live.querySelector('.budget-details');
+      if (nextBudgetDetails) nextBudgetDetails.open = budgetDetailsOpen;
+      const nextScroll = live.querySelector('.results-section .table-scroll');
+      if (nextScroll && scrollLeft) nextScroll.scrollLeft = scrollLeft;
+      return;
+    }
+
+    const openDetails = Array.from(live.querySelectorAll('details')).map(detail => detail.open);
+    live.innerHTML = html;
+    live.querySelectorAll('details').forEach((detail, index) => { detail.open = openDetails[index] || false; });
+  }
+
   async function poll() {
     if (polling) return;
     polling = true;
@@ -186,9 +316,7 @@
       if (!response.ok) throw new Error('No se pudo consultar el avance. Los datos guardados se conservan.');
       const snapshot = await response.json();
       if (snapshot.html) {
-        const openDetails = Array.from(live.querySelectorAll('details')).map(detail => detail.open);
-        live.innerHTML = snapshot.html;
-        live.querySelectorAll('details').forEach((detail, index) => { detail.open = openDetails[index] || false; });
+        applyLiveSnapshot(snapshot.html);
       }
       if (snapshot.is_executing) {
         setBusy(true);
@@ -211,6 +339,7 @@
       const data = new FormData(form);
       const errors = form.querySelector('.execution-errors');
       if (errors) { errors.hidden = true; errors.replaceChildren(); }
+      form.querySelectorAll?.('[aria-invalid="true"]').forEach(field => field.removeAttribute('aria-invalid'));
       setBusy(true);
       showFeedback('Iniciando investigación. Los resultados aparecerán cuando se guarden.');
       try {
@@ -224,7 +353,7 @@
           showFeedback(result.error_message || 'No se pudo iniciar la investigación. Revisa la autorización y los topes.', 'error');
           if (errors && result.errors) {
             Object.entries(result.errors).forEach(([name, messages]) => {
-              const field = form.elements.namedItem(name);
+              const field = form.elements?.namedItem?.(name);
               if (field && field.setAttribute) field.setAttribute('aria-invalid', 'true');
               messages.forEach(message => {
                 const paragraph = document.createElement('p');
@@ -234,11 +363,13 @@
             });
             errors.hidden = false;
             errors.tabIndex = -1;
-            errors.focus();
+            errors.focus?.();
           }
           if (busy) poll();
           return;
         }
+        const authDetails = document.querySelector('#authorization details');
+        if (authDetails) authDetails.open = false;
         showFeedback('Investigación en curso. Puedes consultar el avance y las empresas que se van guardando.');
         window.clearTimeout(pollTimer);
         poll();

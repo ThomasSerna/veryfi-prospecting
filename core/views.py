@@ -3,12 +3,14 @@
 from functools import wraps
 from pathlib import Path
 import sqlite3
+from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from pydantic import ValidationError
 
@@ -20,6 +22,13 @@ from prospecting.pipeline import (
 from core import execution
 from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
 from core.presentation import READY, download_csv
+
+SAVED_MESSAGES = {
+    "closed": "La campaña se cerró conservando los resultados y el consumo registrado.",
+    "review": "Decisión del equipo guardada en la ficha de la empresa.",
+    "channel": "Confirmación manual del canal guardada. La disponibilidad se actualizó.",
+}
+FILTER_KEYS = ("q", "countries", "segments", "priorities", "availability")
 
 
 def _paths():
@@ -80,6 +89,25 @@ def _require_idle(view):
         raise execution.ExecutionBusy("Hay una investigación en curso. Espera antes de modificar o exportar resultados.")
 
 
+def _clean_filter_query(filter_form):
+    if not filter_form.is_valid():
+        return "", 0
+    selected = filter_form.cleaned_data
+    pairs = []
+    active_groups = 0
+    for key in FILTER_KEYS:
+        val = selected.get(key)
+        if not val:
+            continue
+        active_groups += 1
+        if isinstance(val, (list, tuple, set)):
+            for item in val:
+                pairs.append((key, item))
+        else:
+            pairs.append((key, val))
+    return urlencode(pairs), active_groups
+
+
 def _campaign_context(request, campaign_id):
     context = _base()
     view = _campaign_view(campaign_id, context)
@@ -100,15 +128,20 @@ def _campaign_context(request, campaign_id):
     order = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
     results.sort(key=lambda item: (order.get(None if item.assessment is None else item.assessment.priority, 2),
                                    -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name))
+    filter_query, active_filter_count = _clean_filter_query(filter_form)
     form = None if context["access"] is None else AuthorizationForm(access=context["access"], view=view)
     counts = {"total": len(view.companies), "completed": sum(item.run_item.stage == "completed" for item in view.companies),
               "ready": sum(item.business_status in READY for item in view.companies),
               "pending": sum(item.business_status not in READY for item in view.companies),
               "accepted": sum(item.run_item.review_status == "accepted" for item in view.companies)}
+    saved_key = request.GET.get("saved", "")
     context.update(view=view, campaign=view.campaign, results=results, filter_form=filter_form,
+                   filter_query=filter_query, has_active_filters=active_filter_count > 0,
+                   active_filter_count=active_filter_count,
                    authorization_form=form, operation_rows=[] if form is None else form.operation_rows,
                    counts=counts, execution=state, is_executing=state["is_executing"],
-                   stop_reason=state["stop_reason"], error_message=state["error_message"])
+                   stop_reason=state["stop_reason"], error_message=state["error_message"],
+                   saved_notice=SAVED_MESSAGES.get(saved_key))
     return context
 
 
@@ -117,6 +150,15 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
     result = next((item for item in context["view"].companies if item.company.id == company_id), None)
     if result is None:
         raise Http404("La empresa no pertenece a esta campaña.")
+    sequence = context["results"]
+    if not any(item.company.id == company_id for item in sequence):
+        order = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
+        sequence = sorted(context["view"].companies, key=lambda item: (
+            order.get(None if item.assessment is None else item.assessment.priority, 2),
+            -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name))
+    idx = next((i for i, item in enumerate(sequence) if item.company.id == company_id), 0)
+    prev_company = sequence[idx - 1].company if idx > 0 else None
+    next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
     forms = []
     for person in result.contacts:
         for channel_index, channel in enumerate(person.contact.channels):
@@ -130,7 +172,9 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
             forms.append({"person": person, "channel": channel, "form": form})
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
-                   confirmation_forms=forms, nav_active="campaigns")
+                   confirmation_forms=forms, nav_active="campaigns",
+                   prev_company=prev_company, next_company=next_company,
+                   sequence_position=idx + 1, sequence_total=len(sequence))
     return context
 
 
@@ -188,8 +232,10 @@ def company(request, campaign_id, company_id):
 def status(request, campaign_id):
     try:
         context = _campaign_context(request, campaign_id)
-        return JsonResponse(context["execution"] | {"status": context["campaign"].status,
-                            "html": render_to_string("components/_campaign_results.html", context, request=request)})
+        payload = context["execution"] | {"status": context["campaign"].status}
+        if request.GET.get("compact") != "1":
+            payload["html"] = render_to_string("components/_campaign_results.html", context, request=request)
+        return JsonResponse(payload)
     except (ValueError, OSError, sqlite3.Error, ValidationError) as error:
         return JsonResponse({"error_message": execution.error_message(error), "is_executing": execution.snapshot(campaign_id)["is_executing"]}, status=503)
     except Http404:
@@ -236,7 +282,7 @@ def close(request, campaign_id):
         base = _base()
         _require_idle(_campaign_view(campaign_id, base))
         finish_campaign(_paths()[0], campaign_id)
-    return redirect("webapp:campaign", campaign_id=campaign_id)
+    return redirect(f"{reverse('webapp:campaign', kwargs={'campaign_id': campaign_id})}?saved=closed")
 
 
 @require_POST
@@ -245,11 +291,22 @@ def review(request, campaign_id, company_id):
     form = ReviewForm(request.POST)
     if not form.is_valid():
         return render(request, "pages/company.html", _company_context(request, campaign_id, company_id, review_form=form), status=400)
+    target_id = company_id
     with execution.idle_action():
         context = _company_context(request, campaign_id, company_id)
         _require_idle(context["view"])
         review_company(_paths()[0], campaign_id, company_id, status=form.cleaned_data["status"], reason=form.cleaned_data["reason"])
-    return redirect("webapp:company", campaign_id=campaign_id, company_id=company_id)
+        next_raw = request.POST.get("next_company_id", "").strip()
+        if next_raw:
+            try:
+                candidate = UUID(next_raw)
+                if any(item.company.id == candidate for item in context["view"].companies):
+                    target_id = candidate
+            except ValueError:
+                pass
+    query = context["filter_query"]
+    suffix = f"?{query}&saved=review" if query else "?saved=review"
+    return redirect(f"{reverse('webapp:company', kwargs={'campaign_id': campaign_id, 'company_id': target_id})}{suffix}")
 
 
 @require_POST
@@ -269,7 +326,9 @@ def confirm_channel(request, campaign_id, company_id):
             raise ValueError("La persona no es elegible según la evidencia y las exclusiones actuales.")
         confirm_alternative_channel(_paths()[0], campaign_id, contact_id, form.cleaned_data["channel_type"],
                                     form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=form.cleaned_data["confirmed"])
-    return redirect("webapp:company", campaign_id=campaign_id, company_id=company_id)
+    query = context["filter_query"]
+    suffix = f"?{query}&saved=channel" if query else "?saved=channel"
+    return redirect(f"{reverse('webapp:company', kwargs={'campaign_id': campaign_id, 'company_id': company_id})}{suffix}#contacts")
 
 
 @require_GET

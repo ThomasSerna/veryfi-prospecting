@@ -1,0 +1,59 @@
+{% load prospecting_ui %}
+<section id="authorization" class="surface authorization-section{% if promoted %} authorization-promoted{% endif %}" aria-labelledby="authorization-title">
+  <details {% if campaign.status == 'created' %}open{% endif %}>
+    <summary>
+      <span>
+        <strong id="authorization-title">{% if campaign.status == 'created' %}Paso 2 · Autorizar la investigación{% else %}Autorizar y reanudar la investigación{% endif %}</strong>
+        <small>Aprueba cada operación y su tope máximo. Preparar la campaña no concede permisos de consumo.</small>
+      </span>
+    </summary>
+    {% if authorization_form %}
+    <form method="post" action="{% url 'webapp:execute' campaign.id %}" id="execution-form" data-idle-form>{% csrf_token %}
+      <div class="authorization-toolbar">
+        <p>Cada ejecución necesita una aprobación nueva del responsable del cupo. Durante la investigación no se pide aprobación entre empresas.</p>
+        <button type="button" class="button button-small button-secondary" data-apply-suggested data-idle-only {% if is_executing %}disabled{% endif %}>Usar topes disponibles</button>
+      </div>
+      <div class="notice notice-error execution-errors" role="alert" hidden></div>
+      {% if authorization_form.non_field_errors %}<div class="notice notice-error">{{ authorization_form.non_field_errors }}</div>{% endif %}
+      <fieldset {% if is_executing %}disabled{% endif %}>
+        <div class="form-grid">
+          {% include 'components/_field.html' with field=authorization_form.responsible %}
+          {% include 'components/_field.html' with field=authorization_form.reference %}
+        </div>
+        <div class="operation-list">
+          {% for row in operation_rows %}
+          <fieldset class="operation-row" data-operation-row data-suggested-cost="{{ row.suggested_cost }}" data-suggested-credits="{{ row.suggested_credits }}">
+            <legend class="sr-only">{{ row.label }}</legend>
+            <div class="operation-heading">
+              <label class="checkbox-label" for="{{ row.allow.id_for_label }}">
+                {{ row.allow }}
+                <span>
+                  <strong>{{ row.label }}</strong>
+                  <small>{{ row.provider }} / {{ row.operation }} · Cuenta: {{ row.account_ref }} · {{ row.funding_label }}</small>
+                </span>
+              </label>
+              <p class="field-help">{% if row.key_present %}Clave configurada (<code>{{ row.key_name }}</code>); acceso y cupo según la comprobación guardada.{% else %}Falta configurar <code>{{ row.key_name }}</code> en el servidor. Solicita ayuda al responsable de la instalación.{% endif %}</p>
+            </div>
+            <div class="operation-limits">
+              {% include 'components/_field.html' with field=row.cost %}
+              {% include 'components/_field.html' with field=row.credits %}
+            </div>
+            <p class="operation-balance">Saldo controlado: {{ row.account.cost.available|money_summary }} <span class="money-exact">({{ row.account.cost.available|money }})</span> · Créditos disponibles: {{ row.account.credits.available|default_if_none:'Desconocido' }}</p>
+          </fieldset>
+          {% endfor %}
+        </div>
+        <div class="consent-field">{{ authorization_form.confirmed }}{{ authorization_form.confirmed.label_tag }}{{ authorization_form.confirmed.errors }}</div>
+        <div class="form-actions">
+          <button type="submit" class="button button-primary" data-idle-only>{% if campaign.status == 'created' %}Autorizar y ejecutar{% else %}Autorizar y reanudar{% endif %}</button>
+          <p class="field-help">Los topes se validan antes de cada llamada.</p>
+        </div>
+      </fieldset>
+    </form>
+    {% else %}
+    <div class="notice notice-info">
+      <strong>El acceso a proveedores aún no está preparado.</strong>
+      <p>Un responsable de la instalación debe configurar las cuentas y los cupos comprobados en <code>data/provider-access.json</code>, y las claves en el entorno del servidor. Puedes consultar los resultados guardados sin claves.</p>
+    </div>
+    {% endif %}
+  </details>
+</section>

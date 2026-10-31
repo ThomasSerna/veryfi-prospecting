@@ -9,6 +9,12 @@ from prospecting.models import Campaign, CampaignFilters
 from prospecting.pipeline import AuthorizationInput, provider_operations
 from core.presentation import label
 
+FUNDING_LABELS = {
+    "free_credit": "Crédito gratuito",
+    "prepaid": "Prepago en USD",
+    "paid_credit": "Créditos de pago",
+}
+
 
 class CampaignForm(forms.Form):
     draft_id = forms.UUIDField(widget=forms.HiddenInput)
@@ -96,6 +102,7 @@ class AuthorizationForm(forms.Form):
     def __init__(self, *args, access, view, **kwargs):
         self.operations, self.operation_rows = provider_operations(access), []
         super().__init__(*args, **kwargs)
+        campaign_avail = view.budget.campaign.available
         for provider, operation, account_ref in self.operations:
             key = f"{provider}_{operation}"
             key_name = {"tavily": "TAVILY_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "hunter": "HUNTER_API_KEY"}[provider]
@@ -106,10 +113,23 @@ class AuthorizationForm(forms.Form):
             self.fields[f"credits_{key}"] = forms.DecimalField(label="Tope de créditos", min_value=Decimal(0), max_digits=18,
                                                               decimal_places=6, initial=Decimal(0), required=False)
             account = next(item for item in view.budget.accounts if (item.provider, item.account_ref) == (provider, account_ref))
-            self.operation_rows.append({"provider": provider, "operation": operation, "account_ref": account_ref,
-                                        "label": OPERATION_LABELS.get((provider, operation), operation),
-                                        "key_present": key_present, "key_name": key_name, "account": account,
-                                        "allow": self[f"allow_{key}"], "cost": self[f"cost_{key}"], "credits": self[f"credits_{key}"]})
+            avail_cost = account.cost.available
+            avail_credits = account.credits.available
+            if account.funding_source == "free_credit":
+                suggested_cost = "0"
+            else:
+                candidates = [val for val in (avail_cost, campaign_avail) if val is not None]
+                best_cost = min(candidates) if candidates else Decimal(0)
+                suggested_cost = f"{max(best_cost, Decimal(0)):.2f}" if best_cost > 0 else "0"
+            suggested_credits = str(min(avail_credits, Decimal(10))) if avail_credits is not None and avail_credits > 0 else "0"
+            self.operation_rows.append({
+                "provider": provider, "operation": operation, "account_ref": account_ref,
+                "label": OPERATION_LABELS.get((provider, operation), operation),
+                "funding_label": FUNDING_LABELS.get(account.funding_source, account.funding_source),
+                "suggested_cost": suggested_cost, "suggested_credits": suggested_credits,
+                "key_present": key_present, "key_name": key_name, "account": account,
+                "allow": self[f"allow_{key}"], "cost": self[f"cost_{key}"], "credits": self[f"credits_{key}"],
+            })
 
     def clean(self):
         cleaned = super().clean()
