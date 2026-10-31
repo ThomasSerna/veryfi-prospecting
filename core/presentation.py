@@ -118,6 +118,62 @@ def money(value):
     return "Desconocido" if value is None else f"USD {value:.6f}"
 
 
+def money_summary(value):
+    """Formato compacto para titulares de presupuesto; conserva hasta 6 decimales si hay fracciones de centavo."""
+    if value is None:
+        return "Desconocido"
+    full = f"{value:.6f}"
+    whole, decimals = full.split(".")
+    trimmed = decimals.rstrip("0")
+    if len(trimmed) <= 2:
+        return f"USD {value:.2f}"
+    return f"USD {whole}.{trimmed}"
+
+
+def campaign_title(campaign):
+    """Nombre legible para ventas a partir de países y segmentos."""
+    if campaign is None:
+        return "Campaña"
+    countries = ", ".join(label(code) for code in getattr(campaign, "countries", ()) or ())
+    segments = ", ".join(label(seg) for seg in getattr(campaign, "segments", ()) or ())
+    if countries and segments:
+        return f"{countries} · {segments}"
+    return countries or segments or f"Campaña {str(campaign.id)[:8]}"
+
+
+def campaign_short_title(campaign):
+    """Etiqueta breve para barra lateral y migas de pan."""
+    if campaign is None:
+        return "Campaña"
+    codes = ", ".join(getattr(campaign, "countries", ()) or ())
+    segs = list(getattr(campaign, "segments", ()) or ())
+    first_seg = label(segs[0]) if segs else ""
+    if len(segs) > 1:
+        first_seg = f"{first_seg} +{len(segs) - 1}"
+    if codes and first_seg:
+        return f"{codes} · {first_seg}"
+    return codes or first_seg or f"Campaña {str(campaign.id)[:8]}"
+
+
+def ineligible_reason(person):
+    """Explica en lenguaje comercial por qué una persona aún no admite confirmación manual."""
+    if person is None or getattr(person, "eligible", False):
+        return ""
+    match = getattr(person, "match", None)
+    if match is not None and getattr(match, "blocked_reason", None):
+        return f"No disponible para confirmación manual porque {match_label(match.blocked_reason)}."
+    contact = getattr(person, "contact", None)
+    if contact is None:
+        return "Faltan datos comprobados de la persona para habilitar la confirmación manual."
+    if not contact.name_complete or contact.identity_status != "confirmed":
+        return "Requiere nombre completo e identidad confirmada sin contradicciones antes de confirmar un canal."
+    if not contact.current_employment:
+        return "Requiere comprobar que la persona sigue en el puesto actual antes de confirmar un canal."
+    if not contact.relevant_function:
+        return "Requiere que el cargo sea pertinente para los perfiles buscados en la campaña."
+    return "La persona aún tiene comprobaciones pendientes según las reglas de la campaña."
+
+
 def _stop_key(reason, messages):
     return next((key for key in messages if reason == key or reason.startswith(key + "_") or reason.startswith(key + ":")), None)
 
