@@ -36,3 +36,6 @@ dist/
 
 # Agents
 .impeccable/
+
+# Grafo local de Graphify
+/graphify-out/
