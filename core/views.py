@@ -232,7 +232,7 @@ def company(request, campaign_id, company_id):
 def status(request, campaign_id):
     try:
         context = _campaign_context(request, campaign_id)
-        payload = context["execution"] | {"status": context["campaign"].status}
+        payload = context["execution"] | {"status": context["campaign"].status, "html": ""}
         if request.GET.get("compact") != "1":
             payload["html"] = render_to_string("components/_campaign_results.html", context, request=request)
         return JsonResponse(payload)

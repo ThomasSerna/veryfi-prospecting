@@ -500,3 +500,31 @@ def test_close_campaign_preserves_companies_contacts_assessment_and_spend(ui_res
         assert db.list_contacts(case.companies[0].id) == contacts
         assert db.get_assessment(assessment.id) == assessment
         assert db.list_usage() == usage
+
+
+def test_sequential_review_preserves_filters_and_advances_to_next_company(ui_results, client):
+    case = ui_results
+    first, second = case.companies[0], case.companies[1]
+    page = text(client.get(url("company", case.campaign.id, first.id)))
+    assert "Empresa 1 de 2" in page
+    assert "Guardar y pasar a la siguiente" in page
+    response = client.post(
+        f'{url("review", case.campaign.id, first.id)}?priorities=high&priorities=low',
+        {"status": "accepted", "reason": "Revisión secuencial sintética.", "next_company_id": str(second.id)},
+    )
+    assert response.status_code == 302
+    assert url("company", case.campaign.id, second.id) in response.url
+    assert "priorities=high" in response.url and "saved=review" in response.url
+    next_page = text(client.get(response.url))
+    assert "Decisión del equipo guardada en la ficha de la empresa." in next_page
+    assert "Empresa 2 de 2" in next_page
+
+
+def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_status_skips_html(ui_results, client):
+    case = ui_results
+    with Database(case.paths.db) as db:
+        db.save_contact(case.contact.model_copy(update={"current_employment": False}))
+    page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    assert "No disponible para confirmación manual porque una fuente indica que ya no ocupa el puesto." in page
+    compact = client.get(url("status", case.campaign.id), {"compact": "1"}).json()
+    assert compact["html"] == ""
