@@ -336,6 +336,43 @@ def test_blind_templates_hide_predictions_and_do_not_overwrite(tmp_path, config)
         evaluation.prepare_blind(path, output)
 
 
+@pytest.mark.parametrize(("kind", "filename"), [
+    ("report", None), ("report", "report.md"),
+    ("blind", None), ("blind", "true_positive-label-template.json"),
+])
+def test_existing_output_directory_is_rejected_without_adding_files(tmp_path, config, kind, filename):
+    path = write_synthetic_dataset(tmp_path / "source", config)
+    output = tmp_path / "output"
+    output.mkdir()
+    previous = {} if filename is None else {filename: b"Resultado sintetico anterior"}
+    for name, content in previous.items():
+        (output / name).write_bytes(content)
+    if kind == "blind":
+        with pytest.raises(FileExistsError):
+            evaluation.prepare_blind(path, output)
+    else:
+        result = subprocess.run(
+            [sys.executable, str(Path(evaluation.__file__)), str(path), "--output", str(output)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 2
+    assert {item.name: item.read_bytes() for item in output.iterdir()} == previous
+
+
+def test_cli_creates_reports_and_blind_files_in_new_directories(tmp_path, config):
+    path = write_synthetic_dataset(tmp_path / "source", config)
+    output, blind = tmp_path / "new" / "reports", tmp_path / "new" / "blind"
+    result = subprocess.run(
+        [sys.executable, str(Path(evaluation.__file__)), str(path),
+         "--output", str(output), "--prepare-blind", str(blind)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    report = evaluation.read_json(output / "report.json")
+    assert (output / "report.md").read_text(encoding="utf-8") == evaluation.render_markdown(report)
+    assert len(list(blind.iterdir())) == 2 * len(report["cases"])
+
+
 def test_cli_default_is_aggregate_and_invalid_labels_do_not_expose_values(tmp_path, config):
     path = write_synthetic_dataset(tmp_path, config)
     script = Path(evaluation.__file__)

@@ -647,6 +647,7 @@ def prepare_blind(manifest_path, output):
     if any(case.origin != "synthetic" for case in manifest.cases) and not output.resolve().is_relative_to(DATA_ROOT.resolve()):
         raise ValueError("Las fichas reales deben permanecer bajo data/.")
     evaluate_manifest(manifest_path)
+    output.mkdir(parents=True, exist_ok=False)
     for case in manifest.cases:
         snapshot, _, _, _, metadata = load_snapshot(manifest_path.parent, case)
         facts = snapshot.evidence if snapshot.selected_evidence_ids is None else [item for item in snapshot.evidence if item.id in snapshot.selected_evidence_ids]
@@ -696,6 +697,7 @@ def main():
         if args.output:
             if any(row["origin"] != "synthetic" for row in report["cases"]) and not args.output.resolve().is_relative_to(DATA_ROOT.resolve()):
                 raise ValueError("Los informes con casos reales deben permanecer bajo data/.")
+            args.output.mkdir(parents=True, exist_ok=False)
             write_new(args.output / "report.json", report)
             write_new(args.output / "report.md", render_markdown(report))
         else:
