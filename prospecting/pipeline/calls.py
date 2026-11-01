@@ -1,15 +1,44 @@
 """Reservar, llamar y registrar el consumo observado; ninguna transacción queda abierta durante la red."""
 
 from decimal import Decimal
+import os
 import time
 from uuid import UUID
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.haiku import MODEL_ID
-from prospecting.models import TokenUsage, Usage, UsageStatus
+from prospecting.models import Campaign, TokenUsage, Usage, UsageStatus
+from prospecting.providers.apollo import ApolloAccess
 from prospecting.providers import (
     CLAUDE_OPERATION, CLAUDE_PROVIDER, ProviderClient, ProviderRequest, input_token_bound, reservation_cost,
 )
+
+
+def require_apollo_access(campaign: Campaign, access: ApolloAccess | None, budget: Budget) -> None:
+    if campaign.config_snapshot.people_provider != "apollo":
+        raise ValueError("La campaña histórica solo permite consulta y exportación; prepara una campaña nueva con Apollo.")
+    key = os.environ.get("APOLLO_API_KEY", "").strip()
+    if not key or any(ord(char) < 32 or ord(char) == 127 for char in key):
+        raise ValueError("Apollo bloqueado: falta una APOLLO_API_KEY válida en el entorno local.")
+    try:
+        key.encode("latin-1")
+    except UnicodeEncodeError:
+        raise ValueError("Apollo bloqueado: credencial local no válida para HTTP.") from None
+    if access is None:
+        raise ValueError("Apollo bloqueado: falta comprobar acceso, correo laboral y cuota.")
+    access = ApolloAccess.model_validate(access)
+    if not access.access_verified or not access.work_email_verified or not {
+            "people_search", "people_enrichment"}.issubset(access.enabled_operations):
+        raise ValueError("Apollo bloqueado: comprueba correo laboral, acceso a Search/Enrichment, cuota y facturación antes de investigar.")
+    allowance = next((item for item in budget.account_allowances if
+                      (item.provider, item.account_ref, item.funding_source) ==
+                      ("apollo", access.account_ref, access.funding_source)), None)
+    if allowance is None or allowance.credit_limit is None:
+        raise ValueError("Apollo bloqueado: falta una cuenta con cuota comprobada compatible.")
+    account = next(item for item in budget.snapshot(campaign.id).accounts if
+                   (item.provider, item.account_ref) == ("apollo", access.account_ref))
+    if account.credits.unknown or account.credits.available is None or account.credits.available < access.enrichment_credit_bound:
+        raise ValueError("Apollo bloqueado: cuota agotada o pendiente de conciliación.")
 
 
 def seconds_left(deadline: float | None) -> float | None:

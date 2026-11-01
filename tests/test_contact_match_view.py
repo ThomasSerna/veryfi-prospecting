@@ -27,10 +27,10 @@ READY, SALES, CONTRADICTED = "Persona Sintética Lista", "Persona Sintética Ven
 
 
 @pytest.fixture
-def people(tmp_path, make_campaign, make_company, make_assessment):
+def people(tmp_path, make_campaign, make_company, make_assessment, config):
     """Tres personas guardadas en un orden distinto al del match: ventas, contradicha y lista."""
     path, now = tmp_path / "synthetic-match.sqlite3", utc_now()
-    campaign = make_campaign(status="completed")
+    campaign = make_campaign(status="completed", config_snapshot=config.model_copy(update={"people_provider": None}))
     company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
                                              segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])

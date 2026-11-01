@@ -133,7 +133,10 @@ def _campaign_context(request, campaign_id):
         results = []
     results.sort(key=_company_sort_key)
     filter_query, active_filter_count = _clean_filter_query(filter_form)
-    form = None if context["access"] is None else AuthorizationForm(access=context["access"], view=view)
+    legacy_readonly = view.campaign.config_snapshot.people_provider != "apollo"
+    apollo = None if context["access"] is None else context["access"].apollo_access
+    apollo_blocked = apollo is None or not apollo.access_verified or not apollo.work_email_verified
+    form = None if legacy_readonly or apollo_blocked else AuthorizationForm(access=context["access"], view=view)
     counts = {"total": len(view.companies), "completed": sum(item.run_item.stage == "completed" for item in view.companies),
               "ready": sum(item.business_status in READY for item in view.companies),
               "pending": sum(item.business_status not in READY for item in view.companies),
@@ -142,6 +145,7 @@ def _campaign_context(request, campaign_id):
     context.update(view=view, campaign=view.campaign, results=results, filter_form=filter_form,
                    filter_query=filter_query, has_active_filters=active_filter_count > 0,
                    active_filter_count=active_filter_count,
+                   legacy_readonly=legacy_readonly, apollo_blocked=apollo_blocked,
                    authorization_form=form, operation_rows=[] if form is None else form.operation_rows,
                    counts=counts, execution=state, is_executing=state["is_executing"],
                    stop_reason=state["stop_reason"], error_message=state["error_message"],
@@ -161,7 +165,7 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
     prev_company = sequence[idx - 1].company if idx > 0 else None
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
     forms = []
-    for person in result.contacts:
+    for person in ([] if context["legacy_readonly"] else result.contacts):
         for channel_index, channel in enumerate(person.contact.channels):
             if channel.type not in ("linkedin", "other") or channel.normalized_status == "invalid":
                 continue
@@ -259,8 +263,13 @@ def execute(request, campaign_id):
             raise execution.ExecutionBusy("Otra campaña está investigándose en esta instancia.")
         if view.is_executing:
             raise execution.ExecutionBusy("Hay una investigación en curso en esta instancia.")
-        if base["access"] is None:
+        if view.campaign.config_snapshot.people_provider != "apollo":
+            raise ValueError("La campaña histórica solo permite consulta y exportación.")
+        if base["access"] is None or base["access"].apollo_access is None:
             raise ValueError("Configura el acceso y los cupos comprobados antes de autorizar una investigación.")
+        apollo = base["access"].apollo_access
+        if not apollo.access_verified or not apollo.work_email_verified:
+            raise ValueError("Apollo bloqueado: falta comprobar acceso, correo laboral y cuota.")
         form = AuthorizationForm(request.POST, access=base["access"], view=view)
         if not form.is_valid():
             return JsonResponse(current | {"error_message": "Revisa la autorización, los campos obligatorios y los topes seleccionados.",

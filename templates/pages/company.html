@@ -202,6 +202,7 @@
       {% endfor %}
     </section>
   </div>
+  {% if not legacy_readonly %}
   <aside class="review-panel surface" aria-labelledby="review-title">
     <h2 id="review-title">Revisión</h2>
     <form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
@@ -219,5 +220,6 @@
     </form>
     {% if result.run_item.reviewed_at %}<p class="quiet-note">Revisado: {{ result.run_item.reviewed_at|date:'d M Y · H:i' }}</p>{% endif %}
   </aside>
+  {% endif %}
 </div>
 {% endblock %}

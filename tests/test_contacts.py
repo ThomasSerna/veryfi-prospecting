@@ -15,9 +15,9 @@ from prospecting.contacts import (
     target_roles, validate_contact,
 )
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
-from prospecting.providers.hunter import (
-    HUNTER_OPERATIONS, HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
-    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, verifier_request,
+from legacy_hunter import (
+    HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse,
+    parse_domain_search, parse_finder, parse_verifier,
 )
 
 
@@ -30,6 +30,7 @@ EMAIL = "persona-sintetica@example.com"
 @pytest.fixture
 def eligible(make_campaign, make_company, make_assessment):
     campaign = make_campaign()
+    campaign = campaign.model_copy(update={"config_snapshot": campaign.config_snapshot.model_copy(update={"people_provider": None})})
     company, _ = make_company(domain="example.com", entity_name="Empresa sintética", segments=["fintech_software"],
                                identity_status="confirmed")
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=[TITLE])
@@ -69,20 +70,6 @@ def public_output(source, contact_id=None, *, title=TITLE, employment="Empresa s
     return json.dumps({"candidates": [{"contact_id": str(contact_id) if contact_id else None, "name": NAME, "facts": facts}]})
 
 
-def test_access_has_explicit_pools_and_sources():
-    fields = {"search_account_ref": "synthetic-search", "enabled_operations": ["domain_search", "email_verifier"],
-              "automatic_lead_saving_disabled": True, "funding_source": "free_credit",
-              "source_reference": "Comprobación sintética", "checked_at": NOW}
-    assert HunterAccess(**fields).verification_account_ref is None
-    assert HunterAccess(**fields, unified_credits=False, verification_account_ref="synthetic-verification")
-    with pytest.raises(ValidationError):
-        HunterAccess(**fields, verification_account_ref="another-pool")
-    with pytest.raises(ValidationError):
-        HunterAccess(**fields, unified_credits=False)
-    with pytest.raises(ValidationError):
-        HunterAccess(**fields | {"automatic_lead_saving_disabled": "true"})
-
-
 def test_public_name_only_is_preserved_as_pending_candidate(eligible):
     company, campaign, assessment, _, evidence = eligible
     source = evidence[0].model_copy(update={"contact_id": None})
@@ -93,29 +80,6 @@ def test_public_name_only_is_preserved_as_pending_candidate(eligible):
     assert contact.name == NAME and contact.title is None and contact.current_employment is None
     assert contact.identity_status == "pending" and contact.provenance["name"]
     assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) == "qualified_no_contact"
-
-
-def test_only_read_operations_with_bearer_and_bounded_timeout():
-    assert {item.operation for item in HUNTER_OPERATIONS} == {"domain_search", "email_finder", "email_verifier"}
-    assert all(item.method == "GET" and item.auth_header == "Authorization" and item.auth_prefix == "Bearer " for item in HUNTER_OPERATIONS)
-    assert next(item for item in HUNTER_OPERATIONS if item.operation == "email_verifier").timeout_seconds == 25
-
-
-def test_requests_preserve_full_names_and_restrict_to_confirmed_domain(eligible):
-    company, campaign, assessment, contact, _ = eligible
-    roles = [TITLE]
-    # Primero todas las personas nominales del dominio, sin filtro de cargo ni paginación.
-    request = domain_search_request(company, roles, "synthetic")
-    assert request.params == {"domain": "example.com", "type": "personal", "limit": 10, "offset": 0}
-    targeted = domain_search_request(company, roles, "synthetic", by_roles=True)
-    assert targeted.params == request.params | {"job_titles": "CTO"}
-    assert finder_request(contact, company, "synthetic").params["full_name"] == NAME
-    assert finder_request(contact, company, "synthetic").params["max_duration"] == 6
-    assert verifier_request(EMAIL, "synthetic").params == {"email": EMAIL}
-    with pytest.raises(ContactError):
-        domain_search_request(company.model_copy(update={"identity_status": "pending"}), roles, "synthetic")
-    with pytest.raises(ContactError):
-        finder_request(contact.model_copy(update={"name_complete": False}), company, "synthetic")
 
 
 def test_hunter_preserves_source_dates_and_never_infers_current_employment(eligible):
@@ -587,13 +551,6 @@ def test_wrong_or_unknown_entity_cannot_lend_channels_after_public_completion(el
     assert all(not channel_is_usable(channel, completed, facts + public_facts, campaign.limits, NOW, company)
                for channel in completed.channels)
     assert derive_readiness(assessment, [completed], facts + public_facts, campaign.limits, NOW, company) != "ready_preferred"
-
-
-def test_future_access_check_is_rejected():
-    with pytest.raises(ValidationError, match="fecha futura"):
-        HunterAccess(search_account_ref="synthetic-search", enabled_operations=["domain_search"],
-                     funding_source="free_credit", source_reference="Comprobación sintética futura",
-                     checked_at=utc_now() + timedelta(days=1))
 
 
 def test_contact_search_summary_cannot_become_public_contact_facts(eligible):

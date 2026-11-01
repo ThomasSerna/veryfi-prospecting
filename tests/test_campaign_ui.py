@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from core.presentation import download_csv
+from prospecting.providers.apollo import ApolloAccess
 from prospecting.budget import AccountAllowance
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
@@ -22,10 +23,15 @@ from prospecting.pipeline import campaign as bridge
 
 
 @pytest.fixture
-def access():
+def access(monkeypatch):
+    monkeypatch.setenv("APOLLO_API_KEY", "clave-exclusivamente-sintetica")
     return ProviderAccess(
         tavily_account_ref="tavily-sintetica", claude_account_ref="claude-sintetica",
+        apollo_access=ApolloAccess(account_ref="apollo-sintetica", source_reference="Acceso sintético",
+                                  observed_at=utc_now(), work_email_verified=True, access_verified=True),
         account_allowances=[
+            AccountAllowance(provider="apollo", account_ref="apollo-sintetica", funding_source="free_credit",
+                             credit_limit="10", source_reference="Cupo sintético", observed_at=utc_now()),
             AccountAllowance(provider="tavily", account_ref="tavily-sintetica", funding_source="free_credit",
                              credit_limit="10", source_reference="Cupo sintético", observed_at=utc_now()),
             AccountAllowance(provider="anthropic", account_ref="claude-sintetica", funding_source="prepaid",
@@ -127,32 +133,13 @@ def test_access_roundtrip_has_no_permits_and_rejects_missing_conflicting_future_
             ProviderAccess.model_validate(access.model_dump() | changes)
 
 
-def test_operations_respect_separate_hunter_accounts(access):
-    hunter = {
-        "search_account_ref": "hunter-search-sintetica", "verification_account_ref": "hunter-verify-sintetica",
-        "enabled_operations": ["domain_search", "email_verifier"], "unified_credits": False,
-        "automatic_lead_saving_disabled": True, "funding_source": "free_credit",
-        "source_reference": "Comprobación sintética", "checked_at": utc_now(),
-    }
-    accounts = access.account_allowances + [AccountAllowance(
-        provider="hunter", account_ref=account, funding_source="free_credit", credit_limit="10",
-        source_reference="Cupo sintético", observed_at=utc_now()) for account in
-        ("hunter-search-sintetica", "hunter-verify-sintetica")]
-    checked = ProviderAccess.model_validate(access.model_dump() | {"hunter_access": hunter,
-                                                                 "account_allowances": accounts})
-    assert provider_operations(checked)[-2:] == [
-        ("hunter", "domain_search", "hunter-search-sintetica"),
-        ("hunter", "email_verifier", "hunter-verify-sintetica"),
+def test_operations_share_one_apollo_account(access):
+    assert provider_operations(access)[-2:] == [
+        ("apollo", "people_search", "apollo-sintetica"),
+        ("apollo", "people_enrichment", "apollo-sintetica"),
     ]
     with pytest.raises(ValidationError):
-        ProviderAccess.model_validate(checked.model_dump() | {
-            "hunter_access": hunter | {"automatic_lead_saving_disabled": False},
-        })
-
-    domain_search_only = ProviderAccess.model_validate(checked.model_dump() | {
-        "hunter_access": hunter | {"enabled_operations": ["domain_search"], "automatic_lead_saving_disabled": False},
-    })
-    assert provider_operations(domain_search_only)[-1] == ("hunter", "domain_search", "hunter-search-sintetica")
+        ProviderAccess.model_validate(access.model_dump() | {"hunter_access": {}})
 
 
 def test_execute_builds_fresh_grants_after_budget_and_preserves_campaign(tmp_path, make_campaign, access, monkeypatch):
@@ -255,10 +242,10 @@ def test_review_survives_reopen_changes_only_review_and_preserves_unknowns(
 
 
 def test_read_recalculates_freshness_without_overwriting_persisted_checkpoint(
-        tmp_path, make_campaign, make_company, make_assessment, monkeypatch):
+        tmp_path, make_campaign, make_company, make_assessment, monkeypatch, config):
     now = utc_now()
     path = tmp_path / "synthetic.sqlite3"
-    campaign = prepare_campaign(path, make_campaign())
+    campaign = prepare_campaign(path, make_campaign(config_snapshot=config.model_copy(update={"people_provider": None})))
     company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
                                              operating_countries=["CO", "MX"], segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])

@@ -21,6 +21,7 @@ def manual_case(tmp_path, make_campaign, make_company, make_assessment):
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
     source = Evidence(company_id=company.id, contact_id=contact_id, kind="observed", source_type="primary",
+                      provider="anthropic", external_reference=f"apollo_public_v1:synthetic:{contact_id}",
                       url="https://example.com/team", retrieved_at=now,
                       claim="Directorio profesional sintético actual.",
                       excerpt="Persona Sintética Uno, CTO de Empresa sintética. Perfil nominal de mensajería.")
@@ -66,7 +67,7 @@ def test_confirmation_is_observed_persisted_and_preserves_original_fields(manual
     channel = case.channel.model_copy(update={"type": ChannelType(channel_type)})
     previous = case.contact.model_copy(update={"channels": [channel, case.contact.channels[1]]})
     case.db.save_contact(previous)
-    for variable in ("TAVILY_API_KEY", "HUNTER_API_KEY", "ANTHROPIC_API_KEY"):
+    for variable in ("TAVILY_API_KEY", "APOLLO_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(variable, raising=False)
 
     def forbidden(*args, **kwargs):
@@ -214,12 +215,11 @@ def test_confirmation_expires_without_refreshing_employment(manual_case):
 
 def test_other_ready_contact_keeps_preferred_status(manual_case):
     case = manual_case
-    provider = Evidence(company_id=case.company.id, contact_id=case.contact.id, kind="observed", source_type="provider",
-                        provider="hunter", external_reference="verification-synthetic", retrieved_at=utc_now(),
-                        claim="Verificación sintética válida para preferred-synthetic@example.com.")
+    provider = case.source.model_copy(update={
+        "id": uuid4(), "excerpt": f"{case.contact.name}, CTO de {case.company.name}, correo profesional preferred-synthetic@example.com."})
     preferred = Channel(contact_id=case.contact.id, type="email", value="preferred-synthetic@example.com",
-                        evidence_ids=[provider.id], retrieved_at=provider.retrieved_at, verified_at=provider.retrieved_at,
-                        professional=True, direct=True, normalized_status="verified", provider_status="valid")
+                        evidence_ids=[provider.id], published_evidence_ids=[provider.id], retrieved_at=provider.retrieved_at,
+                        professional=True, direct=True, normalized_status="published_professional")
     case.db.save_contact(case.contact.model_copy(update={"channels": case.contact.channels + [preferred]}), evidence=[provider])
     assert confirm(case).business_status == "ready_preferred"
 

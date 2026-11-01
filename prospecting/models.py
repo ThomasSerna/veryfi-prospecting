@@ -388,6 +388,7 @@ class Defaults(CampaignLimits):
 
 
 class VeryfiConfig(Contract):
+    people_provider: Literal["apollo"] | None = None
     schema_version: Annotated[StrictInt, Field(ge=1, le=1)]
     catalog: Catalog
     profiles: Annotated[list[Profile], Field(min_length=1)]

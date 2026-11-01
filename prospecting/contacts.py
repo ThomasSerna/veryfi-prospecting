@@ -29,6 +29,20 @@ class ContactError(Exception):
         self.code, self.message = code, message
 
 
+def contact_context(campaign: Campaign, contacts: list[Contact], evidence: list[Evidence]
+                    ) -> tuple[list[Contact], list[Evidence]]:
+    """Separa personas nuevas y legado; la evidencia empresarial permanece compartida."""
+    apollo_ids = {item.contact_id for item in evidence if item.contact_id is not None and (
+        item.provider == "apollo" and (item.external_reference or "").startswith("apollo_v1:")
+        or (item.external_reference or "").startswith("apollo_public_v1:"))}
+    apollo = campaign.config_snapshot.people_provider == "apollo"
+    selected = [item for item in contacts if (item.id in apollo_ids) == apollo]
+    selected_ids = {item.id for item in selected}
+    facts = [item for item in evidence if (item.contact_id is None or item.contact_id in selected_ids)
+             and (item.provider != "hunter" if apollo else item.provider != "apollo")]
+    return selected, facts
+
+
 def parse_source_date(value: str | None) -> datetime | None:
     if value is None:
         return None
@@ -209,6 +223,10 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
             contact.current_employment is False or contact.relevant_function is not True or
             not contact.name or not contact.title):
         return False
+    apollo = [item for item in evidence if item.contact_id == contact.id and item.provider == "apollo"
+              and (item.external_reference or "").startswith("apollo_v1:")]
+    if apollo and not any((item.external_reference or "").endswith("#enrichment") for item in apollo):
+        return False
     for field in ("name", "title", "relevant_function"):
         facts = _valid_refs(contact.provenance.get(field, []), contact, evidence)
         if not facts or any(item.kind != "observed" for item in facts):
@@ -250,6 +268,8 @@ def _employment_from_evidence(contact: Contact, company: Company, evidence: list
     if contact.current_employment is not True:
         return False
     facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
+    if any(item.contact_id == contact.id and item.provider == "apollo" for item in evidence):
+        facts = [item for item in facts if item.source_type in ("primary", "secondary")]
     if any(item.kind == "observed" and employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in facts):
         return False
     return bool(facts) and any(item.kind == "observed" and not is_search_evidence(item) and
@@ -297,8 +317,9 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
     facts = _valid_refs(channel.evidence_ids, contact, evidence)
     if not facts or any(item.retrieved_at > now for item in facts):
         return False
-    structured = [item for item in facts if item.source_type == "provider" and item.provider == "hunter" and
+    structured = [item for item in facts if item.source_type == "provider" and item.provider in ("hunter", "apollo") and
                   item.contact_id == contact.id and item.external_reference is not None and
+                  (item.provider != "apollo" or item.external_reference.startswith("apollo_v1:")) and
                   "#contact:" not in item.external_reference and not item.claim.startswith("Hecho nominal publicado:")]
     if channel.type == ChannelType.EMAIL:
         # El correo laboral pertenece al dominio confirmado de la empresa; sin dominio no hay canal (§10.2).
@@ -494,6 +515,8 @@ def merge_contact(old: Contact, new: Contact, evidence: list[Evidence]) -> Conta
         channels[item.type, item.value] = item
     values = old.model_dump()
     for field in ("name", "title", "name_complete", "current_employment", "relevant_function", "geographic_scope"):
+        if field in ("name", "name_complete") and old.name_complete is True and new.name_complete is not True:
+            continue
         if getattr(new, field) is not None:
             values[field] = getattr(new, field)
     if new.identity_status != IdentityStatus.PENDING:

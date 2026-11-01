@@ -139,7 +139,9 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
         if "source_date" in values and "employment" in values and values["source_date"].evidence_id != values["employment"].evidence_id:
             raise ContactError("date_mismatch", "La fecha citada pertenece a otra evidencia que la relación laboral.")
         strong = next((values[field].value for field in ("email", "linkedin") if field in values), None)
-        contact_id = candidate.contact_id or (uuid5(company.id, f"public:{strong}") if strong else uuid4())
+        apollo = campaign.config_snapshot.people_provider == "apollo"
+        namespace = "public_apollo_v1" if apollo else "public"
+        contact_id = candidate.contact_id or (uuid5(company.id, f"{namespace}:{strong}") if strong else uuid4())
         evidence, provenance, employment_ids = [], {}, []
         quoted_date = parse_source_date(values["source_date"].value) if "source_date" in values else None
         for field in ("name", "title", "employment", "geographic_scope", "email", "phone", "whatsapp", "linkedin", "other"):
@@ -147,9 +149,14 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
                 continue
             cited = values[field]
             source = by_id[cited.evidence_id]
+            reference = ((source.external_reference + f"#contact:{field}")
+                         if source.external_reference else None)
+            if apollo:
+                reference = f"apollo_public_v1:{request_id}#contact:{field}"
             derived = Evidence(company_id=company.id, contact_id=contact_id,
                                claim=f"Hecho nominal publicado: {field}={cited.value}", url=source.url,
-                               provider=source.provider, external_reference=(source.external_reference + f"#contact:{field}") if source.external_reference else None,
+                               provider=(source.provider or "public_extraction") if apollo else source.provider,
+                               external_reference=reference,
                                excerpt=cited.quote, retrieved_at=source.retrieved_at,
                                published_at=source.published_at or (quoted_date if "source_date" in values and values["source_date"].evidence_id == cited.evidence_id else None),
                                updated_at=source.updated_at,
@@ -199,7 +206,7 @@ def parse_contacts_output(text: str, stop_reason: str | None, company: Company, 
         contact = apply_target_roles(contact, target_roles(company, assessment, campaign))
         evidence.append(Evidence(company_id=company.id, contact_id=contact_id,
                                  claim=f"Extracción propuesta por {MODEL_ID}; prompt={CONTACTS_PROMPT_VERSION}; referencias y citas validadas por Python.",
-                                 provider="anthropic", external_reference=str(request_id), retrieved_at=now,
+                                 provider="anthropic", external_reference=f"apollo_public_v1:{request_id}" if apollo else str(request_id), retrieved_at=now,
                                  kind="inference", source_type="provider"))
         if candidate.contact_id is not None:
             contact = merge_contact(known[candidate.contact_id], contact, evidence)

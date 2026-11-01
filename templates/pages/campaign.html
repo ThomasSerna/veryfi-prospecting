@@ -9,10 +9,12 @@
       <h1>{{ campaign|campaign_title }}</h1>
       <p class="quiet-note">{{ campaign.created_at|date:"d M Y · H:i" }} · Máx. {{ campaign.max_companies }} empresas</p>
     </div>
-    {% if campaign.status != 'completed' %}
+    {% if not legacy_readonly and campaign.status != 'completed' %}
     <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
     {% endif %}
   </header>
+  {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
+  {% elif apollo_blocked %}<div class="notice notice-warning">Apollo bloqueado: comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
   <div id="execution-feedback" role="status" aria-live="polite">
     {% if stop_reason %}
     <div class="notice notice-warning">
@@ -25,13 +27,13 @@
     <strong>La lista de exclusiones necesita confirmación.</strong>
   </div>
   {% endif %}
-  {% if campaign.status == 'created' and not counts.total %}
+  {% if not legacy_readonly and campaign.status == 'created' and not counts.total %}
     {% include 'components/_authorization_section.html' with promoted=True %}
   {% endif %}
   <div class="campaign-workspace">
     <div id="campaign-live">{% include 'components/_campaign_results.html' %}</div>
   </div>
-  {% if campaign.status != 'completed' %}
+  {% if not legacy_readonly and campaign.status != 'completed' %}
     {% if campaign.status != 'created' or counts.total %}
       {% include 'components/_authorization_section.html' with promoted=False %}
     {% endif %}

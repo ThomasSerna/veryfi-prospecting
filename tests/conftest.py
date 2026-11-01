@@ -209,7 +209,7 @@ def make_assessment():
 def make_hunter_contact():
     """Persona sintética solo de Hunter: correo verificado y fuente vigente, sin evidencia del puesto."""
     from prospecting.contacts import apply_target_roles
-    from prospecting.providers.hunter import HunterDomainSearchResponse, parse_domain_search
+    from legacy_hunter import HunterDomainSearchResponse, parse_domain_search
 
     def build(company, now, *, title="CTO", local="persona-hunter"):
         day = now.date().isoformat()

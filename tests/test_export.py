@@ -41,18 +41,21 @@ def csv_case(tmp_path, make_campaign, make_company, make_assessment):
             name = f"Persona Sintética {'Uno' if index == 0 else 'Dos'}"
             email = f"persona-sintetica-{index}@example.com"
             phone = "+571234567890"
-            primary = Evidence(company_id=company.id, contact_id=id, claim="Directorio corporativo sintético actual.",
+            primary = Evidence(company_id=company.id, contact_id=id, provider="anthropic",
+                               external_reference=f"apollo_public_v1:synthetic:{id}", claim="Directorio corporativo sintético actual.",
                                excerpt=f"{name}, CTO de Empresa sintética. Teléfono nominal {phone}.",
                                url="https://example.com/team", retrieved_at=now, kind="observed", source_type="primary")
-            verified = Evidence(company_id=company.id, contact_id=id, claim=f"Correo sintético {email}, estado valid.",
-                                provider="hunter", external_reference=f"synthetic-verification-{index}", retrieved_at=now,
-                                kind="observed", source_type="provider")
+            verified = Evidence(company_id=company.id, contact_id=id, claim=f"Publicación corporativa sintética del correo {email}.",
+                                excerpt=f"{name}, CTO de Empresa sintética, correo profesional {email}.",
+                                url="https://example.com/team", provider="anthropic",
+                                external_reference=f"apollo_public_v1:synthetic-email:{id}", retrieved_at=now,
+                                kind="observed", source_type="primary")
             contact = Contact(id=id, company_id=company.id, name=name, title="CTO", name_complete=True,
                               identity_status="confirmed" if index == 0 else "pending", current_employment=True,
                               relevant_function=True, employment_evidence_ids=[primary.id],
                               provenance={key: [primary.id] for key in ("name", "title", "relevant_function")},
                               channels=[Channel(contact_id=id, type="email", value=email, evidence_ids=[verified.id],
-                                                provider_status="valid", normalized_status="verified", verified_at=now,
+                                                normalized_status="published_professional", published_evidence_ids=[verified.id],
                                                 retrieved_at=now, professional=True, direct=True,
                                                 warnings=['Advertencia sintética con coma, comillas " y salto\nde línea.']),
                                         Channel(contact_id=id, type="phone", value=phone, phone_country="CO",
@@ -93,7 +96,7 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
     assert row["contact_ready"] == "True" and row["business_status"] == "ready_preferred"
     assert row["phone"] == "'\t+571234567890"
     channels = json.loads(row["channels"])
-    assert channels[0]["provider_status"] == "valid" and channels[0]["verified_at"]
+    assert channels[0]["normalized_status"] == "published_professional" and channels[0]["verified_at"] is None
     facts = json.loads(row["sources"])
     assert all(fact["retrieved_at"] and (fact["url"] or fact["external_reference"]) for fact in facts)
     assert all(fact["contact_id"] in (None, str(case.contacts[0].id)) for fact in facts)
@@ -106,12 +109,19 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
 def test_employment_inferred_from_hunter_is_exported_with_its_warning(csv_case, make_hunter_contact):
     case = csv_case
     contact, evidence = make_hunter_contact(case.company, case.now)
+    legacy = case.campaign.model_copy(update={"id": uuid4(), "config_snapshot": case.campaign.config_snapshot.model_copy(update={"people_provider": None})})
+    assessment = case.assessment.model_copy(update={"id": uuid4(), "campaign_id": legacy.id})
     with Database(case.path) as db:
+        db.save_campaign(legacy)
+        db.save_run_item(RunItem(campaign_id=legacy.id, company_id=case.company.id, stage="completed"))
+        db.save_assessment(assessment)
+        db.save_run_item(RunItem(campaign_id=legacy.id, company_id=case.company.id, stage="completed", last_assessment_id=assessment.id))
         db.save_contact(contact, evidence=evidence)
-    exported = {row["contact_id"]: row for row in rows(export_csv(read_campaign(case.path, case.campaign.id)))}
+    exported = {row["contact_id"]: row for row in rows(export_csv(read_campaign(case.path, legacy.id)))}
     assert exported[str(contact.id)]["contact_ready"] == "True"
     assert HUNTER_EMPLOYMENT_WARNING in exported[str(contact.id)]["warnings"]
-    assert HUNTER_EMPLOYMENT_WARNING not in exported[str(case.contacts[0].id)]["warnings"]
+    assert str(case.contacts[0].id) not in exported
+
 
 
 def test_all_results_keeps_pending_people_and_company_without_people(csv_case):

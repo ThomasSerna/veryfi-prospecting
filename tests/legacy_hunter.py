@@ -31,7 +31,7 @@ HunterOperation = Literal["domain_search", "email_finder", "email_verifier"]
 
 HUNTER_OPERATIONS = [
     OperationSpec(provider=PROVIDER, operation=operation, endpoint=f"https://api.hunter.io/v2/{path}",
-                  method="GET", api_key_env="HUNTER_API_KEY", timeout_seconds=timeout)
+                  method="GET", api_key_env="APOLLO_API_KEY", timeout_seconds=timeout)
     for operation, path, timeout in (
         ("domain_search", "domain-search", 10.0),
         ("email_finder", "email-finder", 10.0),

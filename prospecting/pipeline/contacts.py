@@ -11,7 +11,7 @@ from pydantic import Field, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, merge_contact, role_position, target_roles,
+    ContactError, apply_target_roles, channel_is_usable, contact_context, derive_readiness, merge_contact, role_position, target_roles,
     validate_contact,
 )
 from prospecting.db import Database
@@ -19,11 +19,11 @@ from prospecting.models import (
     BusinessStatus, ChannelStatus, ChannelType, Contact, Contract, Evidence, IdentityStatus, Priority,
     RunItem, RunStage, Text, UsageStatus, utc_now,
 )
-from prospecting.pipeline.calls import grant_for, observed_credits, reserve_claude, reserve_credits, seconds_left
+from prospecting.pipeline.calls import grant_for, observed_credits, require_apollo_access, reserve_claude, reserve_credits, seconds_left
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
-from prospecting.providers.hunter import (
-    HunterAccess, HunterDomainSearchResponse, HunterFinderResponse, HunterVerifierResponse, classify_hunter_error,
-    domain_search_request, finder_request, parse_domain_search, parse_finder, parse_verifier, verifier_request,
+from prospecting.providers.apollo import (
+    ApolloAccess, ApolloSearchResponse, ApolloEnrichmentResponse, classify_apollo_error,
+    people_search_request, enrichment_request, parse_search, parse_enrichment, person_id,
 )
 from prospecting.providers.tavily import (
     SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,
@@ -61,9 +61,13 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         run = None if contact is None else db.get_run_item(campaign_id, contact.company_id)
         if campaign is None or contact is None or run is None:
             raise ValueError("El contacto no pertenece a la campaña.")
+        if campaign.config_snapshot.people_provider != "apollo":
+            raise ValueError("La campaña histórica solo permite consulta y exportación.")
         company = db.get_company(contact.company_id)
         assessment = None if run.last_assessment_id is None else db.get_assessment(run.last_assessment_id)
-        evidence = db.list_evidence(contact.company_id)
+        people, evidence = contact_context(campaign, db.list_contacts(contact.company_id), db.list_evidence(contact.company_id))
+        if contact.id not in {item.id for item in people}:
+            raise ValueError("El contacto no pertenece al flujo Apollo de esta campaña.")
         now = utc_now()
         roles = None if assessment is None else target_roles(company, assessment, campaign)
         if (assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED
@@ -89,7 +93,8 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         if not channel_is_usable(updated_channel, updated, evidence + [fact], campaign.limits, now, company):
             raise ValueError("El canal conserva evidencia contradictoria o con fecha futura; no se puede confirmar.")
         db.save_contact(updated, evidence=[fact])
-        readiness = derive_readiness(assessment, db.list_contacts(company.id), db.list_evidence(company.id),
+        people, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
+        readiness = derive_readiness(assessment, people, evidence,
                                      campaign.limits, now, company, roles)
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
@@ -97,8 +102,8 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
 def _contact_error_reason(error) -> str:
     if isinstance(error, (BudgetError, ContactError)):
         return error.code
-    if error.provider == "hunter":
-        return classify_hunter_error(error)
+    if error.provider == "apollo":
+        return classify_apollo_error(error)
     return classify_tavily_error(error)
 
 
@@ -108,14 +113,11 @@ REQUEST_KEY = "contacts:request:"
 PROCESSED_KEY = "contacts:processed:"
 HAIKU_KEY = "contacts:haiku"
 HAIKU_REQUEST_KEY = "contacts:haiku_request:"
-VERIFY_KEY = "contacts:verify:"
-DOMAIN_SEARCH_KEY = "contacts:domain_search"
+PEOPLE_SEARCH_KEY = "contacts:apollo_search"
 WEB_QUERIES_KEY = "contacts:web_queries"
 PAGES_KEY = "contacts:pages"
 EXTRACT_KEY = "contacts:extract"
-ENRICHMENTS_KEY = "contacts:hunter_enrichments"
-# Fallos de Hunter que permiten seguir por la ruta pública en lugar de detener la etapa.
-_HUNTER_DEGRADED = ("permission_denied", "rate_limited", "quota_exceeded", "local_error")
+ENRICHMENTS_KEY = "contacts:apollo_enrichments"
 
 
 def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
@@ -133,11 +135,11 @@ class _ContactStage:
     validación al investigarla. Cada fase devuelve un ContactReport cuando la etapa termina, o None para seguir.
     """
 
-    def __init__(self, db, budget, client, campaign, company, run, assessment, *, hunter_access, authorizations,
+    def __init__(self, db, budget, client, campaign, company, run, assessment, *, apollo_access, authorizations,
                  tavily_account_ref, claude, claude_account_ref, claude_funding_source, deadline):
         self.db, self.budget, self.client = db, budget, client
         self.campaign, self.company, self.run, self.assessment = campaign, company, run, assessment
-        self.hunter_access, self.grants = hunter_access, authorizations or []
+        self.apollo_access, self.grants = apollo_access, authorizations or []
         self.tavily_account_ref = tavily_account_ref
         self.claude, self.claude_account_ref = claude, claude_account_ref
         self.claude_funding_source = claude_funding_source
@@ -145,10 +147,6 @@ class _ContactStage:
         self.effort = campaign.limits.effort[str(assessment.priority)]
         self.roles = target_roles(company, assessment, campaign)
         self.requests, self.evidence_ids, self.warnings = [], [], []
-        self.degraded_error = None
-        if hunter_access is not None and not hunter_access.automatic_lead_saving_disabled and any(
-                operation in hunter_access.enabled_operations for operation in ("email_finder", "email_verifier")):
-            self.warnings.append("Finder y Verifier deshabilitados: falta comprobar que no guardan leads automáticamente.")
         self.tick = time.monotonic()
         local_deadline = self.tick + max(0.0, self.effort.active_seconds - run.consumed_limits.contacts_active_seconds)
         self.deadline = local_deadline if deadline is None else min(deadline, local_deadline)
@@ -156,7 +154,8 @@ class _ContactStage:
     # Estado, checkpoints y llamadas comunes a todas las fases.
 
     def facts(self):
-        return self.db.list_evidence(self.company.id)
+        return contact_context(self.campaign, self.db.list_contacts(self.company.id),
+                               self.db.list_evidence(self.company.id))[1]
 
     def checkpoint(self, *, attempts=None, consumed=None, updates=None, aggregates=(), facts=()):
         now_tick = time.monotonic()
@@ -193,7 +192,9 @@ class _ContactStage:
         now = utc_now()
         fresh_ids = {item.contact_id for item in self.facts() if item.contact_id is not None
                      and now - timedelta(days=self.campaign.limits.cache.contact_days) <= item.retrieved_at <= now}
-        return [item for item in self.db.list_contacts(self.company.id) if item.id in fresh_ids]
+        people, _ = contact_context(self.campaign, self.db.list_contacts(self.company.id),
+                                    self.db.list_evidence(self.company.id))
+        return [item for item in people if item.id in fresh_ids]
 
     def readiness(self):
         return derive_readiness(self.assessment, self.people(), self.facts(), self.campaign.limits, utc_now(),
@@ -219,6 +220,9 @@ class _ContactStage:
         rows = [row for row in self.db.list_usage(company_id=self.company.id, provider=provider)
                 if (row.operation, row.account_ref, row.request_fingerprint) == (operation, account, fingerprint)]
         for row in reversed(rows):
+            previous_campaign = self.db.get_campaign(row.campaign_id)
+            if previous_campaign.config_snapshot.people_provider != "apollo":
+                continue
             previous = self.db.get_run_item(row.campaign_id, self.company.id)
             done = previous.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0)
             if row.status in (UsageStatus.IN_FLIGHT, UsageStatus.UNCERTAIN):
@@ -270,12 +274,14 @@ class _ContactStage:
             observed = observed_credits(result.data)
             if observed is not None:
                 self.budget.record_result(usage.request_id, Observation(outcome="succeeded", credits=observed))
-        if result.http_status == 202:
-            self.checkpoint(attempts=attempts, consumed=consumed)
-            raise BudgetError("verification_pending", "Hunter mantiene la verificación en procesamiento.", usage.request_id)
+        if request.provider == "apollo" and request.operation == "people_search":
+            self.budget.record_result(usage.request_id, Observation(outcome="succeeded", credits=Decimal(0)))
         try:
             aggregates, facts = parse(result.data, usage.request_id)
-        except (ContactError, ValueError, TypeError):
+        except ContactError:
+            self.checkpoint(attempts=attempts, consumed=consumed)
+            raise
+        except (ValueError, TypeError):
             self.checkpoint(attempts=attempts, consumed=consumed)
             raise BudgetError("invalid_contact_data", "La respuesta no respalda los datos de contacto esperados.", usage.request_id) from None
         self.checkpoint(attempts=attempts | {f"{PROCESSED_KEY}{fingerprint}": 1}, consumed=consumed,
@@ -288,10 +294,12 @@ class _ContactStage:
         desplaza a uno idóneo encontrado después. Los topes de llamadas no cambian.
         """
         facts = self.facts()
-        known = self.db.list_contacts(self.company.id)
+        known, _ = contact_context(self.campaign, self.db.list_contacts(self.company.id),
+                                   self.db.list_evidence(self.company.id))
         saved = []
         for candidate, source in parsed:
-            match = next((old for old in known if old.id == candidate.id or any(
+            apollo_id = person_id(candidate, source)
+            match = next((old for old in known if old.id == candidate.id or apollo_id is None and any(
                 a.type == b.type and a.type in ("email", "linkedin") and a.value == b.value
                 for a in old.channels for b in candidate.channels)), None)
             if match is not None:
@@ -311,14 +319,11 @@ class _ContactStage:
         if self.effort.people == 0:
             return self.finish("people_limit")
         try:
-            for phase in (self._recover_pending, self._reuse_known_people, self._search_hunter,
-                          self._search_public, self._extract_public, self._enrich_people):
+            for phase in (self._recover_pending, self._reuse_known_people, self._search_apollo,
+                          self._enrich_people, self._search_public, self._extract_public, self._reuse_known_people):
                 report = phase()
                 if report is not None:
                     return report
-            if self.degraded_error is not None and not (
-                    self.run.attempts.get(WEB_QUERIES_KEY, 0) or self.run.attempts.get(HAIKU_KEY, 0)):
-                raise self.degraded_error
             return self.finish("contact_plan_exhausted")
         except (BudgetError, ProviderError, ContactError) as error:
             if getattr(error, "request_id", None) is not None:
@@ -348,8 +353,6 @@ class _ContactStage:
 
     def _reuse_known_people(self):
         """Un canal preferido ya guardado termina la etapa; las personas válidas ocupan su cupo."""
-        if self.readiness() == BusinessStatus.READY_PREFERRED:
-            return self.finish("preferred_channel_found")
         existing_eligible = [item for item in self.ranked_people() if validate_contact(
             item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles)]
         if existing_eligible:
@@ -360,47 +363,20 @@ class _ContactStage:
                     selected.add(item.id)
                     additions[f"{PERSON_KEY}{item.id}"] = 1
             self.checkpoint(attempts=additions)
+        if self.readiness() == BusinessStatus.READY_PREFERRED:
+            return self.finish("preferred_channel_found")
         return None
 
-    def _search_hunter(self):
-        """Domain Search de todas las personas del dominio y, en el segundo intento, por cargos objetivo.
-
-        La consulta amplia trae candidatos de cualquier cargo para ordenarlos por match; la segunda
-        alcanza cargos objetivo que no estuvieran entre los 10 primeros.
-        """
-        access, company = self.hunter_access, self.company
-        if access is None or "domain_search" not in access.enabled_operations:
-            return None
+    def _search_apollo(self):
+        """Busca candidatos del dominio; el segundo intento acota los cargos, sin paginación."""
+        access, company = self.apollo_access, self.company
         for index in range(self.effort.people_queries):
-            request = domain_search_request(company, self.roles, access.search_account_ref, by_roles=bool(index))
-            try:
-                fingerprint = self.client.fingerprint(request)
-                if self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0):
-                    handled = next((row for row in self.db.list_usage(
-                        campaign_id=self.campaign.id, company_id=company.id, provider="hunter")
-                        if row.status in (UsageStatus.FAILED, UsageStatus.RECONCILED) and
-                        (row.operation, row.account_ref, row.request_fingerprint, row.outcome) ==
-                        (request.operation, request.account_ref, fingerprint, "failed")), None)
-                    if handled is not None:
-                        self.requests.append(handled.request_id)
-                        self.warnings.append(f"Hunter: {handled.error_message}")
-                        return None
-                self.perform(request, HunterDomainSearchResponse, credits=1,
-                             count_key=DOMAIN_SEARCH_KEY, cap=self.effort.people_queries,
-                             consumed={"people_queries": 1}, funding=access.funding_source,
-                             parse=lambda data, request_id: self.save_candidates(
-                                 parse_domain_search(company, data, request_id, utc_now())))
-            except (BudgetError, ProviderError) as error:
-                if _contact_error_reason(error) not in _HUNTER_DEGRADED:
-                    raise
-                prior = self.db.get_usage(error.request_id) if error.request_id is not None else None
-                if prior is not None and prior.status == UsageStatus.FAILED and prior.outcome == "failed":
-                    self.checkpoint(attempts={f"{PROCESSED_KEY}{prior.request_fingerprint}": 1})
-                self.warnings.append(f"Hunter: {_contact_error_reason(error)}: {error}")
-                self.degraded_error = error
-                return None
-            if self.readiness() == BusinessStatus.READY_PREFERRED:
-                return self.finish("preferred_channel_found")
+            request = people_search_request(company, self.roles, access.account_ref, by_roles=bool(index))
+            self.perform(request, ApolloSearchResponse, credits=0,
+                         count_key=PEOPLE_SEARCH_KEY, cap=self.effort.people_queries,
+                         consumed={"people_queries": 1}, funding=access.funding_source,
+                         parse=lambda data, request_id: self.save_candidates(
+                             parse_search(company, data, request_id, utc_now())))
         return None
 
     def _search_public(self):
@@ -413,10 +389,10 @@ class _ContactStage:
                          and any(part in str(item.url).lower() for part in ("/equipo", "/team", "/directorio", "/leadership"))]
         if self.tavily_account_ref is None or stored_public or self.run.attempts.get(HAIKU_KEY, 0):
             return None
-        queries = [f'"{company.name}" {" ".join(self.roles[:4])} equipo directorio {" ".join(campaign.countries)}']
-        # Por prioridad de cargo; una persona fuera del perfil no gasta consultas nominales (T09).
-        queries += [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.ranked_people()
-                    if item.name and item.relevant_function is not False]
+        # Primero las personas resueltas por Apollo; un apellido ofuscado nunca se usa como nombre completo.
+        queries = [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.ranked_people()
+                   if item.name and item.name_complete is True and item.relevant_function is True]
+        queries += [f'"{company.name}" {" ".join(self.roles[:4])} equipo directorio {" ".join(campaign.countries)}']
         queries += [f'"{company.name}" equipo producto ingeniería marketing contacto profesional']
         for query in list(dict.fromkeys(queries))[:effort.web_queries]:
             request = contact_search_request(query, self.tavily_account_ref)
@@ -489,7 +465,7 @@ class _ContactStage:
         return None
 
     def _enrich_people(self):
-        """Finder y Verifier solo sobre personas pertinentes y vigentes, dentro del cupo de enriquecimientos."""
+        """Resuelve candidatos pertinentes por ID antes de exigir nombre completo y empleo público."""
         for contact in self.ranked_people():
             report = self._enrich(contact)
             if report is not None:
@@ -497,63 +473,24 @@ class _ContactStage:
         return None
 
     def _enrich(self, contact):
-        company, access = self.company, self.hunter_access
-        # Solo una persona validada ocupa el cupo; validar no consume llamadas (T09).
-        if not validate_contact(contact, company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles):
+        company, access = self.company, self.apollo_access
+        identifier = person_id(contact, self.facts())
+        if (identifier is None or contact.relevant_function is not True or
+                contact.identity_status == IdentityStatus.CONTRADICTED or contact.current_employment is False):
             return None
-        selected = self.selected()
-        if contact.id not in selected:
-            if len(selected) >= self.effort.people:
-                return None
-            self.checkpoint(attempts={f"{PERSON_KEY}{contact.id}": 1})
-        if any(channel_is_usable(channel, contact, self.facts(), self.campaign.limits, utc_now(), company)
-               and channel.type in ("email", "phone", "whatsapp") for channel in contact.channels):
+        request = enrichment_request(identifier, access.account_ref)
+        self.perform(request, ApolloEnrichmentResponse, credits=access.enrichment_credit_bound,
+                     count_key=ENRICHMENTS_KEY, cap=min(self.effort.people, self.effort.enrichments_per_provider),
+                     consumed={"enrichments": 1}, funding=access.funding_source,
+                     parse=lambda data, request_id: self.save_candidates([parse_enrichment(
+                         contact, company, data, request_id, utc_now())]))
+        if self.readiness() == BusinessStatus.READY_PREFERRED:
             return self.finish("preferred_channel_found")
-        if access is None or self.degraded_error is not None:
-            return None
-        if (not any(channel.type == "email" and channel.professional is True for channel in contact.channels)
-                and "email_finder" in access.enabled_operations and access.automatic_lead_saving_disabled):
-            request = finder_request(contact, company, access.search_account_ref)
-            self.perform(request, HunterFinderResponse, credits=1, count_key=ENRICHMENTS_KEY,
-                         cap=self.effort.enrichments_per_provider, consumed={"enrichments": 1},
-                         funding=access.funding_source,
-                         parse=lambda data, request_id: ([(parse_finder(contact, company, data, request_id, utc_now()))], []))
-            contact = self.db.get_contact(contact.id)
-            if self.readiness() == BusinessStatus.READY_PREFERRED:
-                return self.finish("preferred_channel_found")
-        if "email_verifier" not in access.enabled_operations or not access.automatic_lead_saving_disabled:
-            return None
-        return self._verify_emails(contact)
-
-    def _verify_emails(self, contact):
-        company, access = self.company, self.hunter_access
-        for channel in contact.channels:
-            if channel.type != "email" or channel.professional is not True or channel.direct is not True:
-                continue
-            if channel_is_usable(channel, contact, self.facts(), self.campaign.limits, utc_now(), company):
-                continue
-            request = verifier_request(channel.value, access.verification_account_ref or access.search_account_ref)
-            channel_key = f"{VERIFY_KEY}{self.client.fingerprint(request)}"
-            if self.run.attempts.get(channel_key, 0) >= self.campaign.limits.email_verifications_per_channel:
-                continue
-            def verified(data, request_id):
-                return [parse_verifier(contact, company, data, request_id, utc_now())], []
-            before = self.run.attempts.get(ENRICHMENTS_KEY, 0)
-            try:
-                self.perform(request, HunterVerifierResponse, credits="0.5" if access.unified_credits else "1",
-                             count_key=ENRICHMENTS_KEY, cap=self.effort.enrichments_per_provider,
-                             consumed={"enrichments": 1, "email_verifications": 1},
-                             funding=access.funding_source, parse=verified)
-            finally:
-                if self.run.attempts.get(ENRICHMENTS_KEY, 0) > before:
-                    self.checkpoint(attempts={channel_key: 1})
-            if self.readiness() == BusinessStatus.READY_PREFERRED:
-                return self.finish("preferred_channel_found")
         return None
 
 
 def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign_id: UUID,
-                  company_id: UUID, *, hunter_access: HunterAccess | None = None,
+                  company_id: UUID, *, apollo_access: ApolloAccess | None = None,
                   authorizations: list[SpendingAuthorization] | None = None,
                   tavily_account_ref: str | None = None, claude: ClaudeClient | None = None,
                   claude_account_ref: str | None = None,
@@ -570,15 +507,21 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
         raise ValueError("La empresa no pertenece a la campaña.")
     assessment = None if run.last_assessment_id is None else db.get_assessment(run.last_assessment_id)
     base = {"campaign_id": campaign_id, "company_id": company_id}
+    if campaign.config_snapshot.people_provider != "apollo":
+        return ContactReport(**base, status="skipped", business_status=run.business_status,
+                             stop_reason="legacy_campaign_read_only")
     if (run.business_status == BusinessStatus.EXCLUDED or assessment is None
             or assessment.priority not in (Priority.MEDIUM, Priority.HIGH)
             or company.identity_status != IdentityStatus.CONFIRMED
             or company.domain is None or is_non_business(company.domain)):
         return ContactReport(**base, status="skipped", business_status=run.business_status,
                              stop_reason="contact_preconditions")
-    if hunter_access is not None:
-        hunter_access = HunterAccess.model_validate(hunter_access)
-    stage = _ContactStage(db, budget, client, campaign, company, run, assessment, hunter_access=hunter_access,
+    try:
+        require_apollo_access(campaign, apollo_access, budget)
+    except ValueError as error:
+        return ContactReport(**base, status="pending", business_status=run.business_status,
+                             stop_reason="apollo_access_unverified", error_message=str(error))
+    stage = _ContactStage(db, budget, client, campaign, company, run, assessment, apollo_access=apollo_access,
                           authorizations=authorizations, tavily_account_ref=tavily_account_ref, claude=claude,
                           claude_account_ref=claude_account_ref, claude_funding_source=claude_funding_source,
                           deadline=deadline)

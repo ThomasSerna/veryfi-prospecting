@@ -87,9 +87,8 @@ OPERATION_LABELS = {
     ("tavily", "search"): "Buscar empresas y fuentes en la web",
     ("tavily", "extract"): "Leer las páginas encontradas",
     ("anthropic", "messages"): "Analizar evidencia y posibles contactos",
-    ("hunter", "domain_search"): "Buscar contactos profesionales por empresa",
-    ("hunter", "email_finder"): "Encontrar el correo de una persona",
-    ("hunter", "email_verifier"): "Comprobar el estado de un correo",
+    ("apollo", "people_search"): "Buscar personas por empresa en Apollo",
+    ("apollo", "people_enrichment"): "Resolver identidad y correo profesional en Apollo",
 }
 
 
@@ -104,7 +103,7 @@ class AuthorizationForm(forms.Form):
         campaign_avail = view.budget.campaign.available
         for provider, operation, account_ref in self.operations:
             key = f"{provider}_{operation}"
-            key_name = {"tavily": "TAVILY_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "hunter": "HUNTER_API_KEY"}[provider]
+            key_name = {"tavily": "TAVILY_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "apollo": "APOLLO_API_KEY"}[provider]
             key_present = bool(os.environ.get(key_name, "").strip())
             self.fields[f"allow_{key}"] = forms.BooleanField(label=OPERATION_LABELS.get((provider, operation), operation), required=False, disabled=not key_present)
             self.fields[f"cost_{key}"] = forms.DecimalField(label="Tope en USD", min_value=Decimal(0), max_digits=18,

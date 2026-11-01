@@ -20,7 +20,7 @@ from prospecting.haiku import MODEL_ID
 from prospecting.identity import ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import Assessment, Campaign, Company, Contact, Evidence
 from prospecting.providers import CLAUDE_PRICES_PER_MTOK, ClaudeClient, ProviderClient
-from prospecting.providers.hunter import (
+from legacy_hunter import (
     HUNTER_OPERATIONS, HunterDomainSearchResponse, domain_search_request, finder_request, parse_domain_search,
     verifier_request,
 )
@@ -83,7 +83,7 @@ def contact() -> Contact:
 
 def campaign(config) -> Campaign:
     return Campaign(id=CAMPAIGN_ID, countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"],
-                    config_snapshot=config, created_at=RETRIEVED_AT, updated_at=RETRIEVED_AT)
+                    config_snapshot=config.model_copy(update={"people_provider": None}), created_at=RETRIEVED_AT, updated_at=RETRIEVED_AT)
 
 
 def assessment() -> Assessment:
@@ -191,3 +191,40 @@ def test_sqlite_schema_does_not_change(tmp_path):
 def test_reserved_model_has_a_published_price():
     """Sin precio acotado no se puede reservar la llamada (§14.5)."""
     assert MODEL_ID in CLAUDE_PRICES_PER_MTOK
+
+
+def test_apollo_v1_request_fingerprints_are_fixed():
+    from prospecting.providers.apollo import APOLLO_OPERATIONS, enrichment_request, people_search_request
+
+    client = ProviderClient(None, APOLLO_OPERATIONS)
+    assert {
+        "broad": client.fingerprint(people_search_request(company(), ["Product Manager"], ACCOUNT)),
+        "roles": client.fingerprint(people_search_request(company(), ["Product Manager"], ACCOUNT, by_roles=True)),
+        "enrichment": client.fingerprint(enrichment_request("apollo-sintetico-1", ACCOUNT)),
+    } == {
+        "broad": "606b51a5dca7dfa3467dcbda7f0179f975e04c6d67978691b67c70cf641ab5a9",
+        "roles": "7c92f3bf535dfa4c9c07ffa6a25ed0c6923c008657d50b34a1ad93a20c7bb98f",
+        "enrichment": "9f62205cbb37cb6af56a6a319195c089d09d49a72f39aebde0ed56d6da963a66",
+    }
+
+
+def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
+    from prospecting.pipeline.contacts import PEOPLE_SEARCH_KEY, ENRICHMENTS_KEY
+    from prospecting.providers.apollo import ApolloSearchResponse, parse_search
+
+    data = ApolloSearchResponse.model_validate({"total_entries": 1, "people": [{
+        "id": "apollo-sintetico-1", "first_name": "Persona", "last_name_obfuscated": "S***", "title": "CTO"}]})
+    [(candidate, facts)] = parse_search(company(), data, REQUEST_ID, NOW)
+    assert str(candidate.id) == "099a33e4-625d-5787-9ac8-ed0e03af8b0a"
+    assert [item.external_reference for item in facts] == [
+        f"apollo_v1:apollo-sintetico-1:{REQUEST_ID}#{field}" for field in ("name", "title", "search")]
+    current = campaign(config).model_copy(update={"config_snapshot": config.model_copy(update={"people_provider": "apollo"})})
+    output = json.dumps({"candidates": [{"contact_id": None, "name": "Persona Sintética Uno", "facts": [
+        {"field": field, "value": value, "evidence_id": str(DIRECTORY), "quote": NOMINAL}
+        for field, value in (("name", "Persona Sintética Uno"), ("title", "Product Manager"),
+                             ("employment", "Empresa Uno"), ("email", "persona@empresa-uno.example"))]}]})
+    [(public, public_facts)] = parse_contacts_output(output, "end_turn", company(), assessment(), current,
+                                                   [evidence()[2]], NOW, REQUEST_ID)
+    assert str(public.id) == "c238a15c-f22a-5ac2-aa08-ae55ab7f7ac8"
+    assert all((item.external_reference or "").startswith(f"apollo_public_v1:{REQUEST_ID}") for item in public_facts)
+    assert (PEOPLE_SEARCH_KEY, ENRICHMENTS_KEY) == ("contacts:apollo_search", "contacts:apollo_enrichments")

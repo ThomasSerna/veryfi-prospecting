@@ -17,7 +17,7 @@ from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
 from prospecting.contacts import (
-    ContactMatch, ContactMatchConfig, channel_is_usable, contact_match, derive_readiness, employment_basis, load_contact_match,
+    ContactMatch, ContactMatchConfig, channel_is_usable, contact_context, contact_match, derive_readiness, employment_basis, load_contact_match,
     match_sort_key, target_roles, validate_contact,
 )
 from prospecting.db import Database
@@ -30,13 +30,13 @@ from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract,
     Evidence, Money, Priority, RunItem, RunStage, Text, utc_now,
 )
-from prospecting.pipeline.calls import grant_for, seconds_left
+from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
 from prospecting.pipeline.contacts import find_contacts
 from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
-from prospecting.providers.hunter import HUNTER_OPERATIONS, HunterAccess, PROVIDER as HUNTER
+from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess, PROVIDER as APOLLO
 from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION, TAVILY_OPERATIONS
 from prospecting.sources import is_search_evidence
 
@@ -90,7 +90,7 @@ class ProviderAccess(Contract):
     tavily_account_ref: Text
     claude_account_ref: Text
     claude_funding_source: FundingSource = "prepaid"
-    hunter_access: HunterAccess | None = None
+    apollo_access: ApolloAccess | None = None
 
     @model_validator(mode="after")
     def validate_accounts(self):
@@ -99,12 +99,12 @@ class ProviderAccess(Contract):
             raise ValueError("Las cuentas de consumo deben tener referencias únicas.")
         expected = [(TAVILY, self.tavily_account_ref, "free_credit"),
                     (CLAUDE_PROVIDER, self.claude_account_ref, self.claude_funding_source)]
-        hunter = self.hunter_access
-        if hunter is not None:
-            if any(operation in ("email_finder", "email_verifier") for operation in hunter.enabled_operations) and not hunter.automatic_lead_saving_disabled:
-                raise ValueError("Debe estar comprobada la desactivación del guardado automático de Hunter.")
-            expected.extend((provider, account, hunter.funding_source) for provider, _, account in
-                            provider_operations(self) if provider == HUNTER)
+        apollo = self.apollo_access
+        if apollo is not None:
+            expected.append((APOLLO, apollo.account_ref, apollo.funding_source))
+        if apollo is not None and (accounts.get((APOLLO, apollo.account_ref)) is None or
+                                   accounts[(APOLLO, apollo.account_ref)].credit_limit is None):
+            raise ValueError("Apollo necesita un cupo de créditos comprobado.")
         if any(accounts.get((provider, account)) is None or
                accounts[provider, account].funding_source != funding for provider, account, funding in expected):
             raise ValueError("Cada proveedor habilitado necesita una cuenta y financiación comprobadas.")
@@ -159,12 +159,9 @@ def provider_operations(access: ProviderAccess) -> list[tuple[str, str, str]]:
     operations = [(TAVILY, SEARCH_OPERATION, access.tavily_account_ref),
                   (TAVILY, EXTRACT_OPERATION, access.tavily_account_ref),
                   (CLAUDE_PROVIDER, CLAUDE_OPERATION, access.claude_account_ref)]
-    if access.hunter_access is not None:
-        hunter = access.hunter_access
-        operations.extend((HUNTER, operation,
-                           hunter.verification_account_ref or hunter.search_account_ref
-                           if operation == "email_verifier" else hunter.search_account_ref)
-                          for operation in hunter.enabled_operations)
+    if access.apollo_access is not None:
+        apollo = access.apollo_access
+        operations.extend((APOLLO, operation, apollo.account_ref) for operation in apollo.enabled_operations)
     return operations
 
 
@@ -230,7 +227,7 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 match = _exclusion_match(company, campaign, exclusions)
                 excluded = item.business_status == BusinessStatus.EXCLUDED or match is not None and match.strength == "confirmed"
                 assessment = None if item.last_assessment_id is None else db.get_assessment(item.last_assessment_id)
-                evidence, contacts = db.list_evidence(company.id), db.list_contacts(company.id)
+                contacts, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
                 roles = None if assessment is None else target_roles(company, assessment, campaign)
                 results = []
                 for contact in contacts:
@@ -287,6 +284,7 @@ def _approve(budget: Budget, access: ProviderAccess, approvals: list[Authorizati
     return [budget.authorize(SpendingAuthorization(**item.model_dump(), authorized_at=utc_now())) for item in inputs]
 
 
+
 def execute_campaign(db_path: Path, campaign_id: UUID, *, access: ProviderAccess,
                      approvals: list[AuthorizationInput], progress: Callable[[CompanyProgress], None] | None = None,
                      exclusions_path: Path | None = None) -> CampaignReport:
@@ -306,12 +304,13 @@ def execute_campaign(db_path: Path, campaign_id: UUID, *, access: ProviderAccess
                 return _report(db, campaign_id, stop_reason="another_campaign_active" if
                                active is not None and active.id != campaign_id else None, exclusions=exclusions)
             budget = Budget(db, campaign.config_snapshot.defaults.budget, access.account_allowances)
+            require_apollo_access(campaign, access.apollo_access, budget)
             authorizations = _approve(budget, access, approvals, campaign_id)
-            client = ProviderClient(budget, TAVILY_OPERATIONS + HUNTER_OPERATIONS)
+            client = ProviderClient(budget, TAVILY_OPERATIONS + APOLLO_OPERATIONS)
             return _execute(db, campaign_id, exclusions, lambda saved: _Run(
                 db, budget, client, saved, authorizations=authorizations, tavily_account_ref=access.tavily_account_ref,
                 claude=ClaudeClient(budget), claude_account_ref=access.claude_account_ref,
-                claude_funding_source=access.claude_funding_source, hunter_access=access.hunter_access,
+                claude_funding_source=access.claude_funding_source, apollo_access=access.apollo_access,
                 exclusions=exclusions, progress=progress))
         finally:
             _EXECUTION.release()
@@ -333,6 +332,9 @@ def review_company(db_path: Path, campaign_id: UUID, company_id: UUID, *,
         raise ValueError("La campaña está ejecutándose; espera antes de revisarla.")
     try:
         with _saved_database(db_path) as db, db.transaction():
+            campaign = db.get_campaign(campaign_id)
+            if campaign is None or campaign.config_snapshot.people_provider != "apollo":
+                raise ValueError("La campaña histórica solo permite consulta y exportación.")
             item = db.get_run_item(campaign_id, company_id)
             if item is None:
                 raise ValueError("La empresa no pertenece a esta campaña.")
@@ -412,11 +414,11 @@ class _Run:
     """Una sesión de ejecución de la campaña; su estado vive en SQLite, no aquí."""
 
     def __init__(self, db, budget, client, campaign, *, authorizations, tavily_account_ref, claude,
-                 claude_account_ref, claude_funding_source, hunter_access, exclusions, progress):
+                 claude_account_ref, claude_funding_source, apollo_access, exclusions, progress):
         self.db, self.budget, self.client, self.campaign = db, budget, client, campaign
         self.authorizations, self.tavily_account_ref = authorizations or [], tavily_account_ref
         self.claude, self.claude_account_ref = claude, claude_account_ref
-        self.claude_funding_source, self.hunter_access = claude_funding_source, hunter_access
+        self.claude_funding_source, self.apollo_access = claude_funding_source, apollo_access
         self.exclusions, self.progress = exclusions, progress
         used = sum(item.consumed_limits.active_seconds for item in db.list_run_items(campaign.id))
         # Tope global (§9): el tiempo ya registrado por las empresas se descuenta al reanudar.
@@ -616,7 +618,7 @@ class _Run:
             if self.out_of_time():
                 return
             report = find_contacts(
-                self.db, self.budget, self.client, self.campaign.id, company_id, hunter_access=self.hunter_access,
+                self.db, self.budget, self.client, self.campaign.id, company_id, apollo_access=self.apollo_access,
                 authorizations=self.authorizations, tavily_account_ref=self.tavily_account_ref, claude=self.claude,
                 claude_account_ref=self.claude_account_ref, claude_funding_source=self.claude_funding_source,
                 deadline=self.deadline)
@@ -629,8 +631,9 @@ class _Run:
             elif report.status == "skipped":
                 company = self.db.get_company(company_id)
                 item = self.db.get_run_item(self.campaign.id, company_id)
+                people, evidence = contact_context(self.campaign, self.db.list_contacts(company_id), self.db.list_evidence(company_id))
                 state = BusinessStatus.EXCLUDED if item.business_status == BusinessStatus.EXCLUDED else derive_readiness(
-                    assessment, self.db.list_contacts(company_id), self.db.list_evidence(company_id),
+                    assessment, people, evidence,
                     self.campaign.limits, utc_now(), company, target_roles(company, assessment, self.campaign))
                 self.complete(company_id, state, item.stop_reason if state == BusinessStatus.EXCLUDED else report.stop_reason)
             self.notify(company_id)
@@ -642,7 +645,7 @@ def run_campaign(db: Database, budget: Budget, client: ProviderClient, campaign_
                  authorizations: list[SpendingAuthorization] | None, tavily_account_ref: str,
                  claude: ClaudeClient | None = None, claude_account_ref: str | None = None,
                  claude_funding_source: Literal["free_credit", "prepaid", "new_outlay"] = "prepaid",
-                 hunter_access: HunterAccess | None = None, exclusions: ExclusionList | None = None,
+                 apollo_access: ApolloAccess | None = None, exclusions: ExclusionList | None = None,
                  progress: Callable[[CompanyProgress], None] | None = None) -> CampaignReport:
     """Ejecuta o reanuda una campaña de principio a fin, sin pedir aprobación entre empresas (§6).
 
@@ -658,10 +661,14 @@ def run_campaign(db: Database, budget: Budget, client: ProviderClient, campaign_
             raise ValueError("La campaña no existe.")
         return _report(db, campaign_id, stop_reason="campaign_already_running", exclusions=exclusions)
     try:
+        current = db.get_campaign(campaign_id)
+        if current is None:
+            raise ValueError("La campaña no existe.")
+        require_apollo_access(current, apollo_access, budget)
         return _execute(db, campaign_id, exclusions, lambda campaign: _Run(
             db, budget, client, campaign, authorizations=authorizations, tavily_account_ref=tavily_account_ref,
             claude=claude, claude_account_ref=claude_account_ref, claude_funding_source=claude_funding_source,
-            hunter_access=hunter_access, exclusions=exclusions, progress=progress))
+            apollo_access=apollo_access, exclusions=exclusions, progress=progress))
     finally:
         _EXECUTION.release()
 

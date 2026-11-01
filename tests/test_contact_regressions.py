@@ -30,7 +30,8 @@ def test_reopened_ambiguous_direct_channel_is_pending_in_ui_and_primary_csv(tmp_
     company, evidence = make_company(domain="example.com", identity_status="confirmed", segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
-    fact = Evidence(company_id=company.id, contact_id=contact_id, claim="Directorio exclusivamente sintético.",
+    fact = Evidence(company_id=company.id, contact_id=contact_id, provider="anthropic",
+                    external_reference=f"apollo_public_v1:synthetic:{contact_id}", claim="Directorio exclusivamente sintético.",
                     excerpt=f"Persona Sintética Uno, CTO de {company.name}. {publication}",
                     url="https://example.com/team", retrieved_at=now, kind="observed", source_type="primary")
     channel = Channel(contact_id=contact_id, type=kind, value=value, evidence_ids=[fact.id], retrieved_at=now,
@@ -78,7 +79,8 @@ def test_reopened_contact_with_contradictory_professional_facts_is_not_ready(tmp
     company, evidence = make_company(domain="example.com", identity_status="confirmed", segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
-    fact = Evidence(company_id=company.id, contact_id=contact_id, claim="Salida laboral exclusivamente sintética.",
+    fact = Evidence(company_id=company.id, contact_id=contact_id, provider="anthropic",
+                    external_reference=f"apollo_public_v1:synthetic:{contact_id}", claim="Salida laboral exclusivamente sintética.",
                     excerpt=f"{record} {company.name}, correo profesional persona@example.com.",
                     url="https://example.com/team", retrieved_at=now, kind="observed", source_type="primary")
     channel = Channel(contact_id=contact_id, type="email", value="persona@example.com", evidence_ids=[fact.id],

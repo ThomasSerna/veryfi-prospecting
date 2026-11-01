@@ -29,7 +29,7 @@ DB_NAME = "demo-sintetica.sqlite3"
 EXCLUSIONS_NAME = "exclusiones-sinteticas.json"
 # Nunca se crea: sin archivo de acceso, la interfaz rechaza toda ejecución.
 ACCESS_NAME = "sin-acceso-a-proveedores.json"
-PROVIDER_KEYS = ("TAVILY_API_KEY", "ANTHROPIC_API_KEY", "HUNTER_API_KEY", "APOLLO_API_KEY")
+PROVIDER_KEYS = ("TAVILY_API_KEY", "ANTHROPIC_API_KEY", "APOLLO_API_KEY")
 ADDRESS = "127.0.0.1:8000"
 CRITERIA = ("document_need", "offer_match", "scale_potential", "adoption_capacity", "opportunity_timing")
 
@@ -111,6 +111,7 @@ def _person(company: Company, name: str, title: str, now: datetime, *, complete:
     directory = _primary(company.id, f"Directorio corporativo exclusivamente sintético de {company.name}.",
                          f"https://{company.domain}/equipo", f"{name}, {title} de {company.name}. Perfil ficticio.",
                          now, contact_id=contact_id)
+    directory = directory.model_copy(update={"provider": "anthropic", "external_reference": f"apollo_public_v1:demo:{contact_id}"})
     sources = {"name": [directory.id], "title": [directory.id]}
     if not complete:
         return Contact(id=contact_id, company_id=company.id, name=name, title=title, name_complete=False,
@@ -127,14 +128,14 @@ def _channel(contact: Contact, company: Company, kind: str, now: datetime) -> tu
         return Channel(contact_id=contact.id, type="linkedin", value=f"https://www.linkedin.com/in/demo-{slug.replace('.', '-')}",
                        evidence_ids=contact.employment_evidence_ids, retrieved_at=now - timedelta(days=1)), []
     email = f"{slug}@{company.domain}"
-    verified_at = now - timedelta(days=2)
-    record = Evidence(company_id=company.id, contact_id=contact.id, provider="hunter",
-                      external_reference=f"demo-sintetica:{email}", retrieved_at=verified_at, kind="observed",
-                      source_type="provider",
-                      claim=f"Registro de proveedor exclusivamente sintético: {email} verificado para {contact.name}.")
-    return Channel(contact_id=contact.id, type="email", value=email, evidence_ids=[record.id], provider_status="valid",
-                   normalized_status="verified", retrieved_at=verified_at, verified_at=verified_at,
-                   professional=True, direct=True), [record]
+    record = _primary(company.id, "Publicación nominal exclusivamente sintética del correo profesional.",
+                      f"https://{company.domain}/equipo", f"{contact.name}, {contact.title} de {company.name}, correo profesional {email}.",
+                      now, contact_id=contact.id)
+    record = record.model_copy(update={"provider": "anthropic", "external_reference": f"apollo_public_v1:demo:email:{contact.id}"})
+    return Channel(contact_id=contact.id, type="email", value=email, evidence_ids=[record.id],
+                   published_evidence_ids=[record.id], normalized_status="published_professional",
+                   retrieved_at=record.retrieved_at, professional=True, direct=True), [record]
+
 
 
 def build_demo(directory: Path, now: datetime) -> Campaign:

@@ -19,6 +19,7 @@ from django.urls import reverse
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
+from prospecting.providers.apollo import ApolloAccess
 from prospecting.budget import AccountAllowance
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
@@ -91,9 +92,12 @@ def ui_paths(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def ui_results(ui_paths, make_campaign, make_company, make_assessment):
+def ui_results(ui_paths, make_campaign, make_company, make_assessment, request, config):
     now = utc_now()
-    campaign = make_campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"], status="completed")
+    legacy = getattr(request, "param", None) == "legacy"
+    snapshot = config.model_copy(update={"people_provider": None}) if legacy else config
+    campaign = make_campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"],
+                             status="completed", config_snapshot=snapshot)
     companies = []
     contact_id = uuid4()
     with Database(ui_paths.db) as db:
@@ -114,6 +118,8 @@ def ui_results(ui_paths, make_campaign, make_company, make_assessment):
             if index:
                 continue
             fact = Evidence(company_id=company.id, contact_id=contact_id, retrieved_at=now, kind="observed",
+                            provider=None if legacy else "anthropic",
+                            external_reference=None if legacy else f"apollo_public_v1:synthetic:{contact_id}",
                             source_type="primary", url=f"https://{company.domain}/team",
                             claim="Directorio profesional exclusivamente sintético.",
                             excerpt=f"Persona Sintética Uno, CTO de {company.name}, perfil profesional nominal.")
@@ -130,10 +136,13 @@ def ui_results(ui_paths, make_campaign, make_company, make_assessment):
 
 @pytest.fixture
 def ui_access(ui_paths, monkeypatch):
-    for variable in ("TAVILY_API_KEY", "ANTHROPIC_API_KEY"):
+    for variable in ("TAVILY_API_KEY", "ANTHROPIC_API_KEY", "APOLLO_API_KEY"):
         monkeypatch.setenv(variable, "clave-exclusivamente-sintetica")
-    access = ProviderAccess(tavily_account_ref="tavily-sintetica", claude_account_ref="claude-sintetica",
+    access = ProviderAccess(apollo_access=ApolloAccess(account_ref="apollo-sintetica", source_reference="Acceso sintético",
+                            observed_at=utc_now(), work_email_verified=True, access_verified=True), tavily_account_ref="tavily-sintetica", claude_account_ref="claude-sintetica",
                             account_allowances=[
+                                AccountAllowance(provider="apollo", account_ref="apollo-sintetica", funding_source="free_credit",
+                                                 credit_limit="10", source_reference="Cupo sintético", observed_at=utc_now()),
                                 AccountAllowance(provider="tavily", account_ref="tavily-sintetica", funding_source="free_credit",
                                                  credit_limit="10", source_reference="Cupo sintético", observed_at=utc_now()),
                                 AccountAllowance(provider="anthropic", account_ref="claude-sintetica", funding_source="prepaid",
@@ -213,9 +222,9 @@ def test_invalid_provider_configuration_does_not_echo_sensitive_input(ui_paths, 
     ("0.1234567", "0.123456"),
 ])
 def test_authorization_suggests_available_subcent_cost_without_rounding_up(ui_results, ui_access, available, expected):
-    allowance = ui_access.account_allowances[1].model_copy(update={"cost_limit_usd": Decimal(available)})
-    view = read_campaign(ui_results.paths.db, ui_results.campaign.id,
-                         account_allowances=[ui_access.account_allowances[0], allowance])
+    allowances = [item.model_copy(update={"cost_limit_usd": Decimal(available)}) if item.provider == "anthropic"
+                  else item for item in ui_access.account_allowances]
+    view = read_campaign(ui_results.paths.db, ui_results.campaign.id, account_allowances=allowances)
     form = AuthorizationForm(access=ui_access, view=view)
     row = next(row for row in form.operation_rows if row["provider"] == "anthropic")
     suggested = form.fields["cost_anthropic_messages"].clean(row["suggested_cost"])
@@ -291,6 +300,7 @@ def test_manual_confirmation_preserves_filters_and_company_sequence(ui_results, 
     assert f'href="{escape(url("campaign", case.campaign.id) + "?" + query)}"' in saved_page
 
 
+@pytest.mark.parametrize("ui_results", ["legacy"], indirect=True)
 def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client, make_hunter_contact):
     case = ui_results
     contact, evidence = make_hunter_contact(case.companies[0], case.now)
@@ -421,6 +431,7 @@ def test_hostile_external_text_is_escaped_and_private_source_is_not_a_link(
     private = Evidence(company_id=company.id, retrieved_at=now, kind="observed", source_type="primary",
                        url="http://127.0.0.1/panel", claim="Fuente sintética con destino privado.")
     person = Evidence(company_id=company.id, contact_id=contact_id, retrieved_at=now, kind="observed",
+                      provider="anthropic", external_reference=f"apollo_public_v1:synthetic-hostile:{contact_id}",
                       source_type="primary", url="https://synthetic-hostile.example/equipo",
                       claim=f"Persona sintética {hostile}", excerpt=hostile)
     contact = Contact(id=contact_id, company_id=company.id, name=f"Persona {hostile}", title=f"Cargo {hostile}",

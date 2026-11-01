@@ -36,7 +36,7 @@ ALLOWED = {
     "prospecting.contact_extraction": {
         "prospecting.contacts", "prospecting.haiku", "prospecting.models", "prospecting.sources",
     },
-    "prospecting.providers.hunter": {
+    "prospecting.providers.apollo": {
         "prospecting.contacts", "prospecting.models", "prospecting.providers.http", "prospecting.sources",
     },
     "prospecting.pipeline": {
@@ -47,11 +47,12 @@ ALLOWED = {
         "prospecting.budget", "prospecting.contacts", "prospecting.db", "prospecting.discovery",
         "prospecting.identity", "prospecting.models", "prospecting.pipeline.calls", "prospecting.pipeline.contacts",
         "prospecting.pipeline.discovery", "prospecting.pipeline.qualification", "prospecting.pipeline.research",
-        "prospecting.providers", "prospecting.providers.hunter", "prospecting.providers.tavily",
+        "prospecting.providers", "prospecting.providers.apollo", "prospecting.providers.tavily",
         "prospecting.sources",
     },
     "prospecting.pipeline.calls": {
         "prospecting.budget", "prospecting.haiku", "prospecting.models", "prospecting.providers",
+        "prospecting.providers.apollo",
     },
     "prospecting.pipeline.discovery": {
         "prospecting.budget", "prospecting.db", "prospecting.discovery", "prospecting.identity", "prospecting.models",
@@ -68,7 +69,7 @@ ALLOWED = {
     "prospecting.pipeline.contacts": {
         "prospecting.budget", "prospecting.contact_extraction", "prospecting.contacts", "prospecting.db",
         "prospecting.models", "prospecting.pipeline.calls", "prospecting.providers",
-        "prospecting.providers.hunter", "prospecting.providers.tavily", "prospecting.sources",
+        "prospecting.providers.apollo", "prospecting.providers.tavily", "prospecting.sources",
     },
 }
 # Envío de mensajes y automatización de navegador quedan fuera del paquete y de la interfaz (§1, §15).
@@ -80,7 +81,7 @@ INTERFACE_ALLOWED = {"prospecting.pipeline", "prospecting.models", "prospecting.
 # Únicas operaciones de proveedor habilitadas: búsqueda, lectura y verificación.
 READ_OPERATIONS = {
     ("tavily", "search"), ("tavily", "extract"),
-    ("hunter", "domain_search"), ("hunter", "email_finder"), ("hunter", "email_verifier"),
+    ("apollo", "people_search"), ("apollo", "people_enrichment"),
 }
 
 

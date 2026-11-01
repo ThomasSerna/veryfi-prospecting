@@ -1,4 +1,5 @@
 {
+  "people_provider": "apollo",
   "schema_version": 1,
   "catalog": {
     "version": "catalog_v1",
