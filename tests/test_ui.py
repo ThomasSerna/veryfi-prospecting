@@ -2,6 +2,7 @@
 
 import csv
 from datetime import timedelta
+from decimal import Decimal
 from html import escape
 from html.parser import HTMLParser
 from io import StringIO
@@ -26,6 +27,7 @@ from prospecting.pipeline import ProviderAccess, read_campaign
 from prospecting.pipeline import campaign as bridge
 from prospecting.sources import validate_public_url
 from core.presentation import stop_message
+from core.forms import AuthorizationForm
 
 
 @pytest.fixture
@@ -206,6 +208,21 @@ def test_invalid_provider_configuration_does_not_echo_sensitive_input(ui_paths, 
     assert not ui_paths.db.exists()
 
 
+@pytest.mark.parametrize(("available", "expected"), [
+    ("0.006", "0.006"), ("0.004", "0.004"), ("0.015", "0.015"),
+    ("0.1234567", "0.123456"),
+])
+def test_authorization_suggests_available_subcent_cost_without_rounding_up(ui_results, ui_access, available, expected):
+    allowance = ui_access.account_allowances[1].model_copy(update={"cost_limit_usd": Decimal(available)})
+    view = read_campaign(ui_results.paths.db, ui_results.campaign.id,
+                         account_allowances=[ui_access.account_allowances[0], allowance])
+    form = AuthorizationForm(access=ui_access, view=view)
+    row = next(row for row in form.operation_rows if row["provider"] == "anthropic")
+    suggested = form.fields["cost_anthropic_messages"].clean(row["suggested_cost"])
+    assert suggested == Decimal(expected)
+    assert suggested <= Decimal(available)
+
+
 def test_filters_and_company_detail_show_persisted_evidence(ui_results, client):
     case = ui_results
     response = client.get(url("company", case.campaign.id, case.companies[0].id))
@@ -257,6 +274,21 @@ def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_act
     assert result.business_status == "ready_alternative"
     assert result.contacts[0].usable_channels[0].manual_confirmed_at is not None
     assert result.run_item.review_status == "pending"
+
+
+def test_manual_confirmation_preserves_filters_and_company_sequence(ui_results, client):
+    case = ui_results
+    company_path = url("company", case.campaign.id, case.companies[0].id)
+    confirmation_path = url("confirm_channel", case.campaign.id, case.companies[0].id)
+    query = "countries=CO&segments=fintech_software"
+    page = text(client.get(f"{company_path}?{query}"))
+    assert f'action="{escape(confirmation_path + "?" + query)}"' in page
+    response = client.post(f"{confirmation_path}?{query}", confirmation(case, confirmed="on"))
+    assert response.status_code == 302
+    assert response.url == f"{company_path}?{query}&saved=channel#contacts"
+    saved_page = text(client.get(response.url))
+    assert "Empresa 1 de 1" in saved_page
+    assert f'href="{escape(url("campaign", case.campaign.id) + "?" + query)}"' in saved_page
 
 
 def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client, make_hunter_contact):

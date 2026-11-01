@@ -1,6 +1,6 @@
 """Formularios de ventas; los contratos del pipeline conservan la validación final."""
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 import os
 from django import forms
 from pydantic import ValidationError
@@ -119,7 +119,7 @@ class AuthorizationForm(forms.Form):
             else:
                 candidates = [val for val in (avail_cost, campaign_avail) if val is not None]
                 best_cost = min(candidates) if candidates else Decimal(0)
-                suggested_cost = f"{max(best_cost, Decimal(0)):.2f}" if best_cost > 0 else "0"
+                suggested_cost = str(best_cost.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)) if best_cost > 0 else "0"
             suggested_credits = str(min(avail_credits, Decimal(10))) if avail_credits is not None and avail_credits > 0 else "0"
             self.operation_rows.append({
                 "provider": provider, "operation": operation, "account_ref": account_ref,
