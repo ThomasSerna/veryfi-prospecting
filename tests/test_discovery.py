@@ -627,3 +627,81 @@ def test_resolve_company_identity_persists_entity_structure_and_size_with_proven
     user_prompt = payload["messages"][0]["content"]
     assert '"entity_type": "subsidiary"' in user_prompt
     assert '"icp_tier": "tier_2"' in user_prompt
+
+
+def test_discovery_queries_v2_favors_enterprise_and_preserves_v1_reproducibility(make_campaign):
+    """Mantiene v1 reproducible y orienta v2 a cuentas enterprise con señal documental (T13)."""
+    from prospecting.discovery import ENTERPRISE_TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION, load_icp_enterprise
+
+    icp = load_icp_enterprise()
+    assert icp.version == "icp_enterprise_v1" and icp.validation_status == "pending"
+
+    campaign = make_campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"])
+    queries_v1 = build_search_queries(campaign, template_version=LEGACY_TEMPLATE_VERSION)
+    queries_v2 = build_search_queries(campaign, template_version=ENTERPRISE_TEMPLATE_VERSION)
+    assert len(queries_v1) == 8 and len(queries_v2) == 8
+    assert all(item.template_version == "discovery_queries_v1" for item in queries_v1)
+    assert all(item.template_version == "discovery_queries_v2" for item in queries_v2)
+    assert [item.query for item in queries_v1] != [item.query for item in queries_v2]
+    for item in queries_v2:
+        assert any(word in item.query.lower() for word in ("recibos", "comprobantes", "facturas", "ticket"))
+        assert any(
+            word in item.query.lower()
+            for word in ("corporativa", "corporativo", "enterprise", "consumo masivo", "grupo empresarial")
+        )
+
+
+def test_select_candidates_prioritizes_enterprise_document_fit_over_no_fit_and_microsites(make_campaign):
+    """Prioriza cuentas grandes con necesidad documental frente a conglomerados no-fit o micrositios."""
+    from prospecting.discovery import LEGACY_TEMPLATE_VERSION, SearchHit, compare_discovery_versions
+
+    campaign = make_campaign(countries=["CO"], segments=["fintech_software"], max_companies=2)
+    q_v2 = build_search_queries(campaign)[0]
+    q_v1 = build_search_queries(campaign, template_version=LEGACY_TEMPLATE_VERSION)[0]
+    req_id = uuid4()
+
+    def make_hit(query, rank, host, title, snippet):
+        return SearchHit(
+            url=f"https://{host}/",
+            host=host,
+            title=title,
+            snippet=snippet,
+            rank=rank,
+            query=query,
+            query_index=0,
+            local_request_id=req_id,
+            retrieved_at=RETRIEVED_AT,
+        )
+
+    hits_v2 = [
+        make_hit(q_v2, 1, "minera-andina.example", "Minera Andina", "Grupo de minería y generación eléctrica en Colombia."),
+        make_hit(q_v2, 2, "promo.gastos-pyme.example", "Promo Gastos", "Sube tu recibo en esta promoción."),
+        make_hit(
+            q_v2, 3, "corp-spend.example", "Corp Spend",
+            "Plataforma corporativa de tarjetas empresariales y control de gastos que escanea recibos en Colombia.",
+        ),
+        make_hit(
+            q_v2, 4, "enterprise-ap.example", "Enterprise AP",
+            "Software enterprise de cuentas por pagar y ERP que procesa facturas de proveedores.",
+        ),
+    ]
+    candidates_v2, _ = group_candidates(hits_v2, 60)
+    selected_v2, _ = select_candidates(candidates_v2, campaign)
+    assert [item.host for item in selected_v2] == ["corp-spend.example", "enterprise-ap.example"]
+
+    hits_v1 = [
+        make_hit(q_v1, 1, "cliente-actual.example", "Cliente Actual", "Tarjetas corporativas y recibos."),
+        make_hit(q_v1, 2, "minera-andina.example", "Minera Andina", "Grupo de minería y generación eléctrica en Colombia."),
+        make_hit(q_v1, 3, "pyme-recibos.example", "Pyme Recibos", "App sencilla para escanear recibos."),
+    ]
+    comparison = compare_discovery_versions(
+        campaign,
+        hits_v1,
+        hits_v2,
+        excluded_domains={"cliente-actual.example"},
+    )
+    assert "cliente-actual.example" not in comparison.v1_selected_hosts
+    assert comparison.v2_enterprise_candidates == 2
+    assert comparison.v1_enterprise_candidates == 0
+    assert comparison.v2_no_fit_candidates == 0
+    assert comparison.v1_no_fit_candidates == 1
