@@ -24,9 +24,9 @@ from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, Filter
 from core.presentation import READY, download_csv
 
 SAVED_MESSAGES = {
-    "closed": "La campaña se cerró conservando los resultados y el consumo registrado.",
-    "review": "Decisión del equipo guardada en la ficha de la empresa.",
-    "channel": "Confirmación manual del canal guardada. La disponibilidad se actualizó.",
+    "closed": "Campaña cerrada.",
+    "review": "Revisión guardada.",
+    "channel": "Canal confirmado.",
 }
 FILTER_KEYS = ("q", "countries", "segments", "priorities", "availability")
 
@@ -170,11 +170,13 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
                 form = confirmation_form
             form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
             forms.append({"person": person, "channel": channel, "form": form})
+    evidence_numbers = {fact.id: index for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
                    confirmation_forms=forms, nav_active="campaigns",
                    prev_company=prev_company, next_company=next_company,
-                   sequence_position=idx + 1, sequence_total=len(sequence))
+                   sequence_position=idx + 1, sequence_total=len(sequence),
+                   evidence_numbers=evidence_numbers)
     return context
 
 

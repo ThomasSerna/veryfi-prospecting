@@ -19,10 +19,10 @@ FUNDING_LABELS = {
 class CampaignForm(forms.Form):
     draft_id = forms.UUIDField(widget=forms.HiddenInput)
     countries = forms.MultipleChoiceField(label="Países", widget=forms.CheckboxSelectMultiple)
-    segments = forms.MultipleChoiceField(label="Tipo de empresa", widget=forms.CheckboxSelectMultiple)
-    keywords = forms.CharField(label="¿Qué quieres encontrar?", required=False, max_length=1000,
-                              help_text="Palabras o frases opcionales, separadas por comas.")
-    max_companies = forms.IntegerField(label="Empresas a investigar", min_value=1, max_value=20)
+    segments = forms.MultipleChoiceField(label="Segmentos", widget=forms.CheckboxSelectMultiple)
+    keywords = forms.CharField(label="Palabras clave (opcional)", required=False, max_length=1000,
+                              help_text="Separadas por comas.")
+    max_companies = forms.IntegerField(label="Máximo de empresas", min_value=1, max_value=20)
 
     def __init__(self, *args, config, campaign_id, **kwargs):
         self.config, self.campaign_id = config, campaign_id
@@ -71,16 +71,16 @@ class FilterForm(forms.Form):
 
 
 class ReviewForm(forms.Form):
-    status = forms.ChoiceField(label="Tu decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
-    reason = forms.CharField(label="Motivo de tu decisión", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
+    status = forms.ChoiceField(label="Decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
+    reason = forms.CharField(label="Notas", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
 
 
 class ConfirmationForm(forms.Form):
     contact_id = forms.UUIDField(widget=forms.HiddenInput)
     channel_type = forms.ChoiceField(choices=[("linkedin", "LinkedIn"), ("other", "Otro canal")], widget=forms.HiddenInput)
     channel_value = forms.CharField(max_length=2048, widget=forms.HiddenInput)
-    reason = forms.CharField(label="¿Cómo comprobaste el acceso directo?", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
-    confirmed = forms.BooleanField(label="He comprobado que puedo contactar directamente a esta persona por este canal, sin enviar mensajes.")
+    reason = forms.CharField(label="Notas de verificación", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+    confirmed = forms.BooleanField(label="Canal directo comprobado")
 
 
 OPERATION_LABELS = {
@@ -94,10 +94,9 @@ OPERATION_LABELS = {
 
 
 class AuthorizationForm(forms.Form):
-    responsible = forms.CharField(label="Responsable del presupuesto", max_length=200)
-    reference = forms.CharField(label="Referencia de esta autorización", max_length=1000,
-                                help_text="Una referencia local de la aprobación; nunca claves o datos de contactos.")
-    confirmed = forms.BooleanField(label="Soy responsable del presupuesto y autorizo únicamente las operaciones y topes seleccionados.")
+    responsible = forms.CharField(label="Responsable", max_length=200)
+    reference = forms.CharField(label="Referencia", max_length=1000)
+    confirmed = forms.BooleanField(label="Autorizo las operaciones y topes seleccionados.")
 
     def __init__(self, *args, access, view, **kwargs):
         self.operations, self.operation_rows = provider_operations(access), []

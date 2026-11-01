@@ -65,3 +65,8 @@ def percentage(value):
 @register.filter
 def score(value):
     return "Desconocido" if value is None or value == "" else f"{value:.1f}"
+
+
+@register.filter
+def evidence_number(mapping, evidence_id):
+    return mapping.get(evidence_id) if isinstance(mapping, dict) else None
