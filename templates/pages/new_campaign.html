@@ -5,19 +5,17 @@
 {% block content %}
 <header class="page-heading">
   <div>
-    <h1>¿Dónde está tu próxima oportunidad?</h1>
-    <p>Define el mercado de esta campaña. Podrás revisar el presupuesto y autorizar los topes antes de empezar a investigar.</p>
+    <h1>Nueva campaña</h1>
   </div>
 </header>
 {% if is_executing or execution.is_executing %}
 <div class="notice notice-info" role="status">
-  <strong>Hay una investigación en curso.</strong>
-  <p>Espera a que termine para preparar otra campaña.</p>
+  <strong>Investigación en curso.</strong>
 </div>
 {% elif blocking_campaign %}
 <div class="notice notice-warning" role="status">
   <strong>Hay una campaña sin terminar.</strong>
-  <p>Retómala o ciérrala conservando sus resultados antes de preparar otra. <a href="{% url 'webapp:campaign' blocking_campaign.id %}" class="text-link">Ver campaña ({{ blocking_campaign|campaign_short_title }})</a></p>
+  <p><a href="{% url 'webapp:campaign' blocking_campaign.id %}" class="text-link">Abrir campaña ({{ blocking_campaign|campaign_short_title }})</a></p>
 </div>
 {% endif %}
 <div class="preparation-layout">
@@ -26,39 +24,29 @@
     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
     {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
     <fieldset {% if is_executing or execution.is_executing or blocking_campaign %}disabled{% endif %}>
-      <legend class="section-title">El mercado que quieres explorar</legend>
+      <legend class="sr-only">Criterios de campaña</legend>
       <div class="form-grid">
         {% include 'components/_field.html' with field=form.countries %}
         {% include 'components/_field.html' with field=form.segments %}
       </div>
       <div class="form-divider"></div>
-      <h2>Afina la búsqueda</h2>
       {% include 'components/_field.html' with field=form.keywords %}
       {% include 'components/_field.html' with field=form.max_companies %}
+      <dl class="budget-limits">
+        <div>
+          <dt>Tope por campaña</dt>
+          <dd>{{ config.defaults.budget.campaign_usd|money_summary }}</dd>
+        </div>
+        <div>
+          <dt>Tope por empresa</dt>
+          <dd>{{ config.defaults.budget.company_usd|money_summary }}</dd>
+        </div>
+      </dl>
       <div class="form-actions">
-        <button type="submit" class="button button-primary" data-idle-only>Preparar campaña</button>
+        <button type="submit" class="button button-primary" data-idle-only>Crear campaña</button>
         <a href="{% url 'webapp:campaigns' %}" class="button button-secondary">Cancelar</a>
       </div>
     </fieldset>
   </form>
-  <aside class="preparation-aside" aria-label="Qué pasa después">
-    <h2>Primero preparas.<br>Después decides.</h2>
-    <p>Guardar estos criterios crea el borrador en la base local sin iniciar la investigación ni consumir cupo de proveedores.</p>
-    <dl class="budget-limits">
-      <div>
-        <dt>Tope por campaña</dt>
-        <dd>{{ config.defaults.budget.campaign_usd|money_summary }}<span class="money-exact">{{ config.defaults.budget.campaign_usd|money }}</span></dd>
-      </div>
-      <div>
-        <dt>Tope por empresa</dt>
-        <dd>{{ config.defaults.budget.company_usd|money_summary }}<span class="money-exact">{{ config.defaults.budget.company_usd|money }}</span></dd>
-      </div>
-    </dl>
-    <p>En el siguiente paso podrás verificar el saldo disponible por proveedor y aprobar explícitamente cada operación.</p>
-    <div class="aside-note">
-      <strong>Todo se conserva</strong>
-      <p>Los criterios, la evidencia y el consumo quedan guardados en SQLite para retomar y revisar la campaña cuando quieras.</p>
-    </div>
-  </aside>
 </div>
 {% endblock %}
