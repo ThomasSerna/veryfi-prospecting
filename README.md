@@ -218,7 +218,10 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `PRODUCT.md` y `DESIGN.md`: contexto de ventas y decisiones visuales de la interfaz.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
-- `docs/IDEA.md` y `AGENTS.md`: requisitos y reglas de desarrollo.
+- `docs/IDEA.md`: índice de la documentación de requisitos y mapa de las secciones `§N`.
+- `docs/Project-context.md`, `docs/Business-rules.md`, `docs/Architecture.md`, `docs/Library-docs.md`, `docs/Budget-policy.md` y `docs/Testing.md`: producto y criterios de éxito, reglas de negocio, arquitectura y esquema SQLite, uso de librerías y servicios, política de gasto y pruebas mínimas por riesgo.
+- `docs/Roadmap.md`: copia y guía del backlog de los issues de GitHub, con el estado y la siguiente tarea.
+- `AGENTS.md`: reglas de desarrollo.
 
 La aplicación no carga `.env` automáticamente; `.env.example` solo enumera las variables.
 Para ejecutar proveedores, define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y
