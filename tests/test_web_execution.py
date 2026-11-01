@@ -121,7 +121,7 @@ def test_execute_starts_one_daemon_and_polling_or_second_click_cannot_repeat(
     refreshed = client.get(url("status", campaign.id)).json()
     assert refreshed["is_executing"] is False
     assert refreshed["stop_reason"] == "authorization_required"
-    assert "authorization_required" in text(client.get(url("campaign", campaign.id)))
+    assert "Permiso ausente o tope insuficiente" in text(client.get(url("campaign", campaign.id)))
 
 
 def test_pending_thread_window_blocks_every_mutation_and_export(

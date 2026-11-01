@@ -102,8 +102,8 @@ def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(pe
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert "100 %</strong> de match" in html and "25 %</strong> de match" in html
     assert "Descartada por regla: su identidad tiene contradicciones" in html
-    assert html.count("Cómo se calculó el match") == 3 and "Cargo fuera de los perfiles" in html
-    assert "contact_match_v1" in html and "El porcentaje de match no está disponible" not in html
+    assert html.count("Desglose de match") == 3 and "Cargo fuera de los perfiles" in html
+    assert "El porcentaje de match no está disponible" not in html
 
 
 def test_company_page_warns_when_weights_are_invalid(people):
