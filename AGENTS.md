@@ -2,7 +2,7 @@
 
 Prototipo académico: descubrir empresas de Latinoamérica para Veryfi, calificarlas con evidencia y proponer personas con canal directo. Ventas revisa y contacta fuera de la aplicación.
 
-`docs/IDEA.md` fija requisitos, decisiones y aceptación (`§N` remite allí). Sus valores y arquitectura son propuestas, no criterios certificados por Veryfi: impleméntalos; cambiar decisiones, valores o arquitectura exige justificación y aprobación del usuario. Este archivo regula desarrollo y Git; comprueba el estado real en los archivos pertinentes.
+`docs/IDEA.md` es el índice de la documentación de requisitos y su mapa resuelve cada `§N`. Los requisitos, decisiones y aceptación están en `docs/Project-context.md`, `docs/Business-rules.md`, `docs/Budget-policy.md`, `docs/Architecture.md`, `docs/Library-docs.md` y `docs/Testing.md`; el backlog, en `docs/Roadmap.md` (copia de los issues de GitHub, que mandan). Sus valores y arquitectura son propuestas, no criterios certificados por Veryfi: impleméntalos; cambiar decisiones, valores o arquitectura exige justificación y aprobación del usuario. Este archivo regula desarrollo y Git; comprueba el estado real en los archivos pertinentes.
 
 ## Invariantes de negocio y seguridad
 
@@ -26,20 +26,21 @@ Ante la duda, fail closed: lo no comprobado queda pendiente; lo no acotado no se
 
 ## Documentación y contexto bajo demanda
 
-Consulta por tema; la documentación especializada describe implementación, IDEA fija decisiones:
+Consulta por tema; la documentación especializada describe implementación y los archivos de requisitos fijan decisiones (el mapa de `docs/IDEA.md` resuelve los `§N` de código y pruebas):
 
-| Tema | Documentos / secciones de IDEA |
+| Tema | Documentos |
 |---|---|
-| Alcance, backlog, aceptación | §4, §17.2, §19 |
-| Descubrimiento, identidad, exclusiones, evidencia | `docs/discovery.md`; §7; perfiles/señales/cargos: §5 |
-| Calificación, IA | `docs/qualification.md`; §8, §12 |
-| Personas, canales, listo | `docs/contacts.md`; §10 completo antes de marcar listo |
-| Pipeline, esfuerzo, parada, recuperación | `docs/campaign.md`; §9, §13.3 |
-| Arquitectura, contratos, SQLite, identificadores | `docs/persistence.md`; §13 |
-| Presupuesto, proveedores, acceso | `docs/budget-providers.md`, `docs/provider-check.md`; §11, §14, §21 |
-| UI, revisión, URLs, CSV | `docs/ui.md`; §6, §15 |
-| Pruebas | §18.1 |
-| Evaluación, entrega | §18.2, §19; según la tarea: `docs/evaluation.md`, `docs/t10-evaluation.md`, `docs/delivery.md` |
+| Producto, usuarios, alcance, criterios de éxito | `docs/Project-context.md` |
+| Backlog, siguiente tarea, aceptación | `docs/Roadmap.md` (copia de los issues de GitHub; manda el tracker) |
+| Descubrimiento, identidad, exclusiones, evidencia | `docs/discovery.md`; `docs/Business-rules.md`; perfiles/señales/cargos en `docs/Project-context.md` |
+| Calificación, IA | `docs/qualification.md`; `docs/Business-rules.md`; Haiku en `docs/Library-docs.md` |
+| Personas, canales, listo | `docs/contacts.md`; `docs/Business-rules.md` completo antes de marcar listo |
+| Pipeline, esfuerzo, parada, recuperación | `docs/campaign.md`; `docs/Business-rules.md`; ejecución y recuperación en `docs/Architecture.md` |
+| Arquitectura, contratos, SQLite, identificadores | `docs/Architecture.md`; `docs/persistence.md` |
+| Presupuesto, proveedores, acceso | `docs/budget-providers.md`, `docs/provider-check.md`; `docs/Budget-policy.md`; `docs/Library-docs.md` |
+| UI, revisión, URLs, CSV | `docs/ui.md`; experiencia de uso en `docs/Project-context.md`; seguridad en `docs/Architecture.md` |
+| Pruebas | `docs/Testing.md` |
+| Evaluación, entrega | `docs/evaluation.md`, `docs/t10-evaluation.md`, `docs/delivery.md`; métricas y criterios en `docs/Project-context.md` |
 
 Antes de implementar integraciones, verifica parámetros y respuestas en documentación oficial (§21); Haiku: ID y parámetros vigentes en W4 (§21). Integrar otros proveedores requiere evaluación justificativa.
 
@@ -67,7 +68,7 @@ Antes de implementar integraciones, verifica parámetros y respuestas en documen
 ## Colaboración y límites de modificación
 
 - Edita lo de tu tarea; sin Txx, pregunta antes de tocar código compartido. Cambiar contratos compartidos (§13.2) o módulos de otra área (§16.1) exige detenerse y proponer qué y por qué.
-- `docs/IDEA.md` solo se edita por petición expresa; reporta discrepancias/decisiones nuevas con texto propuesto.
+- Los documentos de requisitos (`docs/IDEA.md`, `Project-context.md`, `Business-rules.md`, `Budget-policy.md`, `Architecture.md`, `Library-docs.md` y `Testing.md`) solo se editan por petición expresa; `docs/Roadmap.md` refleja los issues de GitHub y se actualiza cuando estos cambian. Reporta discrepancias/decisiones nuevas con texto propuesto.
 - Cambios de instalación/ejecución: actualiza `README.md` en un `docs:` aparte, como guía general sin planes futuros ni próximos Txx.
 
 ## graphify
