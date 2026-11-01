@@ -138,8 +138,10 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 
 La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
 filtrar por país, segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
-Contactos y Evidencia con referencias cruzadas numeradas (`[1]`, `[2]`), mostrando encaje,
-cobertura, criterios, caso de uso, contactos y motivos de detención sin jerga técnica.
+Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
+número de fuente (`Fuente original · dominio.com #1`, `Hunter #2`), mostrando encaje,
+cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
+`Sin evidencia`), caso de uso, contactos y motivos de detención sin jerga técnica.
 Datos desconocidos se muestran separados de cero.
 
 La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
