@@ -24,7 +24,8 @@ pages = extract_company_pages(db, budget, client, campaign.id, report.selected_c
                               urls, account_ref="cuenta-tavily", authorization=extract_grant)
 ```
 
-`run_discovery` genera consultas de plantilla (`discovery_queries_v1`) solo para los
+`run_discovery` genera consultas de plantilla (`discovery_queries_v2` en campañas con
+`people_provider="apollo"` y `discovery_queries_v1` en campañas históricas) solo para los
 países y segmentos de la campaña, con un máximo de 8 consultas `basic` de 10
 resultados cada una, y aplica el tope de 60 candidatos brutos. Agrupa los resultados
 por host exacto y selecciona hasta `max_companies`, intentando
@@ -45,7 +46,18 @@ Cada empresa queda con identidad `pending`, nombre inferido (evidencia `inferenc
 y dominio respaldado por los resultados observados. País de operación y segmento
 quedan desconocidos. La evidencia guarda la URL, `provider="tavily"`, la referencia
 de la solicitud, el fragmento acotado del buscador y `retrieved_at`.
-El fragmento del buscador solo localiza la fuente.
+El fragmento del buscador solo localiza la fuente. En `discovery_queries_v2`,
+`select_candidates` prioriza dentro de cada combinación país/segmento los candidatos cuyos
+títulos y fragmentos combinan señales documentales y señales corporativas/enterprise frente
+a micrositios promocionales o conglomerados sin caso de uso documental, y
+`compare_discovery_versions` permite comparar de forma reproducible `v1` frente a `v2` sin
+depender de llamadas ni proveedores adicionales.
+
+La calibración del ICP enterprise vive versionada en `config/icp_enterprise.json`
+(`icp_enterprise_v1`, cargada con `load_icp_enterprise`), con estado de validación
+`pending`, niveles `tier_1`/`tier_2`/`tier_3` tomados de *How Veryfi Sells*, ejemplos
+positivos y negativos por segmento, cargos de referencia (`business_champion`,
+`technical_champion`, `economic_buyer`) y política de muestra independiente.
 
 `extract_company_pages` valida cada URL: solo admite HTTP(S) hacia nombres públicos
 y rechaza IP, `localhost`, credenciales, puertos no estándar, redes sociales y
@@ -139,3 +151,17 @@ Las exclusiones guardan `business_status="excluded"` antes de cualquier
 enriquecimiento. País y segmento se acumulan con su procedencia, y una identidad
 confirmada no se degrada desde otra campaña. Repetir la resolución no duplica
 evidencia.
+
+Además, `assess_identity` y `resolve_company_identity` extraen de forma determinista sobre
+evidencia observada:
+- **Estructura societaria (`entity_name`, `entity_type`, `parent_company_id`):** distingue
+  razón social (`legal_entity`), filial (`subsidiary`) y marca (`brand`) a partir de
+  menciones explícitas en páginas primarias, vinculando `parent_company_id` cuando la
+  matriz ya está confirmada o registrando una advertencia para mantener matriz y
+  filial/marca separadas.
+- **Señales de escala (`CompanySize`):** extrae empleados o rangos, ingresos públicos
+  (`public_revenue`) y cobertura geográfica (`geographic_coverage`) junto con su alcance
+  (`scope`: `group`, `subsidiary`, `country`, `entity`), nivel (`icp_tier`: `tier_1`,
+  `tier_2`, `tier_3`, `unknown`) y `evidence_ids`. Nunca usa fragmentos de búsqueda ni
+  inventa estimaciones: cuando la escala no consta en fuentes primarias o de proveedor,
+  `company.size` permanece en `None`.

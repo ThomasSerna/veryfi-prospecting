@@ -140,7 +140,8 @@ y las instantáneas de las pruebas del pipeline los fijan:
 - Marcadores de resultados de buscador, que nunca prueban un hecho: `claim` que
   empieza por `Tavily devolvió esta página` y `external_reference` que empieza
   por `contacts_search:`.
-- Versiones: `discovery_queries_v1`, `research_queries_v1`, `haiku_assessment_v3`,
+- Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
+  `research_queries_v1`, `haiku_assessment_v3`,
   `contacts_extraction_v1`, `rubric_v1` y el esquema SQLite `user_version=1`.
 
 Estos valores de Hunter siguen identificando el historial y no se reinterpretan
@@ -160,4 +161,8 @@ identificadores sin reescribir el ledger anterior:
 
 El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
 recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera
-datos guardados ([Personas y canales](contacts.md#porcentaje-de-match)).
+datos guardados ([Personas y canales](contacts.md#porcentaje-de-match)). Del mismo modo,
+la calibración del ICP enterprise (`config/icp_enterprise.json`, `icp_enterprise_v1`) vive
+versionada fuera de SQLite, y los campos adicionales de escala en `CompanySize`
+(`public_revenue`, `geographic_coverage`, `scope`, `icp_tier`) tienen valores
+predeterminados compatibles con los registros JSON ya persistidos.
