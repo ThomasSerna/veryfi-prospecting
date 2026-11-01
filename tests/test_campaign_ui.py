@@ -260,7 +260,7 @@ def test_read_recalculates_freshness_without_overwriting_persisted_checkpoint(
     path = tmp_path / "synthetic.sqlite3"
     campaign = prepare_campaign(path, make_campaign())
     company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
-                                             operating_countries=["CO", "MX"])
+                                             operating_countries=["CO", "MX"], segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
     contact_id = uuid4()
     source = Evidence(company_id=company.id, contact_id=contact_id, claim="Directorio profesional sintético",
