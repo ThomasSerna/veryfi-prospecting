@@ -313,7 +313,7 @@
         credentials: 'same-origin',
         cache: 'no-store',
       });
-      if (!response.ok) throw new Error('No se pudo consultar el avance. Los datos guardados se conservan.');
+      if (!response.ok) throw new Error('No se pudo consultar el avance.');
       const snapshot = await response.json();
       if (snapshot.html) {
         applyLiveSnapshot(snapshot.html);
@@ -325,7 +325,7 @@
         window.location.reload();
       }
     } catch (error) {
-      showFeedback(error.message + ' Puedes volver a cargar la página para consultar el estado.', 'warning');
+      showFeedback(error.message, 'warning');
       pollTimer = window.setTimeout(poll, 5000);
     } finally {
       polling = false;
@@ -341,7 +341,7 @@
       if (errors) { errors.hidden = true; errors.replaceChildren(); }
       form.querySelectorAll?.('[aria-invalid="true"]').forEach(field => field.removeAttribute('aria-invalid'));
       setBusy(true);
-      showFeedback('Iniciando investigación. Los resultados aparecerán cuando se guarden.');
+      showFeedback('Iniciando investigación…');
       try {
         const response = await fetch(form.action, {
           method: 'POST', body: data, credentials: 'same-origin',
@@ -350,7 +350,7 @@
         const result = await response.json();
         if (!response.ok) {
           setBusy(result.is_executing === true);
-          showFeedback(result.error_message || 'No se pudo iniciar la investigación. Revisa la autorización y los topes.', 'error');
+          showFeedback(result.error_message || 'No se pudo iniciar la investigación.', 'error');
           if (errors && result.errors) {
             Object.entries(result.errors).forEach(([name, messages]) => {
               const field = form.elements?.namedItem?.(name);
@@ -370,11 +370,11 @@
         }
         const authDetails = document.querySelector('#authorization details');
         if (authDetails) authDetails.open = false;
-        showFeedback('Investigación en curso. Puedes consultar el avance y las empresas que se van guardando.');
+        showFeedback('Investigación en curso.');
         window.clearTimeout(pollTimer);
         poll();
       } catch (_error) {
-        showFeedback('No pudimos confirmar la respuesta del servidor. Consulta el avance antes de volver a ejecutar; los datos guardados se conservan.', 'warning');
+        showFeedback('No se pudo confirmar la respuesta del servidor.', 'warning');
         poll();
       }
     });

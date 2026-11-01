@@ -6,26 +6,23 @@
 <div id="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}">
   <header class="page-heading">
     <div>
-      <h1>Investigación de prospectos</h1>
-      <p>{{ campaign|campaign_title }}</p>
-      <p class="quiet-note">Preparada el {{ campaign.created_at|date:"d M Y · H:i" }} UTC · Hasta {{ campaign.max_companies }} empresas · ID {{ campaign.id|stringformat:"s"|slice:":8" }}</p>
+      <h1>{{ campaign|campaign_title }}</h1>
+      <p class="quiet-note">{{ campaign.created_at|date:"d M Y · H:i" }} · Máx. {{ campaign.max_companies }} empresas</p>
     </div>
     {% if campaign.status != 'completed' %}
-    <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar investigación{% else %}Reanudar investigación{% endif %}</a>
+    <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
     {% endif %}
   </header>
   <div id="execution-feedback" role="status" aria-live="polite">
     {% if stop_reason %}
     <div class="notice notice-warning">
       <strong>{{ stop_reason|stop_message }}</strong>
-      <p class="literal-detail">Motivo registrado: {{ stop_reason }}</p>
     </div>
     {% endif %}
   </div>
   {% if view.exclusions_status != 'validated' %}
   <div class="notice notice-warning">
     <strong>La lista de exclusiones necesita confirmación.</strong>
-    <p>Está ausente o sin validar. El estado se conserva; no se supone que no existan exclusiones.</p>
   </div>
   {% endif %}
   {% if campaign.status == 'created' and not counts.total %}
@@ -41,19 +38,16 @@
   {% endif %}
   <section class="campaign-actions" aria-label="Exportación y cierre">
     <div>
-      <h2>Comparte los resultados con ventas</h2>
-      <p>La descarga incluye la campaña completa, aunque hayas aplicado filtros. La revisión humana se conserva.</p>
+      <h2>Exportar</h2>
     </div>
     <div class="export-actions">
-      <a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-navy" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar prospectos listos ({{ counts.ready }})</a>
-      <a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-secondary" data-idle-only {% if is_executing or not counts.total %}aria-disabled="true" tabindex="-1"{% endif %}>Todos los resultados ({{ counts.total }})</a>
+      <a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-navy" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar listos ({{ counts.ready }})</a>
+      <a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-secondary" data-idle-only {% if is_executing or not counts.total %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar todos ({{ counts.total }})</a>
     </div>
-    <p class="quiet-note">“Listo” según las reglas y “Aceptado” por el equipo son decisiones distintas. El CSV de listos incluye canales actualmente utilizables.</p>
   </section>
   {% if campaign.status == 'running' or campaign.status == 'paused_budget' %}
   <form method="post" action="{% url 'webapp:close' campaign.id %}" class="close-campaign" data-idle-form>{% csrf_token %}
-    <button class="text-link" type="submit" data-idle-only {% if is_executing %}disabled{% endif %}>Cerrar campaña conservando resultados</button>
-    <p class="quiet-note">Libera el espacio para otra campaña. Los resultados y el consumo permanecen guardados.</p>
+    <button class="text-link" type="submit" data-idle-only {% if is_executing %}disabled{% endif %}>Cerrar campaña</button>
   </form>
   {% endif %}
 </div>
