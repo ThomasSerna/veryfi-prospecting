@@ -71,10 +71,5 @@ def score(value):
 
 
 @register.filter
-def evidence_number(mapping, evidence_id):
-    return mapping.get(evidence_id) if isinstance(mapping, dict) else None
-
-
-@register.filter
 def evidence_item(mapping, evidence_id):
     return mapping.get(evidence_id) if isinstance(mapping, dict) else None

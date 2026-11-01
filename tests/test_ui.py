@@ -9,7 +9,7 @@ from io import StringIO
 import os
 import re
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import django
 import pytest
@@ -549,6 +549,47 @@ def test_sequential_review_preserves_filters_and_advances_to_next_company(ui_res
     next_page = text(client.get(response.url))
     assert "Revisión guardada." in next_page
     assert "Empresa 2 de 2" in next_page
+
+
+def test_company_list_and_sequence_preserve_priority_score_name_and_tie_order(
+        ui_paths, client, make_campaign, make_company, make_assessment):
+    campaign = make_campaign(status="completed")
+    specs = [
+        ("Zeta alta", "high", 90), ("Alfa alta", "high", 90), ("Alta menor", "high", 80),
+        ("Media cero", "medium", 0), ("Media sin cifra", "medium", None),
+        ("Media igual", "medium", 0), ("Media igual", "medium", 0),
+        ("Sin evaluación", None, None), ("Insuficiente", "insufficient_evidence", None),
+        ("Baja", "low", 100), ("Excluida", "excluded", 100),
+    ]
+    companies = []
+    with Database(ui_paths.db) as db:
+        db.save_campaign(campaign)
+        for index, (name, priority, score) in enumerate(specs, start=1):
+            company, facts = make_company(id=UUID(int=index), name=f"Empresa sintética {name}")
+            db.save_company(company, evidence=facts)
+            item = db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id))
+            if priority is not None:
+                assessment = make_assessment(campaign.id, company.id, priority=priority, fit_score=score)
+                db.save_assessment(assessment)
+                db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+            companies.append(company)
+    expected = [companies[index] for index in (1, 0, 2, 3, 5, 6, 4, 8, 7, 9, 10)]
+    paths = [url("company", campaign.id, company.id) for company in expected]
+
+    def company_links(response):
+        links = Links()
+        links.feed(text(response))
+        return [link for link in links.urls if link in paths]
+
+    assert company_links(client.get(url("campaign", campaign.id))) == paths
+    for index, path in enumerate(paths):
+        page = client.get(path)
+        assert f"Empresa {index + 1} de {len(paths)}" in text(page)
+        assert company_links(page) == paths[max(0, index - 1):index] + paths[index + 1:index + 2]
+    fallback = client.get(f"{paths[8]}?priorities=high")
+    assert "Empresa 9 de 11" in text(fallback)
+    assert f'href="{paths[7]}?priorities=high"' in text(fallback)
+    assert f'href="{paths[9]}?priorities=high"' in text(fallback)
 
 
 def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_status_skips_html(ui_results, client):

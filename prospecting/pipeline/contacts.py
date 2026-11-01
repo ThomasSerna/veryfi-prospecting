@@ -95,9 +95,7 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
 
 
 def _contact_error_reason(error) -> str:
-    if isinstance(error, BudgetError):
-        return error.code
-    if isinstance(error, ContactError):
+    if isinstance(error, (BudgetError, ContactError)):
         return error.code
     if error.provider == "hunter":
         return classify_hunter_error(error)

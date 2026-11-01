@@ -29,6 +29,7 @@ SAVED_MESSAGES = {
     "channel": "Canal confirmado.",
 }
 FILTER_KEYS = ("q", "countries", "segments", "priorities", "availability")
+PRIORITY_ORDER = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
 
 
 def _paths():
@@ -108,6 +109,11 @@ def _clean_filter_query(filter_form):
     return urlencode(pairs), active_groups
 
 
+def _company_sort_key(item):
+    return (PRIORITY_ORDER.get(None if item.assessment is None else item.assessment.priority, 2),
+            -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name)
+
+
 def _campaign_context(request, campaign_id):
     context = _base()
     view = _campaign_view(campaign_id, context)
@@ -125,9 +131,7 @@ def _campaign_context(request, campaign_id):
                    and (not selected["availability"] or item.business_status in selected["availability"])]
     else:
         results = []
-    order = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
-    results.sort(key=lambda item: (order.get(None if item.assessment is None else item.assessment.priority, 2),
-                                   -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name))
+    results.sort(key=_company_sort_key)
     filter_query, active_filter_count = _clean_filter_query(filter_form)
     form = None if context["access"] is None else AuthorizationForm(access=context["access"], view=view)
     counts = {"total": len(view.companies), "completed": sum(item.run_item.stage == "completed" for item in view.companies),
@@ -152,10 +156,7 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
         raise Http404("La empresa no pertenece a esta campaña.")
     sequence = context["results"]
     if not any(item.company.id == company_id for item in sequence):
-        order = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
-        sequence = sorted(context["view"].companies, key=lambda item: (
-            order.get(None if item.assessment is None else item.assessment.priority, 2),
-            -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name))
+        sequence = sorted(context["view"].companies, key=_company_sort_key)
     idx = next((i for i, item in enumerate(sequence) if item.company.id == company_id), 0)
     prev_company = sequence[idx - 1].company if idx > 0 else None
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
@@ -170,14 +171,13 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
                 form = confirmation_form
             form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
             forms.append({"person": person, "channel": channel, "form": form})
-    evidence_numbers = {fact.id: index for index, fact in enumerate(result.evidence, start=1)}
     evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
                    confirmation_forms=forms, nav_active="campaigns",
                    prev_company=prev_company, next_company=next_company,
                    sequence_position=idx + 1, sequence_total=len(sequence),
-                   evidence_numbers=evidence_numbers, evidence_items=evidence_items)
+                   evidence_items=evidence_items)
     return context
 
 
