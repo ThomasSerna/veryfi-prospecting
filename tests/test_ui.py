@@ -265,9 +265,9 @@ def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client
     with Database(case.paths.db) as db:
         db.save_contact(contact, evidence=evidence)
     shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
-    assert "Persona pertinente; vigencia inferida de Hunter" in shown
-    assert "Inferido de Hunter; por confirmar" in shown and "confírmalo, por ejemplo en LinkedIn" in shown
-    assert "Persona pertinente y vigente" in shown
+    assert "Pertinente" in shown
+    assert "Inferida de Hunter; confirmar antes de contactar" in shown
+    assert "Vigente según evidencia del puesto" in shown
 
 
 def test_confirmation_of_ineligible_person_does_not_modify_channel(ui_results, client):
@@ -371,8 +371,8 @@ def test_budget_reservation_is_not_added_again_to_pending(ui_results, client):
                             reserved_cost_usd="0.02", reserved_credits="0", status="reserved"))
     response = client.get(url("campaign", ui_results.campaign.id))
     assert response.status_code == 200
-    assert "USD 0.020000" in text(response)
-    assert "USD 0.040000" not in text(response)
+    assert "USD 0.02" in text(response)
+    assert "USD 0.04" not in text(response)
     view = read_campaign(ui_results.paths.db, ui_results.campaign.id)
     assert view.budget.campaign.reserved == view.budget.campaign.pending
 
@@ -408,7 +408,7 @@ def test_hostile_external_text_is_escaped_and_private_source_is_not_a_link(
     response = client.get(url("company", campaign.id, company.id))
     shown = text(response)
     for expected in (company.name, page.claim, assessment.explanation, contact.name, contact.title,
-                     contact.channels[0].value, item.stop_reason, item.error_message):
+                     contact.channels[0].value, item.error_message):
         assert escape(expected) in shown
     assert "<script>alert(1)</script>" not in shown
     links = Links()
@@ -444,9 +444,8 @@ def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reas
         item = db.get_run_item(case.campaign.id, case.companies[0].id)
         db.save_run_item(item.model_copy(update={"stop_reason": reason}))
     shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
-    notice = re.search(r'<div class="notice notice-(\w+)"><strong>([^<]*)</strong><p class="literal-detail">'
-                       r'Motivo registrado: ([^<]*)</p>', shown)
-    assert notice is not None and notice[1] == tone and expected in notice[2] and notice[3] == escape(reason)
+    notice = re.search(r'<div class="notice notice-(\w+)"><strong>([^<]*)</strong></div>', shown)
+    assert notice is not None and notice[1] == tone and expected in notice[2]
     assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
 
 
@@ -500,3 +499,60 @@ def test_close_campaign_preserves_companies_contacts_assessment_and_spend(ui_res
         assert db.list_contacts(case.companies[0].id) == contacts
         assert db.get_assessment(assessment.id) == assessment
         assert db.list_usage() == usage
+
+
+def test_sequential_review_preserves_filters_and_advances_to_next_company(ui_results, client):
+    case = ui_results
+    first, second = case.companies[0], case.companies[1]
+    page = text(client.get(url("company", case.campaign.id, first.id)))
+    assert "Empresa 1 de 2" in page
+    assert "Guardar y siguiente" in page
+    response = client.post(
+        f'{url("review", case.campaign.id, first.id)}?priorities=high&priorities=low',
+        {"status": "accepted", "reason": "Revisión secuencial sintética.", "next_company_id": str(second.id)},
+    )
+    assert response.status_code == 302
+    assert url("company", case.campaign.id, second.id) in response.url
+    assert "priorities=high" in response.url and "saved=review" in response.url
+    next_page = text(client.get(response.url))
+    assert "Revisión guardada." in next_page
+    assert "Empresa 2 de 2" in next_page
+
+
+def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_status_skips_html(ui_results, client):
+    case = ui_results
+    with Database(case.paths.db) as db:
+        db.save_contact(case.contact.model_copy(update={"current_employment": False}))
+    page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    assert "No disponible para confirmación manual porque una fuente indica que ya no ocupa el puesto." in page
+    compact = client.get(url("status", case.campaign.id), {"compact": "1"}).json()
+    assert compact["html"] == ""
+
+
+def test_company_criteria_and_sources_use_semantic_labels_and_contextual_pills(ui_results, client, make_assessment):
+    case = ui_results
+    company = case.companies[0]
+    with Database(case.paths.db) as db:
+        source_id = db.list_evidence(company.id)[0].id
+        assessment = make_assessment(
+            case.campaign.id, company.id, priority="high", fit_score=70.0, coverage=0.8,
+            criteria={
+                "document_need": {"value": 1, "evidence_ids": [source_id], "justification": "Señal fuerte sintética."},
+                "offer_match": {"value": 0.5, "evidence_ids": [source_id], "justification": "Señal parcial sintética."},
+                "scale_potential": {"value": 0, "evidence_ids": [source_id], "justification": "Incompatible sintético."},
+                "adoption_capacity": {"value": 1, "evidence_ids": [source_id], "justification": "Adopción sintética."},
+                "opportunity_timing": {"value": None, "evidence_ids": [], "justification": "Pendiente sintético."},
+            },
+        )
+        db.save_assessment(assessment)
+        item = db.get_run_item(case.campaign.id, company.id)
+        db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    page = text(client.get(url("company", case.campaign.id, company.id)))
+    assert "Señal fuerte" in page
+    assert "Señal parcial" in page
+    assert "Incompatible" in page
+    assert "Sin evidencia" in page
+    assert "Fuente original · example.com #1" in page
+    assert "Fuente original · synthetic-co.example #" in page
+    assert 'class="company-nav-bar"' not in page
+    assert 'aria-label="Navegación secuencial de empresas"' in page

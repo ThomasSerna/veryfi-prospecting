@@ -3,8 +3,10 @@
 import csv
 from io import StringIO
 import json
+from urllib.parse import urlsplit
 
 from prospecting.pipeline import CampaignView, read_campaign
+from prospecting.sources import validate_public_url
 
 
 HUNTER_EMPLOYMENT_WARNING = ("Vigencia del puesto inferida de Hunter (correo verificado y fuente vista hace poco); "
@@ -38,6 +40,18 @@ LABELS = {
     "entity_type": "Tipo de entidad", "operating_countries": "Países de operación", "segments": "Segmentos",
     "size": "Tamaño", "current_employment": "Empleo actual", "relevant_function": "Función pertinente",
     "geographic_scope": "Alcance geográfico",
+    "primary": "Fuente original", "provider": "Proveedor",
+    "search_result": "Búsqueda", "manual": "Confirmación manual",
+}
+CRITERION_LABELS = {
+    1: "Señal fuerte",
+    0.5: "Señal parcial",
+    0: "Incompatible",
+}
+CRITERION_TONES = {
+    1: "strong",
+    0.5: "partial",
+    0: "none",
 }
 MATCH_LABELS = {
     "role": "Cargo", "channel": "Canal", "identity": "Identidad", "employment": "Vigencia del empleo",
@@ -59,53 +73,97 @@ MATCH_LABELS = {
 }
 READY = {"ready_preferred", "ready_alternative"}
 STOP_MESSAGES = {
-    "budget_exceeded": "Se agotó el presupuesto disponible. Revisa el consumo y concilia antes de reanudar.",
-    "company_budget_exceeded": "Se alcanzó el tope de esta empresa. La campaña puede continuar con las demás.",
-    "authorization": "Falta un permiso de esta sesión o su tope es insuficiente. Revisa las operaciones y autoriza de nuevo.",
-    "account": "La cuenta no tiene un cupo comprobado suficiente. Revisa la configuración y el consumo registrado.",
-    "price_unbounded": "No se puede acotar el costo de la operación. Se bloqueó la llamada.",
-    "reservation_overrun": "El consumo superó una reserva. Concilia antes de continuar.",
-    "budget_unknown": "Hay consumo desconocido. Debe conciliarse antes de continuar.",
-    "campaign_time_limit": "Se agotó el tiempo activo de la campaña; se conservaron los resultados parciales.",
-    "time_limit": "Se agotó el tiempo de investigación de esta empresa.",
-    "duplicate_request": "La solicitud ya fue enviada y no se repite. Revisa su resultado y consumo; una respuesta de descubrimiento no guardada puede haberse perdido.",
-    "campaign_already_running": "Otra ejecución sigue en curso en esta instancia. Espera a que termine.",
-    "another_campaign_active": "Hay otra campaña activa. Ciérrala conservando los resultados antes de ejecutar esta.",
-    "permission_denied": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
-    "quota_exceeded": "El proveedor agotó la cuota. Comprueba el saldo y registra la conciliación.",
-    "rate_limited": "El proveedor limitó las solicitudes. Conserva el resultado y revisa el plazo de reintento.",
+    "budget_exceeded": "Presupuesto disponible agotado.",
+    "company_budget_exceeded": "Se alcanzó el tope de esta empresa.",
+    "authorization": "Permiso ausente o tope insuficiente; autoriza de nuevo.",
+    "account": "Cupo de cuenta insuficiente.",
+    "price_unbounded": "Costo de operación no acotado.",
+    "reservation_overrun": "Consumo superior a la reserva.",
+    "budget_unknown": "Hay consumo pendiente de conciliación.",
+    "campaign_time_limit": "Tiempo máximo de campaña alcanzado.",
+    "time_limit": "Tiempo máximo de empresa alcanzado.",
+    "duplicate_request": "La solicitud ya fue enviada y no se repite.",
+    "campaign_already_running": "Otra ejecución sigue en curso.",
+    "another_campaign_active": "Hay otra campaña activa.",
+    "permission_denied": "El proveedor rechazó el acceso.",
+    "quota_exceeded": "El proveedor agotó la cuota.",
+    "rate_limited": "El proveedor limitó las solicitudes.",
     # Claude informa sus fallos con el código HTTP literal.
-    "http_401": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
-    "http_403": "El proveedor rechazó el acceso. Revisa los permisos de la cuenta.",
-    "http_429": "El proveedor limitó las solicitudes. Conserva el resultado y revisa el plazo de reintento.",
-    "timeout": "El proveedor no respondió dentro del plazo. La reserva se conserva hasta conciliar.",
-    "invalid_response": "La respuesta del proveedor no cumple el contrato. La empresa queda pendiente.",
-    "qualification_unavailable": "La calificación no está disponible. Revisa la configuración de Haiku y su autorización.",
-    "insufficient_evidence": "La evidencia reunida no permite decidir; la empresa queda pendiente.",
-    "contact_plan_exhausted": "Se agotó el esfuerzo de contactos asignado. Revisa los candidatos y canales encontrados.",
-    "exclusion_review": "La exclusión necesita revisión humana antes de seguir investigando.",
-    "duplicate_review": "La identidad o un posible duplicado necesita revisión antes de continuar.",
-    "assessment_pending": "La calificación quedó pendiente. Revisa el fallo y la evidencia conservada.",
-    "no_target_roles": "La calificación no dejó cargos de los perfiles de esta campaña; no se buscaron personas.",
-    "contact_preconditions": "La empresa no cumple las condiciones para buscar contactos: identidad confirmada y prioridad alta o media.",
-    "domain_unknown": "No se pudo confirmar el dominio oficial; la identidad queda pendiente.",
-    "identity_unverified": "Ninguna página propia de la empresa confirmó su identidad; queda pendiente de revisión.",
-    "name_unconfirmed": "La página propia no confirmó el nombre de la empresa; la identidad queda pendiente.",
-    "country_unconfirmed": "No se confirmó la operación en los países de la campaña; la identidad queda pendiente.",
+    "http_401": "El proveedor rechazó el acceso.",
+    "http_403": "El proveedor rechazó el acceso.",
+    "http_429": "El proveedor limitó las solicitudes.",
+    "timeout": "Tiempo de espera agotado en el proveedor.",
+    "invalid_response": "Respuesta inválida del proveedor; falta evidencia válida.",
+    "qualification_unavailable": "Calificación no disponible.",
+    "insufficient_evidence": "La evidencia no permite decidir.",
+    "contact_plan_exhausted": "Búsqueda de contactos agotada.",
+    "exclusion_review": "Exclusión pendiente de revisión.",
+    "duplicate_review": "Posible duplicado pendiente de revisión.",
+    "assessment_pending": "La calificación quedó pendiente.",
+    "no_target_roles": "Sin cargos objetivo en esta campaña.",
+    "contact_preconditions": "No cumple las condiciones para buscar contactos.",
+    "domain_unknown": "Dominio oficial sin confirmar.",
+    "identity_unverified": "No se confirmó su identidad en fuentes propias.",
+    "name_unconfirmed": "Nombre de la empresa sin confirmar.",
+    "country_unconfirmed": "Operación en países de la campaña sin confirmar.",
 }
 # Paradas previstas: la empresa terminó su plan con un resultado, no quedó pendiente ni falló.
 STOP_OUTCOMES = {
-    "preferred_channel_found": "Se encontró una persona pertinente con un canal preferido; la búsqueda de contactos terminó.",
-    "people_limit": "Se investigó el máximo de personas previsto para esta prioridad; la búsqueda de contactos terminó.",
-    "already_checked": "Los contactos ya se habían investigado y se reutilizaron sin repetir consultas.",
-    "excluded_account": "La empresa figura en la lista de exclusiones; no se investigó más.",
-    "duplicate_of": "Es un duplicado confirmado de otra empresa de esta campaña; se investiga una sola vez.",
-    "low_fit": "El encaje es bajo con evidencia suficiente; no se buscaron contactos.",
+    "preferred_channel_found": "Se encontró un canal preferido.",
+    "people_limit": "Se alcanzó el máximo de personas evaluadas.",
+    "already_checked": "Contactos reutilizados de una consulta previa.",
+    "excluded_account": "Incluida en la lista de exclusiones.",
+    "duplicate_of": "Es un duplicado confirmado en esta campaña.",
+    "low_fit": "El encaje es bajo.",
 }
 
 
 def label(value):
     return "Pendiente" if value is None else LABELS.get(value, str(value))
+
+
+def criterion_label(value):
+    """Traduce el multiplicador de la rúbrica (1, 0.5, 0, None) a una etiqueta comercial legible."""
+    if value is None or value == "":
+        return "Sin evidencia"
+    return CRITERION_LABELS.get(value, str(value))
+
+
+def criterion_tone(value):
+    """Variante semántica de presentación para el nivel de un criterio."""
+    if value is None or value == "":
+        return "unknown"
+    return CRITERION_TONES.get(value, "unknown")
+
+
+def evidence_pill(fact, number: int) -> dict[str, str | int]:
+    """Resumen informativo de una fuente para píldoras de referencia cruzada."""
+    source_type = getattr(fact, "source_type", None)
+    provider = getattr(fact, "provider", None)
+    if source_type == "provider" and provider:
+        origin = str(provider).capitalize()
+    else:
+        origin = label(source_type)
+    host = ""
+    raw_url = getattr(fact, "url", None)
+    if raw_url:
+        try:
+            valid = validate_public_url(str(raw_url))
+            if valid:
+                parsed = urlsplit(valid).hostname or ""
+                host = parsed[4:] if parsed.startswith("www.") else parsed
+        except ValueError:
+            host = ""
+    summary = f"{origin} · {host}" if host else origin
+    claim = (getattr(fact, "claim", "") or "").strip()
+    retrieved = getattr(fact, "retrieved_at", None)
+    date_str = retrieved.strftime("%Y-%m-%d") if hasattr(retrieved, "strftime") else ""
+    title = f"{claim} ({date_str})" if claim and date_str else (claim or summary)
+    return {
+        "number": number,
+        "label": f"{summary} #{number}",
+        "title": title,
+    }
 
 
 def match_label(value):
@@ -116,6 +174,62 @@ def match_label(value):
 
 def money(value):
     return "Desconocido" if value is None else f"USD {value:.6f}"
+
+
+def money_summary(value):
+    """Formato compacto para titulares de presupuesto; conserva hasta 6 decimales si hay fracciones de centavo."""
+    if value is None:
+        return "Desconocido"
+    full = f"{value:.6f}"
+    whole, decimals = full.split(".")
+    trimmed = decimals.rstrip("0")
+    if len(trimmed) <= 2:
+        return f"USD {value:.2f}"
+    return f"USD {whole}.{trimmed}"
+
+
+def campaign_title(campaign):
+    """Nombre legible para ventas a partir de países y segmentos."""
+    if campaign is None:
+        return "Campaña"
+    countries = ", ".join(label(code) for code in getattr(campaign, "countries", ()) or ())
+    segments = ", ".join(label(seg) for seg in getattr(campaign, "segments", ()) or ())
+    if countries and segments:
+        return f"{countries} · {segments}"
+    return countries or segments or f"Campaña {str(campaign.id)[:8]}"
+
+
+def campaign_short_title(campaign):
+    """Etiqueta breve para barra lateral y migas de pan."""
+    if campaign is None:
+        return "Campaña"
+    codes = ", ".join(getattr(campaign, "countries", ()) or ())
+    segs = list(getattr(campaign, "segments", ()) or ())
+    first_seg = label(segs[0]) if segs else ""
+    if len(segs) > 1:
+        first_seg = f"{first_seg} +{len(segs) - 1}"
+    if codes and first_seg:
+        return f"{codes} · {first_seg}"
+    return codes or first_seg or f"Campaña {str(campaign.id)[:8]}"
+
+
+def ineligible_reason(person):
+    """Explica en lenguaje comercial por qué una persona aún no admite confirmación manual."""
+    if person is None or getattr(person, "eligible", False):
+        return ""
+    match = getattr(person, "match", None)
+    if match is not None and getattr(match, "blocked_reason", None):
+        return f"No disponible para confirmación manual porque {match_label(match.blocked_reason)}."
+    contact = getattr(person, "contact", None)
+    if contact is None:
+        return "Faltan datos comprobados de la persona."
+    if not contact.name_complete or contact.identity_status != "confirmed":
+        return "Requiere nombre completo e identidad confirmada."
+    if not contact.current_employment:
+        return "Requiere empleo actual confirmado."
+    if not contact.relevant_function:
+        return "Requiere cargo pertinente."
+    return "Comprobaciones pendientes."
 
 
 def _stop_key(reason, messages):
@@ -130,13 +244,12 @@ def stop_message(reason):
             inner = reason[len(key) + 1:] if reason.startswith(key + ":") else ""
             detail = _stop_key(inner, STOP_MESSAGES) if inner else None
             return messages[key] if detail is None else f"{messages[key]} {STOP_MESSAGES[detail]}"
-    return "La investigación quedó pendiente. Revisa el error y los datos guardados antes de reanudar."
+    return "La investigación quedó pendiente."
 
 
 def stop_tone(reason):
     """Una parada prevista se informa; las demás piden revisar antes de seguir."""
     return "info" if _stop_key(reason, STOP_OUTCOMES) is not None else "warning"
-
 
 
 def csv_text(value):
@@ -217,7 +330,6 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
     return output.getvalue().encode("utf-8-sig")
 
 
-
 def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None,
                  contact_match_path=None):
     """Consulta al descargar con una conexión nueva, sin reutilizar una pantalla anterior."""
@@ -226,4 +338,3 @@ def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=
     if current.is_executing:
         raise ValueError("La campaña está ejecutándose; espera antes de exportar.")
     return export_csv(current, include_all=include_all)
-

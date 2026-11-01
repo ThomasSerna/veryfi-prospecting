@@ -1,32 +1,223 @@
 {% extends 'base.html' %}
 {% load prospecting_ui %}
 {% block title %}{{ result.company.name }} · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><a href="{% url 'webapp:campaign' campaign.id %}">Investigación</a><span>/</span><span>Ficha de empresa</span>{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><a href="{% url 'webapp:campaign' campaign.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ campaign|campaign_short_title }}</a><span>/</span><span>{{ result.company.name }}</span>{% endblock %}
+{% block topbar_actions %}
+{% if sequence_total %}
+<nav class="sequence-nav" aria-label="Navegación secuencial de empresas">
+  {% if prev_company %}
+  <a class="sequence-link" href="{% url 'webapp:company' campaign.id prev_company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" title="Anterior: {{ prev_company.name }}">← Anterior</a>
+  {% else %}
+  <span class="sequence-link" aria-disabled="true">← Anterior</span>
+  {% endif %}
+  <span class="sequence-counter">Empresa {{ sequence_position }} de {{ sequence_total }}</span>
+  {% if next_company %}
+  <a class="sequence-link" href="{% url 'webapp:company' campaign.id next_company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" title="Siguiente: {{ next_company.name }}">Siguiente →</a>
+  {% else %}
+  <span class="sequence-link" aria-disabled="true">Siguiente →</span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}
 {% block content %}
-<header class="page-heading company-heading"><div><a class="back-link" href="{% url 'webapp:campaign' campaign.id %}">Volver a la campaña</a><h1>{{ result.company.name }}</h1><p>{{ result.company.domain|default_if_none:'Dominio pendiente' }} · {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %}</p></div><div class="company-heading-status"><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">Prioridad {{ result.assessment.priority|label|lower }}</span><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></div></header>
-{% if is_executing %}<div class="notice notice-info" role="status"><strong>La investigación está en curso.</strong><p>Puedes consultar la ficha. La revisión y la confirmación de canales estarán disponibles cuando termine.</p></div>{% endif %}
-{% if result.business_status != result.run_item.business_status %}<div class="notice notice-warning"><strong>La disponibilidad se volvió a comprobar.</strong><p>La disponibilidad actual difiere de la guardada: la vigencia se revisa al consultar y exportar.</p></div>{% endif %}
-{% if result.run_item.stop_reason %}<div class="notice notice-{{ result.run_item.stop_reason|stop_tone }}"><strong>{{ result.run_item.stop_reason|stop_message }}</strong><p class="literal-detail">Motivo registrado: {{ result.run_item.stop_reason }}</p></div>{% endif %}
-{% if result.run_item.error_message %}<div class="notice notice-error" role="alert"><strong>Fallo en {{ result.run_item.error_stage|label }}</strong><p class="literal-detail">{{ result.run_item.error_message }}</p><p>La evidencia y los resultados guardados se conservan.</p></div>{% endif %}
+<header class="page-heading company-heading">
+  <div>
+    <h1>{{ result.company.name }}</h1>
+    <p>{{ result.company.domain|default_if_none:'Dominio pendiente' }} · {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</p>
+  </div>
+  <div class="company-heading-status">
+    <span class="priority priority-{{ result.assessment.priority|default:'pending' }}">Prioridad {{ result.assessment.priority|label|lower }}</span>
+    <span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span>
+    <span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span>
+  </div>
+</header>
+{% if is_executing %}<div class="notice notice-info" role="status"><strong>Investigación en curso.</strong></div>{% endif %}
+{% if result.run_item.stop_reason %}<div class="notice notice-{{ result.run_item.stop_reason|stop_tone }}"><strong>{{ result.run_item.stop_reason|stop_message }}</strong></div>{% endif %}
+{% if result.run_item.error_message %}<div class="notice notice-error" role="alert"><strong>Fallo en {{ result.run_item.error_stage|label }}</strong><p class="literal-detail">{{ result.run_item.error_message }}</p></div>{% endif %}
 <div class="company-layout">
   <div class="company-main" data-tabs>
-    <nav class="tabs" aria-label="Secciones de la ficha"><a href="#summary" class="tab-link">Resumen</a><a href="#contacts" class="tab-link">Contactos <span>{{ result.contacts|length }}</span></a><a href="#evidence" class="tab-link">Evidencia <span>{{ result.evidence|length }}</span></a></nav>
+    <nav class="tabs" aria-label="Secciones de la ficha">
+      <a href="#summary" class="tab-link">Resumen</a>
+      <a href="#contacts" class="tab-link">Contactos <span>{{ result.contacts|length }}</span></a>
+      <a href="#evidence" class="tab-link">Evidencia <span>{{ result.evidence|length }}</span></a>
+    </nav>
     <section id="summary" class="tab-panel surface company-panel" aria-labelledby="summary-title">
-      <h2 id="summary-title">Por qué puede interesar a Veryfi</h2>
-      {% if result.assessment %}<p class="assessment-explanation">{{ result.assessment.explanation }}</p><dl class="assessment-metrics"><div><dt>Encaje con Veryfi</dt><dd>{{ result.assessment.fit_score|score }}<small>/ 100</small></dd></div><div><dt>Cobertura de evidencia</dt><dd>{{ result.assessment.coverage|percentage }}</dd></div></dl><p class="quiet-note">El encaje mide compatibilidad con las reglas propuestas, no probabilidad de compra. Un dato pendiente no equivale a cero.</p><dl class="detail-grid"><div><dt>Productos candidatos</dt><dd>{% for product in result.assessment.products %}{{ product|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendientes{% endfor %}</dd></div><div><dt>Rúbrica</dt><dd>{{ result.assessment.rubric_version }}</dd></div></dl><h3>Qué sostiene la calificación</h3><div class="criteria-list">{% for name, criterion in result.assessment.criteria.items %}<article class="criterion"><div><h4>{{ name|label }}</h4><span class="criterion-value">{{ criterion.value|default_if_none:'Desconocido' }}</span></div><p>{{ criterion.justification }}</p><p class="evidence-references">Evidencia: {% for evidence_id in criterion.evidence_ids %}<a href="#source-{{ evidence_id }}" data-evidence-link>{{ evidence_id }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}</p></article>{% endfor %}</div>{% else %}<div class="empty-state"><h3>La calificación está pendiente.</h3><p>La evidencia guardada sigue disponible. Revisa el motivo de detención antes de reanudar.</p></div>{% endif %}
-      <details class="identity-details"><summary>Identidad y procedencia de la empresa</summary><dl class="detail-grid"><div><dt>Entidad</dt><dd>{{ result.company.entity_name|default_if_none:'Pendiente' }}</dd></div><div><dt>Dominio</dt><dd>{{ result.company.domain|default_if_none:'Pendiente' }}</dd></div><div><dt>Etapa de investigación</dt><dd>{{ result.run_item.stage|label }}</dd></div><div><dt>Disponibilidad guardada</dt><dd>{{ result.run_item.business_status|label }}</dd></div></dl><dl class="provenance-list">{% for field, ids in result.company.provenance.items %}<div><dt>{{ field|label }}</dt><dd>{% for evidence_id in ids %}<a href="#source-{{ evidence_id }}" data-evidence-link>{{ evidence_id }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}</dd></div>{% empty %}<p>La procedencia de estos campos está pendiente.</p>{% endfor %}</dl></details>
+      <h2 id="summary-title" class="sr-only">Resumen</h2>
+      {% if result.assessment %}
+      <p class="assessment-explanation">{{ result.assessment.explanation }}</p>
+      <dl class="assessment-metrics">
+        <div><dt>Encaje</dt><dd>{{ result.assessment.fit_score|score }}<small>/ 100</small></dd></div>
+        <div><dt>Cobertura</dt><dd>{{ result.assessment.coverage|percentage }}</dd></div>
+        <div class="assessment-products"><dt>Productos</dt><dd>{% for product in result.assessment.products %}{{ product|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendientes{% endfor %}</dd></div>
+      </dl>
+      <div class="criteria-list">
+        {% for name, criterion in result.assessment.criteria.items %}
+        <article class="criterion">
+          <div>
+            <h3>{{ name|label }}</h3>
+            <span class="status criterion-badge criterion-{{ criterion.value|criterion_tone }}">{{ criterion.value|criterion_label }}</span>
+          </div>
+          <p>{{ criterion.justification }}</p>
+          {% if criterion.evidence_ids %}
+          <div class="evidence-references">
+            {% for evidence_id in criterion.evidence_ids %}
+              {% with pill=evidence_items|evidence_item:evidence_id %}
+                <a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>
+              {% endwith %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <h3>Calificación pendiente</h3>
+      </div>
+      {% endif %}
+      <details class="identity-details">
+        <summary>Datos de la empresa</summary>
+        <dl class="detail-grid">
+          <div><dt>Entidad</dt><dd>{{ result.company.entity_name|default_if_none:'Pendiente' }}</dd></div>
+          <div><dt>Dominio</dt><dd>{{ result.company.domain|default_if_none:'Pendiente' }}</dd></div>
+          <div><dt>Etapa</dt><dd>{{ result.run_item.stage|label }}</dd></div>
+        </dl>
+        {% if result.company.provenance %}
+        <dl class="provenance-list">
+          {% for field, ids in result.company.provenance.items %}
+          <div><dt>{{ field|label }}</dt><dd>{% for evidence_id in ids %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% empty %}Pendiente{% endfor %}</dd></div>
+          {% endfor %}
+        </dl>
+        {% endif %}
+      </details>
     </section>
-    <section id="contacts" class="tab-panel surface company-panel" aria-labelledby="contacts-title"><h2 id="contacts-title">Personas y canales de contacto</h2><p>Todas las personas encontradas, de mayor a menor porcentaje de match. Comprueba quién es pertinente y qué canal puedes usar. La aplicación no envía mensajes.</p>{% if view.contact_match_version %}<p class="quiet-note">El match ({{ view.contact_match_version }}) suma cargo, canal, identidad y vigencia del empleo. Ordena la revisión: no es probabilidad de respuesta ni reemplaza «listo». Un dato pendiente suma 0, pero no equivale a no cumplir.</p>{% elif result.contacts %}<div class="notice notice-warning"><strong>El porcentaje de match no está disponible.</strong><p>Falta config/contact_match.json o no es válido. Las personas se muestran sin porcentaje.</p></div>{% endif %}
-      {% for person in result.contacts %}<article class="contact-detail"><header><div><h3>{{ person.contact.name|default_if_none:'Nombre pendiente' }}</h3><p>{{ person.contact.title|default_if_none:'Cargo pendiente' }}</p></div><div class="contact-badges">{% if person.match %}<span class="match-score{% if person.match.blocked_reason %} match-blocked{% endif %}"><strong>{{ person.match.score }} %</strong> de match</span>{% endif %}<span class="status {% if person.eligible %}status-accepted{% else %}status-pending{% endif %}">{% if person.eligible and person.employment_basis == 'hunter_signal' %}Persona pertinente; vigencia inferida de Hunter{% elif person.eligible %}Persona pertinente y vigente{% else %}Persona por comprobar{% endif %}</span></div></header><p>Función en la compra: <strong>{{ person.contact.buying_role|label }}</strong></p>{% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}. Va al final de la lista; el desglose conserva el cálculo.</div>{% endif %}{% if person.match %}<details class="match-details"><summary>Cómo se calculó el match</summary><dl class="match-breakdown">{% for item in person.match.components %}<div><dt>{{ item.name|match_label }}</dt><dd>{{ item|match_label }}{% if item.pending %} <span class="pending-tag">Pendiente</span>{% endif %}</dd><dd class="numeric">{{ item.points }} / {{ item.weight }}</dd></div>{% endfor %}</dl></details>{% endif %}{% if person.employment_basis == 'hunter_signal' %}<div class="notice notice-warning">La vigencia del puesto se infiere de Hunter: correo verificado y una fuente que lo sigue publicando, vista hace poco. No prueba el cargo actual; confírmalo, por ejemplo en LinkedIn, antes de contactar.</div>{% endif %}
-        {% for channel in person.contact.channels %}<div class="channel-detail"><div class="channel-heading"><strong>{{ channel.type|label }}</strong><span class="status status-{{ channel.normalized_status }}">{{ channel.normalized_status|label }}</span></div><p class="channel-value">{{ channel.value }}</p><dl class="channel-dates"><div><dt>Consulta</dt><dd>{{ channel.retrieved_at|date:'d M Y · H:i' }} UTC</dd></div><div><dt>Verificación</dt><dd>{% if channel.verified_at %}{{ channel.verified_at|date:'d M Y · H:i' }} UTC{% else %}Sin fecha{% endif %}</dd></div><div><dt>Confirmación manual</dt><dd>{% if channel.manual_confirmed_at %}{{ channel.manual_confirmed_at|date:'d M Y · H:i' }} UTC{% else %}Pendiente{% endif %}</dd></div></dl><p class="quiet-note">Estado original del proveedor: {{ channel.provider_status|default_if_none:'Sin dato' }}</p>{% if channel.type == 'email' %}<p class="quiet-note">La publicación corporativa ofrece un contacto; no garantiza entregabilidad.</p>{% elif channel.type == 'phone' or channel.type == 'whatsapp' %}<p class="quiet-note">El formato comprobado no garantiza que el canal atienda.</p>{% endif %}{% for warning in channel.warnings %}<div class="notice notice-warning">{{ warning }}</div>{% endfor %}
+    <section id="contacts" class="tab-panel surface company-panel" aria-labelledby="contacts-title">
+      <h2 id="contacts-title" class="sr-only">Contactos</h2>
+      {% if not view.contact_match_version and result.contacts %}
+      <div class="notice notice-warning"><strong>El porcentaje de match no está disponible.</strong></div>
+      {% endif %}
+      {% for person in result.contacts %}
+      <article class="contact-detail">
+        <header>
+          <div>
+            <h3>{{ person.contact.name|default_if_none:'Nombre pendiente' }}</h3>
+            <p>{{ person.contact.title|default_if_none:'Cargo pendiente' }} · <span>{{ person.contact.buying_role|label }}</span></p>
+          </div>
+          <div class="contact-badges">
+            {% if person.match %}<span class="match-score{% if person.match.blocked_reason %} match-blocked{% endif %}"><strong>{{ person.match.score }} %</strong> de match</span>{% endif %}
+            <span class="status {% if person.eligible %}status-accepted{% else %}status-pending{% endif %}">{% if person.eligible %}Pertinente{% else %}Por confirmar{% endif %}</span>
+          </div>
+        </header>
+        {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>{% endif %}
+        {% if person.match %}
+        <details class="match-details">
+          <summary>Desglose de match</summary>
+          <dl class="match-breakdown">
+            {% for item in person.match.components %}
+            <div>
+              <dt>{{ item.name|match_label }}</dt>
+              <dd>{{ item|match_label }}{% if item.pending %} <span class="pending-tag">Pendiente</span>{% endif %}</dd>
+              <dd class="numeric">{{ item.points }} / {{ item.weight }}</dd>
+            </div>
+            {% endfor %}
+          </dl>
+        </details>
+        {% endif %}
+        {% for channel in person.contact.channels %}
+        <div class="channel-detail">
+          <div class="channel-heading">
+            <strong>{{ channel.type|label }}</strong>
+            <span class="status status-{{ channel.normalized_status }}">{{ channel.normalized_status|label }}</span>
+          </div>
+          <div class="channel-value-row">
+            <p class="channel-value">{{ channel.value }}</p>
+            <button type="button" class="copy-channel-btn" data-copy-channel="{{ channel.value }}" aria-label="Copiar canal {{ channel.type|label }}">Copiar</button>
+          </div>
+          {% for warning in channel.warnings %}<div class="notice notice-warning">{{ warning }}</div>{% endfor %}
           {% include 'components/_channel_details.html' %}
-          {% for confirmation in confirmation_forms %}{% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}<details class="confirmation-details" {% if confirmation.form.errors %}open{% endif %}><summary>Confirmar acceso directo a este canal</summary><form method="post" action="{% url 'webapp:confirm_channel' campaign.id result.company.id %}" data-idle-form>{% csrf_token %}{% for hidden in confirmation.form.hidden_fields %}{{ hidden }}{% endfor %}<fieldset {% if is_executing or not person.eligible %}disabled{% endif %}>{% include 'components/_field.html' with field=confirmation.form.reason %}<div class="consent-field">{{ confirmation.form.confirmed }}{{ confirmation.form.confirmed.label_tag }}{{ confirmation.form.confirmed.errors }}</div><button class="button button-small button-navy" type="submit" data-idle-only>Guardar confirmación manual</button></fieldset></form></details>{% endif %}{% endfor %}
-        </div>{% empty %}<div class="notice notice-info">Esta persona todavía no tiene canales identificados.</div>{% endfor %}
-        <details class="contact-provenance"><summary>Procedencia e identidad de la persona</summary><dl class="detail-grid"><div><dt>Nombre completo</dt><dd>{{ person.contact.name_complete|yesno:'Sí,No,Pendiente' }}</dd></div><div><dt>Empleo actual</dt><dd>{% if person.employment_basis == 'hunter_signal' %}Inferido de Hunter; por confirmar{% else %}{{ person.contact.current_employment|yesno:'Sí,No,Pendiente' }}{% endif %}</dd></div><div><dt>Función pertinente</dt><dd>{{ person.contact.relevant_function|yesno:'Sí,No,Pendiente' }}</dd></div><div><dt>Identidad</dt><dd>{% if person.contact.identity_status == 'confirmed' %}Confirmada{% elif person.contact.identity_status == 'contradicted' %}Con contradicciones{% else %}Pendiente{% endif %}</dd></div><div><dt>Alcance geográfico</dt><dd>{{ person.contact.geographic_scope|default_if_none:'Pendiente' }}</dd></div><div><dt>Canales utilizables</dt><dd>{{ person.usable_channels|length }}</dd></div></dl><dl class="provenance-list">{% for field, ids in person.contact.provenance.items %}<div><dt>{{ field|label }}</dt><dd>{% for evidence_id in ids %}<a href="#source-{{ evidence_id }}" data-evidence-link>{{ evidence_id }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}</dd></div>{% empty %}<p>La procedencia de estos campos está pendiente.</p>{% endfor %}</dl></details>
-      </article>{% empty %}<div class="empty-state"><h3>Todavía no hay personas identificadas.</h3><p>La empresa conserva su calificación y el motivo de detención. Una oportunidad puede tener buen encaje y seguir pendiente de contacto.</p></div>{% endfor %}
+          {% for confirmation in confirmation_forms %}
+            {% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
+            <details class="confirmation-details" {% if confirmation.form.errors %}open{% endif %}>
+              <summary>Confirmar canal</summary>
+              {% if not person.eligible %}
+              <div class="notice notice-warning"><p>{{ person|ineligible_reason }}</p></div>
+              {% endif %}
+              <form method="post" action="{% url 'webapp:confirm_channel' campaign.id result.company.id %}" data-idle-form>{% csrf_token %}
+                {% for hidden in confirmation.form.hidden_fields %}{{ hidden }}{% endfor %}
+                <fieldset {% if is_executing or not person.eligible %}disabled{% endif %}>
+                  {% include 'components/_field.html' with field=confirmation.form.reason %}
+                  <div class="consent-field">{{ confirmation.form.confirmed }}{{ confirmation.form.confirmed.label_tag }}{{ confirmation.form.confirmed.errors }}</div>
+                  <button class="button button-small button-navy" type="submit" data-idle-only>Confirmar</button>
+                </fieldset>
+              </form>
+            </details>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% empty %}
+        <div class="notice notice-info">Sin canales identificados.</div>
+        {% endfor %}
+        <details class="contact-provenance">
+          <summary>Datos de la persona</summary>
+          <dl class="detail-grid">
+            <div><dt>Identidad</dt><dd>{% if person.contact.identity_status == 'confirmed' %}Confirmada{% elif person.contact.identity_status == 'contradicted' %}Con contradicciones{% else %}Pendiente{% endif %}</dd></div>
+            <div><dt>Empleo actual</dt><dd>{{ person.contact.current_employment|yesno:'Sí,No,Pendiente' }}</dd></div>
+            <div><dt>Función pertinente</dt><dd>{{ person.contact.relevant_function|yesno:'Sí,No,Pendiente' }}</dd></div>
+            <div><dt>Alcance geográfico</dt><dd>{{ person.contact.geographic_scope|default_if_none:'Pendiente' }}</dd></div>
+          </dl>
+          {% if person.contact.provenance %}
+          <dl class="provenance-list">
+            {% for field, ids in person.contact.provenance.items %}
+            <div><dt>{{ field|label }}</dt><dd>{% for evidence_id in ids %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% empty %}Pendiente{% endfor %}</dd></div>
+            {% endfor %}
+          </dl>
+          {% endif %}
+        </details>
+      </article>
+      {% empty %}
+      <div class="empty-state">
+        <h3>Sin contactos identificados</h3>
+      </div>
+      {% endfor %}
     </section>
-    <section id="evidence" class="tab-panel surface company-panel" aria-labelledby="evidence-title"><h2 id="evidence-title">Evidencia para decidir</h2><p>Estas son las fuentes que sostienen la ficha. Todas las fechas de consulta se presentan en UTC.</p>{% for fact in result.evidence %}<article id="source-{{ fact.id }}" class="evidence-detail"><div class="evidence-meta"><span>{% if fact.source_type == 'primary' %}Fuente original{% elif fact.source_type == 'provider' %}Proveedor{% else %}{{ fact.source_type|label }}{% endif %}</span><time>{{ fact.retrieved_at|date:'d M Y · H:i' }} UTC</time></div><h3>{{ fact.claim }}</h3>{% if fact.excerpt %}<blockquote>{{ fact.excerpt }}</blockquote>{% endif %}<dl class="evidence-dates">{% if fact.published_at %}<div><dt>Publicación</dt><dd>{{ fact.published_at }}</dd></div>{% endif %}{% if fact.updated_at %}<div><dt>Actualización</dt><dd>{{ fact.updated_at }}</dd></div>{% endif %}{% if fact.provider %}<div><dt>Proveedor</dt><dd>{{ fact.provider }}</dd></div><div><dt>Referencia</dt><dd>{{ fact.external_reference|default_if_none:'Pendiente' }}</dd></div>{% endif %}</dl>{% if fact.contradiction_ids %}<p class="notice notice-warning">Contradicciones: {{ fact.contradiction_ids|join:', ' }}</p>{% endif %}{% with url=fact.url|public_url %}{% if url %}<a href="{{ url }}" class="text-link" target="_blank" rel="noopener noreferrer">Abrir fuente pública<span class="sr-only"> en otra pestaña</span></a>{% endif %}{% endwith %}<p class="evidence-id">Referencia de evidencia: {{ fact.id }}</p></article>{% empty %}<div class="empty-state"><h3>La evidencia todavía está pendiente.</h3><p>Los datos sin procedencia permanecen desconocidos.</p></div>{% endfor %}</section>
+    <section id="evidence" class="tab-panel surface company-panel" aria-labelledby="evidence-title">
+      <h2 id="evidence-title" class="sr-only">Evidencia</h2>
+      {% for fact in result.evidence %}
+      <article id="source-{{ fact.id }}" class="evidence-detail">
+        <div class="evidence-meta">
+          <span>#{{ forloop.counter }} · {% if fact.source_type == 'provider' and fact.provider %}{{ fact.provider|capfirst }}{% else %}{{ fact.source_type|label }}{% endif %}</span>
+          <time>{{ fact.retrieved_at|date:'d M Y' }}</time>
+        </div>
+        <h3>{{ fact.claim }}</h3>
+        {% if fact.excerpt %}<blockquote>{{ fact.excerpt }}</blockquote>{% endif %}
+        {% if fact.contradiction_ids %}<p class="notice notice-warning">Contradicciones registradas.</p>{% endif %}
+        {% with url=fact.url|public_url %}
+          {% if url %}<a href="{{ url }}" class="text-link" target="_blank" rel="noopener noreferrer">Abrir fuente<span class="sr-only"> en otra pestaña</span></a>{% endif %}
+        {% endwith %}
+      </article>
+      {% empty %}
+      <div class="empty-state">
+        <h3>Sin evidencia registrada</h3>
+      </div>
+      {% endfor %}
+    </section>
   </div>
-  <aside class="review-panel surface" aria-labelledby="review-title"><h2 id="review-title">Decisión del equipo</h2><p>Guarda tu revisión sin cambiar la calificación ni la disponibilidad del contacto.</p><form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}" data-idle-form>{% csrf_token %}<fieldset {% if is_executing %}disabled{% endif %}>{% if review_form.non_field_errors %}<div class="notice notice-error">{{ review_form.non_field_errors }}</div>{% endif %}{% include 'components/_field.html' with field=review_form.status %}{% include 'components/_field.html' with field=review_form.reason %}<button type="submit" class="button button-primary" data-idle-only>Guardar revisión</button></fieldset></form>{% if result.run_item.reviewed_at %}<p class="quiet-note">Última revisión: {{ result.run_item.reviewed_at|date:'d M Y · H:i' }} UTC</p>{% endif %}<div class="review-explanation"><strong>Listo y aceptado son distintos.</strong><p>“Listo” indica un canal utilizable según las reglas. “Aceptado” registra la decisión del equipo de ventas.</p></div></aside>
+  <aside class="review-panel surface" aria-labelledby="review-title">
+    <h2 id="review-title">Revisión</h2>
+    <form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
+      <fieldset {% if is_executing %}disabled{% endif %}>
+        {% if review_form.non_field_errors %}<div class="notice notice-error">{{ review_form.non_field_errors }}</div>{% endif %}
+        {% include 'components/_field.html' with field=review_form.status %}
+        {% include 'components/_field.html' with field=review_form.reason %}
+        <div class="review-actions">
+          <button type="submit" class="button button-primary" data-idle-only>Guardar</button>
+          {% if next_company %}
+          <button type="submit" name="next_company_id" value="{{ next_company.id }}" class="button button-secondary" data-idle-only>Guardar y siguiente →</button>
+          {% endif %}
+        </div>
+      </fieldset>
+    </form>
+    {% if result.run_item.reviewed_at %}<p class="quiet-note">Revisado: {{ result.run_item.reviewed_at|date:'d M Y · H:i' }}</p>{% endif %}
+  </aside>
 </div>
 {% endblock %}

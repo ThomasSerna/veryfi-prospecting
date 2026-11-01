@@ -1,0 +1,54 @@
+{% load prospecting_ui %}
+<section id="authorization" class="surface authorization-section{% if promoted %} authorization-promoted{% endif %}" aria-labelledby="authorization-title">
+  <details {% if campaign.status == 'created' %}open{% endif %}>
+    <summary>
+      <span>
+        <strong id="authorization-title">{% if campaign.status == 'created' %}Autorizar ejecución{% else %}Reanudar ejecución{% endif %}</strong>
+      </span>
+    </summary>
+    {% if authorization_form %}
+    <form method="post" action="{% url 'webapp:execute' campaign.id %}" id="execution-form" data-idle-form>{% csrf_token %}
+      <div class="authorization-toolbar">
+        <button type="button" class="button button-small button-secondary" data-apply-suggested data-idle-only {% if is_executing %}disabled{% endif %}>Usar topes disponibles</button>
+      </div>
+      <div class="notice notice-error execution-errors" role="alert" hidden></div>
+      {% if authorization_form.non_field_errors %}<div class="notice notice-error">{{ authorization_form.non_field_errors }}</div>{% endif %}
+      <fieldset {% if is_executing %}disabled{% endif %}>
+        <div class="form-grid">
+          {% include 'components/_field.html' with field=authorization_form.responsible %}
+          {% include 'components/_field.html' with field=authorization_form.reference %}
+        </div>
+        <div class="operation-list">
+          {% for row in operation_rows %}
+          <fieldset class="operation-row" data-operation-row data-suggested-cost="{{ row.suggested_cost }}" data-suggested-credits="{{ row.suggested_credits }}">
+            <legend class="sr-only">{{ row.label }}</legend>
+            <div class="operation-heading">
+              <label class="checkbox-label" for="{{ row.allow.id_for_label }}">
+                {{ row.allow }}
+                <span>
+                  <strong>{{ row.label }}</strong>
+                  <small>{{ row.funding_label }} · Disponible: {{ row.account.cost.available|money_summary }} · Créditos: {{ row.account.credits.available|default_if_none:'—' }}</small>
+                </span>
+              </label>
+              {% if not row.key_present %}<p class="field-help">Clave no configurada en el servidor.</p>{% endif %}
+            </div>
+            <div class="operation-limits">
+              {% include 'components/_field.html' with field=row.cost %}
+              {% include 'components/_field.html' with field=row.credits %}
+            </div>
+          </fieldset>
+          {% endfor %}
+        </div>
+        <div class="consent-field">{{ authorization_form.confirmed }}{{ authorization_form.confirmed.label_tag }}{{ authorization_form.confirmed.errors }}</div>
+        <div class="form-actions">
+          <button type="submit" class="button button-primary" data-idle-only>{% if campaign.status == 'created' %}Ejecutar{% else %}Reanudar{% endif %}</button>
+        </div>
+      </fieldset>
+    </form>
+    {% else %}
+    <div class="notice notice-info">
+      <strong>Acceso a proveedores no configurado.</strong>
+    </div>
+    {% endif %}
+  </details>
+</section>

@@ -19,12 +19,12 @@ class ExecutionBusy(ValueError):
 
 def error_message(error):
     if isinstance(error, ValidationError):
-        return "Revisa los campos obligatorios y los límites; los datos no cumplen el contrato."
+        return "Datos fuera de rango o incompletos."
     if isinstance(error, sqlite3.Error):
-        return "No se pudo leer o actualizar la base local. Los datos guardados se conservan."
+        return "Error de lectura o escritura en la base local."
     if isinstance(error, ValueError):
         return str(error)
-    return "No se pudo completar la investigación. Los datos guardados se conservan; revisa y reanuda con una nueva autorización."
+    return "No se pudo completar la operación."
 
 
 def _snapshot(campaign_id):

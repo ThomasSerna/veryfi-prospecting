@@ -1,22 +1,130 @@
 {% load prospecting_ui %}
-<section class="campaign-overview" aria-label="Estado y avance de campaña">
-  <div class="overview-status"><span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span><span class="quiet-note">Campaña {{ campaign.id|stringformat:'s'|slice:':8' }}</span></div>
-  <div class="campaign-counts"><div><strong>{{ counts.total }}</strong><span>Empresas encontradas</span></div><div><strong>{{ counts.ready }}</strong><span>Con contacto listo</span></div><div><strong>{{ counts.pending }}</strong><span>Sin contacto listo</span></div><div><strong>{{ counts.accepted }}</strong><span>Aceptadas por el equipo</span></div></div>
-  {% if is_executing %}<div class="execution-progress" role="status"><div class="progress-copy"><strong>Investigación en curso</strong><span>{% if counts.total %}{{ counts.completed }} de {{ counts.total }} empresas terminadas{% else %}Buscando empresas; el avance aún no se puede medir.{% endif %}</span></div>{% if counts.total %}<progress value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas terminadas">{{ counts.completed }} de {{ counts.total }}</progress>{% else %}<progress aria-label="Descubrimiento en curso"></progress>{% endif %}<p>La revisión, el cierre y la exportación esperan a que termine. Puedes cerrar esta pestaña; la investigación continúa mientras el servidor esté abierto.</p></div>{% elif campaign.status == 'created' %}<div class="prepared-note"><strong>Los criterios están guardados.</strong><span>Autoriza las operaciones para iniciar la investigación.</span></div>{% elif campaign.status != 'completed' %}<p class="quiet-note">Reanudar conserva resultados y consumo. Si el descubrimiento se interrumpió, las respuestas todavía no guardadas pueden perderse y las consultas enviadas no se repiten.</p>{% endif %}
+<section class="campaign-overview" data-live-section="overview" aria-label="Estado y avance de campaña">
+  <div class="overview-status">
+    <span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span>
+  </div>
+  <div class="campaign-counts">
+    <div><strong>{{ counts.total }}</strong><span>Empresas</span></div>
+    <div><strong>{{ counts.ready }}</strong><span>Con contacto listo</span></div>
+    <div><strong>{{ counts.pending }}</strong><span>Sin contacto listo</span></div>
+    <div><strong>{{ counts.accepted }}</strong><span>Aceptadas</span></div>
+  </div>
+  {% if is_executing %}
+  <div class="execution-progress" role="status">
+    <div class="progress-copy">
+      <strong>Investigación en curso</strong>
+      <span>{% if counts.total %}{{ counts.completed }} de {{ counts.total }} empresas{% else %}Buscando empresas…{% endif %}</span>
+    </div>
+    {% if counts.total %}
+    <progress value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas terminadas">{{ counts.completed }} de {{ counts.total }}</progress>
+    {% else %}
+    <progress aria-label="Descubrimiento en curso"></progress>
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
-<section class="surface results-section" aria-labelledby="results-title">
-  <div class="section-heading section-heading-row"><div><h2 id="results-title">Empresas para tu revisión</h2><p>Ordenadas por prioridad y encaje. Abre una ficha para ver por qué interesa y qué falta.</p></div><span class="result-count">{{ results|length }} de {{ counts.total }}</span></div>
-  {% if results %}<div class="table-scroll" tabindex="0" role="region" aria-label="Empresas de la campaña"><table class="data-table results-table"><thead><tr><th>Empresa</th><th>Prioridad</th><th>Disponibilidad</th><th>Revisión</th><th class="numeric">Encaje</th><th class="numeric">Cobertura</th><th class="numeric">Contactos</th><th>Mercado</th><th>Etapa</th></tr></thead><tbody>{% for result in results %}<tr>
-    <th scope="row"><a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}">{{ result.company.name }}</a><span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span></th>
-    <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
-    <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td><td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
-    <td class="numeric">{{ result.assessment.fit_score|score }}</td><td class="numeric">{{ result.assessment.coverage|percentage }}</td><td class="numeric">{{ result.contacts|length }}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td><td>{% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}<span class="cell-note">{% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span></td><td>{{ result.run_item.stage|label }}</td>
-  </tr>{% endfor %}</tbody></table></div>{% elif counts.total %}<div class="empty-state"><h3>Ninguna empresa coincide con estos filtros.</h3><p>Prueba otro país, segmento, prioridad o disponibilidad para ampliar la vista.</p><a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Ver todas las empresas</a></div>{% else %}<div class="empty-state"><h3>{% if is_executing %}Estamos buscando empresas para esta campaña.{% else %}La campaña todavía no tiene empresas descubiertas.{% endif %}</h3><p>{% if is_executing %}Los resultados aparecerán aquí cuando se guarden. El descubrimiento tiene avance indeterminado.{% else %}Autoriza la investigación para comenzar, o revisa el motivo de detención si ya se intentó ejecutar.{% endif %}</p></div>{% endif %}
+<section class="result-filters" data-live-filters aria-label="Filtrar empresas" {% if not counts.total and not has_active_filters %}hidden{% endif %}>
+  <form method="get" class="filter-form">
+    <div class="filter-fields">
+      {% include 'components/_field.html' with field=filter_form.q %}
+      {% include 'components/_filter.html' with field=filter_form.countries %}
+      {% include 'components/_filter.html' with field=filter_form.segments %}
+      {% include 'components/_filter.html' with field=filter_form.priorities %}
+      {% include 'components/_filter.html' with field=filter_form.availability %}
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="button button-small button-navy">Aplicar filtros{% if active_filter_count %} ({{ active_filter_count }}){% endif %}</button>
+      {% if has_active_filters %}<a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Limpiar filtros</a>{% else %}<a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Restablecer</a>{% endif %}
+    </div>
+  </form>
 </section>
-<section class="surface budget-section" aria-labelledby="budget-title">
-  <div class="section-heading"><h2 id="budget-title">Presupuesto bajo control</h2><p>El consumo se conserva entre ejecuciones. Las cifras desconocidas requieren conciliación.</p></div>
-  <dl class="budget-summary"><div><dt>Disponible · campaña</dt><dd class="budget-available">{{ view.budget.campaign.available|money }}</dd></div><div><dt>Confirmado · campaña</dt><dd>{{ view.budget.campaign.confirmed|money }}</dd></div><div><dt>Estimado · campaña</dt><dd>{{ view.budget.campaign.estimated|money }}</dd></div><div><dt>Reservado · campaña</dt><dd>{{ view.budget.campaign.reserved|money }}</dd></div></dl>
-  <p class="budget-caption">Acumulado global: {{ view.budget.global_budget.exposure|money }} / {{ view.budget.global_budget.limit|money }} · Límite operativo: {{ view.budget.operating.limit|money }} · Margen: {{ campaign.limits.budget.uncertainty_usd|money }} · Pendiente de conciliación: {{ view.budget.campaign.pending|money }}.</p>
-  {% if view.budget.reservation_overrun or view.budget.operating.unknown or view.budget.campaign.unknown %}<div class="notice notice-warning"><strong>Hay consumo incierto o una reserva excedida.</strong><p>Se conserva hasta su conciliación; no se libera para ejecutar otra vez.</p></div>{% endif %}
-  <details class="budget-details"><summary>Detalle de presupuesto y cuentas</summary><dl class="detail-grid"><div><dt>Exposición operativa</dt><dd>{{ view.budget.operating.exposure|money }}</dd></div><div><dt>Disponible operativo</dt><dd>{{ view.budget.operating.available|money }}</dd></div><div><dt>Desembolso global</dt><dd>{{ view.budget.outlay_usd|money }}</dd></div><div><dt>Equivalente de créditos gratuitos</dt><dd>{{ view.budget.free_credit_equivalent.exposure|money }}</dd></div></dl>{% for account in view.budget.accounts %}<div class="account-detail"><h3>{{ account.provider }} <span>{{ account.account_ref }} · {{ account.funding_source }}</span></h3><div class="table-scroll" tabindex="0" role="region" aria-label="Consumo de {{ account.provider }}"><table class="data-table account-table"><thead><tr><th>Consumo</th><th>Confirmado</th><th>Estimado</th><th>Reservado</th><th>Pendiente</th><th>Disponible</th></tr></thead><tbody><tr><th scope="row">Créditos</th><td>{{ account.credits.confirmed|default_if_none:'Desconocido' }}</td><td>{{ account.credits.estimated|default_if_none:'Desconocido' }}</td><td>{{ account.credits.reserved|default_if_none:'Desconocido' }}</td><td>{{ account.credits.pending|default_if_none:'Desconocido' }}</td><td>{{ account.credits.available|default_if_none:'Desconocido' }}</td></tr><tr><th scope="row">Costo USD</th><td>{{ account.cost.confirmed|money }}</td><td>{{ account.cost.estimated|money }}</td><td>{{ account.cost.reserved|money }}</td><td>{{ account.cost.pending|money }}</td><td>{{ account.cost.available|money }}</td></tr></tbody></table></div></div>{% empty %}<p>No hay cuentas comprobadas disponibles en esta instalación.</p>{% endfor %}</details><p class="quiet-note">La estimación no reemplaza la facturación. Desconocido no equivale a cero.</p>
+<section class="surface results-section" data-live-section="results" aria-labelledby="results-title">
+  <div class="section-heading section-heading-row">
+    <h2 id="results-title">Empresas</h2>
+    <span class="result-count">{{ results|length }} de {{ counts.total }}</span>
+  </div>
+  {% if results %}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Empresas de la campaña">
+    <table class="data-table results-table">
+      <thead>
+        <tr>
+          <th>Empresa</th>
+          <th>Prioridad</th>
+          <th>Disponibilidad</th>
+          <th>Revisión</th>
+          <th class="numeric">Encaje</th>
+          <th class="numeric">Cobertura</th>
+          <th class="numeric">Contactos</th>
+          <th>Mercado</th>
+          <th>Etapa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in results %}
+        <tr>
+          <th scope="row">
+            <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}</a>
+            <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
+          </th>
+          <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
+          <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
+          <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
+          <td class="numeric">{{ result.assessment.fit_score|score }}</td>
+          <td class="numeric">{{ result.assessment.coverage|percentage }}</td>
+          <td class="numeric">{{ result.contacts|length }}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
+          <td>
+            {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}
+            <span class="cell-note">{% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
+          </td>
+          <td>{{ result.run_item.stage|label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif counts.total %}
+  <div class="empty-state">
+    <h3>Ninguna empresa coincide con estos filtros.</h3>
+    <a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Ver todas las empresas</a>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>{% if is_executing %}Buscando empresas…{% else %}Sin empresas registradas{% endif %}</h3>
+  </div>
+  {% endif %}
+</section>
+<section class="surface budget-section" data-live-section="budget" aria-labelledby="budget-title">
+  <div class="section-heading">
+    <h2 id="budget-title">Presupuesto</h2>
+  </div>
+  <dl class="budget-summary">
+    <div><dt>Disponible</dt><dd class="budget-available">{{ view.budget.campaign.available|money_summary }}</dd></div>
+    <div><dt>Confirmado</dt><dd>{{ view.budget.campaign.confirmed|money_summary }}</dd></div>
+    <div><dt>Estimado</dt><dd>{{ view.budget.campaign.estimated|money_summary }}</dd></div>
+    <div><dt>Reservado</dt><dd>{{ view.budget.campaign.reserved|money_summary }}</dd></div>
+  </dl>
+  {% if view.budget.reservation_overrun or view.budget.operating.unknown or view.budget.campaign.unknown %}
+  <div class="notice notice-warning">
+    <strong>Consumo pendiente de conciliación.</strong>
+  </div>
+  {% endif %}
+  <details class="budget-details">
+    <summary>Cuentas</summary>
+    {% for account in view.budget.accounts %}
+    <div class="account-detail">
+      <h3>{{ account.provider }} <span>{{ account.account_ref }}</span></h3>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Consumo de {{ account.provider }}">
+        <table class="data-table account-table">
+          <thead><tr><th>Consumo</th><th>Confirmado</th><th>Estimado</th><th>Reservado</th><th>Pendiente</th><th>Disponible</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Créditos</th><td>{{ account.credits.confirmed|default_if_none:'Desconocido' }}</td><td>{{ account.credits.estimated|default_if_none:'Desconocido' }}</td><td>{{ account.credits.reserved|default_if_none:'Desconocido' }}</td><td>{{ account.credits.pending|default_if_none:'Desconocido' }}</td><td>{{ account.credits.available|default_if_none:'Desconocido' }}</td></tr>
+            <tr><th scope="row">Costo USD</th><td>{{ account.cost.confirmed|money_summary }}</td><td>{{ account.cost.estimated|money_summary }}</td><td>{{ account.cost.reserved|money_summary }}</td><td>{{ account.cost.pending|money_summary }}</td><td>{{ account.cost.available|money_summary }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% empty %}
+    <p>Sin cuentas configuradas.</p>
+    {% endfor %}
+  </details>
 </section>

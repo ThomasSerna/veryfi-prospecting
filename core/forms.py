@@ -9,14 +9,20 @@ from prospecting.models import Campaign, CampaignFilters
 from prospecting.pipeline import AuthorizationInput, provider_operations
 from core.presentation import label
 
+FUNDING_LABELS = {
+    "free_credit": "Crédito gratuito",
+    "prepaid": "Prepago en USD",
+    "paid_credit": "Créditos de pago",
+}
+
 
 class CampaignForm(forms.Form):
     draft_id = forms.UUIDField(widget=forms.HiddenInput)
     countries = forms.MultipleChoiceField(label="Países", widget=forms.CheckboxSelectMultiple)
-    segments = forms.MultipleChoiceField(label="Tipo de empresa", widget=forms.CheckboxSelectMultiple)
-    keywords = forms.CharField(label="¿Qué quieres encontrar?", required=False, max_length=1000,
-                              help_text="Palabras o frases opcionales, separadas por comas.")
-    max_companies = forms.IntegerField(label="Empresas a investigar", min_value=1, max_value=20)
+    segments = forms.MultipleChoiceField(label="Segmentos", widget=forms.CheckboxSelectMultiple)
+    keywords = forms.CharField(label="Palabras clave (opcional)", required=False, max_length=1000,
+                              help_text="Separadas por comas.")
+    max_companies = forms.IntegerField(label="Máximo de empresas", min_value=1, max_value=20)
 
     def __init__(self, *args, config, campaign_id, **kwargs):
         self.config, self.campaign_id = config, campaign_id
@@ -65,16 +71,16 @@ class FilterForm(forms.Form):
 
 
 class ReviewForm(forms.Form):
-    status = forms.ChoiceField(label="Tu decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
-    reason = forms.CharField(label="Motivo de tu decisión", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
+    status = forms.ChoiceField(label="Decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
+    reason = forms.CharField(label="Notas", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
 
 
 class ConfirmationForm(forms.Form):
     contact_id = forms.UUIDField(widget=forms.HiddenInput)
     channel_type = forms.ChoiceField(choices=[("linkedin", "LinkedIn"), ("other", "Otro canal")], widget=forms.HiddenInput)
     channel_value = forms.CharField(max_length=2048, widget=forms.HiddenInput)
-    reason = forms.CharField(label="¿Cómo comprobaste el acceso directo?", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
-    confirmed = forms.BooleanField(label="He comprobado que puedo contactar directamente a esta persona por este canal, sin enviar mensajes.")
+    reason = forms.CharField(label="Notas de verificación", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+    confirmed = forms.BooleanField(label="Canal directo comprobado")
 
 
 OPERATION_LABELS = {
@@ -88,14 +94,14 @@ OPERATION_LABELS = {
 
 
 class AuthorizationForm(forms.Form):
-    responsible = forms.CharField(label="Responsable del presupuesto", max_length=200)
-    reference = forms.CharField(label="Referencia de esta autorización", max_length=1000,
-                                help_text="Una referencia local de la aprobación; nunca claves o datos de contactos.")
-    confirmed = forms.BooleanField(label="Soy responsable del presupuesto y autorizo únicamente las operaciones y topes seleccionados.")
+    responsible = forms.CharField(label="Responsable", max_length=200)
+    reference = forms.CharField(label="Referencia", max_length=1000)
+    confirmed = forms.BooleanField(label="Autorizo las operaciones y topes seleccionados.")
 
     def __init__(self, *args, access, view, **kwargs):
         self.operations, self.operation_rows = provider_operations(access), []
         super().__init__(*args, **kwargs)
+        campaign_avail = view.budget.campaign.available
         for provider, operation, account_ref in self.operations:
             key = f"{provider}_{operation}"
             key_name = {"tavily": "TAVILY_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "hunter": "HUNTER_API_KEY"}[provider]
@@ -106,10 +112,23 @@ class AuthorizationForm(forms.Form):
             self.fields[f"credits_{key}"] = forms.DecimalField(label="Tope de créditos", min_value=Decimal(0), max_digits=18,
                                                               decimal_places=6, initial=Decimal(0), required=False)
             account = next(item for item in view.budget.accounts if (item.provider, item.account_ref) == (provider, account_ref))
-            self.operation_rows.append({"provider": provider, "operation": operation, "account_ref": account_ref,
-                                        "label": OPERATION_LABELS.get((provider, operation), operation),
-                                        "key_present": key_present, "key_name": key_name, "account": account,
-                                        "allow": self[f"allow_{key}"], "cost": self[f"cost_{key}"], "credits": self[f"credits_{key}"]})
+            avail_cost = account.cost.available
+            avail_credits = account.credits.available
+            if account.funding_source == "free_credit":
+                suggested_cost = "0"
+            else:
+                candidates = [val for val in (avail_cost, campaign_avail) if val is not None]
+                best_cost = min(candidates) if candidates else Decimal(0)
+                suggested_cost = f"{max(best_cost, Decimal(0)):.2f}" if best_cost > 0 else "0"
+            suggested_credits = str(min(avail_credits, Decimal(10))) if avail_credits is not None and avail_credits > 0 else "0"
+            self.operation_rows.append({
+                "provider": provider, "operation": operation, "account_ref": account_ref,
+                "label": OPERATION_LABELS.get((provider, operation), operation),
+                "funding_label": FUNDING_LABELS.get(account.funding_source, account.funding_source),
+                "suggested_cost": suggested_cost, "suggested_credits": suggested_credits,
+                "key_present": key_present, "key_name": key_name, "account": account,
+                "allow": self[f"allow_{key}"], "cost": self[f"cost_{key}"], "credits": self[f"credits_{key}"],
+            })
 
     def clean(self):
         cleaned = super().clean()
