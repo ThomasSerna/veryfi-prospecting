@@ -1,18 +1,18 @@
 # Personas y canales profesionales
 
-La búsqueda utiliza Hunter para personas y correos, y Tavily para localizar o
-contrastar información pública. `prospecting.providers.hunter` construye las
-solicitudes de Hunter y convierte sus respuestas; `prospecting.contact_extraction`
+La búsqueda utiliza Apollo para personas y correos, y Tavily para localizar o
+contrastar información pública. `prospecting.providers.apollo` construye las
+solicitudes de Apollo y convierte sus respuestas; `prospecting.contact_extraction`
 prepara la extracción con Haiku y valida sus citas; `prospecting.contacts` aplica las
 reglas de persona, canal y listo, independientes de la fuente. Los tres son funciones
 sin red ni persistencia.
 `prospecting.pipeline` reserva gasto, llama proveedores y guarda resultados. No
 hay envío de mensajes, llamadas comerciales, secuencias ni sincronización de
-contactos a otra plataforma. Apollo y X-Ray Search no están habilitados.
+contactos a otra plataforma. X-Ray Search no está habilitado.
 
 ## Entrada y flujo
 
-`find_contacts(db, budget, client, campaign_id, company_id, *, hunter_access=None,
+`find_contacts(db, budget, client, campaign_id, company_id, *, apollo_access=None,
 authorizations=None, tavily_account_ref=None, claude=None, claude_account_ref=None,
 claude_funding_source="prepaid", deadline=None)` investiga una empresa ya guardada
 y vinculada a la campaña, con dominio/entidad confirmados y evaluación seleccionada
@@ -23,26 +23,22 @@ de la campaña.
 
 El orden de trabajo es:
 
-1. Reutilizar personas, canales y evidencia guardados. Si ya existe un canal
+1. Reutilizar personas, canales y evidencia de la generación Apollo. Si ya existe un canal
    preferido utilizable, terminar sin nuevas llamadas.
-2. Consultar Domain Search sobre el dominio confirmado, primero sin filtro de cargo
-   (todas las personas nominales del dominio) y, si queda un segundo intento, por los
-   cargos objetivo, para alcanzar a quienes no estuvieran entre los primeros resultados.
-   `type="personal"` significa un correo nominal del dominio profesional; las direcciones
-   genéricas no cuentan como canal de una persona. Cada consulta pide como máximo 10
-   resultados, con `offset=0`, sin recorrer páginas: en el plan Free de Hunter
-   `limit + offset` no puede superar 10.
-3. Complementar con búsquedas y extracción de URLs públicas mediante Tavily,
+2. Consultar People API Search sobre el dominio confirmado, primero sin filtro de cargo
+   y, si queda un segundo intento, por los cargos objetivo. Cada consulta pide como
+   máximo 10 candidatos en la primera página. Search no devuelve correo ni teléfono;
+   sus nombres pueden ser parciales y permanecen pendientes.
+3. Enriquecer selectivamente los candidatos pertinentes con un identificador observado
+   de Apollo, autorización y cupo. People Enrichment no solicita emails personales,
+   teléfonos ni waterfall. No completar apellidos con IA ni construir direcciones.
+4. Complementar con búsquedas y extracción de URLs públicas mediante Tavily,
    dentro del cupo. Si se proporcionó Haiku y su autorización, extraer hechos
    nominales citados de evidencia nueva o ya disponible. Las páginas de LinkedIn
    no se automatizan.
-4. Sobre candidatos cuya identidad, cargo y empleo son pertinentes y vigentes,
-   usar Finder solo si falta correo profesional. Enviar nombre completo observado
-   y dominio confirmado; no construir direcciones por patrón ni solicitar correos privados.
-5. Reutilizar la verificación vigente o la publicación nominal corporativa.
-   Verifier se consulta únicamente si el correo todavía necesita comprobación,
-   queda cupo y la operación está habilitada. Un 202 deja la ejecución pendiente;
-   no hay polling automático.
+5. Comprobar independientemente identidad, empresa actual, cargo, vigencia y canal.
+   Una fecha de consulta no es una fecha de verificación: un correo sin esta fecha
+   permanece pendiente salvo publicación nominal corporativa vigente.
 6. Guardar contactos y evidencia con cada resultado, conservar el consumo y
    detenerse al primer correo, teléfono o WhatsApp profesional utilizable.
 
@@ -57,13 +53,11 @@ web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes
 consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
 no se recuperan.
 
-La prioridad media permite 1 persona, 2 búsquedas Hunter (la segunda, por cargos,
-solo si la primera no dejó un canal preferido), hasta 1 enriquecimiento Hunter, 2 consultas
+La prioridad media permite 1 persona, 2 búsquedas Apollo (la segunda, por cargos,
+solo si la primera no dejó un canal preferido), hasta 1 enriquecimiento Apollo, 2 consultas
 web, 2 páginas y 90 segundos adicionales. La alta permite
-hasta 3 personas, 2 búsquedas Hunter, 3 enriquecimientos, 4 consultas web, 4 páginas
-y 180 segundos. Finder y Verifier comparten el cupo de enriquecimientos; una
-verificación también incrementa su contador específico. El máximo inicial es una
-verificación por canal. Las reducciones de configuración y los límites económicos
+hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos, 4 consultas web, 4 páginas
+y 180 segundos. Las reducciones de configuración y los límites económicos
 siguen vigentes; esos máximos no obligan a agotarlos.
 
 `ContactReport` devuelve `status` (`checked`, `already_checked`, `pending` o
@@ -73,50 +67,47 @@ una solicitud enviada con resultado faltante o consumo incierto exige revisión 
 no se repite. Las cachés de resultados usan inicialmente 30 días para web y 30 para
 contactos; reutilizar no vuelve actual una verificación ni un empleo caducados.
 
-## Acceso a Hunter
+## Acceso a Apollo
 
-`HunterAccess` recibe `search_account_ref`, `verification_account_ref`,
-`enabled_operations`, `unified_credits`, `automatic_lead_saving_disabled`,
-`funding_source`, `source_reference` y `checked_at`. Es un registro de comprobación;
-la presencia de `HUNTER_API_KEY` no demuestra acceso ni autoriza una llamada.
-El saldo inicial y su valoración pertenecen a `AccountAllowance`; cada permiso
-pertenece a la sesión de `Budget` que lo registró.
+`ApolloAccess` registra la referencia de cuenta, operaciones habilitadas, origen de
+financiación, referencia y fecha de comprobación, plan, correo laboral, acceso y
+tope de créditos de enriquecimiento. La presencia de `APOLLO_API_KEY` no demuestra
+acceso ni autoriza una llamada. El saldo inicial y su valoración pertenecen a
+`AccountAllowance`; cada permiso pertenece a la sesión de `Budget` que lo registró.
+Si falta comprobar acceso, cuota o facturación, la ejecución real se bloquea sin
+recurrir a Hunter. El adaptador admite el plan Free y la campaña necesita al menos
+un crédito disponible después de descontar el consumo y las reservas. La consulta
+del historial y la demo siguen disponibles.
 
-Usar una referencia canónica por saldo real. Domain Search y Finder comparten la
-cuota de búsqueda. Con créditos unificados, Verifier usa la misma referencia;
-con cuotas separadas, necesita una referencia distinta para verificación.
-Los permisos deben corresponder a la operación y referencia exactas. No reutilizar
-cuotas o autorizaciones de una sesión anterior. Véase
-[Presupuesto y proveedores](budget-providers.md).
+La comprobación compartida de `pipeline/calls.py` también se aplica al invocar
+`find_contacts` directamente, aunque el límite de búsquedas sea cero. Si falla,
+el informe queda `pending` con el motivo y no se llama a ningún proveedor.
 
-Las únicas operaciones Hunter son `domain_search`, `email_finder` y
-`email_verifier`, con Bearer en cabecera. Sus modelos Pydantic validan los campos
-utilizados e ignoran campos externos nuevos. Los nombres incompletos, fechas
-ausentes o fuentes insuficientes quedan pendientes; no se completan con IA.
-
-Finder y Verifier necesitan comprobar previamente
-`automatic_lead_saving_disabled=True`. El
-[OpenAPI de Hunter](https://hunter.io/openapi.json) describe guardado automático
-de leads, desactivable en la cuenta. El módulo no modifica ese ajuste. Sin su
-comprobación, esas operaciones no se habilitan.
+Usar una referencia canónica por saldo real. Las operaciones admitidas son
+`people_search` y `people_enrichment`; sus permisos deben corresponder a la operación
+y cuenta exactas. La búsqueda tiene cota de cero créditos y el enriquecimiento, de
+un crédito por persona, únicamente para las condiciones comprobadas de la cuenta.
+No reutilizar permisos de otra sesión. Véase [Presupuesto y proveedores](budget-providers.md).
+Los modelos Pydantic validan los campos utilizados; nombres incompletos, fechas
+ausentes o fuentes insuficientes quedan pendientes.
 
 La invocación siguiente presupone una base y un `Budget` abiertos, una empresa
 calificada y los registros de acceso/cupos comprobados. `session_authorizations`
 contiene exclusivamente los objetos que corresponden a permisos explícitos del
 responsable en esta sesión, ya registrados mediante `budget.authorize`; este
-ejemplo no crea ni concede autorizaciones. Cada proveedor opcional solo se usa
-si se proporciona su cuenta y el permiso correspondiente.
+ejemplo no crea ni concede autorizaciones. Apollo necesita el acceso comprobado;
+Tavily y Haiku solo se usan si se proporcionan sus cuentas y permisos.
 
 ```python
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, ProviderClient
-from prospecting.providers.hunter import HUNTER_OPERATIONS
+from prospecting.providers.apollo import APOLLO_OPERATIONS
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
-client = ProviderClient(budget, [*HUNTER_OPERATIONS, *TAVILY_OPERATIONS])
+client = ProviderClient(budget, [*APOLLO_OPERATIONS, *TAVILY_OPERATIONS])
 report = find_contacts(
     db, budget, client, campaign_id, company_id,
-    hunter_access=hunter_access,
+    apollo_access=apollo_access,
     authorizations=session_authorizations,
     tavily_account_ref=tavily_account_ref,
     claude=ClaudeClient(budget),
@@ -135,21 +126,22 @@ las búsquedas y la prioridad entre candidatos. Un título
 o el indicador de autoridad del proveedor no asignan automáticamente un papel de
 compra; `buying_role` permanece `unknown` sin respaldo específico.
 
-Hunter proporciona candidatos y fuentes del correo. Las fechas `extracted_on`,
-`last_seen_on` y `verification.date` se conservan con su significado; ninguna se
-convierte en fecha del puesto. Para validar empleo se necesita evidencia fechada
+Apollo proporciona candidatos y datos profesionales sujetos a validación. Una fecha
+de consulta o de actualización del perfil no se convierte en fecha del puesto ni
+de verificación del correo. Para validar empleo se necesita evidencia fechada
 dentro de 365 días o un directorio corporativo actual consultado dentro de la
 caché web de 30 días. Una fuente sin vigencia estimable exige revisión. Estos son
 valores iniciales del prototipo, reducidos según la configuración guardada de
 la campaña.
 
-Sin esa evidencia, `employment_basis` admite la vigencia inferida de Hunter
-(`hunter_signal`): correo nominal del dominio confirmado verificado `valid` dentro de
+Para los registros históricos, sin esa evidencia, `employment_basis` admite la
+vigencia inferida de Hunter (`hunter_signal`): correo nominal del dominio confirmado verificado `valid` dentro de
 `email_days` y una fuente de Hunter con `still_on_page=True` y `last_seen_on` dentro
 de `employment_days`. `current_employment=False`, una salida nominal o una fuente
 contradictoria la anulan. Se calcula al validar, sin cambiar `current_employment` ni
 hacer llamadas, así que también se aplica a contactos ya guardados. La ficha y el CSV
-la muestran como inferida y piden confirmar el cargo antes de contactar.
+la muestran como inferida y piden confirmar el cargo antes de contactar. Esta
+inferencia no se extiende a los candidatos de Apollo.
 
 La extracción pública usa `contacts_extraction_v1` con el mismo Haiku que la
 calificación. Si toda la evidencia vigente cabe en el límite de entrada, se envía
@@ -166,7 +158,7 @@ reasignar la empresa. El contenido externo no puede
 cambiar instrucciones, presupuesto ni condición de listo.
 
 - **Email:** asociación nominal y dominio confirmado de la empresa (un correo de otro
-  dominio no cuenta aunque una fuente lo marque como profesional), con verificación `valid` de
+  dominio no cuenta aunque una fuente lo marque como profesional), con verificación vigente de
   hasta 30 días; también puede servir la publicación nominal corporativa vigente
   sin verificación negativa. La publicación no garantiza entregabilidad.
 - **Estados:** se conservan el original y `verified`, `published_professional`,
@@ -236,13 +228,9 @@ Si el archivo falta o no es válido, la aplicación no usa pesos por defecto: mu
 personas sin porcentaje, avisa en la ficha y deja vacías las columnas del CSV.
 
 Las pruebas sin red usan credenciales y datos declarados sintéticos; no demuestran
-cobertura, acceso ni consumo de la cuenta del equipo. Las llamadas reales a Hunter
-de T07, T09 y la entrega están en [Comprobación de proveedores](provider-check.md);
-la selección del cupo y la prioridad de fragmentos descritas arriba (14 de octubre)
-solo se han verificado con datos sintéticos. La búsqueda amplia de Domain Search y el
-porcentaje de match (15 de octubre) tampoco se han probado con llamadas reales: la primera
-consulta amplia necesita autorización del responsable del cupo. La clave pública `test-api-key` devuelve
-datos ficticios y no sirve para una demostración de prospectos reales.
+cobertura, acceso ni consumo de Apollo. Las llamadas históricas a Hunter de T07, T09
+y la entrega están en [Comprobación de proveedores](provider-check.md). Las pruebas
+reales de Apollo requieren comprobar la cuenta y obtener autorización de gasto.
 
 Los teléfonos se comprueban automáticamente solo para prefijos y longitudes de
 Colombia/México; otros formatos necesitan revisión. El registro no almacena cuerpos

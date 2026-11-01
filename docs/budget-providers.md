@@ -84,16 +84,15 @@ una tabla HTTP universal ni reintenta automáticamente.
 
 El transporte estándar utiliza HTTPS verificado, un opener privado sin proxies
 heredados ni redirecciones y respuesta máxima de 1 MiB. Cada descriptor fija
-`timeout_seconds`, positivo y finito: 10 segundos por defecto; Hunter Verifier
-usa 25 segundos para permitir su procesamiento de hasta 20 segundos.
+`timeout_seconds`, positivo y finito: 10 segundos por defecto.
 Descuenta del tiempo restante el empleado
 en la preparación y reclamación. Ese timeout no garantiza un plazo absoluto para
 DNS o toda la llamada. El cliente no descarga páginas arbitrarias. Los adaptadores
-`prospecting/providers/tavily.py` y `prospecting/providers/hunter.py` habilitan únicamente
+`prospecting/providers/tavily.py` y `prospecting/providers/apollo.py` habilitan únicamente
 las operaciones explícitas de lectura; la pantalla no inicia llamadas automáticamente.
 
-Las claves se leen únicamente de variables de entorno al ejecutar una operación:
-`TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `APOLLO_API_KEY` y `HUNTER_API_KEY`.
+Las claves se leen únicamente de variables de entorno antes o durante la ejecución:
+`TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y `APOLLO_API_KEY`.
 No se carga `.env` automáticamente. Una clave presente no autoriza gasto.
 No hay envío comercial, recargas, waterfall ni enriquecimiento móvil de pago.
 
@@ -103,41 +102,32 @@ ese resultado, requieren revisión. Un segundo intento necesita conciliación,
 fallo transitorio identificado por el adaptador y otra reserva; después de un
 reinicio no se deduce transitoriedad del mensaje guardado.
 
-## Consumo y respuestas de Hunter
+## Consumo y respuestas de Apollo
 
-`HunterAccess` (`prospecting/providers/hunter.py`) registra operaciones disponibles, fecha y referencia de la
-comprobación, financiación y la referencia canónica de cada saldo real. Sus
-referencias `search_account_ref` y `verification_account_ref` se utilizan como
-`account_ref` del ledger y de los permisos, sin enviarse a Hunter.
-Domain Search y Finder comparten el mismo saldo de búsqueda. En una cuenta con
-créditos unificados también lo comparte Verifier; en una cuenta con cuotas
-separadas, el saldo de verificación tiene otra referencia y otro `AccountAllowance`.
-No crear alias o cupos por operación para un mismo saldo, ni sumar búsquedas y
-verificaciones de cuotas independientes como si fueran créditos intercambiables.
+`ApolloAccess` (`prospecting/providers/apollo.py`) registra las operaciones
+comprobadas, cuenta, financiación, plan, fecha, referencia y condiciones de acceso.
+La referencia de cuenta se usa en el ledger y los permisos; no se envía a Apollo.
+La configuración no sustituye `AccountAllowance` ni la autorización explícita de
+cada operación en la sesión de ejecución.
 
-Las cotas documentadas son 1 crédito para Domain Search con hasta 10 resultados y
-1 para Finder. El cobro por llamada de Domain Search se comprobó con la cuenta real el
-2026-10-12: una consulta con 3 correos costó 1 crédito, aunque la página de precios
-mencione un crédito por correo (véase `docs/provider-check.md`). Verifier reserva 0,5 créditos unificados o 1 crédito de su cuota
-separada, según la cuenta comprobada. Finder incluye la verificación del correo
-encontrado. Estos valores no comprueban acceso ni saldo en la cuenta del equipo;
-el origen y la valoración económica deben quedar acreditados antes del gasto.
-Consulta la [referencia de consumo de la API](https://help.hunter.io/en/articles/1970956-hunter-api)
-y la [distinción entre créditos de verificación](https://help.hunter.io/en/articles/1935055-how-many-credits-are-used-to-verify-an-email).
+Para una cuenta cuyas condiciones se hayan comprobado, People API Search tiene
+cota de cero créditos y People Enrichment reserva un crédito por persona. El
+adaptador actual admite el plan Free. Antes de ejecutar, verificar disponibilidad,
+cuotas, condiciones y facturación de la cuenta; el plan declarado o una clave
+presente no bastan. La aplicación bloquea la campaña si falta una clave con formato
+HTTP válido, el cupo de esa cuenta es desconocido o queda menos de un crédito tras
+descontar consumo y reservas. La
+[documentación oficial de créditos](https://docs.apollo.io/docs/api-pricing) explica
+el consumo general; el [registro de proveedores](provider-check.md) informa qué
+se ha comprobado en la cuenta del equipo.
 
-No asumir consumo exacto por obtener resultados: las reservas y estimaciones se
-mantienen hasta conciliación con un comprobante del proveedor. Un resultado vacío
-o una verificación desconocida tampoco autorizan liberar importes sin confirmar.
+No asumir consumo exacto por obtener resultados: si Apollo no informa los créditos
+observados del enriquecimiento, se mantiene la reserva pendiente hasta conciliar
+con un comprobante. Search se registra con cero créditos según la cota documentada.
+Un resultado vacío o un timeout tampoco autorizan liberar importes sin confirmar.
+No hay reenvío automático. Los errores conservan etapa y motivo sin registrar claves
+ni cuerpos HTTP. Las búsquedas y el enriquecimiento no solicitan emails personales,
+teléfonos ni waterfall, y no escriben contactos en Apollo.
 
-Para `hunter/email_verifier`, HTTP 202 conserva `Usage` como `uncertain`, con
-`outcome="unknown"`, y el saldo reservado. Un cuerpo 202 inválido también mantiene
-esa incertidumbre. No hay polling ni reenvío automático: el candidato queda
-pendiente. HTTP 222 se trata como fallo aunque pertenezca al rango 2xx. El mensaje
-de `errors[]` conserva `id`, `code` y `details` después de omitir claves, entradas
-sensibles, correos, números y URLs; no se guarda el cuerpo HTTP.
-
-Finder y Verifier solo pueden habilitarse tras comprobar que el guardado automático
-de leads está desactivado en la cuenta. El
-[OpenAPI oficial de Hunter](https://hunter.io/openapi.json) describe ese efecto y
-su desactivación a nivel de cuenta; no se supone un parámetro de petición para
-desactivarlo. La comprobación de acceso no cambia ajustes de la cuenta desde el código.
+El ledger de Hunter es histórico: sus referencias, gastos y comprobantes se
+conservan, pero no autorizan nuevas operaciones ni financian solicitudes de Apollo.

@@ -33,8 +33,10 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
    progreso es indeterminado; después se muestran las etapas y resultados parciales tras
    guardarlos en SQLite. La pantalla consulta el estado cada dos segundos mientras se ejecuta.
 
-El historial recupera campañas y permite reanudar o cerrar una campaña interrumpida
-conservando resultados y consumo. Los clics duplicados no repiten solicitudes
+El historial recupera campañas y permite reanudar o cerrar una campaña de Apollo
+interrumpida conservando resultados y consumo. Las campañas anteriores a Apollo
+solo se consultan o exportan; si una sigue activa, debe cerrarse explícitamente para
+preparar otra. Los clics duplicados no repiten solicitudes
 enviadas. Cerrar la pestaña no detiene la campaña; detener o reiniciar el servidor sí.
 No existe cola persistente ni reanudación automática: tras reiniciar, revisa el estado
 guardado y autoriza de nuevo. El último informe general está en memoria y se pierde al
@@ -48,8 +50,8 @@ repetirla ni borrar su reserva. Consulta [Orquestación](campaign.md) para los l
 
 `data/` está ignorado por Git. `provider-access.json` solo guarda cuentas, cupos y
 comprobaciones de acceso; las claves viven en variables de entorno. La aplicación
-no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y,
-cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Django; con un
+no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y
+`APOLLO_API_KEY` antes de iniciar Django; con un
 `.env` local, añade `--env-file .env` a `uv run --locked` para pasarlas al proceso.
 Si la interfaz indica «Clave no configurada en el servidor» con el `.env` presente, se inició sin `--env-file`.
 La interfaz habilita únicamente las operaciones cuya variable local tiene un valor configurado,
@@ -83,8 +85,8 @@ y sus cifras no sustituyen los cupos reales. Muestra la forma validada de `Provi
       "credit_valuation": null
     },
     {
-      "provider": "hunter",
-      "account_ref": "hunter-sintetica",
+      "provider": "apollo",
+      "account_ref": "apollo-sintetica",
       "funding_source": "free_credit",
       "credit_limit": "30",
       "cost_limit_usd": "0",
@@ -96,15 +98,16 @@ y sus cifras no sustituyen los cupos reales. Muestra la forma validada de `Provi
   "tavily_account_ref": "tavily-sintetica",
   "claude_account_ref": "claude-sintetica",
   "claude_funding_source": "prepaid",
-  "hunter_access": {
-    "search_account_ref": "hunter-sintetica",
-    "verification_account_ref": null,
-    "enabled_operations": ["domain_search"],
-    "unified_credits": true,
-    "automatic_lead_saving_disabled": false,
+  "apollo_access": {
+    "account_ref": "apollo-sintetica",
+    "enabled_operations": ["people_search", "people_enrichment"],
     "funding_source": "free_credit",
     "source_reference": "Acceso exclusivamente sintético",
-    "checked_at": "2026-10-11T12:00:00Z"
+    "observed_at": "2026-10-11T12:00:00Z",
+    "work_email_verified": true,
+    "access_verified": true,
+    "enrichment_credit_bound": "1",
+    "plan": "free"
   }
 }
 ```
@@ -117,16 +120,25 @@ Los cupos son la asignación inicial comprobada, no el saldo restante ni un perm
 el ledger descuenta el consumo anterior, también tras un reinicio. No reinicies una
 cuenta o una base para renovar el saldo.
 
-`hunter_access` puede ser `null`; en ese caso se usa la ruta pública para contactos.
-`enabled_operations` admite `domain_search`, `email_finder` y `email_verifier`.
-Finder y Verifier requieren comprobar `automatic_lead_saving_disabled=true`;
-Domain Search puede habilitarse sin esa comprobación, como en el ejemplo.
-Con créditos unificados se usa una sola cuenta.
-Si las cuotas de búsqueda y verificación son separadas, configura
-`unified_credits=false`, otra `verification_account_ref` y su `AccountAllowance`
-cuando habilites `email_verifier`. La financiación de Hunter aplica a ambas bolsas;
-las cuentas con créditos de pago necesitan `credit_valuation` comprobada, con
-`unit_value_usd`, `source_reference` y `observed_at`, para acotar el costo.
+Para la ejecución real, `apollo_access` debe acreditar correo laboral, acceso a
+`people_search` y `people_enrichment`, saldo y facturación de la cuenta; el adaptador
+actual admite el plan `free` y reserva un crédito por enriquecimiento. Las marcas del
+ejemplo son sintéticas y no deben copiarse como comprobaciones reales. Una clave
+presente no demuestra acceso. Antes de investigar, la aplicación exige una clave con
+formato HTTP válido, un cupo de créditos conocido para esa cuenta y al menos un crédito
+disponible después de descontar el consumo y las reservas pendientes. Si la exposición
+de créditos es desconocida o faltan estas condiciones, la
+ejecución se bloquea; consulta y demo siguen disponibles, sin recurrir a Hunter. La
+búsqueda se registra con cota de cero créditos. Las cuentas con créditos de pago
+necesitan `credit_valuation` comprobada, con `unit_value_usd`, `source_reference` y
+`observed_at`, para acotar el costo.
+
+Si el archivo local procede de la integración anterior, conserva las cuentas y cupos
+de Tavily y Anthropic, retira `hunter_access` y el cupo de Hunter del archivo y agrega
+la cuenta y comprobación reales de Apollo cuando estén disponibles. No completes
+campos con los valores sintéticos del ejemplo: la configuración antigua no habilita
+una ejecución nueva. Cambiar ese archivo no borra el ledger histórico de SQLite;
+conserva la base y sus archivos auxiliares.
 
 El presupuesto muestra consumo confirmado, estimado, reservado y disponible en formato
 comercial legible, además del desglose por cuenta. Una reserva incierta se conserva hasta conciliarla.
@@ -139,7 +151,7 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
 filtrar por país, segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
 Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
-número de fuente (`Fuente original · dominio.com #1`, `Hunter #2`), mostrando encaje,
+número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
 cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
 `Sin evidencia`), caso de uso, contactos y motivos de detención sin jerga técnica.
 Datos desconocidos se muestran separados de cero.

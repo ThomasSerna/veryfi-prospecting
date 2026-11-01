@@ -3,6 +3,36 @@
 Registro de las pruebas reales mínimas (IDEA.md §11.1). No contiene claves, datos
 personales ni listas de empresas; los resultados quedan en la base local bajo `data/`.
 
+## Apollo: comprobación previa de T12
+
+El 2026-11-01 (America/Bogota) se revisaron únicamente metadatos locales. Existe
+`data/provider-access.json`, pero no contiene `apollo_access` ni un cupo de Apollo.
+`APOLLO_API_KEY` no estaba presente en el entorno del proceso; el nombre de la
+variable sí aparece en `.env`. Esta revisión no comprueba el valor de una clave.
+
+El responsable indicó que dispone de un plan Free. La verificación del correo laboral,
+los permisos de People API Search y People Enrichment, el saldo, las tarifas y la
+facturación de esa cuenta aún no están comprobados. No se autorizaron ni realizaron
+llamadas reales a Apollo. La ejecución real queda bloqueada hasta comprobar acceso y
+límites y obtener autorización de gasto por operación; la migración sin red fue
+autorizada. No se recurre a Hunter automáticamente.
+
+Documentación oficial consultada el 2026-11-01:
+
+- [People API Search](https://docs.apollo.io/reference/people-api-search) busca
+  candidatos sin consumir créditos; puede ocultar el apellido y no entrega correo
+  ni teléfono. Una coincidencia de dominio puede corresponder a un empleo anterior.
+- [People Enrichment](https://docs.apollo.io/reference/people-enrichment) acepta el
+  identificador de la persona. Sin teléfono ni waterfall, la cota es un crédito
+  bajo las condiciones vigentes documentadas; los [planes heredados](https://docs.apollo.io/docs/api-pricing)
+  pueden diferir y deben comprobarse en la cuenta.
+- El [esquema de Apollo](https://docs.apollo.io/openapi/apollo-rest-api.json) no
+  documenta una fecha de verificación de correo para la persona. Una fecha genérica
+  de actualización del perfil no demuestra la fecha del correo ni del puesto.
+- Los [límites de API](https://docs.apollo.io/reference/rate-limits) publicados
+  para Free son 50 solicitudes por minuto, 200 por hora y 600 por día, por equipo
+  y endpoint. El acceso efectivo y sus límites siguen pendientes de comprobación.
+
 ## Tavily
 
 | Campo | Valor observado |

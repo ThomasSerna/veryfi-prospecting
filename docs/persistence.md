@@ -29,6 +29,15 @@ IDEA.md, `rubric_v1` y los límites iniciales. No representa capacidades ni regl
 certificadas comercialmente. Cada campaña conserva una instantánea de esta
 configuración; actualizar el archivo no cambia campañas ya guardadas.
 
+La instantánea identifica la generación de contactos mediante `people_provider`:
+las campañas anteriores, sin ese campo, son históricas; las nuevas utilizan `apollo`.
+Los contactos y referencias de Apollo y de la extracción pública nueva se aíslan de
+los históricos, aunque la misma empresa se reutilice; la evidencia empresarial sin
+contacto asociado permanece compartida. Las campañas históricas se
+pueden consultar y exportar, pero no reanudar con Apollo. Si una permanece activa,
+debe cerrarse explícitamente antes de crear otra. Esta separación no recrea la base
+ni cambia el esquema SQLite; conserva resultados, procedencia y consumo anteriores.
+
 `Database` ofrece `save_campaign/company/evidence/assessment/contact/run_item/usage`,
 consultas `get_*` y listas `list_campaigns/evidence/assessments/contacts/run_items/usage`.
 `get_active_campaign()` recupera la única campaña `running` o `paused_budget`.
@@ -64,7 +73,7 @@ referencias de nombre, cargo, empleo y canales. Una asociación laboral o un can
 incompleto permanece pendiente; persistirlos no los vuelve utilizables.
 `employment_evidence_ids` prueba el vínculo laboral, mientras que cada canal
 conserva su propia evidencia, estado original del proveedor, estado normalizado y
-fechas. Una respuesta de Hunter consultada hoy no sustituye la fecha de verificación
+fechas. La fecha de consulta de un proveedor no sustituye la fecha de verificación
 del correo ni demuestra empleo vigente. La evaluación de estas condiciones está
 descrita en [Personas y canales](contacts.md).
 
@@ -133,6 +142,21 @@ y las instantáneas de las pruebas del pipeline los fijan:
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `research_queries_v1`, `haiku_assessment_v3`,
   `contacts_extraction_v1`, `rubric_v1` y el esquema SQLite `user_version=1`.
+
+Estos valores de Hunter siguen identificando el historial y no se reinterpretan
+como operaciones, contactos ni consumo de Apollo. La nueva ruta conserva sus propios
+identificadores sin reescribir el ledger anterior:
+
+- `people_provider="apollo"` en la instantánea de las campañas nuevas; el campo
+  ausente identifica campañas históricas.
+- Claves `contacts:apollo_search` y `contacts:apollo_enrichments` para los intentos
+  de búsqueda y enriquecimiento; las claves compartidas mantienen su significado.
+- `uuid5(company_id, "apollo:<id>")` para candidatos Apollo y
+  `uuid5(company_id, "public_apollo_v1:<valor_del_canal>")` para contactos públicos nuevos
+  con correo o LinkedIn, separados de los identificadores históricos.
+- Referencias `apollo_v1:<id>:<request_id>#<campo>` para hechos de Apollo y
+  `apollo_public_v1:<request_id>#contact:<campo>` para hechos públicos de la generación
+  nueva; conservan la procedencia y no convierten una búsqueda en verificación.
 
 El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
 recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera

@@ -3,7 +3,7 @@
 `prospecting/pipeline/campaign.py` recorre una campaña completa desde Python: descubre
 empresas, reúne evidencia, califica, amplía una vez la evidencia insuficiente y busca
 contactos. Decide siempre con lo guardado en SQLite, así que repetir un clic o
-reanudar tras un cierre no duplica la campaña ni repite llamadas. Ninguna
+reanudar una campaña de Apollo tras un cierre no duplica la campaña ni repite llamadas. Ninguna
 función envía mensajes ni contacta a nadie.
 
 La interfaz de Django usa este mismo pipeline y esta misma base; su configuración
@@ -19,17 +19,17 @@ del cupo registrados en esta sesión con `budget.authorize`. El ejemplo no conce
 from prospecting.identity import load_exclusions
 from prospecting.pipeline import run_campaign, start_campaign
 from prospecting.providers import ClaudeClient, ProviderClient
-from prospecting.providers.hunter import HUNTER_OPERATIONS
+from prospecting.providers.apollo import APOLLO_OPERATIONS
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 campaign, created = start_campaign(db, campaign)
-client = ProviderClient(budget, [*TAVILY_OPERATIONS, *HUNTER_OPERATIONS])
+client = ProviderClient(budget, [*TAVILY_OPERATIONS, *APOLLO_OPERATIONS])
 report = run_campaign(
     db, budget, client, campaign.id,
     authorizations=session_authorizations,
     tavily_account_ref=tavily_account_ref,
     claude=ClaudeClient(budget), claude_account_ref=claude_account_ref, claude_funding_source="prepaid",
-    hunter_access=hunter_access,                          # opcional
+    apollo_access=apollo_access,                          # cuenta comprobada
     exclusions=load_exclusions("data/exclusions.json"),  # opcional
     progress=print,                                       # opcional
 )
@@ -51,8 +51,13 @@ report = run_campaign(
   empresa queda guardado.
 
 Cada proveedor se usa solo si se proporcionan su cuenta y su permiso: sin `claude` no se
-califica y la campaña queda `partial` con `qualification_unavailable`; sin `hunter_access`
-los contactos usan únicamente la ruta pública.
+califica y la campaña queda `partial` con `qualification_unavailable`; sin acceso comprobado
+a Apollo se bloquea la ejecución real y se explica el motivo, sin recurrir a Hunter.
+Consulta y exportación históricas y demo sintética siguen disponibles.
+
+Una campaña creada antes de Apollo conserva sus resultados y gasto para consulta y
+exportación, pero no se reanuda con el proveedor nuevo. Si sigue activa, hay que cerrarla
+explícitamente antes de preparar otra; no se borra ni se reinicia su consumo.
 
 ## Puente de la interfaz
 
@@ -150,7 +155,7 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
   explica esta limitación y no fabrica resultados.
 - Las pruebas sin red cubren interrupción de descubrimiento, tiempo acumulado al reanudar,
   excepción inesperada con checkpoints conservados y guarda liberada, y campaña completa
-  con `HunterAccess` sintético. No demuestran acceso real ni contactabilidad comercial.
+  con acceso sintético a Apollo. No demuestran acceso real ni contactabilidad comercial.
 - El [registro de proveedores](provider-check.md) documenta una campaña real del
   2026-10-12, incluida ampliación con `include_domains`, que terminó `completed` desde
   Python. Sus resultados comerciales fueron `insufficient_evidence` y

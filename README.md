@@ -5,7 +5,7 @@ Latinoamérica. La interfaz local de Django permite configurar y ejecutar campa�
 consultar progreso, evidencia y presupuesto, revisar empresas, confirmar canales
 alternativos existentes y descargar CSV seguro. Reutiliza SQLite y el pipeline de
 descubrimiento con Tavily, calificación determinista con Claude Haiku y búsqueda de
-personas con Hunter y evidencia pública. La aplicación no envía mensajes ni contacta
+personas con Apollo y evidencia pública. La aplicación no envía mensajes ni contacta
 a nadie; ventas revisa y contacta fuera de ella.
 
 ## Instalación
@@ -51,6 +51,10 @@ Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). La pantalla puede abrirse s
 claves y consultar campañas ya guardadas. Preparar una campaña guarda sus criterios
 sin llamar a proveedores; ejecutar o reanudar requiere cuentas y cupos comprobados,
 claves en variables de entorno y autorización explícita por operación, cuenta y tope.
+Sin acceso comprobado a Apollo, la ejecución real queda bloqueada; la consulta del
+historial y la demostración sintética siguen disponibles. Las campañas anteriores a
+Apollo se conservan para consulta y exportación; una campaña antigua activa debe
+cerrarse explícitamente antes de iniciar otra.
 Detén el servidor con Ctrl+C. El servidor se limita a `127.0.0.1`, no requiere
 autenticación y usa recursos estáticos locales, sin telemetría ni fuentes remotas.
 No requiere `migrate`: Django no administra los datos de prospección con su ORM.
@@ -87,7 +91,8 @@ empresas ficticias (dominios `.example`), sus personas, evidencia y una lista de
 que cubren todos los estados comerciales. Las puntuaciones y la disponibilidad salen de las
 mismas reglas que con datos reales. Cada página muestra un aviso de demostración y los CSV
 descargados empiezan por `demo-sintetica-`. No son resultados reales ni sirven como
-evidencia de contactabilidad.
+evidencia de contactabilidad. El correo listo de ejemplo está respaldado por una
+publicación corporativa sintética, no por una verificación real de Apollo.
 
 El proceso quita las claves de proveedores de su entorno y no tiene archivo de acceso: la
 interfaz no puede ejecutar investigaciones. Revisar, confirmar canales y exportar funcionan
@@ -159,7 +164,7 @@ historial, consumo decimal exacto y recuperación al reabrir SQLite. Comprueban
 reservas concurrentes, cupos de créditos y autorizaciones acumuladas, duplicados,
 conciliación y timeouts mediante transportes sintéticos. Verifican identidad,
 vigencia y estados de canales, la extracción pública citada,
-límites de contactos y respuestas pendientes de Hunter sin repetir consumo. Recorren
+límites de contactos y respuestas pendientes de Apollo sin repetir consumo. Recorren
 campañas completas y comprueban que reanudar o repetir un clic no repite llamadas, que
 las interrupciones conservan el gasto y que el presupuesto y el tiempo acumulado
 detienen la ejecución conservando lo guardado. También
@@ -189,7 +194,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
 - `prospecting/text.py`, `sources.py` y `haiku.py`: texto externo, política de URLs y fuentes, y forma común de las solicitudes a Haiku.
-- `prospecting/providers/`: cliente JSON acotado y errores de proveedor (`http.py`), cliente de Claude con el SDK oficial, precios y tope de reserva (`claude.py`) y formato de Tavily (`tavily.py`) y Hunter (`hunter.py`).
+- `prospecting/providers/`: cliente JSON acotado y errores de proveedor (`http.py`), cliente de Claude con el SDK oficial, precios y tope de reserva (`claude.py`) y formato de Tavily (`tavily.py`) y Apollo (`apollo.py`).
 - `prospecting/discovery.py`: consultas de plantilla y selección de empresas candidatas.
 - `prospecting/identity.py`: identidad, duplicados y exclusiones.
 - `prospecting/qualification.py`: rúbrica, puntuación, prioridad, solicitud a Haiku y validación de su respuesta.
@@ -204,7 +209,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/budget-providers.md`: presupuesto, autorizaciones, conciliación y cliente de proveedores.
 - `docs/discovery.md`: descubrimiento y extracción con Tavily, identidad, duplicados y exclusiones.
 - `docs/qualification.md`: calificación con Haiku, puntuación y prioridad.
-- `docs/contacts.md`: invocación desde Python, acceso a Hunter, personas, canales y límites de búsqueda.
+- `docs/contacts.md`: invocación desde Python, acceso a Apollo, personas, canales y límites de búsqueda.
 - `docs/campaign.md`: orquestación de campañas, límites de tiempo, parada y reanudación.
 - `docs/ui.md`: uso de la interfaz, configuración local de proveedores, revisión y CSV seguro.
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
@@ -216,8 +221,8 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/IDEA.md` y `AGENTS.md`: requisitos y reglas de desarrollo.
 
 La aplicación no carga `.env` automáticamente; `.env.example` solo enumera las variables.
-Para ejecutar proveedores, define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y, si está
-habilitado, `HUNTER_API_KEY` en el entorno del proceso antes de iniciar Django.
+Para ejecutar proveedores, define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y
+`APOLLO_API_KEY` en el entorno del proceso antes de iniciar Django.
 `data/`, bases SQLite, credenciales y cachés quedan fuera de Git. Importar los
 módulos o iniciar la pantalla no crea una base. Preparar una campaña desde la
 interfaz crea la base si falta; abrir `Database` sobre una ruta nueva también la crea.
