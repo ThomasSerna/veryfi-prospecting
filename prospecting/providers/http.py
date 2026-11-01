@@ -43,7 +43,7 @@ class OperationSpec(Contract):
     endpoint: HttpUrl
     method: Literal["GET", "POST"] = "POST"
     api_key_env: Literal[
-        "TAVILY_API_KEY", "ANTHROPIC_API_KEY", "APOLLO_API_KEY", "HUNTER_API_KEY"
+        "TAVILY_API_KEY", "ANTHROPIC_API_KEY", "APOLLO_API_KEY"
     ]
     auth_header: Text = "Authorization"
     auth_prefix: StrictStr = "Bearer "
@@ -332,12 +332,9 @@ class ProviderClient:
             self._fail(error, "unknown")
         except (ValueError, TypeError):
             self._fail(ProviderError("transport", "Respuesta inválida del transporte; consumo pendiente.", **context), "unknown")
-        hunter_verifier = request.provider == "hunter" and request.operation == "email_verifier"
-        pending = hunter_verifier and response.status == 202
-        failure_outcome = "unknown" if pending else "failed"
         if len(response.body) > MAX_RESPONSE_BYTES:
-            self._fail(ProviderError("response_limit", "La respuesta supera el límite de tamaño.", **context), failure_outcome)
-        if response.status >= 300 or response.status < 200 or hunter_verifier and response.status == 222:
+            self._fail(ProviderError("response_limit", "La respuesta supera el límite de tamaño.", **context), "failed")
+        if response.status >= 300 or response.status < 200:
             message = f"HTTP {response.status}."
             try:
                 raw = json.loads(response.body)
@@ -348,6 +345,9 @@ class ProviderClient:
                                      if isinstance(item.get(field), (str, int)) and not isinstance(item[field], bool))
                             for item in raw["errors"] if isinstance(item, dict)
                         )
+                    elif isinstance(raw.get("error_details"), dict):
+                        detail = " ".join(str(raw["error_details"][field]) for field in ("code", "message")
+                                          if isinstance(raw["error_details"].get(field), str))
                     else:
                         detail = raw.get("error", raw)
                         if isinstance(detail, dict):
@@ -365,16 +365,16 @@ class ProviderClient:
             self._fail(error, "failed")
         content_type = (_header(response.headers, "Content-Type") or "").split(";", 1)[0].strip().lower()
         if content_type != "application/json" and not (content_type.startswith("application/") and content_type.endswith("+json")):
-            self._fail(ProviderError("content_type", "El proveedor no devolvió contenido JSON.", **context), failure_outcome)
+            self._fail(ProviderError("content_type", "El proveedor no devolvió contenido JSON.", **context), "failed")
         try:
             json.loads(response.body, parse_constant=_reject_json_constant)
         except (ValueError, UnicodeError, RecursionError):
-            self._fail(ProviderError("json", "JSON inválido del proveedor.", **context), failure_outcome)
+            self._fail(ProviderError("json", "JSON inválido del proveedor.", **context), "failed")
         try:
             data = response_model.model_validate_json(response.body)
         except (ValueError, TypeError):
-            self._fail(ProviderError("schema", "La respuesta no cumple el esquema esperado.", **context), failure_outcome)
-        observation = Observation(outcome="unknown" if pending else "succeeded")
+            self._fail(ProviderError("schema", "La respuesta no cumple el esquema esperado.", **context), "failed")
+        observation = Observation(outcome="succeeded")
         self.budget.record_result(request_id, observation)
         return ProviderResult(request_id=request_id, data=data, observation=observation,
                               http_status=response.status)
