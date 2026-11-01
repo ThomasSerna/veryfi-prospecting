@@ -16,7 +16,7 @@ from prospecting.identity import (
     exclusions_status, find_reusable, match_exclusion,
 )
 from prospecting.models import (
-    BusinessStatus, Company, Contract, Count, IdentityStatus, Money, RunItem, RunStage, Text, utc_now,
+    BusinessStatus, Company, Contract, Count, EntityType, IdentityStatus, Money, RunItem, RunStage, Text, utc_now,
 )
 from prospecting.pipeline.calls import call_free_credit
 from prospecting.providers import ProviderClient, ProviderError
@@ -204,6 +204,18 @@ def resolve_company_identity(db: Database, campaign_id: UUID, company_id: UUID, 
                     "aliases": list(dict.fromkeys([*(company.aliases or []), company.name]))}
         provenance["aliases"] = list(dict.fromkeys([*provenance.get("aliases", []), *provenance["name"]]))
         provenance["name"] = decision.name_evidence_ids
+    if decision.entity_name is not None and company.entity_name is None:
+        updates["entity_name"] = decision.entity_name
+        provenance["entity_name"] = list(dict.fromkeys([*provenance.get("entity_name", []), *decision.entity_name_evidence_ids]))
+    if decision.entity_type != EntityType.UNKNOWN and company.entity_type == EntityType.UNKNOWN:
+        updates["entity_type"] = decision.entity_type
+        provenance["entity_type"] = list(dict.fromkeys([*provenance.get("entity_type", []), *decision.entity_type_evidence_ids]))
+    if decision.parent_company_id is not None and company.parent_company_id is None and decision.parent_company_id != company.id:
+        updates["parent_company_id"] = decision.parent_company_id
+        provenance["parent_company_id"] = list(dict.fromkeys([*provenance.get("parent_company_id", []), *decision.parent_evidence_ids]))
+    if decision.size is not None and (company.size is None or company.size.icp_tier == "unknown"):
+        updates["size"] = decision.size
+        provenance["size"] = list(dict.fromkeys([*provenance.get("size", []), *decision.size.evidence_ids]))
     if decision.status == "confirmed" and company.identity_status != IdentityStatus.CONFIRMED:
         updates |= {"identity_status": IdentityStatus.CONFIRMED, "identity_key": decision.identity_key}
     updated = Company.model_validate(company.model_dump() | updates | {"provenance": provenance})

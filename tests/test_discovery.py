@@ -489,3 +489,141 @@ def test_only_confirmed_same_domain_name_and_country_is_reusable():
     assert find_reusable(candidate("MX", "Inicio | Empresa Uno"), [confirmed]) is None
     sibling = candidate("CO", "Inicio | Empresa Uno").model_copy(update={"name": "Filial Dos"})
     assert find_reusable(sibling, [confirmed]) is None
+
+
+def test_entity_structure_distinguishes_legal_entity_subsidiary_brand_and_parent(make_campaign):
+    """Distingue razón social, marca, filial y matriz sin fusionarlas ni perder procedencia."""
+    campaign = make_campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"])
+    parent_raw, parent_facts = discovered("grupo-andino.example", "Inicio | Grupo Andino")
+    parent_page = page(
+        parent_raw,
+        "https://grupo-andino.example/",
+        "Grupo Andino S.A.S. gestiona programas de puntos y tickets en Colombia con más de 2.500 colaboradores a nivel grupo.",
+    )
+    parent_decision = assess(parent_raw, [*parent_facts, parent_page], campaign)
+    assert parent_decision.status == "confirmed"
+    assert parent_decision.entity_name == "Grupo Andino S.A.S."
+    assert parent_decision.entity_type == "legal_entity"
+    assert parent_decision.size is not None
+    assert parent_decision.size.employee_min == 2500
+    assert parent_decision.size.scope == "group"
+    assert parent_decision.size.icp_tier == "tier_1"
+
+    confirmed_parent = confirmed_copy(
+        parent_raw,
+        parent_decision.identity_key,
+        entity_name=parent_decision.entity_name,
+        entity_type=parent_decision.entity_type,
+        provenance=parent_raw.provenance | {
+            "entity_name": parent_decision.entity_name_evidence_ids,
+            "entity_type": parent_decision.entity_type_evidence_ids,
+        },
+    )
+
+    sub_raw, sub_facts = discovered("andino-pagos.example", "Pagos | Andino Pagos")
+    sub_page = page(
+        sub_raw,
+        "https://andino-pagos.example/co/",
+        "Andino Pagos S.A.S. es una filial de Grupo Andino en Colombia que digitaliza facturas y recibos con 350 empleados en la filial.",
+    )
+    sub_decision = assess(sub_raw, [*sub_facts, sub_page], campaign, confirmed=[confirmed_parent])
+    assert sub_decision.status == "confirmed"
+    assert sub_decision.entity_name == "Andino Pagos S.A.S."
+    assert sub_decision.entity_type == "subsidiary"
+    assert sub_decision.parent_company_id == confirmed_parent.id
+    assert sub_decision.parent_evidence_ids == [sub_page.id]
+    assert sub_decision.size is not None
+    assert sub_decision.size.employee_count == 350
+    assert sub_decision.size.scope == "subsidiary"
+    assert sub_decision.size.icp_tier == "tier_2"
+
+    brand_raw, brand_facts = discovered("promo.snacks-sol.example", "Promoción | Snacks Sol", country="MX")
+    brand_page = page(
+        brand_raw,
+        "https://promo.snacks-sol.example/mx/",
+        "Snacks Sol es una marca registrada de Corporación Externa en México: sube tu ticket y gana premios.",
+    )
+    brand_decision = assess(brand_raw, [*brand_facts, brand_page], campaign, confirmed=[confirmed_parent])
+    assert brand_decision.status == "confirmed"
+    assert brand_decision.entity_type == "brand"
+    assert brand_decision.parent_company_id is None
+    assert any("Corporación Externa" in warning for warning in brand_decision.warnings)
+    assert brand_decision.size is None
+
+
+def test_scale_signals_keep_unknown_when_absent_or_only_in_search_hits(make_campaign):
+    """Conserva tamaño desconocido (None) cuando no hay cifras observadas en fuentes primarias o de proveedor."""
+    campaign = make_campaign(countries=["CO", "MX"])
+    company, facts = discovered("fintech-incognita.example", "Gastos | Fintech Incognita")
+    hit_with_numbers = facts[0].model_copy(update={"excerpt": "Más de 5.000 empleados e ingresos anuales de USD 900 millones."})
+    own_page = page(
+        company,
+        "https://fintech-incognita.example/",
+        "Fintech Incognita automatiza reembolsos y captura de recibos para empresas en Colombia.",
+    )
+    decision = assess(company, [hit_with_numbers, *facts[1:], own_page], campaign)
+    assert decision.status == "confirmed"
+    assert decision.size is None
+
+    with_scale_page = page(
+        company,
+        "https://fintech-incognita.example/nosotros",
+        "Fintech Incognita opera en Colombia con entre 150 y 300 colaboradores, ingresos anuales de USD 120 millones y presencia en 6 países de Latinoamérica.",
+    )
+    scaled = assess(company, [*facts, own_page, with_scale_page], campaign)
+    assert scaled.size is not None
+    assert scaled.size.employee_min == 150 and scaled.size.employee_max == 300
+    assert scaled.size.public_revenue == "ingresos anuales de USD 120 millones"
+    assert scaled.size.geographic_coverage == "presencia en 6 países de Latinoamérica"
+    assert scaled.size.scope == "country"
+    assert scaled.size.icp_tier == "tier_2"
+    assert scaled.size.evidence_ids == [with_scale_page.id]
+
+
+def test_resolve_company_identity_persists_entity_structure_and_size_with_provenance(database, make_campaign):
+    """Persiste razón social, tipo de entidad, matriz y escala con procedencia en SQLite."""
+    from prospecting.models import RunItem
+    from prospecting.pipeline.discovery import resolve_company_identity
+    from prospecting.qualification import build_haiku_request
+
+    campaign = make_campaign(countries=["CO", "MX"])
+    database.save_campaign(campaign)
+
+    parent_co, parent_ev = discovered("grupo-matriz.example", "Inicio | Grupo Matriz")
+    parent_page = page(
+        parent_co,
+        "https://grupo-matriz.example/co/",
+        "Grupo Matriz S.A.S. automatiza reembolsos y recibos en Colombia con más de 1.500 empleados a nivel grupo.",
+    )
+    database.save_company(parent_co, evidence=[*parent_ev, parent_page])
+    database.save_run_item(RunItem(campaign_id=campaign.id, company_id=parent_co.id))
+    parent_report = resolve_company_identity(database, campaign.id, parent_co.id)
+    assert parent_report.decision.status == "confirmed"
+    saved_parent = database.get_company(parent_co.id)
+    assert saved_parent.entity_name == "Grupo Matriz S.A.S."
+    assert saved_parent.entity_type == "legal_entity"
+    assert saved_parent.size is not None and saved_parent.size.icp_tier == "tier_1"
+    assert saved_parent.provenance["entity_name"] == [parent_page.id]
+    assert saved_parent.provenance["size"] == [parent_page.id]
+
+    sub_co, sub_ev = discovered("filial-pagos.example", "Pagos | Filial Pagos")
+    sub_page = page(
+        sub_co,
+        "https://filial-pagos.example/co/",
+        "Filial Pagos S.A.S. es una filial de Grupo Matriz en Colombia que recibe facturas con 220 colaboradores en la filial.",
+    )
+    database.save_company(sub_co, evidence=[*sub_ev, sub_page])
+    database.save_run_item(RunItem(campaign_id=campaign.id, company_id=sub_co.id))
+    sub_report = resolve_company_identity(database, campaign.id, sub_co.id)
+    assert sub_report.decision.status == "confirmed"
+    saved_sub = database.get_company(sub_co.id)
+    assert saved_sub.entity_name == "Filial Pagos S.A.S."
+    assert saved_sub.entity_type == "subsidiary"
+    assert saved_sub.parent_company_id == saved_parent.id
+    assert saved_sub.size is not None and saved_sub.size.icp_tier == "tier_2"
+    assert saved_sub.provenance["parent_company_id"] == [sub_page.id]
+
+    payload, _ = build_haiku_request(saved_sub, database.list_evidence(saved_sub.id), campaign)
+    user_prompt = payload["messages"][0]["content"]
+    assert '"entity_type": "subsidiary"' in user_prompt
+    assert '"icp_tier": "tier_2"' in user_prompt
