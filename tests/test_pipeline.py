@@ -10,15 +10,16 @@ from uuid import uuid4
 
 import pytest
 
-from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
+from prospecting.budget import AccountAllowance, Budget, BudgetError, SpendingAuthorization
 from prospecting.discovery import build_search_queries, initial_urls
 from prospecting.identity import ExclusionList
 from prospecting.models import CampaignLimits, UsageStatus, utc_now
 from prospecting.pipeline import (
     extract_company_pages, research_company, resolve_company_identity, run_discovery,
 )
+from prospecting.pipeline import calls
 from prospecting.providers import HttpResponse, ProviderClient
-from prospecting.providers.tavily import TAVILY_OPERATIONS
+from prospecting.providers.tavily import TAVILY_OPERATIONS, TavilySearchResponse, search_request
 from prospecting.sources import SEARCH_HIT_CLAIM, is_search_hit
 
 
@@ -114,6 +115,41 @@ def extract(case, company_id, urls, **kwargs):
         case.db, case.budget, case.client, case.campaign.id, company_id, urls,
         account_ref=ACCOUNT, authorization=kwargs.pop("authorization", case.grants["extract"]), **kwargs,
     )
+
+
+@pytest.mark.parametrize(("deadline", "reservation_seconds"), [(1, 2), (1, 0.25), (None, 2)])
+def test_credit_call_preserves_deadline_across_reservation(tavily, monkeypatch, deadline, reservation_seconds):
+    case = tavily.setup()
+    clock, received = [0], []
+    reserve, request_json = calls.reserve_credits, case.client.request_json
+
+    def slow_reservation(*args, **kwargs):
+        usage = reserve(*args, **kwargs)
+        clock[0] += reservation_seconds
+        return usage
+
+    def call(*args, **kwargs):
+        received.append(kwargs["remaining_seconds"])
+        return request_json(*args, **kwargs)
+
+    monkeypatch.setattr(calls, "reserve_credits", slow_reservation)
+    monkeypatch.setattr(calls, "seconds_left", lambda limit: None if limit is None else limit - clock[0])
+    monkeypatch.setattr(case.client, "request_json", call)
+    planned = build_search_queries(case.campaign)[0]
+    request = search_request(planned, ACCOUNT, case.campaign.limits.discovery)
+    kwargs = dict(campaign_id=case.campaign.id, company_id=None, credits=1,
+                  authorization=case.grants["search"], deadline=deadline)
+    if deadline is not None and reservation_seconds >= deadline:
+        with pytest.raises(BudgetError) as caught:
+            calls.call_free_credit(case.budget, case.client, request, TavilySearchResponse, **kwargs)
+        assert caught.value.code == "time_limit"
+        usage = case.db.get_usage(caught.value.request_id)
+        assert usage is not None and usage.status == UsageStatus.RESERVED and usage.reserved_credits == 1
+        assert received == [] and case.calls == []
+    else:
+        calls.call_free_credit(case.budget, case.client, request, TavilySearchResponse, **kwargs)
+        assert received == [None if deadline is None else deadline - reservation_seconds]
+        assert len(case.calls) == 1
 
 
 def test_discovery_persists_selected_candidates_with_sources(tavily):

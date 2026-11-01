@@ -468,12 +468,17 @@ class _ContactStage:
         usage = reserve_claude(self.budget, fingerprint, payload, account_ref=account,
                                funding_source=self.claude_funding_source, authorization=grant, **self.base)
         self.requests.append(usage.request_id)
+        attempts = {HAIKU_KEY: 1, f"{HAIKU_REQUEST_KEY}{usage.request_id}": 1}
         try:
             call = claude.create(usage.request_id, payload, account_ref=account, authorization=grant,
                                  remaining_seconds=seconds_left(self.deadline))
+        except ProviderError as error:
+            if error.no_send:
+                attempts.pop(HAIKU_KEY)
+            raise
         finally:
             if self.db.get_usage(usage.request_id).status != UsageStatus.RESERVED:
-                self.checkpoint(attempts={HAIKU_KEY: 1, f"{HAIKU_REQUEST_KEY}{usage.request_id}": 1})
+                self.checkpoint(attempts=attempts)
         try:
             parsed = parse_contacts_output(call.text, call.stop_reason, self.company, self.assessment, campaign,
                                            supplied, utc_now(), usage.request_id, contacts=self.people())

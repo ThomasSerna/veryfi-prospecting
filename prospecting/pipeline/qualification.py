@@ -265,11 +265,10 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                                         "request_fingerprint": usage.request_fingerprint}):
             return pending("trace_capture_failed", capture_errors[-1] +
                            " La reserva se conserva sin envío para conciliación.", request_id=usage.request_id)
-        if evaluation_dir is not None:
-            remaining = seconds_left(deadline)
-            if remaining is not None and remaining <= 0:
-                return pending("time_limit", "Se agotó el tiempo de la etapa durante la captura; "
-                               "la reserva se conserva sin envío para conciliación.", request_id=usage.request_id)
+        remaining = seconds_left(deadline)
+        if remaining is not None and remaining <= 0:
+            return pending("time_limit", "Se agotó el tiempo de la etapa antes de llamar; "
+                           "la reserva se conserva sin envío para conciliación.", request_id=usage.request_id)
         call = claude.create(usage.request_id, payload, account_ref=account_ref,
                              authorization=authorization, remaining_seconds=remaining)
     except BudgetError as error:

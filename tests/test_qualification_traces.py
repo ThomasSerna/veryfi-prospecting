@@ -29,6 +29,38 @@ def read_trace(directory):
                       for path in paths[0].iterdir()}
 
 
+@pytest.mark.parametrize("capture", [False, True])
+@pytest.mark.parametrize(("deadline", "reservation_seconds"), [(1, 2), (1, 0.25), (None, 2)])
+def test_qualification_preserves_deadline_across_reservation(
+        claude, tmp_path, monkeypatch, capture, deadline, reservation_seconds):
+    clock, received = [0], []
+    reserve, create = qualification.reserve_claude, claude.client.create
+
+    def slow_reservation(*args, **kwargs):
+        usage = reserve(*args, **kwargs)
+        clock[0] += reservation_seconds
+        return usage
+
+    def call(*args, **kwargs):
+        received.append(kwargs["remaining_seconds"])
+        return create(*args, **kwargs)
+
+    monkeypatch.setattr(qualification, "reserve_claude", slow_reservation)
+    monkeypatch.setattr(qualification, "seconds_left", lambda limit: None if limit is None else limit - clock[0])
+    monkeypatch.setattr(claude.client, "create", call)
+    report = claude.qualify(deadline=deadline,
+                            evaluation_dir=tmp_path / "data" / "evaluation" if capture else None)
+    if deadline is not None and reservation_seconds >= deadline:
+        assert report.status == "pending" and report.reason == "time_limit" and not report.called_model
+        usage = claude.db.get_usage(report.request_id)
+        assert usage is not None and usage.status == UsageStatus.RESERVED and usage.reserved_cost_usd > 0
+        assert received == [] and claude.requests == []
+    else:
+        assert report.status == "assessed" and report.called_model
+        assert received == [None if deadline is None else deadline - reservation_seconds]
+        assert len(claude.requests) == 1
+
+
 def test_trace_freezes_request_response_versions_and_hashes(claude, tmp_path):
     directory = tmp_path / "data" / "evaluation"
     payload, selected = build_haiku_request(claude.company, claude.db.list_evidence(claude.company.id), claude.campaign)

@@ -82,6 +82,9 @@ def call_free_credit(budget: Budget, client: ProviderClient, request: ProviderRe
     usage = reserve_credits(budget, request, client.fingerprint(request), Decimal(credits),
                             funding_source="free_credit", campaign_id=campaign_id, company_id=company_id,
                             authorization=authorization)
+    remaining = seconds_left(deadline)
+    if remaining is not None and remaining <= 0:
+        raise BudgetError("time_limit", "Se agotó el tiempo de la etapa antes de llamar.", usage.request_id)
     result = client.request_json(
         usage.request_id, request, response_model,
         authorization=authorization, remaining_seconds=remaining,

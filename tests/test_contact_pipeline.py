@@ -330,6 +330,35 @@ def test_time_limit_preserves_previous_data_without_transport(contact_case):
     assert case.db.get_contact(contact.id) is not None
 
 
+def test_unsent_public_extraction_keeps_quota_and_blocks_repetition(contact_case, monkeypatch):
+    from prospecting.pipeline import contacts
+
+    case = contact_case
+    seed_contact(case)
+    clock = [100]
+    claim = case.budget.claim
+
+    def slow_claim(*args, **kwargs):
+        usage = claim(*args, **kwargs)
+        clock[0] = 102
+        return usage
+
+    monkeypatch.setattr(contacts.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(case.budget, "claim", slow_claim)
+    kwargs = dict(hunter_access=None, claude=case.claude, claude_account_ref="claude-synthetic", deadline=101)
+    report = case.find(**kwargs)
+    assert report.status == "pending" and case.calls == [] and case.model_calls == []
+    usage, = case.db.list_usage()
+    assert usage.status == "failed" and usage.credits == 0 and not any(usage.tokens.model_dump().values())
+    assert usage.reserved_cost_usd > 0 and usage.error_message == report.error_message
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert run.attempts.get(contacts.HAIKU_KEY, 0) == 0
+    assert run.attempts[f"{contacts.HAIKU_REQUEST_KEY}{usage.request_id}"] == 1
+    kwargs["deadline"] = 103
+    assert case.find(**kwargs).status == "pending"
+    assert case.calls == [] and case.model_calls == [] and len(case.db.list_usage()) == 1
+
+
 def test_zero_reduced_people_limit_stops_without_any_call(contact_case):
     case = contact_case
     limits = case.campaign.limits.model_copy(deep=True)
