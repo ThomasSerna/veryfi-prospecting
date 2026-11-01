@@ -219,7 +219,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
                     item.source_type == "provider" and item.contact_id == contact.id)
                    for item in facts):
             return False
-    if not role_matches(contact.title, roles or assessment.target_roles or [contact.title]):
+    if not role_matches(contact.title, roles if roles is not None else assessment.target_roles):
         return False
     if contact.geographic_scope and (not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence)
                                      or not _scope_covers(contact.geographic_scope, company)):
@@ -279,6 +279,8 @@ def hunter_employment_signal(contact: Contact, company: Company, evidence: list[
 def employment_basis(contact: Contact, company: Company, evidence: list[Evidence],
                      limits: CampaignLimits, now: datetime) -> Literal["evidence", "hunter_signal"] | None:
     """Base de la vigencia del empleo: evidencia del puesto o, en su defecto, la señal de Hunter (§10.2)."""
+    if _employment_contradicted(contact, evidence):
+        return None
     if _employment_from_evidence(contact, company, evidence, limits, now):
         return "evidence"
     if hunter_employment_signal(contact, company, evidence, limits, now):

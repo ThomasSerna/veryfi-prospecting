@@ -188,6 +188,27 @@ def test_hunter_signal_never_overrides_departure_contradiction_or_negative_emplo
     assert not validate_contact(contact, company, assessment, contradicted, campaign.limits, NOW)
 
 
+@pytest.mark.parametrize("basis", ["evidence", "hunter_signal"])
+@pytest.mark.parametrize(("statement", "expected"), [
+    (f"{NAME} dejó la empresa en septiembre.", False),
+    ("Otra Persona Sintética dejó la empresa en septiembre.", True),
+    (f"{NAME} fue nombrado CTO de Empresa sintética.", True),
+])
+def test_nominal_departure_overrides_coexisting_positive_employment(eligible, basis, statement, expected):
+    company, campaign, assessment, contact, evidence = eligible
+    if basis == "hunter_signal":
+        contact, evidence = hunter_candidate(company)
+    assert employment_basis(contact, company, evidence, campaign.limits, NOW) == basis
+    observation = Evidence(company_id=company.id, contact_id=contact.id, claim="Noticia sintética.",
+                           excerpt=statement, url="https://example.com/news", retrieved_at=NOW,
+                           kind="observed", source_type="secondary")
+    facts = evidence + [observation]
+    assert employment_basis(contact, company, facts, campaign.limits, NOW) == (basis if expected else None)
+    assert validate_contact(contact, company, assessment, facts, campaign.limits, NOW) is expected
+    assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) == (
+        "ready_preferred" if expected else "qualified_no_contact")
+
+
 @pytest.mark.parametrize("changes", [{"last_name": None}, {"last_name": "S."}, {"verification": {"status": "valid", "date": None}}])
 def test_partial_names_and_undated_verification_are_not_promoted(eligible, changes):
     company, campaign, assessment, _, _ = eligible
@@ -440,6 +461,21 @@ def test_profile_role_not_chosen_by_the_assessment_counts_only_with_profile_role
         assert validate_contact(person, company, assessment, facts, campaign.limits, NOW, roles) is expected
         ready = derive_readiness(assessment, [person], facts, campaign.limits, NOW, company, roles)
         assert (ready == "ready_preferred") is expected
+
+
+@pytest.mark.parametrize(("selected", "arguments", "expected"), [
+    ([TITLE], {}, True),
+    ([], {}, False),
+    ([TITLE], {"roles": []}, False),
+    ([TITLE], {"roles": None}, True),
+    ([], {"roles": [TITLE]}, True),
+])
+def test_empty_roles_never_fall_back_to_the_contact_title(eligible, selected, arguments, expected):
+    company, campaign, assessment, contact, evidence = eligible
+    assessment = assessment.model_copy(update={"target_roles": selected})
+    assert validate_contact(contact, company, assessment, evidence, campaign.limits, NOW, **arguments) is expected
+    assert derive_readiness(assessment, [contact], evidence, campaign.limits, NOW, company, **arguments) == (
+        "ready_preferred" if expected else "qualified_no_contact")
 
 
 def test_future_source_dates_block_even_a_corporate_directory(eligible):
