@@ -455,8 +455,16 @@ class Campaign(Contract):
         return self
 
 
+ScaleScope = Literal["group", "subsidiary", "entity", "country", "unknown"]
+CustomerTier = Literal["tier_1", "tier_2", "tier_3", "unknown"]
+
+
 class CompanySize(Contract):
     original_value: Text
+    public_revenue: Text | None = None
+    geographic_coverage: Text | None = None
+    scope: ScaleScope = "unknown"
+    icp_tier: CustomerTier = "unknown"
     employee_count: Count | None = None
     employee_min: Count | None = None
     employee_max: Count | None = None
@@ -471,6 +479,108 @@ class CompanySize(Contract):
             or self.employee_max is not None and self.employee_count > self.employee_max
         ):
             raise ValueError("La cifra de empleados no pertenece al rango informado.")
+        return self
+
+
+class IcpTierDefinition(Contract):
+    tier: Literal["tier_1", "tier_2", "tier_3"]
+    acv_potential: Text
+    general_industry_revenue: Text
+    software_fintech_employees: Text
+    software_fintech_funding: Text
+    employee_min: Count | None = None
+    employee_max: Count | None = None
+    revenue_min_usd_millions: Count | None = None
+    revenue_max_usd_millions: Count | None = None
+    sales_motion: Literal["outbound_sales_led", "inbound_self_serve"]
+    priority_label: Text
+    source_reference: Text
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> Self:
+        if self.employee_min is not None and self.employee_max is not None and self.employee_max < self.employee_min:
+            raise ValueError("Rango de empleados de tier invertido.")
+        if (
+            self.revenue_min_usd_millions is not None
+            and self.revenue_max_usd_millions is not None
+            and self.revenue_max_usd_millions < self.revenue_min_usd_millions
+        ):
+            raise ValueError("Rango de ingresos de tier invertido.")
+        return self
+
+
+class IcpReferenceCompany(Contract):
+    id: Text
+    name: Text
+    segment: Segment
+    subprofile: Text
+    label: Literal["positive_reference", "negative_reference"]
+    relationship: Literal["current_customer_reference", "prospect_archetype", "no_fit_pattern"]
+    entity_type: EntityType = EntityType.UNKNOWN
+    parent_name: Text | None = None
+    brands_or_subsidiaries: Annotated[list[Text], AfterValidator(_unique)] = Field(default_factory=list)
+    domains: Annotated[list[Text], AfterValidator(_unique)] = Field(default_factory=list)
+    countries: Annotated[list[CountryCode], AfterValidator(_unique)] = Field(default_factory=list)
+    tier_estimate: CustomerTier = "unknown"
+    scale_notes: Text
+    document_use_case: Text
+    usage_authorization: Literal["internal_calibration_only"] = "internal_calibration_only"
+    validation_status: Literal["pending", "validated"] = "pending"
+    source_reference: Text
+
+    @field_validator("domains")
+    @classmethod
+    def validate_domains(cls, values: list[str]) -> list[str]:
+        return [_domain(value) for value in values]
+
+
+class IcpReferenceRole(Contract):
+    id: Text
+    segment: Segment
+    subprofile: Text
+    buying_role: Literal["business_champion", "technical_champion", "economic_buyer"]
+    titles_en: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    titles_es: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    departments: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    seniorities: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    rationale: Text
+    validation_status: Literal["pending", "validated"] = "pending"
+    source_reference: Text
+
+
+class IndependentSamplePolicy(Contract):
+    target_total_companies: Annotated[StrictInt, Field(ge=4, le=20)]
+    target_per_country_segment: Annotated[StrictInt, Field(ge=1, le=5)]
+    countries: Annotated[list[CountryCode], Field(min_length=1), AfterValidator(_unique)]
+    segments: Annotated[list[Segment], Field(min_length=1), AfterValidator(_unique)]
+    exclude_reference_groups: StrictBool = True
+    isolation_rules: Annotated[list[Text], Field(min_length=1)]
+
+
+class IcpEnterpriseConfig(Contract):
+    version: Text
+    validation_status: Literal["pending", "validated"]
+    source_reference: Text
+    source_date: date
+    tiers: dict[Literal["tier_1", "tier_2", "tier_3"], IcpTierDefinition]
+    reference_companies: Annotated[list[IcpReferenceCompany], Field(min_length=1)]
+    reference_roles: Annotated[list[IcpReferenceRole], Field(min_length=1)]
+    independent_sample_policy: IndependentSamplePolicy
+
+    @model_validator(mode="after")
+    def validate_icp(self) -> Self:
+        if set(self.tiers) != {"tier_1", "tier_2", "tier_3"}:
+            raise ValueError("La configuración ICP requiere los tres niveles (tier_1, tier_2, tier_3).")
+        for key, item in self.tiers.items():
+            if item.tier != key:
+                raise ValueError("La clave del nivel debe coincidir con su identificador.")
+        _unique([company.id for company in self.reference_companies])
+        _unique([role.id for role in self.reference_roles])
+        for segment in Segment:
+            positives = [c for c in self.reference_companies if c.segment == segment and c.label == "positive_reference"]
+            negatives = [c for c in self.reference_companies if c.segment == segment and c.label == "negative_reference"]
+            if not positives or not negatives:
+                raise ValueError(f"El segmento {segment} requiere ejemplos positivos y negativos.")
         return self
 
 

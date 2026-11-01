@@ -17,6 +17,8 @@ from prospecting.models import (
     Contact,
     Criterion,
     Evidence,
+    IcpEnterpriseConfig,
+    RunItem,
     RunItem,
     TokenUsage,
     Usage,
@@ -393,3 +395,54 @@ def test_instances_are_revalidated_after_unsafe_in_memory_changes():
         Usage.model_validate(unsafe)
     with pytest.raises(ValidationError):
         Usage.model_validate(usage.model_dump() | {"secret_key": "synthetic-unused"})
+
+
+def test_company_size_supports_enterprise_scale_signals_and_scope():
+    """Preserva alcance, ingresos públicos, cobertura geográfica y tier sin romper compatibilidad previa."""
+    legacy = CompanySize(employee_count=250, original_value="250 empleados", evidence_ids=[uuid4()])
+    assert legacy.scope == "unknown"
+    assert legacy.icp_tier == "unknown"
+    assert legacy.public_revenue is None
+    assert legacy.geographic_coverage is None
+
+    enterprise = CompanySize(
+        employee_count=1200,
+        employee_min=1000,
+        public_revenue="USD 500M anuales",
+
+
+        geographic_coverage="Operación en 12 países de Latinoamérica",
+        scope="group",
+        icp_tier="tier_1",
+        original_value="Más de 1.200 colaboradores a nivel grupo y USD 500M anuales",
+        evidence_ids=[uuid4()],
+    )
+    restored = CompanySize.model_validate_json(enterprise.model_dump_json())
+    assert restored == enterprise
+
+    with pytest.raises(ValidationError):
+        CompanySize(original_value="100 empleados", scope="invalid", evidence_ids=[uuid4()])
+    with pytest.raises(ValidationError):
+        CompanySize(original_value="100 empleados", icp_tier="tier_0", evidence_ids=[uuid4()])
+
+
+def test_icp_enterprise_config_loads_versioned_catalog_with_pending_validation():
+    """Valida el catálogo versionado de calibración ICP enterprise (T13)."""
+    from pathlib import Path
+
+    raw = Path("config/icp_enterprise.json").read_text(encoding="utf-8")
+    icp = IcpEnterpriseConfig.model_validate_json(raw)
+    assert icp.version == "icp_enterprise_v1"
+    assert icp.validation_status == "pending"
+    assert set(icp.tiers) == {"tier_1", "tier_2", "tier_3"}
+    segments = {item.segment for item in icp.reference_companies}
+    assert segments == {"fintech_software", "cpg_loyalty"}
+    labels_by_segment = {
+        segment: {item.label for item in icp.reference_companies if item.segment == segment}
+        for segment in segments
+    }
+    assert labels_by_segment["fintech_software"] == {"positive_reference", "negative_reference"}
+    assert labels_by_segment["cpg_loyalty"] == {"positive_reference", "negative_reference"}
+    role_types = {role.buying_role for role in icp.reference_roles}
+    assert {"business_champion", "technical_champion", "economic_buyer"} <= role_types
+    assert icp.independent_sample_policy.exclude_reference_groups is True
