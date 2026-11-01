@@ -23,7 +23,7 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 ## Preparar y ejecutar
 
 1. Selecciona países, segmentos, palabras clave opcionales y un máximo de 1–20 empresas.
-   Preparar guarda los criterios y la instantánea de configuración sin tráfico.
+   Crear la campaña guarda los criterios y la instantánea de configuración sin tráfico.
 2. Consulta el presupuesto y las cuentas comprobadas. Ejecutar requiere claves en el
    entorno y un archivo válido `data/provider-access.json`.
 3. El responsable autoriza explícitamente cada operación habilitada, con cuenta, tope
@@ -51,8 +51,8 @@ comprobaciones de acceso; las claves viven en variables de entorno. La aplicaci�
 no carga `.env` automáticamente. Define `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` y,
 cuando Hunter esté habilitado, `HUNTER_API_KEY` antes de iniciar Django; con un
 `.env` local, añade `--env-file .env` a `uv run --locked` para pasarlas al proceso.
-Si la interfaz indica «Falta configurar» con el `.env` presente, se inició sin `--env-file`.
-La interfaz indica únicamente si la variable local tiene un valor configurado,
+Si la interfaz indica «Clave no configurada en el servidor» con el `.env` presente, se inició sin `--env-file`.
+La interfaz habilita únicamente las operaciones cuya variable local tiene un valor configurado,
 sin mostrarlo ni probarlo por red. Ese indicador no demuestra permisos ni saldo:
 las comprobaciones de acceso y cupo proceden del archivo local.
 
@@ -128,8 +128,8 @@ cuando habilites `email_verifier`. La financiación de Hunter aplica a ambas bol
 las cuentas con créditos de pago necesitan `credit_valuation` comprobada, con
 `unit_value_usd`, `source_reference` y `observed_at`, para acotar el costo.
 
-El presupuesto muestra consumo confirmado, estimado, reservado y pendiente, además
-de cupos y margen disponibles. Una reserva incierta se conserva hasta conciliarla.
+El presupuesto muestra consumo confirmado, estimado, reservado y disponible en formato
+comercial legible, además del desglose por cuenta. Una reserva incierta se conserva hasta conciliarla.
 El archivo de acceso no habilita operaciones adicionales ni altera límites del catálogo.
 La lista opcional de exclusiones está en `data/exclusions.json`: si falta o no está
 validada, la interfaz muestra su estado y no afirma que se aplicó una lista validada.
@@ -137,11 +137,10 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 ## Resultados y revisión
 
 La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
-filtrar por país, segmento, prioridad y canal. La ficha de empresa organiza Resumen,
-Contactos y Evidencia y
-muestra encaje, cobertura, criterios y fuentes, caso de uso, contactos, advertencias
-y motivos de detención. El encaje no es una probabilidad de compra. Datos desconocidos
-se muestran separados de cero.
+filtrar por país, segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
+Contactos y Evidencia con referencias cruzadas numeradas (`[1]`, `[2]`), mostrando encaje,
+cobertura, criterios, caso de uso, contactos y motivos de detención sin jerga técnica.
+Datos desconocidos se muestran separados de cero.
 
 La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
 match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. La
@@ -151,13 +150,13 @@ un `config/contact_match.json` válido, la ficha lo avisa y muestra a las person
 porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
-son independientes. Guarda aceptado, rechazado o pendiente con motivo y fecha; esto
+son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
 no recalifica ni cambia la rúbrica. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
 La confirmación manual solo permite canales `linkedin` u `other` existentes de una
-persona con identidad, cargo y empleo pertinentes vigentes. Declara acceso directo
-profesional comprobado sin envío y añade un motivo. El pipeline guarda evidencia
+persona con identidad, cargo y empleo pertinentes vigentes. Declara canal directo
+comprobado y añade notas de verificación. El pipeline guarda evidencia
 manual, fecha y disponibilidad recalculada en una sola transacción. Una URL de perfil
 por sí sola no basta; la confirmación tampoco elimina una verificación negativa.
 
