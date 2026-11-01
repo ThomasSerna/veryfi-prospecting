@@ -3,8 +3,10 @@
 import csv
 from io import StringIO
 import json
+from urllib.parse import urlsplit
 
 from prospecting.pipeline import CampaignView, read_campaign
+from prospecting.sources import validate_public_url
 
 
 HUNTER_EMPLOYMENT_WARNING = ("Vigencia del puesto inferida de Hunter (correo verificado y fuente vista hace poco); "
@@ -38,6 +40,18 @@ LABELS = {
     "entity_type": "Tipo de entidad", "operating_countries": "Países de operación", "segments": "Segmentos",
     "size": "Tamaño", "current_employment": "Empleo actual", "relevant_function": "Función pertinente",
     "geographic_scope": "Alcance geográfico",
+    "primary": "Fuente original", "provider": "Proveedor",
+    "search_result": "Búsqueda", "manual": "Confirmación manual",
+}
+CRITERION_LABELS = {
+    1: "Señal fuerte",
+    0.5: "Señal parcial",
+    0: "Incompatible",
+}
+CRITERION_TONES = {
+    1: "strong",
+    0.5: "partial",
+    0: "none",
 }
 MATCH_LABELS = {
     "role": "Cargo", "channel": "Canal", "identity": "Identidad", "employment": "Vigencia del empleo",
@@ -106,6 +120,50 @@ STOP_OUTCOMES = {
 
 def label(value):
     return "Pendiente" if value is None else LABELS.get(value, str(value))
+
+
+def criterion_label(value):
+    """Traduce el multiplicador de la rúbrica (1, 0.5, 0, None) a una etiqueta comercial legible."""
+    if value is None or value == "":
+        return "Sin evidencia"
+    return CRITERION_LABELS.get(value, str(value))
+
+
+def criterion_tone(value):
+    """Variante semántica de presentación para el nivel de un criterio."""
+    if value is None or value == "":
+        return "unknown"
+    return CRITERION_TONES.get(value, "unknown")
+
+
+def evidence_pill(fact, number: int) -> dict[str, str | int]:
+    """Resumen informativo de una fuente para píldoras de referencia cruzada."""
+    source_type = getattr(fact, "source_type", None)
+    provider = getattr(fact, "provider", None)
+    if source_type == "provider" and provider:
+        origin = str(provider).capitalize()
+    else:
+        origin = label(source_type)
+    host = ""
+    raw_url = getattr(fact, "url", None)
+    if raw_url:
+        try:
+            valid = validate_public_url(str(raw_url))
+            if valid:
+                parsed = urlsplit(valid).hostname or ""
+                host = parsed[4:] if parsed.startswith("www.") else parsed
+        except ValueError:
+            host = ""
+    summary = f"{origin} · {host}" if host else origin
+    claim = (getattr(fact, "claim", "") or "").strip()
+    retrieved = getattr(fact, "retrieved_at", None)
+    date_str = retrieved.strftime("%Y-%m-%d") if hasattr(retrieved, "strftime") else ""
+    title = f"{claim} ({date_str})" if claim and date_str else (claim or summary)
+    return {
+        "number": number,
+        "label": f"{summary} #{number}",
+        "title": title,
+    }
 
 
 def match_label(value):

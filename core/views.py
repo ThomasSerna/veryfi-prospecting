@@ -21,7 +21,7 @@ from prospecting.pipeline import (
 )
 from core import execution
 from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
-from core.presentation import READY, download_csv
+from core.presentation import READY, download_csv, evidence_pill
 
 SAVED_MESSAGES = {
     "closed": "Campaña cerrada.",
@@ -171,12 +171,13 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
             form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
             forms.append({"person": person, "channel": channel, "form": form})
     evidence_numbers = {fact.id: index for index, fact in enumerate(result.evidence, start=1)}
+    evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
                    confirmation_forms=forms, nav_active="campaigns",
                    prev_company=prev_company, next_company=next_company,
                    sequence_position=idx + 1, sequence_total=len(sequence),
-                   evidence_numbers=evidence_numbers)
+                   evidence_numbers=evidence_numbers, evidence_items=evidence_items)
     return context
 
 

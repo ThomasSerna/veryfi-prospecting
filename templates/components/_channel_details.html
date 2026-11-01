@@ -1,12 +1,19 @@
 {% load prospecting_ui %}
-<details class="channel-provenance">
-  <summary>Detalles del canal</summary>
-  <dl class="detail-grid">
-    <div><dt>Directo</dt><dd>{{ channel.direct|yesno:'Sí,No,Pendiente' }}</dd></div>
-    <div><dt>Utilizable</dt><dd>{% if channel in person.usable_channels %}Sí{% else %}No{% endif %}</dd></div>
-    {% if channel.phone_country %}<div><dt>País</dt><dd>{{ channel.phone_country }}</dd></div>{% endif %}
-    {% if channel.extension %}<div><dt>Extensión</dt><dd>{{ channel.extension }}</dd></div>{% endif %}
-  </dl>
+<div class="channel-meta">
+  <div class="channel-flags">
+    <span>Directo: <strong>{{ channel.direct|yesno:'Sí,No,Pendiente' }}</strong></span>
+    <span>Utilizable: <strong>{% if channel in person.usable_channels %}Sí{% else %}No{% endif %}</strong></span>
+    {% if channel.phone_country %}<span>País: <strong>{{ channel.phone_country }}</strong></span>{% endif %}
+    {% if channel.extension %}<span>Ext.: <strong>{{ channel.extension }}</strong></span>{% endif %}
+  </div>
   {% if channel.manual_confirmation_reason %}<p class="quiet-note">Notas: {{ channel.manual_confirmation_reason }}</p>{% endif %}
-  <p class="evidence-references">Fuentes: {% for evidence_id in channel.evidence_ids %}<a href="#source-{{ evidence_id }}" data-evidence-link>[{{ evidence_numbers|evidence_number:evidence_id|default:forloop.counter }}]</a>{% if not forloop.last %} {% endif %}{% empty %}Pendiente{% endfor %}</p>
-</details>
+  {% if channel.evidence_ids %}
+  <div class="evidence-references">
+    {% for evidence_id in channel.evidence_ids %}
+      {% with pill=evidence_items|evidence_item:evidence_id %}
+        <a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>
+      {% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

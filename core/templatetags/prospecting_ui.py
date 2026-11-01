@@ -4,7 +4,8 @@ from django import template
 
 from prospecting.sources import validate_public_url
 from core.presentation import (
-    campaign_short_title, campaign_title, ineligible_reason, label as present_label,
+    campaign_short_title, campaign_title, criterion_label, criterion_tone,
+    ineligible_reason, label as present_label,
     match_label, money as present_money, money_summary as present_money_summary,
     stop_message, stop_tone,
 )
@@ -16,6 +17,8 @@ register.filter("match_label", match_label)
 register.filter("campaign_title", campaign_title)
 register.filter("campaign_short_title", campaign_short_title)
 register.filter("ineligible_reason", ineligible_reason)
+register.filter("criterion_label", criterion_label)
+register.filter("criterion_tone", criterion_tone)
 
 
 @register.filter
@@ -69,4 +72,9 @@ def score(value):
 
 @register.filter
 def evidence_number(mapping, evidence_id):
+    return mapping.get(evidence_id) if isinstance(mapping, dict) else None
+
+
+@register.filter
+def evidence_item(mapping, evidence_id):
     return mapping.get(evidence_id) if isinstance(mapping, dict) else None

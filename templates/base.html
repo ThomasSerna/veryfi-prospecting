@@ -45,6 +45,7 @@
       <header class="topbar">
         <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="navigation" aria-label="Abrir navegación"><span></span><span></span><span></span></button>
         <nav class="breadcrumb" aria-label="Ruta de navegación">{% block breadcrumb %}<span>Campañas</span>{% endblock %}</nav>
+        {% block topbar_actions %}{% endblock %}
       </header>
       <main id="main" class="main-content" tabindex="-1">
         {% if demo_mode %}<div class="notice notice-warning" role="note"><strong>Demostración con datos exclusivamente sintéticos.</strong></div>{% endif %}

@@ -527,3 +527,32 @@ def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_st
     assert "No disponible para confirmación manual porque una fuente indica que ya no ocupa el puesto." in page
     compact = client.get(url("status", case.campaign.id), {"compact": "1"}).json()
     assert compact["html"] == ""
+
+
+def test_company_criteria_and_sources_use_semantic_labels_and_contextual_pills(ui_results, client, make_assessment):
+    case = ui_results
+    company = case.companies[0]
+    with Database(case.paths.db) as db:
+        source_id = db.list_evidence(company.id)[0].id
+        assessment = make_assessment(
+            case.campaign.id, company.id, priority="high", fit_score=70.0, coverage=0.8,
+            criteria={
+                "document_need": {"value": 1, "evidence_ids": [source_id], "justification": "Señal fuerte sintética."},
+                "offer_match": {"value": 0.5, "evidence_ids": [source_id], "justification": "Señal parcial sintética."},
+                "scale_potential": {"value": 0, "evidence_ids": [source_id], "justification": "Incompatible sintético."},
+                "adoption_capacity": {"value": 1, "evidence_ids": [source_id], "justification": "Adopción sintética."},
+                "opportunity_timing": {"value": None, "evidence_ids": [], "justification": "Pendiente sintético."},
+            },
+        )
+        db.save_assessment(assessment)
+        item = db.get_run_item(case.campaign.id, company.id)
+        db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+    page = text(client.get(url("company", case.campaign.id, company.id)))
+    assert "Señal fuerte" in page
+    assert "Señal parcial" in page
+    assert "Incompatible" in page
+    assert "Sin evidencia" in page
+    assert "Fuente original · example.com #1" in page
+    assert "Fuente original · synthetic-co.example #" in page
+    assert 'class="company-nav-bar"' not in page
+    assert 'aria-label="Navegación secuencial de empresas"' in page
