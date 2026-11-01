@@ -1,6 +1,6 @@
 # Presupuesto y control de gasto
 
-Política de gasto del proyecto: topes, distribución de la reserva y reglas de reserva y conciliación. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). La implementación (`Budget`, `SpendingAuthorization` y el cliente de proveedores) está en [budget-providers.md](budget-providers.md); lo comprobado con cuentas reales y su conciliación, en [provider-check.md](provider-check.md).
+Política de gasto del proyecto: topes, distribución de la reserva y reglas de reserva y conciliación. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). La implementación (`Budget`, `SpendingAuthorization` y el cliente de proveedores) está en [budget-providers.md](budget-providers.md); lo comprobado con cuentas reales y su conciliación, en [provider-check.md](provider-check.md). Los costos de cada servicio están en [Library-docs.md](Library-docs.md).
 
 **USD 20 es el máximo agregado del primer sprint, entre todos los desarrolladores, Haiku, datos, pruebas y ejecuciones. No es un cupo por agente, cuenta, empresa ni corrida.** No se autoriza comprar suscripciones ni recargar automáticamente por describir este plan.
 

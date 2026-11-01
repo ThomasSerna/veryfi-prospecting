@@ -1,8 +1,8 @@
 # Reglas de negocio
 
-Reglas vigentes de descubrimiento, identidad, evidencia, calificación, esfuerzo de búsqueda, personas y canales. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Las cifras son propuestas iniciales (`rubric_v1`, `contact_match_v1`) pendientes de validación con Veryfi. El flujo de etapas está en [Architecture.md](Architecture.md#flujo-de-investigación).
+Reglas vigentes de descubrimiento, identidad, evidencia, calificación, esfuerzo de búsqueda, personas y canales. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Las cifras son propuestas iniciales (`rubric_v1`, `contact_match_v1`) pendientes de validación con Veryfi. El flujo de etapas está en [Architecture.md](Architecture.md#flujo-de-investigación). Los topes de gasto están en [Budget-policy.md](Budget-policy.md).
 
-Los issues T14 (`rubric_v2`), T16 (parada y número de personas por cuenta), T18 (vigencia del empleo) y T19 (`contact_match_v2`) del backlog proponen modificar reglas de este archivo. Hasta que cada tarea se cierre con aprobación, siguen vigentes las que aquí se describen.
+Los issues T14 (`rubric_v2`), T16 (parada y número de personas por cuenta), T18 (vigencia del empleo) y T19 (`contact_match_v2`) del [backlog](Roadmap.md#copia-del-backlog) proponen modificar reglas de este archivo. Hasta que cada tarea se cierre con aprobación, siguen vigentes las que aquí se describen.
 
 ## Descubrimiento
 

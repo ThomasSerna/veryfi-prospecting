@@ -1,6 +1,6 @@
 # Arquitectura
 
-Pila tecnológica, límites del sistema, estructura de carpetas, flujo de datos y esquema de la base de datos de Veryfi Prospecting. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Cada módulo se describe con más detalle en las guías técnicas de `docs/`; ante cualquier diferencia, manda el código.
+Pila tecnológica, límites del sistema, estructura de carpetas, flujo de datos y esquema de la base de datos de Veryfi Prospecting. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Cada módulo se describe con más detalle en las guías técnicas de `docs/`; ante cualquier diferencia, manda el código. Ver también [Library-docs.md](Library-docs.md) (uso de cada librería y servicio), [Business-rules.md](Business-rules.md), [Budget-policy.md](Budget-policy.md) y [Testing.md](Testing.md).
 
 ## Pila tecnológica
 

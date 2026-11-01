@@ -1,6 +1,6 @@
 # Contexto del proyecto
 
-Veryfi Prospecting: descubrimiento y calificación de clientes potenciales. Este archivo explica qué es el producto, a quién va dirigido, qué decisiones se tomaron y cómo se mide su éxito. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
+Veryfi Prospecting: descubrimiento y calificación de clientes potenciales. Este archivo explica qué es el producto, a quién va dirigido, qué decisiones se tomaron y cómo se mide su éxito. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Ver también [Business-rules.md](Business-rules.md) (reglas de negocio), [Architecture.md](Architecture.md), [Library-docs.md](Library-docs.md), [Budget-policy.md](Budget-policy.md) y [Roadmap.md](Roadmap.md) (backlog).
 
 Las reglas numéricas de calificación, las metas de evaluación y la arquitectura son propuestas iniciales para implementar y validar; no representan criterios comerciales ya certificados por Veryfi.
 
@@ -108,7 +108,7 @@ La carga de una lista de empresas para investigación puede añadirse después s
 
 ## Criterios de éxito
 
-El éxito se mide con las métricas de la revisión comercial y se declara cumplido con los criterios de terminación de cada entrega.
+El éxito se mide con las métricas de la revisión comercial y se declara cumplido con los criterios de terminación de cada entrega. Las métricas del flujo enterprise (T21) y el estado actual del backlog están en [Roadmap.md](Roadmap.md).
 
 ### Revisión comercial
 

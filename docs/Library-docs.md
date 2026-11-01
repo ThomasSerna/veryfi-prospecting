@@ -55,9 +55,9 @@ Las claves se leen solo de variables de entorno; `.env.example` lista los nombre
 
 - **Hunter:** ya no se usa; su historial y consumo se conservan (ver «Historial»).
 - **LinkedIn** [W5]: no hay API abierta de Sales Navigator ni se automatiza el sitio. Los perfiles se revisan a mano y un canal de LinkedIn solo cuenta como utilizable tras la confirmación manual de mensajería.
-- **X-Ray Search:** no está habilitado ([contacts.md](contacts.md)). Es una evaluación opcional y, si se implementara, respetaría las restricciones de «Evolución de la búsqueda de contactos».
+- **X-Ray Search:** no está habilitado ([contacts.md](contacts.md)). Es una evaluación opcional y, si se implementara, respetaría las restricciones de «Evolución de la búsqueda de contactos». La propuesta original está en [Roadmap.md](Roadmap.md#propuestas-fuera-del-backlog).
 - **Exa y Brave Search API** [W6, W7]: alternativas evaluadas; no están integradas.
-- **Snov.io:** evaluación planeada en el backlog (T22), en una rama experimental aislada; no se integra en `main`.
+- **Snov.io:** evaluación planeada en el [backlog](Roadmap.md#exploración-t22-abierta) (T22), en una rama experimental aislada; no se integra en `main`.
 
 ## Librerías
 
