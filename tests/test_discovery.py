@@ -625,8 +625,8 @@ def test_resolve_company_identity_persists_entity_structure_and_size_with_proven
 
     payload, _ = build_haiku_request(saved_sub, database.list_evidence(saved_sub.id), campaign)
     user_prompt = payload["messages"][0]["content"]
-    assert '"entity_type": "subsidiary"' in user_prompt
-    assert '"icp_tier": "tier_2"' in user_prompt
+    assert '"entity_type"' not in user_prompt
+    assert '"size"' not in user_prompt
 
 
 def test_discovery_queries_v2_favors_enterprise_and_preserves_v1_reproducibility(make_campaign):

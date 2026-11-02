@@ -249,30 +249,12 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     limits = campaign.limits.llm
     system = _system_prompt(campaign)
     schema = response_schema(campaign)
-    profile_data = {
+    profile = prompt_json({
         "name": company.name, "domain": company.domain, "aliases": company.aliases,
         "operating_countries": company.operating_countries,
         "segments": None if company.segments is None else [str(item) for item in company.segments],
         "identity_status": str(company.identity_status),
-
-
-
-
-    }
-    if company.entity_name is not None:
-        profile_data["entity_name"] = company.entity_name
-    if str(company.entity_type) != "unknown":
-        profile_data["entity_type"] = str(company.entity_type)
-    if company.parent_company_id is not None:
-        profile_data["parent_company_id"] = str(company.parent_company_id)
-    if company.size is not None:
-        profile_data["size"] = company.size.model_dump(mode="json", exclude_none=True)
-    profile = prompt_json(profile_data)
-
-
-
-
-
+    })
     template = ("Empresa (registro local):\n{profile}\n\n<evidencia>\n{evidence}\n</evidencia>\n\n"
                 "Evalúa los cinco criterios solo con la evidencia anterior.")
     overhead = len(system) + len(json.dumps(schema)) + len(template.format(profile=profile, evidence="")) + 200
