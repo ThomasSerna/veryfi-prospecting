@@ -54,10 +54,12 @@ a micrositios promocionales o conglomerados sin caso de uso documental, y
 depender de llamadas ni proveedores adicionales.
 
 La calibración del ICP enterprise vive versionada en `config/icp_enterprise.json`
-(`icp_enterprise_v1`, cargada con `load_icp_enterprise`), con estado de validación
-`pending`, niveles `tier_1`/`tier_2`/`tier_3` tomados de *How Veryfi Sells*, ejemplos
-positivos y negativos por segmento, cargos de referencia (`business_champion`,
-`technical_champion`, `economic_buyer`) y política de muestra independiente.
+(`icp_enterprise_v1`, cargada con `load_icp_enterprise`), con estado de validación y
+autorización de uso `pending`, niveles contiguos `tier_1`/`tier_2`/`tier_3` tomados de
+*How Veryfi Sells*, ejemplos positivos y negativos por segmento, cargos de referencia
+(`business_champion`, `technical_champion`, `economic_buyer`), política de muestra
+independiente y verificación de cobertura frente a exclusiones
+(`uncovered_reference_customers`).
 
 `extract_company_pages` valida cada URL: solo admite HTTP(S) hacia nombres públicos
 y rechaza IP, `localhost`, credenciales, puertos no estándar, redes sociales y
@@ -156,12 +158,17 @@ Además, `assess_identity` y `resolve_company_identity` extraen de forma determi
 evidencia observada:
 - **Estructura societaria (`entity_name`, `entity_type`, `parent_company_id`):** distingue
   razón social (`legal_entity`), filial (`subsidiary`) y marca (`brand`) a partir de
-  menciones explícitas en páginas primarias, vinculando `parent_company_id` cuando la
-  matriz ya está confirmada o registrando una advertencia para mantener matriz y
-  filial/marca separadas.
+  menciones explícitas ancladas al sujeto de la empresa en páginas primarias (descartando
+  menciones de clientes/terceros o nombres genéricos de país/sector), vinculando
+  `parent_company_id` cuando la matriz ya está confirmada o registrando una advertencia para
+  mantener matriz y filial/marca separadas.
 - **Señales de escala (`CompanySize`):** extrae empleados o rangos, ingresos públicos
-  (`public_revenue`) y cobertura geográfica (`geographic_coverage`) junto con su alcance
-  (`scope`: `group`, `subsidiary`, `country`, `entity`), nivel (`icp_tier`: `tier_1`,
-  `tier_2`, `tier_3`, `unknown`) y `evidence_ids`. Nunca usa fragmentos de búsqueda ni
+  (`public_revenue`) y cobertura geográfica (`geographic_coverage`) junto con el alcance de la
+  frase donde aparece la cifra (`scope`: `group`, `subsidiary`, `country`, `entity` o
+  `unknown` cuando no hay marcador explícito), nivel (`icp_tier`: `tier_1`, `tier_2`,
+  `tier_3`, `unknown`) y `evidence_ids`. El nivel solo se asigna cuando el intervalo completo
+  cae en el mismo nivel, la moneda de ingresos es explícitamente USD (sin convertir `$` local
+  ni unidades ambiguas como «billones»), no hay discrepancia entre empleados e ingresos y una
+  cifra de grupo no se aplica a una filial o marca. Nunca usa fragmentos de búsqueda ni
   inventa estimaciones: cuando la escala no consta en fuentes primarias o de proveedor,
   `company.size` permanece en `None`.
