@@ -524,7 +524,7 @@ class IcpReferenceCompany(Contract):
     tier_estimate: CustomerTier = "unknown"
     scale_notes: Text
     document_use_case: Text
-    usage_authorization: Literal["internal_calibration_only"] = "internal_calibration_only"
+    usage_authorization: Literal["pending", "internal_calibration_only"] = "pending"
     validation_status: Literal["pending", "validated"] = "pending"
     source_reference: Text
 
@@ -574,6 +574,20 @@ class IcpEnterpriseConfig(Contract):
         for key, item in self.tiers.items():
             if item.tier != key:
                 raise ValueError("La clave del nivel debe coincidir con su identificador.")
+        t3, t2, t1 = self.tiers["tier_3"], self.tiers["tier_2"], self.tiers["tier_1"]
+        if (
+            t3.employee_max is None or t2.employee_min is None or t2.employee_max is None or t1.employee_min is None
+            or t3.employee_max + 1 != t2.employee_min
+            or t2.employee_max + 1 != t1.employee_min
+        ):
+            raise ValueError("Los rangos de empleados entre niveles ICP deben ser contiguos y sin solape.")
+        if (
+            t3.revenue_max_usd_millions is None or t2.revenue_min_usd_millions is None
+            or t2.revenue_max_usd_millions is None or t1.revenue_min_usd_millions is None
+            or t3.revenue_max_usd_millions + 1 != t2.revenue_min_usd_millions
+            or t2.revenue_max_usd_millions + 1 != t1.revenue_min_usd_millions
+        ):
+            raise ValueError("Los rangos de ingresos entre niveles ICP deben ser contiguos y sin solape.")
         _unique([company.id for company in self.reference_companies])
         _unique([role.id for role in self.reference_roles])
         for segment in Segment:

@@ -20,6 +20,7 @@ from prospecting.models import (
     CountryCode,
     Evidence,
     IcpEnterpriseConfig,
+    IcpReferenceCompany,
     Segment,
     Text,
     UtcDatetime,
@@ -171,6 +172,29 @@ class DiscoveryComparison(Contract):
 def load_icp_enterprise(path: Path = Path("config/icp_enterprise.json")) -> IcpEnterpriseConfig:
     """Carga y valida el catálogo versionado de calibración ICP enterprise (T13)."""
     return IcpEnterpriseConfig.model_validate_json(Path(path).read_text(encoding="utf-8"))
+
+
+def uncovered_reference_customers(
+    icp: IcpEnterpriseConfig,
+    exclusions,
+) -> list[IcpReferenceCompany]:
+    """Devuelve las referencias de clientes actuales con dominio no cubiertas por las exclusiones."""
+    if exclusions is None:
+        excluded_domains: list[str] = []
+    elif hasattr(exclusions, "entries"):
+        excluded_domains = [domain.lower() for entry in exclusions.entries for domain in entry.domains]
+    else:
+        excluded_domains = [str(domain).lower() for domain in exclusions]
+    uncovered: list[IcpReferenceCompany] = []
+    for company in icp.reference_companies:
+        if company.relationship != "current_customer_reference" or not company.domains:
+            continue
+        if not all(
+            any(within_domain(domain, excluded) for excluded in excluded_domains)
+            for domain in company.domains
+        ):
+            uncovered.append(company)
+    return uncovered
 
 
 def _resolve_template_version(campaign: Campaign, template_version: str | None) -> str:
