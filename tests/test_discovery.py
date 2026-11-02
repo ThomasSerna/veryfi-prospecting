@@ -705,3 +705,94 @@ def test_select_candidates_prioritizes_enterprise_document_fit_over_no_fit_and_m
     assert comparison.v1_enterprise_candidates == 0
     assert comparison.v2_no_fit_candidates == 0
     assert comparison.v1_no_fit_candidates == 1
+
+    hits_neutral_vs_nofit = [
+        make_hit(q_v2, 1, "minera-andina.example", "Minera Andina", "Grupo de minería y generación eléctrica en Colombia."),
+        make_hit(q_v2, 2, "neutral-app.example", "Neutral App", "Soluciones digitales en Colombia."),
+    ]
+    candidates_mixed, _ = group_candidates(hits_neutral_vs_nofit, 60)
+    selected_mixed, _ = select_candidates(candidates_mixed, make_campaign(countries=["CO"], segments=["fintech_software"], max_companies=1))
+    assert [item.host for item in selected_mixed] == ["neutral-app.example"]
+
+
+def test_scale_tier_requires_unambiguous_interval_and_explicit_usd_currency(make_campaign):
+    """No inventa niveles ICP desde cotas inferiores abiertas, monedas locales, discrepancias ni cifras de grupo en filiales."""
+    from prospecting.identity import extract_company_size
+    from prospecting.models import EntityType
+
+    company, _ = discovered("escala-estricta.example", "Gastos | Escala Estricta")
+
+    def size_from(text, *, entity_type=EntityType.UNKNOWN):
+        return extract_company_size([page(company, "https://escala-estricta.example/", text)], entity_type=entity_type)
+
+    assert size_from("Tenemos más de 50 empleados.").icp_tier == "unknown"
+    assert size_from("Contamos con más de 100 empleados.").icp_tier == "unknown"
+    assert size_from("Contamos con entre 50 y 150 empleados.").icp_tier == "unknown"
+    assert size_from("Contamos con entre 90 y 5000 empleados.").icp_tier == "unknown"
+    assert size_from("Somos 1.000 empleados.").icp_tier == "tier_2"
+    assert size_from("Más de 1.000 empleados.").icp_tier == "tier_1"
+    assert size_from("Contamos con entre 150 y 300 empleados.").icp_tier == "tier_2"
+
+    without_scope = size_from("Contamos con 300 empleados. Somos parte del grupo Aval.")
+    assert without_scope.scope == "unknown"
+    assert without_scope.icp_tier == "tier_2"
+
+    cop_implicit = size_from("Ingresos anuales de $1.200 millones en Colombia.")
+    assert cop_implicit.public_revenue == "Ingresos anuales de $1.200 millones"
+    assert cop_implicit.icp_tier == "unknown"
+
+    usd_explicit = size_from("Ingresos anuales de USD 1.200 millones en Colombia.")
+    assert usd_explicit.icp_tier == "tier_1"
+
+    ambiguous_billones = size_from("Ingresos anuales de USD 2 billones.")
+    assert ambiguous_billones.icp_tier == "unknown"
+
+    assert size_from("Ventas de $200 por mes.") is None
+
+    conflicting = size_from("Contamos con 40 empleados e ingresos anuales de USD 500 millones.")
+    assert conflicting.icp_tier == "unknown"
+
+    group_on_subsidiary = size_from(
+        "Más de 2.000 empleados a nivel grupo.",
+        entity_type=EntityType.SUBSIDIARY,
+    )
+    assert group_on_subsidiary.scope == "group"
+    assert group_on_subsidiary.icp_tier == "unknown"
+
+
+def test_entity_structure_rejects_unanchored_or_generic_relations():
+    """Ignora frases genéricas ('empresa de Colombia') y relaciones de terceros ('nuestro cliente es filial')."""
+    from prospecting.identity import extract_entity_structure
+    from prospecting.models import EntityType
+
+    company, _ = discovered("probe.example", "Gastos | Probe")
+
+    def structure_for(text, *, target_company=company):
+        ev = page(target_company, f"https://{target_company.domain}/", text)
+        _, _, entity_type, _, _, _, parent_name = extract_entity_structure(target_company, None, [ev], [])
+        return entity_type, parent_name
+
+    assert structure_for("Somos una empresa de Colombia que digitaliza recibos.") == (EntityType.UNKNOWN, None)
+    assert structure_for("Somos una empresa de Tecnología financiera.") == (EntityType.UNKNOWN, None)
+    assert structure_for("Probe es una empresa de Grupo Aval.") == (EntityType.UNKNOWN, None)
+    assert structure_for("Marca de Grupo X es nuestro cliente.") == (EntityType.UNKNOWN, None)
+    assert structure_for("Nuestro cliente es una filial de Banco Grande.") == (EntityType.UNKNOWN, None)
+    assert structure_for("Probe es una filial de Banco Grande.") == (EntityType.SUBSIDIARY, "Banco Grande")
+
+    brand_co, _ = discovered("snacks-sol.example", "Promoción | Snacks Sol")
+    assert structure_for("Marca de Corporación Externa: Snacks Sol en México.", target_company=brand_co) == (
+        EntityType.BRAND,
+        "Corporación Externa",
+    )
+
+
+def test_uncovered_reference_customers_checks_domain_coverage():
+    """Detecta referencias de clientes actuales cuyos dominios no están cubiertos en exclusiones."""
+    from prospecting.discovery import load_icp_enterprise, uncovered_reference_customers
+
+    icp = load_icp_enterprise()
+    all_domains = {domain for item in icp.reference_companies for domain in item.domains}
+    assert uncovered_reference_customers(icp, all_domains) == []
+    partial = all_domains - {"navan.com"}
+    uncovered = uncovered_reference_customers(icp, partial)
+    assert [item.id for item in uncovered] == ["ref_navan"]

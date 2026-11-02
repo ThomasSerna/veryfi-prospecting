@@ -19,7 +19,6 @@ from prospecting.models import (
     Evidence,
     IcpEnterpriseConfig,
     RunItem,
-    RunItem,
     TokenUsage,
     Usage,
     VeryfiConfig,
@@ -409,8 +408,6 @@ def test_company_size_supports_enterprise_scale_signals_and_scope():
         employee_count=1200,
         employee_min=1000,
         public_revenue="USD 500M anuales",
-
-
         geographic_coverage="Operación en 12 países de Latinoamérica",
         scope="group",
         icp_tier="tier_1",
@@ -446,3 +443,11 @@ def test_icp_enterprise_config_loads_versioned_catalog_with_pending_validation()
     role_types = {role.buying_role for role in icp.reference_roles}
     assert {"business_champion", "technical_champion", "economic_buyer"} <= role_types
     assert icp.independent_sample_policy.exclude_reference_groups is True
+    assert all(item.usage_authorization == "pending" for item in icp.reference_companies)
+    assert icp.tiers["tier_3"].employee_max + 1 == icp.tiers["tier_2"].employee_min
+    assert icp.tiers["tier_2"].employee_max + 1 == icp.tiers["tier_1"].employee_min
+
+    overlapping = icp.model_dump(mode="json")
+    overlapping["tiers"]["tier_1"]["employee_min"] = 1000
+    with pytest.raises(ValidationError):
+        IcpEnterpriseConfig.model_validate(overlapping)
