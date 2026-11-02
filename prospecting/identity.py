@@ -104,9 +104,15 @@ _PUBLIC_REVENUE_RE = re.compile(
     r"\b(?:ingresos(?:\s+anuales|\s+públicos|\s+publicos|\s+consolidados)?"
     r"|facturación(?:\s+anual)?|facturacion(?:\s+anual)?"
     r"|ventas(?:\s+anuales|\s+netas)?|revenue(?:\s+anual)?)\s+"
-    r"(?:de\s+|por\s+|superiores\s+a\s+|of\s+)?"
-    r"(?:USD|US\$|COP|MXN|\$)\s*\d[\d.,]*"
-    r"(?:\s*(?:millones|miles\s+de\s+millones|billones|M|B|MM|bn|million|billion))?",
+    r"(?:de\s+|por\s+|superiores\s+a\s+|más\s+de\s+|mas\s+de\s+|over\s+|more\s+than\s+|of\s+)?"
+    r"(?:(?:USD|US\$|COP|MXN|\$)\s*"
+    r"(?:\d[\d.,]*\s*(?:millones|miles\s+de\s+millones|billones|billón|billon|M|B|MM|bn|million|billion)\b(?:\s+de\s+(?:dólares|dolares|pesos)\b)?"
+    r"|\d{1,3}(?:[.,]\d{3}){2,}\b(?:\s+de\s+(?:dólares|dolares|pesos)\b)?)"
+    r"|\d[\d.,]*\s*(?:millones|miles\s+de\s+millones|billones|billón|billon)\s+de\s+(?:dólares|dolares|pesos)\b)",
+    re.IGNORECASE,
+)
+_REVENUE_LOWER_BOUND_RE = re.compile(
+    r"\b(?:superiores\s+a|más\s+de|mas\s+de|over|more\s+than)\b",
     re.IGNORECASE,
 )
 _GEO_COVERAGE_RE = re.compile(
@@ -117,8 +123,12 @@ _GEO_COVERAGE_RE = re.compile(
     re.IGNORECASE,
 )
 _USD_REVENUE_AMOUNT_RE = re.compile(
-    r"(?:USD|US\$|\$)\s*(?P<amount>\d[\d.,]*)\s*(?P<unit>miles\s+de\s+millones|billones|billion|bn|B|millones|million|MM|M)?",
+    r"(?:\b(?:USD|US\$)\s*(?P<amount1>\d[\d.,]*)(?:\s*(?P<unit1>miles\s+de\s+millones|billion|bn|B|millones|million|MM|M)\b)?"
+    r"|(?:\$\s*)?(?P<amount2>\d[\d.,]*)\s*(?P<unit2>miles\s+de\s+millones|millones)\s+de\s+(?:dólares|dolares)\b)",
     re.IGNORECASE,
+)
+_SENTENCE_SPLIT_RE = re.compile(
+    r"(?:(?<=[a-záéíóúñ]{2})|(?<=\d{2})|(?<=\)))[.!?]+(?=\s|$)|[!?]+(?=\s|$)|[\n;]+"
 )
 
 
@@ -278,8 +288,22 @@ def _parse_int(raw: str | None) -> int | None:
     return value if value > 0 else None
 
 
+def _sentence_for_span(text: str, start: int, end: int) -> str:
+    """Devuelve la oración o cláusula donde aparece la coincidencia."""
+    cursor = 0
+    for part in _SENTENCE_SPLIT_RE.split(text):
+        idx = text.find(part, cursor)
+        if idx == -1:
+            continue
+        part_end = idx + len(part)
+        if idx <= start and end <= part_end:
+            return part
+        cursor = part_end
+    return text
+
+
 def _detect_scale_scope(excerpt: str) -> ScaleScope:
-    """Determina el alcance de la señal de escala según el contexto literal del fragmento."""
+    """Determina el alcance de la señal de escala según el contexto literal de la frase."""
     normalized = plain(excerpt)
     if re.search(r"\b(?:a nivel global|a nivel grupo|en el grupo|del grupo|consolidados|globalmente|worldwide)\b", normalized):
         return "group"
@@ -287,7 +311,76 @@ def _detect_scale_scope(excerpt: str) -> ScaleScope:
         return "subsidiary"
     if re.search(r"\b(?:en colombia|en mexico|a nivel nacional|en el pais)\b", normalized):
         return "country"
-    return "entity"
+    if re.search(r"\b(?:en la entidad|en nuestra entidad|a nivel de la entidad)\b", normalized):
+        return "entity"
+    return "unknown"
+
+
+def _employee_point_tier(count: int) -> CustomerTier:
+    if count > 1000:
+        return "tier_1"
+    if 100 <= count <= 1000:
+        return "tier_2"
+    if 0 < count < 100:
+        return "tier_3"
+    return "unknown"
+
+
+def _employee_tier(
+    employee_count: int | None,
+    employee_min: int | None,
+    employee_max: int | None,
+) -> CustomerTier:
+    if employee_count is not None:
+        return _employee_point_tier(employee_count)
+    if employee_min is not None and employee_max is not None:
+        low_tier = _employee_point_tier(employee_min)
+        high_tier = _employee_point_tier(employee_max)
+        return low_tier if low_tier == high_tier else "unknown"
+    if employee_min is not None:
+        return "tier_1" if employee_min >= 1000 else "unknown"
+    if employee_max is not None:
+        return "tier_3" if 0 < employee_max < 100 else "unknown"
+    return "unknown"
+
+
+def _revenue_tier(public_revenue: str | None) -> CustomerTier:
+    if not public_revenue or re.search(r"\b(?:COP|MXN)\b", public_revenue, re.IGNORECASE):
+        return "unknown"
+    if re.search(r"\bbill(?:ones|ón|on)\b", public_revenue, re.IGNORECASE):
+        return "unknown"
+    match = _USD_REVENUE_AMOUNT_RE.search(public_revenue)
+    if not match:
+        return "unknown"
+    raw_amount = match.group("amount1") or match.group("amount2")
+    unit = (match.group("unit1") or match.group("unit2") or "").lower()
+    parsed_int = _parse_int(raw_amount)
+    if parsed_int is not None:
+        amount = float(parsed_int)
+    else:
+        try:
+            amount = float(raw_amount.replace(",", "."))
+        except ValueError:
+            return "unknown"
+    if amount <= 0:
+        return "unknown"
+    if unit in {"miles de millones", "billion", "bn", "b"}:
+        usd_millions = amount * 1000.0
+    elif unit in {"millones", "million", "mm", "m"}:
+        usd_millions = amount
+    elif not unit and amount >= 1_000_000:
+        usd_millions = amount / 1_000_000.0
+    else:
+        return "unknown"
+    if _REVENUE_LOWER_BOUND_RE.search(public_revenue):
+        return "tier_1" if usd_millions >= 1000 else "unknown"
+    if usd_millions > 1000:
+        return "tier_1"
+    if 100 <= usd_millions <= 1000:
+        return "tier_2"
+    if 0 < usd_millions < 100:
+        return "tier_3"
+    return "unknown"
 
 
 def _derive_icp_tier(
@@ -295,40 +388,25 @@ def _derive_icp_tier(
     employee_min: int | None,
     employee_max: int | None,
     public_revenue: str | None,
+    *,
+    scope: ScaleScope = "unknown",
+    entity_type: EntityType = EntityType.UNKNOWN,
 ) -> CustomerTier:
     """Clasifica el nivel de cuenta según umbrales de How Veryfi Sells sin inventar estimaciones."""
-    employees = employee_count if employee_count is not None else (employee_min if employee_min is not None else employee_max)
-    usd_millions: float | None = None
-    if public_revenue and not re.search(r"\b(?:COP|MXN)\b", public_revenue, re.IGNORECASE):
-        match = _USD_REVENUE_AMOUNT_RE.search(public_revenue)
-        if match:
-            raw_amount = match.group("amount")
-            unit = (match.group("unit") or "").lower()
-            parsed_int = _parse_int(raw_amount)
-            if parsed_int is not None:
-                amount = float(parsed_int)
-            else:
-                try:
-                    amount = float(raw_amount.replace(",", "."))
-                except ValueError:
-                    amount = 0.0
-            if amount > 0:
-                if unit in {"miles de millones", "billones", "billion", "bn", "b"}:
-                    usd_millions = amount * 1000.0
-                elif unit in {"millones", "million", "mm", "m"}:
-                    usd_millions = amount
-                elif amount >= 100_000_000:
-                    usd_millions = amount / 1_000_000.0
-    if (employees is not None and employees >= 1000) or (usd_millions is not None and usd_millions >= 1000):
-        return "tier_1"
-    if (employees is not None and 100 <= employees < 1000) or (usd_millions is not None and 100 <= usd_millions < 1000):
-        return "tier_2"
-    if employees is not None and employees < 100:
-        return "tier_3"
-    return "unknown"
+    if scope == "group" and entity_type in (EntityType.SUBSIDIARY, EntityType.BRAND):
+        return "unknown"
+    emp_tier = _employee_tier(employee_count, employee_min, employee_max)
+    rev_tier = _revenue_tier(public_revenue)
+    if emp_tier != "unknown" and rev_tier != "unknown":
+        return emp_tier if emp_tier == rev_tier else "unknown"
+    return emp_tier if emp_tier != "unknown" else rev_tier
 
 
-def extract_company_size(facts: list[Evidence]) -> CompanySize | None:
+def extract_company_size(
+    facts: list[Evidence],
+    *,
+    entity_type: EntityType = EntityType.UNKNOWN,
+) -> CompanySize | None:
     """Extrae señales explícitas de escala desde evidencia observada primaria o de proveedor.
 
     Nunca utiliza resúmenes de búsqueda (`search_result`) ni inventa cifras ausentes.
@@ -351,7 +429,7 @@ def extract_company_size(facts: list[Evidence]) -> CompanySize | None:
 
     for item in eligible:
         excerpt = item.excerpt or ""
-        matched_here = False
+        matched_spans: list[tuple[int, int]] = []
         if employee_count is None and employee_min is None and employee_max is None:
             range_match = _EMPLOYEE_RANGE_RE.search(excerpt)
             if range_match:
@@ -360,47 +438,55 @@ def extract_company_size(facts: list[Evidence]) -> CompanySize | None:
                 if low is not None and high is not None and high >= low:
                     employee_min, employee_max = low, high
                     snippets.append(re.sub(r"\s+", " ", range_match.group(0)).strip())
-                    matched_here = True
-            if not matched_here:
+                    matched_spans.append(range_match.span())
+            if not matched_spans:
                 min_match = _EMPLOYEE_MIN_RE.search(excerpt)
                 if min_match:
                     low = _parse_int(min_match.group("min1") or min_match.group("min2"))
                     if low is not None:
                         employee_min = low
                         snippets.append(re.sub(r"\s+", " ", min_match.group(0)).strip())
-                        matched_here = True
-            if not matched_here:
+                        matched_spans.append(min_match.span())
+            if not matched_spans:
                 count_match = _EMPLOYEE_COUNT_RE.search(excerpt)
                 if count_match:
                     exact = _parse_int(count_match.group("count"))
                     if exact is not None:
                         employee_count = exact
                         snippets.append(re.sub(r"\s+", " ", count_match.group(0)).strip())
-                        matched_here = True
+                        matched_spans.append(count_match.span())
 
         if public_revenue is None:
             rev_match = _PUBLIC_REVENUE_RE.search(excerpt)
             if rev_match:
                 public_revenue = re.sub(r"\s+", " ", rev_match.group(0)).strip()
                 snippets.append(public_revenue)
-                matched_here = True
+                matched_spans.append(rev_match.span())
 
         if geographic_coverage is None:
             geo_match = _GEO_COVERAGE_RE.search(excerpt)
             if geo_match:
                 geographic_coverage = re.sub(r"\s+", " ", geo_match.group(0)).strip()
                 snippets.append(geographic_coverage)
-                matched_here = True
+                matched_spans.append(geo_match.span())
 
-        if matched_here:
+        if matched_spans:
             evidence_ids.append(item.id)
-            if scope == "unknown":
-                scope = _detect_scale_scope(excerpt)
+            for start, end in matched_spans:
+                if scope == "unknown":
+                    scope = _detect_scale_scope(_sentence_for_span(excerpt, start, end))
 
     if not evidence_ids:
         return None
 
-    icp_tier = _derive_icp_tier(employee_count, employee_min, employee_max, public_revenue)
+    icp_tier = _derive_icp_tier(
+        employee_count,
+        employee_min,
+        employee_max,
+        public_revenue,
+        scope=scope,
+        entity_type=entity_type,
+    )
     return CompanySize(
         original_value="; ".join(dict.fromkeys(snippets)),
         public_revenue=public_revenue,
@@ -555,7 +641,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
         parent_ids,
         parent_name_detected,
     ) = extract_entity_structure(company, observed_name, primary, confirmed)
-    size = extract_company_size(facts)
+    size = extract_company_size(facts, entity_type=entity_type)
     warnings = []
     local = tuple(suffix for country in campaign.countries for suffix in _COUNTRY_SUFFIXES.get(country, ()))
     if domain and domain.endswith(_FOREIGN_SUFFIXES) and not domain.endswith(local):
