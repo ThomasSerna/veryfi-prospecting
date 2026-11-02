@@ -98,9 +98,8 @@ _DOCUMENT_SIGNAL_KEYWORDS = (
 )
 _ENTERPRISE_SIGNAL_KEYWORDS = (
     "corporativo", "corporativa", "corporativos", "enterprise", "empresarial", "empresariales",
-    "multinacional", "grupo", "consumo masivo", "cpg", "erp", "tesoreria", "b2b",
-    "grandes empresas", "grandes marcas", "tarjetas corporativas", "empleados", "colaboradores",
-    "paises", "lider", "global", "regional",
+    "multinacional", "grupo empresarial", "consumo masivo", "cpg", "erp", "tesoreria", "b2b",
+    "grandes empresas", "grandes marcas", "tarjetas corporativas",
 )
 _NO_FIT_CONGLOMERATE_KEYWORDS = (
     "mineria", "petroleo", "cementera", "siderurgica", "infraestructura vial",
@@ -251,11 +250,11 @@ def candidate_signals(candidate: Candidate) -> CandidateSignals:
 def _candidate_priority_key(candidate: Candidate) -> tuple[int, int, int, int, int]:
     signals = candidate_signals(candidate)
     return (
+        1 if signals.has_no_fit_signal else 0,
         0 if (signals.has_document_signal and signals.has_enterprise_signal) else 1,
         0 if signals.has_document_signal else 1,
-        0 if not signals.is_promo_subdomain else 1,
+        1 if signals.is_promo_subdomain else 0,
         0 if signals.has_enterprise_signal else 1,
-        1 if signals.has_no_fit_signal else 0,
     )
 
 
