@@ -76,13 +76,21 @@ _LEGAL_SUFFIX_PATTERN = (
 _PARENT_TOKEN = r"[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ.&'-]*"
 _PARENT_STOPWORDS = r"(?!en\b|para\b|con\b|que\b|y\b|o\b|por\b|del\b|al\b|desde\b|opera\b|ayuda\b|cuenta\b)"
 _BRAND_PARENT_RE = re.compile(
-    rf"\b(?:una\s+)?marca(?:\s+comercial|\s+registrada)?\s+(?:de|del\s+grupo)\s+"
+    rf"\b(?i:(?:una\s+)?marca(?:\s+comercial|\s+registrada)?\s+(?:de|del\s+grupo))\s+"
     rf"(?P<parent>{_PARENT_TOKEN}(?:\s+{_PARENT_STOPWORDS}{_PARENT_TOKEN}){{0,4}})"
 )
 _SUBSIDIARY_PARENT_RE = re.compile(
-    rf"\b(?:una\s+)?(?:filial|subsidiaria|unidad\s+de\s+negocio|empresa)\s+(?:de|del\s+grupo)\s+"
+    rf"\b(?i:(?:una\s+)?(?:filial|subsidiaria|unidad\s+de\s+negocio)\s+(?:de|del\s+grupo))\s+"
     rf"(?P<parent>{_PARENT_TOKEN}(?:\s+{_PARENT_STOPWORDS}{_PARENT_TOKEN}){{0,4}})"
 )
+_THIRD_PARTY_SUBJECT_RE = re.compile(
+    r"\b(?:cliente|clientes|proveedor|proveedores|aliado|aliados|socio|socios|competidor|competidores)\b"
+)
+_INVALID_PARENT_NAMES = {
+    "colombia", "mexico", "latinoamerica", "america", "americalatina", "latam",
+    "tecnologia", "tecnologiafinanciera", "finanzas", "software", "consumo",
+    "consumomasivo", "alimentos", "bebidas", "servicios", "comercio", "pagos",
+}
 
 _EMPLOYEE_RANGE_RE = re.compile(
     r"\b(?:entre\s+(?P<min1>\d[\d.,]*)\s+y\s+(?P<max1>\d[\d.,]*)"
@@ -505,6 +513,31 @@ def _clean_parent_name(raw: str) -> str:
     return cleaned
 
 
+def _valid_parent_name(candidate_parent: str, subject_names: list[str]) -> bool:
+    folded = compact(candidate_parent)
+    if len(folded) < 3 or folded in _INVALID_PARENT_NAMES:
+        return False
+    return folded not in {compact(name) for name in subject_names if name}
+
+
+def _is_anchored_relation(sentence: str, match: re.Match, subject_names: list[str]) -> bool:
+    if _THIRD_PARTY_SUBJECT_RE.search(plain(sentence)):
+        return False
+    prefix = sentence[: match.start()]
+    folded_prefix = plain(prefix)
+    for name in subject_names:
+        target = plain(name)
+        if target and re.search(rf"\b{re.escape(target)}\b", folded_prefix):
+            return True
+    if not prefix.strip():
+        folded_suffix = plain(sentence[match.end() :])
+        for name in subject_names:
+            target = plain(name)
+            if target and re.search(rf"\b{re.escape(target)}\b", folded_suffix):
+                return True
+    return False
+
+
 def extract_entity_structure(
     company: Company,
     observed_name: str | None,
@@ -538,28 +571,30 @@ def extract_entity_structure(
                     entity_name_ids.append(item.id)
                     break
 
-        brand_match = _BRAND_PARENT_RE.search(excerpt)
-        if brand_match:
-            candidate_parent = _clean_parent_name(brand_match.group("parent"))
-            if len(compact(candidate_parent)) >= 3 and compact(candidate_parent) != compact(company.name):
-                entity_type = EntityType.BRAND
-                entity_type_ids.append(item.id)
-                if parent_name_detected is None:
-                    parent_name_detected = candidate_parent
-                    parent_ids.append(item.id)
-                continue
-
-        subsidiary_match = _SUBSIDIARY_PARENT_RE.search(excerpt)
-        if subsidiary_match:
-            candidate_parent = _clean_parent_name(subsidiary_match.group("parent"))
-            if len(compact(candidate_parent)) >= 3 and compact(candidate_parent) != compact(company.name):
-                if entity_type != EntityType.BRAND:
-                    entity_type = EntityType.SUBSIDIARY
+        subject_names = [*candidate_names, *([entity_name] if entity_name else [])]
+        for sentence in _SENTENCE_SPLIT_RE.split(excerpt):
+            brand_match = _BRAND_PARENT_RE.search(sentence)
+            if brand_match and _is_anchored_relation(sentence, brand_match, subject_names):
+                candidate_parent = _clean_parent_name(brand_match.group("parent"))
+                if _valid_parent_name(candidate_parent, subject_names):
+                    entity_type = EntityType.BRAND
                     entity_type_ids.append(item.id)
-                if parent_name_detected is None:
-                    parent_name_detected = candidate_parent
-                    parent_ids.append(item.id)
-                continue
+                    if parent_name_detected is None:
+                        parent_name_detected = candidate_parent
+                        parent_ids.append(item.id)
+                    break
+
+            subsidiary_match = _SUBSIDIARY_PARENT_RE.search(sentence)
+            if subsidiary_match and _is_anchored_relation(sentence, subsidiary_match, subject_names):
+                candidate_parent = _clean_parent_name(subsidiary_match.group("parent"))
+                if _valid_parent_name(candidate_parent, subject_names):
+                    if entity_type != EntityType.BRAND:
+                        entity_type = EntityType.SUBSIDIARY
+                        entity_type_ids.append(item.id)
+                    if parent_name_detected is None:
+                        parent_name_detected = candidate_parent
+                        parent_ids.append(item.id)
+                    break
 
     if entity_type == EntityType.UNKNOWN and entity_name is not None:
         entity_type = EntityType.LEGAL_ENTITY
