@@ -147,6 +147,67 @@
       },
       "zero_meaning": "Evidencia explícita incompatible con el criterio; requiere evidencia y justificación.",
       "unknown_meaning": "No se pudo determinar; ausencia de información no equivale a cero."
+    },
+    "rubric_v2": {
+      "validation_status": "proposed",
+      "allowed_values": [0, 0.5, 1, null],
+      "criteria": {
+        "document_need": {
+          "name": "Necesidad documental/validación",
+          "weight": 30,
+          "strong_signal": "Producto o programa explícitamente recibe/procesa comprobantes relevantes",
+          "partial_signal": "Flujo documental compatible, sin detalle completo"
+        },
+        "offer_match": {
+          "name": "Correspondencia con una oferta",
+          "weight": 20,
+          "strong_signal": "Relación concreta entre problema y capacidad validada de Veryfi",
+          "partial_signal": "Relación plausible con una capacidad, requiere confirmación"
+        },
+        "scale_potential": {
+          "name": "Escala/potencial",
+          "weight": 35,
+          "strong_signal": "Al menos 250 empleados, ingresos explícitos de al menos USD 100 millones o alcance enterprise B2B2B, agencia multimarca enterprise o distribución CPG nacional/multinacional sustentados, con fuente y ámbito aplicables a la cuenta; financiación y tamaño de una matriz no se heredan",
+          "partial_signal": "Entre 50 y 249 empleados o alcance regional documentado, sin señal fuerte válida; intervalos que atraviesan niveles, ámbito desconocido o contradicciones pendientes no determinan escala"
+        },
+        "adoption_capacity": {
+          "name": "Capacidad de adoptar la solución",
+          "weight": 10,
+          "strong_signal": "Producto digital, integración o canal apropiado comprobado",
+          "partial_signal": "Infraestructura parcial compatible"
+        },
+        "opportunity_timing": {
+          "name": "Momento de oportunidad",
+          "weight": 5,
+          "strong_signal": "Lanzamiento, expansión o campaña vigente relevante",
+          "partial_signal": "Iniciativa reciente, sin calendario claro"
+        }
+      },
+      "priority_order": ["excluded", "insufficient_evidence", "high", "medium", "low", "insufficient_evidence"],
+      "preconditions": {
+        "confirmed_exclusion": "excluded",
+        "unknown_identity": "insufficient_evidence",
+        "unknown_criteria": ["document_need", "offer_match"],
+        "material_contradiction": "insufficient_evidence"
+      },
+      "thresholds": {
+        "high": {
+          "fit_score_min": 75,
+          "coverage_min": 0.75,
+          "document_need": 1,
+          "offer_match_min": 0.5,
+          "primary_source_required": true
+        },
+        "medium": {
+          "fit_score_min": 50,
+          "coverage_min": 0.60,
+          "document_need_min": 0.5,
+          "offer_match_min": 0.5
+        },
+        "low": {"coverage_min": 0.60}
+      },
+      "zero_meaning": "Evidencia explícita incompatible con el criterio; requiere evidencia y justificación.",
+      "unknown_meaning": "No se pudo determinar; ausencia de información no equivale a cero."
     }
   },
   "defaults": {

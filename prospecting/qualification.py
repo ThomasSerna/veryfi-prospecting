@@ -11,14 +11,15 @@ from pydantic import Field
 
 from prospecting.haiku import CHARS_PER_TOKEN, prompt_json, structured_request
 from prospecting.models import (
-    CRITERION_NAMES, Campaign, Company, Contract, Criterion, CriterionName, CriterionValue,
-    Evidence, IdentityStatus, Priority, Rubric, Text,
+    CRITERION_NAMES, Assessment, Campaign, Company, Contract, Criterion, CriterionName, CriterionValue,
+    EntityType, Evidence, IdentityStatus, Priority, Rubric, Text,
 )
 from prospecting.sources import is_search_hit
 from prospecting.text import clip
 
 
 PROMPT_VERSION = "haiku_assessment_v3"
+ENTERPRISE_PROMPT_VERSION = "haiku_assessment_v4"
 SEARCH_RESULT_CLAIM = ("La página apareció en una búsqueda web; el extracto es el resumen del buscador "
                        "y no confirma hechos de la empresa.")
 CLAIM_CHARS = 300
@@ -68,6 +69,78 @@ class HaikuAssessment(Contract):
 
 def rubric_for(campaign: Campaign) -> Rubric:
     return campaign.config_snapshot.rubrics[campaign.rubric_version]
+
+
+def prompt_version_for(rubric_version: str) -> str:
+    """La nueva interpretación no invalida las solicitudes ni evaluaciones históricas de v1."""
+    return ENTERPRISE_PROMPT_VERSION if rubric_version == "rubric_v2" else PROMPT_VERSION
+
+
+def enterprise_sort_key(company: Company, assessment: Assessment | None) -> tuple[int, int, float, str, str]:
+    """Orden único de v2: prioridad, necesidad demostrada, encaje y desempate estable."""
+    priorities = list(Priority)
+    priority = Priority.INSUFFICIENT_EVIDENCE if assessment is None else assessment.priority
+    need = None if assessment is None else assessment.criteria["document_need"].value
+    score = None if assessment is None else assessment.fit_score
+    return (priorities.index(priority), 0 if need == 1 else 1,
+            -score if score is not None else float("inf"), company.name.casefold(), str(company.id))
+
+
+def _scale_sources(company: Company, evidence: list[Evidence]) -> bool:
+    size = company.size
+    contradicted = {source_id for item in evidence if item.company_id == company.id
+                    for source_id in item.contradiction_ids}
+    available = {item.id: item for item in evidence if item.company_id == company.id
+                 and item.contact_id is None and item.kind == "observed"
+                 and item.source_type in ("primary", "provider") and not is_search_hit(item)}
+    return size is not None and all(
+        source_id in available and not available[source_id].contradiction_ids and source_id not in contradicted
+        for source_id in size.evidence_ids
+    )
+
+
+def _scale_scope_applies(company: Company) -> bool:
+    if company.identity_status != IdentityStatus.CONFIRMED:
+        return False
+    scope = company.size.scope
+    if scope == "unknown":
+        return False
+    if scope == "group":
+        # La ausencia de una matriz registrada no acredita que la cuenta sea el propio grupo.
+        return False
+    if scope == "subsidiary":
+        return company.entity_type == EntityType.SUBSIDIARY
+    return True
+
+
+def enterprise_employee_signal(company: Company, evidence: list[Evidence]) -> float | None:
+    """Señal numérica sustentada; pocos empleados no prueban ausencia de multiplicador."""
+    if not _scale_sources(company, evidence) or not _scale_scope_applies(company):
+        return None
+    size = company.size
+    low = size.employee_count if size.employee_count is not None else size.employee_min
+    high = size.employee_count if size.employee_count is not None else size.employee_max
+    if low is not None and low >= 250:
+        return 1.0
+    if low is not None and high is not None and 50 <= low <= high <= 249:
+        return 0.5
+    return None
+
+
+def _enterprise_context(company: Company, evidence: list[Evidence]) -> dict:
+    size = company.size if _scale_sources(company, evidence) else None
+    return {
+        "entity_name": company.entity_name, "entity_type": str(company.entity_type),
+        "parent_company_id": None if company.parent_company_id is None else str(company.parent_company_id),
+        "size": None if size is None else {
+            **size.model_dump(mode="json"),
+            "original_value": clip(size.original_value, EXCERPT_CHARS),
+            "public_revenue": None if size.public_revenue is None else clip(size.public_revenue, CLAIM_CHARS),
+            "geographic_coverage": None if size.geographic_coverage is None else clip(size.geographic_coverage, CLAIM_CHARS),
+        },
+        "size_scope_applies": size is not None and _scale_scope_applies(company),
+        "employee_signal": enterprise_employee_signal(company, evidence),
+    }
 
 
 def compute_score(criteria: dict[str, Criterion], rubric: Rubric) -> tuple[float | None, float]:
@@ -168,7 +241,7 @@ def _system_prompt(campaign: Campaign) -> str:
         f"- {product.id}: {product.name}. {'; '.join(product.capabilities)}."
         for product in catalog.products
     )
-    return f"""Eres un analista que evalúa si una empresa muestra necesidades que la oferta de Veryfi podría cubrir \
+    system = f"""Eres un analista que evalúa si una empresa muestra necesidades que la oferta de Veryfi podría cubrir \
 (captura documental, OCR/API, validación de compras, antifraude y fidelización). No decides prioridad, \
 puntuación ni contacto: solo evalúas criterios con la evidencia entregada.
 
@@ -206,6 +279,27 @@ Catálogo ({catalog.version}, {catalog.validation_status}):
 {products}
 
 Cargos permitidos: {", ".join(allowed_roles(campaign))}."""
+    if campaign.rubric_version == "rubric_v2":
+        system += """
+
+Escala enterprise (haiku_assessment_v4):
+- El registro local de tamaño es contexto con referencias, no evidencia independiente. Cada valor conocido
+  sigue necesitando una fuente observada primaria o de proveedor dentro de <evidencia> que lo sustente.
+- 1: al menos 250 empleados de la cuenta, ingresos explícitos de al menos USD 100 millones o alcance
+  enterprise demostrado: plataforma B2B2B para múltiples empresas enterprise, agencia para múltiples marcas
+  enterprise o distribución CPG nacional/multinacional. Una señal fuerte válida prevalece sobre una parcial.
+- 0.5: 50–249 empleados o alcance regional documentado, sin una señal fuerte válida.
+- 0: menos de 50 empleados Y evidencia explícita de operación micro/local sin modelo multiplicador.
+  Tener pocos empleados por sí solo no basta para 0; una plataforma pequeña puede tener escala fuerte.
+- null: faltan señales sustentadas o un ámbito aplicable, hay contradicciones sin resolver sobre el mismo
+  hecho y ámbito, o el intervalo de empleados atraviesa niveles sin otra señal suficiente.
+- No heredes empleados, ingresos ni alcance de una matriz a una filial o marca. Los datos del grupo solo
+  pueden puntuar si la cuenta evaluada es la propia matriz/grupo con identidad confirmada.
+- No conviertas icp_tier automáticamente en escala. La financiación queda como contexto y no puntúa
+  por sí sola. No infieras equivalencias monetarias ni volúmenes documentales a partir del tamaño.
+- Empleados e ingresos de niveles distintos no son por sí solos una contradicción factual. No sustituyas
+  necesidad documental, compatibilidad ni calidad de evidencia por tamaño, notoriedad o intención de compra."""
+    return system
 
 
 def response_schema(campaign: Campaign) -> dict:
@@ -249,12 +343,16 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     limits = campaign.limits.llm
     system = _system_prompt(campaign)
     schema = response_schema(campaign)
-    profile = prompt_json({
+    profile_data = {
         "name": company.name, "domain": company.domain, "aliases": company.aliases,
         "operating_countries": company.operating_countries,
         "segments": None if company.segments is None else [str(item) for item in company.segments],
         "identity_status": str(company.identity_status),
-    })
+    }
+    enterprise = campaign.rubric_version == "rubric_v2"
+    if enterprise:
+        profile_data.update(_enterprise_context(company, evidence))
+    profile = prompt_json(profile_data)
     template = ("Empresa (registro local):\n{profile}\n\n<evidencia>\n{evidence}\n</evidencia>\n\n"
                 "Evalúa los cinco criterios solo con la evidencia anterior.")
     overhead = len(system) + len(json.dumps(schema)) + len(template.format(profile=profile, evidence="")) + 200
@@ -262,6 +360,11 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     if available <= 0:
         raise QualificationError("input_budget", "El prompt fijo supera el límite de entrada configurado.")
     selected = select_evidence(evidence, available)
+    if enterprise:
+        # Las señales estructuradas tampoco pueden referenciar fuentes que no entraron en la solicitud.
+        if company.size is not None and not set(company.size.evidence_ids) <= {item.id for item in selected}:
+            profile_data.update(_enterprise_context(company, []))
+        profile = prompt_json(profile_data)
     user = template.format(profile=profile, evidence="\n".join(prompt_json(_evidence_item(item)) for item in selected))
     return structured_request(system, user, schema, limits.max_output_tokens), selected
 

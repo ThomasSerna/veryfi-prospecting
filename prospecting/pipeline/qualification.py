@@ -20,7 +20,7 @@ from prospecting.providers import ClaudeClient, ProviderError
 from prospecting.qualification import (
     PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
     identity_confirmed, material_contradiction, parse_output, primary_support, rubric_for,
-    unknown_criteria, validate_output,
+    prompt_version_for, unknown_criteria, validate_output,
 )
 
 
@@ -121,10 +121,11 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     if campaign is None or run_item is None or company is None:
         raise ValueError("La empresa no pertenece a la campaña.")
     base = {"campaign_id": campaign_id, "company_id": company_id}
+    prompt_version = prompt_version_for(campaign.rubric_version)
     previous = [item for item in db.list_assessments(campaign_id, company_id)
                 if item.rubric_version == campaign.rubric_version]
     latest = previous[-1] if previous else None
-    modeled = [item for item in previous if item.prompt_version == PROMPT_VERSION]
+    modeled = [item for item in previous if item.prompt_version == prompt_version]
     evidence = db.list_evidence(company_id)
     fresh = set() if not modeled else _expanded_evidence(modeled[-1], evidence)
     trace = None
@@ -144,7 +145,7 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
                 "company": company.model_dump(mode="json"),
                 "evidence": [item.model_dump(mode="json") for item in evidence if item.contact_id is None],
                 "selected_evidence_ids": [str(item.id) for item in selected], "request_payload": payload,
-                "prompt_version": PROMPT_VERSION if payload is not None else None,
+                "prompt_version": prompt_version if payload is not None else None,
                 "requested_model_id": None if payload is None else payload["model"],
                 "rubric_version": campaign.rubric_version,
                 "catalog_version": campaign.config_snapshot.catalog.version,
@@ -294,7 +295,7 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         **base, criteria=criteria, fit_score=result.fit_score, coverage=result.coverage,
         priority=result.priority, products=list(dict.fromkeys(output.products)),
         target_roles=list(dict.fromkeys(output.target_roles)), model_id=call.model,
-        prompt_version=PROMPT_VERSION, rubric_version=campaign.rubric_version,
+        prompt_version=prompt_version, rubric_version=campaign.rubric_version,
         explanation=explanation_text(output), revision_of=None if latest is None else latest.id,
     ), stop_reason={
         Priority.LOW: "low_fit", Priority.INSUFFICIENT_EVIDENCE: f"insufficient_evidence:{result.reason}",

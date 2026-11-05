@@ -430,8 +430,10 @@ def test_unexpected_exception_marks_failed_keeps_checkpoints_and_releases_execut
     assert_no_request_sent_twice(case)
 
 
-def test_complete_campaign_integrates_checked_apollo_access_and_public_employment_evidence(world):
+@pytest.mark.parametrize("rubric_version", ["rubric_v1", "rubric_v2"])
+def test_complete_campaign_integrates_checked_apollo_access_and_public_employment_evidence(world, rubric_version):
     case = world.setup(apollo=True)
+    case.campaign = case.campaign.model_copy(update={"rubric_version": rubric_version})
     start(case)
     access = case.access
     report = case.run(apollo_access=access)

@@ -603,6 +603,65 @@ def test_company_list_and_sequence_preserve_priority_score_name_and_tie_order(
     assert f'href="{paths[9]}?priorities=high"' in text(fallback)
 
 
+def test_enterprise_order_matches_queue_review_navigation_and_csv(
+        ui_paths, client, make_campaign, make_company, make_assessment, monkeypatch):
+    from core.presentation import export_csv
+    from prospecting.models import Criterion
+    from prospecting.pipeline.contacts import ContactReport
+
+    campaign = make_campaign(rubric_version="rubric_v2", status="completed")
+    specs = [("Grande parcial", 0.5, 65), ("Mediana demostrada", 1, 62.5),
+             ("Alfa demostrada", 1, 62.5)]
+    companies = []
+    with Database(ui_paths.db) as db:
+        db.save_campaign(campaign)
+        for index, (name, need, score) in enumerate(specs, start=1):
+            company, facts = make_company(id=UUID(int=index), name=f"Empresa sintética {name}")
+            db.save_company(company, evidence=facts)
+            assessment = make_assessment(campaign.id, company.id, rubric_version="rubric_v2",
+                                         priority="medium", fit_score=score)
+            criteria = dict(assessment.criteria)
+            criteria["document_need"] = Criterion(value=need, evidence_ids=[facts[0].id],
+                                                  justification="Necesidad exclusivamente sintética.")
+            assessment = assessment.model_copy(update={"criteria": criteria})
+            db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, stage="assessed"))
+            db.save_assessment(assessment)
+            item = db.get_run_item(campaign.id, company.id)
+            db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+            companies.append(company)
+        expected = [companies[2], companies[1], companies[0]]
+        contacted = []
+
+        def contacts(*args, **kwargs):
+            company_id = args[4]
+            contacted.append(company_id)
+            return ContactReport(campaign_id=campaign.id, company_id=company_id, status="checked",
+                                 business_status="qualified_no_contact")
+
+        monkeypatch.setattr(bridge, "find_contacts", contacts)
+        runner = bridge._Run(db, None, None, campaign, authorizations=[], tavily_account_ref="sintético",
+                             claude=None, claude_account_ref="sintético", claude_funding_source="prepaid",
+                             apollo_access=None, exclusions=None, progress=None)
+        runner.contacts_pass()
+        assert contacted == [company.id for company in expected]
+
+    view = read_campaign(ui_paths.db, campaign.id)
+    assert [item.company.id for item in view.companies] == contacted
+    rows = list(csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig"))))
+    assert [row["company_id"] for row in rows] == [str(company.id) for company in expected]
+    paths = [url("company", campaign.id, company.id) for company in expected]
+    links = Links()
+    links.feed(text(client.get(url("campaign", campaign.id))))
+    assert [link for link in links.urls if link in paths] == paths
+    for index, path in enumerate(paths):
+        response = client.get(path)
+        assert f"Empresa {index + 1} de 3" in text(response)
+        neighbours = Links()
+        neighbours.feed(text(response))
+        assert [link for link in neighbours.urls if link in paths] == paths[max(0, index - 1):index] + paths[index + 1:index + 2]
+    assert "Empresa 1 de 3" in text(client.get(f"{paths[0]}?priorities=high"))
+
+
 def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_status_skips_html(ui_results, client):
     case = ui_results
     with Database(case.paths.db) as db:

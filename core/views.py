@@ -131,7 +131,8 @@ def _campaign_context(request, campaign_id):
                    and (not selected["availability"] or item.business_status in selected["availability"])]
     else:
         results = []
-    results.sort(key=_company_sort_key)
+    if view.campaign.rubric_version != "rubric_v2":
+        results.sort(key=_company_sort_key)
     filter_query, active_filter_count = _clean_filter_query(filter_form)
     legacy_readonly = view.campaign.config_snapshot.people_provider != "apollo"
     apollo = None if context["access"] is None else context["access"].apollo_access
@@ -160,7 +161,8 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
         raise Http404("La empresa no pertenece a esta campaña.")
     sequence = context["results"]
     if not any(item.company.id == company_id for item in sequence):
-        sequence = sorted(context["view"].companies, key=_company_sort_key)
+        sequence = (context["view"].companies if context["view"].campaign.rubric_version == "rubric_v2"
+                    else sorted(context["view"].companies, key=_company_sort_key))
     idx = next((i for i, item in enumerate(sequence) if item.company.id == company_id), 0)
     prev_company = sequence[idx - 1].company if idx > 0 else None
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None

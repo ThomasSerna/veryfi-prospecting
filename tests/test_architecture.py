@@ -48,7 +48,7 @@ ALLOWED = {
         "prospecting.identity", "prospecting.models", "prospecting.pipeline.calls", "prospecting.pipeline.contacts",
         "prospecting.pipeline.discovery", "prospecting.pipeline.qualification", "prospecting.pipeline.research",
         "prospecting.providers", "prospecting.providers.apollo", "prospecting.providers.tavily",
-        "prospecting.sources",
+        "prospecting.sources", "prospecting.qualification",
     },
     "prospecting.pipeline.calls": {
         "prospecting.budget", "prospecting.haiku", "prospecting.models", "prospecting.providers",

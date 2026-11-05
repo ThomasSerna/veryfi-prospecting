@@ -38,6 +38,7 @@ from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, 
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
 from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess, PROVIDER as APOLLO
 from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION, TAVILY_OPERATIONS
+from prospecting.qualification import enterprise_sort_key
 from prospecting.sources import is_search_evidence
 
 
@@ -249,6 +250,8 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     status = BusinessStatus.INSUFFICIENT_EVIDENCE
                 companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
                                                evidence=evidence, contacts=results, business_status=status))
+        if campaign.rubric_version == "rubric_v2":
+            companies.sort(key=lambda result: enterprise_sort_key(result.company, result.assessment))
         return CampaignView(campaign=campaign, companies=companies, budget=budget,
                             is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions),
                             contact_match_version=None if weights is None else weights.version)
@@ -612,8 +615,10 @@ class _Run:
             item = self.db.get_run_item(self.campaign.id, company_id)
             assessment = None if item.last_assessment_id is None else self.db.get_assessment(item.last_assessment_id)
             if assessment is not None and assessment.priority in (Priority.HIGH, Priority.MEDIUM):
-                queue.append((assessment.priority != Priority.HIGH, -(assessment.fit_score or 0), str(company_id),
-                              company_id, assessment))
+                key = (enterprise_sort_key(self.db.get_company(company_id), assessment)
+                       if self.campaign.rubric_version == "rubric_v2" else
+                       (assessment.priority != Priority.HIGH, -(assessment.fit_score or 0), str(company_id)))
+                queue.append((key, company_id, assessment))
         for *_, company_id, assessment in sorted(queue):
             if self.out_of_time():
                 return
