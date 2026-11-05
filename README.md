@@ -115,6 +115,11 @@ los informes anteriores. El [protocolo de evaluación](docs/t10-evaluation.md) d
 los formatos de entrada, las fichas de revisión sin predicción, los denominadores
 y la comparación de versiones.
 
+La comparación manual de la candidata enterprise usa `--rubric`,
+`--manual-reviews` y `--partition`, con revisiones ciegas y un protocolo congelado
+antes de abrir el conjunto independiente. El [procedimiento](docs/t10-evaluation.md#comparación-manual-enterprise-de-t14)
+explica los archivos y condiciones; no valida respuestas del modelo ni criterios comerciales de Veryfi.
+
 Para generar fichas sin predicción desde un conjunto preparado:
 
 ```console

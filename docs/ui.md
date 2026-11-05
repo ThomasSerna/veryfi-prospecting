@@ -156,6 +156,11 @@ cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial
 `Sin evidencia`), caso de uso, contactos y motivos de detención sin jerga técnica.
 Datos desconocidos se muestran separados de cero.
 
+En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
+prioridad, necesidad documental `1` y score descendente, con desempate estable.
+La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
+orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
+
 La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
 match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. La
 tabla de la campaña muestra cuántas personas tiene cada empresa y su mejor match. El match

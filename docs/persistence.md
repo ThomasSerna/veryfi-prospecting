@@ -25,9 +25,11 @@ with Database(Path("data/prospecting.sqlite3")) as db:
 ```
 
 La configuración contiene un catálogo provisional, los cuatro perfiles de
-IDEA.md, `rubric_v1` y los límites iniciales. No representa capacidades ni reglas
-certificadas comercialmente. Cada campaña conserva una instantánea de esta
-configuración; actualizar el archivo no cambia campañas ya guardadas.
+IDEA.md, `rubric_v1`, la candidata `rubric_v2` y los límites iniciales. No
+representa capacidades ni reglas certificadas comercialmente. Cada campaña
+conserva una instantánea de esta configuración; actualizar el archivo no cambia
+campañas ya guardadas. V2 no es el valor predeterminado mientras no cumpla la
+[condición de activación](Business-rules.md#candidata-enterprise-rubric_v2).
 
 La instantánea identifica la generación de contactos mediante `people_provider`:
 las campañas anteriores, sin ese campo, son históricas; las nuevas utilizan `apollo`.
@@ -141,8 +143,10 @@ y las instantáneas de las pruebas del pipeline los fijan:
   empieza por `Tavily devolvió esta página` y `external_reference` que empieza
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
-  `research_queries_v1`, `haiku_assessment_v3`,
-  `contacts_extraction_v1`, `rubric_v1` y el esquema SQLite `user_version=1`.
+  `research_queries_v1`, `haiku_assessment_v3`, `haiku_assessment_v4`,
+  `contacts_extraction_v1`, `rubric_v1`, `rubric_v2` y el esquema SQLite `user_version=1`.
+  V1 conserva `haiku_assessment_v3`; v2 usa `haiku_assessment_v4` sin reinterpretar
+  las solicitudes ni evaluaciones históricas.
 
 Estos valores de Hunter siguen identificando el historial y no se reinterpretan
 como operaciones, contactos ni consumo de Apollo. La nueva ruta conserva sus propios

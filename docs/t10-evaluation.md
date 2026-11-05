@@ -361,6 +361,58 @@ Markdown se genera con `render_markdown(report)`. Los casos de
 `tests/test_evaluation.py` son el ejemplo ejecutable sintético del formato y de
 sus fallos; no reutilizar sus etiquetas como revisión de Veryfi.
 
+### Comparación manual enterprise de T14
+
+El modo `--manual-reviews` compara reglas sobre anotaciones académicas ciegas y
+evidencia congelada, sin llamar a Haiku ni a otro proveedor. Usa una candidata
+`rubric_v2` y solo admite cambios en sus pesos y en la semántica de escala; los
+umbrales y los otros cuatro criterios conservan la semántica v1. No compara las
+respuestas de los prompts v3/v4 ni demuestra la precisión del modelo.
+
+La muestra prevista tiene 12 casos de desarrollo y 20 independientes: tres y
+cinco, respectivamente, por cada celda CO/MX × FinTech/CPG. La evidencia pública
+se consulta manualmente. Antes de activar v2 hay que verificar y documentar la
+independencia frente a las demás particiones y el inventario histórico: un estado
+`pending`, un inventario sin cobertura comprobada o muestras incompletas no
+superan la condición. Conservar entidad, alias, dominio, grupo y fuentes; no
+inferir que dos cuentas son independientes solo porque sus nombres difieran.
+Cada cuenta debe tener país y segmento atribuidos a ella con procedencia; una
+celda sin respaldo queda pendiente y una atribución que contradice la celda se
+rechaza. La identidad no confirmada impide clasificarla como seleccionada.
+
+`--prepare-blind` con `--manual-reviews` y `--rubric` genera fichas sin
+predicción, plantillas `evaluation_label_v1` para los cinco criterios v1 y una
+plantilla separada para escala v2. El archivo `enterprise_reviews_v1` vincula
+cada caso a la revisión de escala y a las condiciones revisadas de exclusión y
+contradicción. Cada revisión conserva responsable, organización, fecha, motivo,
+referencias y el hash de la instantánea. La decisión comercial académica y cada
+criterio pueden quedar desconocidos; resolver un criterio como `null` no lo
+convierte en cero. Las condiciones no comprobadas permanecen pendientes.
+
+El informe muestra cuatro escenarios sobre los mismos casos: `v1`, `weights_only`
+(solo pesos v2), `scale_v2` (pesos y escala v2, con orden anterior) y `v2`
+(también orden por necesidad dentro de cada prioridad). Incluye posición, score,
+cobertura, prioridad y falsos positivos **académicos** por país y segmento. No
+inventa tokens, latencias, respuestas ni resultados de modelo.
+
+Se revisa primero `--partition development`. Si su informe está completo y sus
+comprobaciones pasan, `--freeze-protocol RUTA_NUEVA` congela la selección, las
+revisiones de desarrollo, la candidata y las huellas del evaluador. Las etiquetas
+independientes pueden completarse después, sin cambiar esa selección ni las
+revisiones de desarrollo. La evaluación `--partition evaluation --protocol RUTA`
+abre la cohorte independiente una sola vez y crea un marcador exclusivo; no debe
+eliminarse para volver a probar ajustes sobre la misma muestra. Antes de abrirla
+se comprueban también los bytes de las etiquetas de desarrollo, no solo sus rutas
+y hashes declarados.
+
+La condición final exige 20 casos independientes completos, al menos una cuenta
+aceptada con escala v2 `1`, mejor posición media de esa cohorte, cero rechazadas
+nuevas seleccionadas y ninguna pérdida de seleccionadas aceptadas con necesidad
+`1`. Un resultado incompleto es pendiente; un fallo requiere informe y nueva
+decisión, sin ajustar pesos automáticamente. Esta comparación puede justificar una
+decisión académica sobre reglas; no es validación comercial de Veryfi ni del
+prompt `haiku_assessment_v4`.
+
 ## Medición y análisis de errores
 
 Reportar siempre numerador, denominador y casos pendientes, en total y por

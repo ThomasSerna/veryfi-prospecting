@@ -94,9 +94,12 @@ el proceso. Las APIs anteriores desde Python se conservan.
    amplía la evidencia una sola vez (`research_company`) y se recalifica. No se amplía
    cuando la identidad espera revisión humana (`exclusion_review` o `duplicate_review`).
    `excluded`, `low_fit` e `insufficient_evidence` tras la ampliación cierran la empresa.
-4. **Contactos**: primero las empresas `high` y después las `medium`, por encaje descendente
-   ([Personas y canales](contacts.md)). La empresa se cierra con el resultado comercial
-   derivado.
+4. **Contactos**: primero las empresas `high` y después las `medium`
+   ([Personas y canales](contacts.md)). En `rubric_v1`, cada prioridad se ordena por encaje
+   descendente. En `rubric_v2`, dentro de cada prioridad precede la necesidad documental `1`
+   y después el encaje descendente; nombre e identificador resuelven empates. La candidata
+   v2 solo se activa tras la [evaluación acordada](Business-rules.md#candidata-enterprise-rubric_v2).
+   La empresa se cierra con el resultado comercial derivado.
 
 Una empresa cerrada queda en la etapa `completed` con su `business_status` y su `stop_reason`.
 

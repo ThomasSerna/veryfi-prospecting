@@ -2,7 +2,7 @@
 
 Reglas vigentes de descubrimiento, identidad, evidencia, calificación, esfuerzo de búsqueda, personas y canales. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Las cifras son propuestas iniciales (`rubric_v1`, `contact_match_v1`) pendientes de validación con Veryfi. El flujo de etapas está en [Architecture.md](Architecture.md#flujo-de-investigación). Los topes de gasto están en [Budget-policy.md](Budget-policy.md).
 
-Los issues T14 (`rubric_v2`), T16 (parada y número de personas por cuenta), T18 (vigencia del empleo) y T19 (`contact_match_v2`) del [backlog](Roadmap.md#copia-del-backlog) proponen modificar reglas de este archivo. Hasta que cada tarea se cierre con aprobación, siguen vigentes las que aquí se describen.
+T14 propone `rubric_v2` para evaluación académica; su activación queda condicionada a la comparación indicada más abajo. `rubric_v1` sigue vigente para las campañas históricas y como valor predeterminado mientras no se cumpla esa condición. Los issues T16 (parada y número de personas por cuenta), T18 (vigencia del empleo) y T19 (`contact_match_v2`) proponen modificar otras reglas de este archivo.
 
 ## Descubrimiento
 
@@ -75,6 +75,21 @@ Reglas, en este orden:
 Ejemplo: valores 1, 1, 0,5, 1 y null producen 80 puntos ponderados sobre 90 conocidos: encaje 88,9 y cobertura 90 %. Si cumple las condiciones de evidencia, prioridad alta. Una empresa de la que solo conocemos la escala tendría puntuación 100, pero cobertura 20 % y quedaría con evidencia insuficiente.
 
 Los umbrales son la versión `rubric_v1`. No cambiarlos silenciosamente entre ejecuciones. Guardar versión, entradas y resultado; los ajustes humanos generan una nueva evaluación o una revisión registrada.
+
+### Candidata enterprise `rubric_v2`
+
+La hipótesis aprobada para evaluación académica conserva la fórmula, los umbrales y el significado de necesidad, correspondencia con la oferta, adopción y oportunidad de `rubric_v1`. Sus pesos son necesidad **30**, oferta **20**, escala **35**, adopción **10** y oportunidad **5**. No equivale a una validación comercial de Veryfi. La puntuación sigue midiendo encaje observable; `null` no es cero y el tamaño por sí solo no permite prioridad alta.
+
+Solo cambia la interpretación de escala, siempre con fuente, fecha y ámbito aplicable a la cuenta:
+
+- `1`: al menos 250 empleados, ingresos explícitos de al menos USD 100 millones o una operación enterprise B2B2B, agencia multimarca enterprise o distribución CPG nacional/multinacional sustentada. Una señal fuerte válida prevalece sobre una parcial.
+- `0,5`: 50–249 empleados o alcance regional documentado, sin una señal fuerte válida.
+- `0`: menos de 50 empleados y evidencia explícita de una operación micro/local sin modelo multiplicador. Pocos empleados por sí solos no bastan.
+- `null`: faltan señales o ámbito aplicable, hay una contradicción sin resolver sobre el mismo hecho y ámbito, o el intervalo de empleados cruza niveles sin otra señal suficiente.
+
+Los datos de una matriz no se atribuyen a su filial o marca; los datos de grupo solo puntúan si la cuenta es el propio grupo y su identidad está confirmada. No se deduce esa relación por falta de una matriz registrada. La financiación es contexto y no puntúa. Dentro de cada prioridad de v2, la necesidad documental `1` precede al score descendente en la cola, la tabla y el informe; v1 conserva su comportamiento.
+
+La activación en campañas nuevas requiere una comparación offline sobre 12 casos de desarrollo y 20 independientes, revisados a ciegas y atribuidos académicamente. Se requieren tres casos de desarrollo y cinco de evaluación por combinación de país/segmento, país y segmento respaldados para cada cuenta, independencia verificada y etiquetas completas. En evaluación, v2 debe mejorar la posición media de las aceptadas con escala `1`, sin añadir empresas rechazadas a `high` o `medium` frente a v1 ni perder seleccionadas aceptadas con necesidad `1`. Si falta una condición o esa cohorte, la activación queda pendiente; si la comparación falla, se informa y se requiere una nueva decisión, sin ajuste automático. El [protocolo](t10-evaluation.md) explica el procedimiento y sus límites: no valida respuestas de Haiku ni criterios comerciales de Veryfi.
 
 ## Esfuerzo de búsqueda y parada
 

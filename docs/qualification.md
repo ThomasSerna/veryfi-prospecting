@@ -7,8 +7,10 @@ campaña. Haiku propone y Python decide:
 - **Sin llamada a Haiku:** una empresa excluida recibe `excluded`. Una identidad no
   confirmada o sin evidencia útil recibe `insufficient_evidence`, con los cinco
   criterios en `null`.
-- **Solicitud:** usa el modelo `claude-haiku-5-5` con el prompt versionado
-  `haiku_assessment_v3`, *thinking* desactivado y *effort* `low`.
+- **Solicitud:** usa el modelo `claude-haiku-5-5`, *thinking* desactivado y
+  *effort* `low`. `rubric_v1` conserva el prompt `haiku_assessment_v3`;
+  la candidata `rubric_v2` usa `haiku_assessment_v4` para interpretar escala.
+  V1 sigue predeterminada hasta cumplir la [condición de activación de v2](Business-rules.md#candidata-enterprise-rubric_v2).
   - La salida es JSON con esquema. El límite de entrada es
     `limits.llm.max_input_tokens` (9.000 tokens) y el de salida,
     `limits.llm.max_output_tokens`. La evidencia se selecciona con 2 caracteres por token,
@@ -33,8 +35,8 @@ campaña. Haiku propone y Python decide:
   faltantes. Python rechaza los ids no suministrados, los valores conocidos sin
   evidencia, los productos o cargos fuera de la configuración y los `1` que solo se
   apoyan en resultados del buscador. No los corrige.
-- **Puntuación:** Python calcula `fit_score` y `coverage` con los pesos de
-  `rubric_v1`. `null` no suma peso ni equivale a cero. La prioridad sigue las reglas
+- **Puntuación:** Python calcula `fit_score` y `coverage` con los pesos de la
+  rúbrica de la instantánea de campaña. `null` no suma peso ni equivale a cero. La prioridad sigue las reglas
   de IDEA.md §8.2 con los umbrales de la rúbrica: `high` exige además que la
   necesidad documental cite una fuente primaria.
 - **Guardado:** se guardan juntos el `Assessment` (modelo exacto, versiones de prompt y
@@ -46,6 +48,15 @@ campaña. Haiku propone y Python decide:
     evaluación `insufficient_evidence` con evidencia de empresa posterior (no manual ni de
     contactos) que entra en la solicitud, como la de la ampliación: entonces se consulta de
     nuevo a Haiku y la evaluación nueva revisa la anterior (`revision_of`).
+
+En v2, el contexto de tamaño distingue entidad, filial y grupo. La señal numérica
+de empleados solo se prepara con identidad y ámbito aplicable y con evidencia
+observada primaria o de proveedor sin contradicción; un dato de grupo no se aplica
+automáticamente a una filial ni se infiere que la cuenta sea la matriz. El prompt
+exige respaldo en la evidencia suministrada, considera la financiación solo como
+contexto y conserva `null` cuando falta información o hay contradicción sobre el
+mismo dato y ámbito. Los otros cuatro criterios mantienen su significado v1. La
+revisión manual de reglas de T14 no acredita cómo responderá Haiku a v4.
 
 `ClaudeClient` (`prospecting/providers/claude.py`) usa el SDK oficial `anthropic` con la clave de `ANTHROPIC_API_KEY`,
 `max_retries=0` y un timeout de 30 s como máximo. Sigue el mismo protocolo de

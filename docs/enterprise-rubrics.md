@@ -3,7 +3,7 @@
 Documento de referencia para las tareas **T13** (calibración de ICP enterprise), **T14** (`rubric_v2` para empresas grandes), **T15** (taxonomía de cargos en Apollo) y **T19** (`contact_match_v2` para priorización de personas). Sintetiza la información de los tres documentos comerciales facilitados por Veryfi y establece cómo se conectan con el registro incremental de perfiles reales en `data/veryfi-reference-profiles.md`.
 
 > **Estado de validación (`AGENTS.md`, `Business-rules.md` y `Roadmap.md`):**
-> Los materiales comerciales citados combinan distintos periodos (2022–2026). Según T13, T14 y T19, los niveles de cliente, los pesos propuestos (`rubric_v2` y `contact_match_v2`) y la taxonomía derivada son **propuestas e hipótesis de trabajo** sujetas a ratificación comercial de Veryfi y a evaluación offline antes de sustituir en código las versiones activas (`rubric_v1` y `contact_match_v1`).
+> Los materiales comerciales citados combinan distintos periodos (2022–2026). Los niveles de cliente, las rúbricas y la taxonomía derivada son **hipótesis de trabajo**, no criterios comerciales ratificados por Veryfi. `rubric_v2` está aprobada para evaluación académica y su activación depende del [resultado offline](Business-rules.md#candidata-enterprise-rubric_v2); v1 sigue como opción predeterminada mientras tanto. `contact_match_v2` sigue siendo una propuesta separada de T19.
 
 ---
 
@@ -24,11 +24,14 @@ En `How Veryfi Sells` (págs. 6–7, 27–29, 46) y `Sales Deck` (págs. 30–32
 
 ### Clasificación de niveles de cliente (*Customer Tiers*)
 
-| Nivel | Potencial ACV | Industria general (ingresos anuales) | Empresas de Software / FinTech | Movimiento comercial | Prioridad en Veryfi Prospecting |
+La tabla resume el material histórico. Sus tiers, financiación y orientación
+comercial no asignan por sí solos la escala ni la prioridad de la aplicación.
+
+| Nivel | Potencial ACV | Industria general (ingresos anuales) | Empresas de Software / FinTech | Movimiento comercial | Orientación histórica |
 |---|---|---|---|---|---|
-| **Tier 1** | > USD 250k | > USD 1B en ingresos | > 1.000 empleados · Funding USD 100M+ | **Sales Team (Outbound)** | **Prioridad máxima (objetivo central enterprise)** |
-| **Tier 2** | USD 25k – 250k | USD 100M – 1B en ingresos | 100 – 1.000 empleados · Funding USD 25M – 99M | **Sales Team (Outbound)** | **Prioridad alta (objetivo enterprise / mid-market alto)** |
-| **Tier 3** | < USD 25k | < USD 100M en ingresos | < 100 empleados · Funding < USD 25M | Marketing vía Self-Serve + TAM | Baja prioridad para outbound (salvo caso de uso B2B2B o agencia multiplicadora) |
+| **Tier 1** | > USD 250k | > USD 1B en ingresos | > 1.000 empleados · Funding USD 100M+ | **Sales Team (Outbound)** | Enfoque enterprise |
+| **Tier 2** | USD 25k – 250k | USD 100M – 1B en ingresos | 100 – 1.000 empleados · Funding USD 25M – 99M | **Sales Team (Outbound)** | Enfoque enterprise / mid-market alto |
+| **Tier 3** | < USD 25k | < USD 100M en ingresos | < 100 empleados · Funding < USD 25M | Marketing vía Self-Serve + TAM | Menor foco outbound; posibles multiplicadores B2B2B o agencias |
 
 ---
 
@@ -79,66 +82,31 @@ La rúbrica inicial (`rubric_v1`) fue diseñada para el MVP general y asignaba s
 
 | Criterio (`id`) | Peso en `rubric_v1` | Peso propuesto en `rubric_v2` (hipótesis T14) | Propósito del ajuste |
 |---|---:|---:|---|
-| **Necesidad documental / validación (`document_need`)** | 35 | **30** | Sigue siendo condición obligatoria: la empresa debe recibir, capturar o validar comprobantes (recibos, facturas, tickets, códigos/tapas, POs/BOLs). |
+| **Necesidad documental / validación (`document_need`)** | 35 | **30** | Conserva el significado y las condiciones de la rúbrica anterior. |
 | **Correspondencia con la oferta (`offer_match`)** | 25 | **20** | Evalúa qué tan directo es el encaje con los productos de Veryfi (`OCR API`, `Lens`, `WhatsApp Bot`, `Fraud Prevention`, `Product Intelligence`). |
-| **Escala / potencial enterprise (`scale_potential`)** | 20 | **35** | **Criterio diferenciador enterprise:** prioriza cuentas *Tier 1* y *Tier 2* por empleados, ingresos, volumen transaccional/documental, presencia multimarca o alcance regional en CO/MX. |
+| **Escala / potencial enterprise (`scale_potential`)** | 20 | **35** | Usa las señales documentadas y el ámbito aplicable de la sección siguiente; un tier histórico no asigna escala automáticamente. |
 | **Capacidad de adopción (`adoption_capacity`)** | 10 | **10** | Evalúa si cuenta con los canales o la infraestructura para integrar Veryfi (app/web/API propia en FinTech; canales digitales/WhatsApp o agencia en CPG; ERP en corporativos). |
 | **Momento de oportunidad (`opportunity_timing`)** | 10 | **5** | Señal complementaria (campaña promocional activa, expansión en LATAM, lanzamiento de producto o digitalización de AP). |
 | **Total** | **100** | **100** | `null` no equivale a `0`; los criterios sin evidencia quedan en `null` y reducen `coverage`. |
 
 ### 4.2. Guía de calificación por criterio en `rubric_v2`
 
-#### 1. `scale_potential` (Peso: 35) — Calibrado con los Customer Tiers de Veryfi
-- **`1.0` (Señal fuerte — Escala Enterprise / Tier 1 o Tier 2 consolidado):**
-  - **FinTech / Software:** evidencia con fuente de **≥ 250 empleados** (o rango *Tier 2/Tier 1* de 100 a >1.000 empleados acompañado de funding ≥ USD 25M, ingresos ≥ USD 100M o base masiva de clientes empresariales B2B2B en CO/MX/LATAM, comparable a *Navan, Brex, Ramp, Zoho, Intuit, Square, Razorpay*).
-  - **CPG / Fidelización:** grupo o marca líder de consumo masivo con operación nacional o multinacional en Colombia y/o México, portafolio multimarca, distribución masiva en supermercados/canal tradicional o ingresos equivalentes a *Tier 1/Tier 2* (≥ USD 100M–1B+, o plantilla ≥ 250–1.000+ empleados, comparable a *PepsiCo, Bimbo, Nestlé, Postobón, Grupo Nutresa/Meals/Doria, Lala, Colgate, Unilever, Diageo*). En agencias/plataformas, operación para múltiples marcas enterprise (comparable a *Merkle* o *AnnexCloud*).
-- **`0.5` (Señal parcial — Escala Media / Tier 2 en crecimiento o filial acotada):**
-  - **FinTech / Software:** entre **50 y 249 empleados** (o startup serie A/B con tracción regional comprobada pero sin evidenciar aún escala de >100–250 empleados o >USD 25M de funding).
-  - **CPG / Fidelización:** marca regional o mediana (50–249 empleados) con presencia comercial comprobada en varios departamentos/estados o cadenas de retail, pero sin escala multinacional/nacional masiva.
-- **`0.0` (Incompatible):**
-  - Evidencia explícita de microempresa o negocio local sin volumen documental ni capacidad para sostener un caso de uso B2B/B2B2C de escala (< 50 empleados sin plataforma multiplicadora).
-- **`null` (Desconocido):**
-  - No existe cifra de empleados, ingresos, financiación ni evidencia de escala operativa con fuente y ámbito (matriz, filial o país). **No se inventan rangos ni se asume tamaño por notoriedad de marca sin fuente.**
+#### `scale_potential` (peso 35)
 
-#### 2. `document_need` (Peso: 30) — Basado en los flujos documentales de los decks
-- **`1.0` (Señal fuerte):**
-  - **FinTech / Software:** el producto recibe o procesa explícitamente comprobantes subidos por usuarios o empresas (captura de recibos de gastos, facturas de proveedores para *Bill Pay* o *AP*, estados de cuenta para conciliación, formularios o documentos de onboarding/KYC).
-  - **CPG / Fidelización:** la marca o agencia ejecuta promociones o programas de lealtad que solicitan al consumidor registrar **tickets/facturas de compra, códigos impresos en empaques o códigos en tapas** (vía WhatsApp, web o app móvil), o requiere validar compras en retail multimarca.
-  - **AP Automation corporativo:** evidencia primaria de portal de proveedores, recepción masiva de facturas/órdenes de compra/remisiones (*PO/BOL/Invoice*) o iniciativa explícita de automatización de cuentas por pagar/recepción documental.
-- **`0.5` (Señal parcial):**
-  - **FinTech / Software:** plataforma de gastos, pagos corporativos, ERP o contabilidad cuyo flujo es compatible con recepción de comprobantes, pero la evidencia solo confirma emisión de facturas electrónicas propias o conciliación bancaria sin detallar captura de documentos de terceros.
-  - **CPG / Fidelización:** marca de consumo masivo con programas promocionales, *trade marketing* o dinámicas digitales frecuentes al consumidor, sin que la fuente extraída detalle aún el envío de ticket o código de empaque.
-- **`0.0` (Incompatible):**
-  - Evidencia explícita de que el modelo de negocio no involucra documentos, comprobantes, facturas de terceros ni dinámicas promocionales de compra.
-- **`null` (Desconocido):**
-  - Evidencia insuficiente sobre el producto o las campañas de la empresa.
+- **`1`:** al menos 250 empleados, ingresos explícitos de al menos USD 100 millones o una operación enterprise B2B2B, agencia multimarca enterprise o distribución CPG nacional/multinacional sustentada. Una señal fuerte válida prevalece sobre una parcial.
+- **`0.5`:** 50–249 empleados o alcance regional documentado, sin señal fuerte válida.
+- **`0`:** menos de 50 empleados y evidencia explícita de operación micro/local sin modelo multiplicador. El número de empleados por sí solo no basta para asignar cero.
+- **`null`:** faltan señales o ámbito aplicable, hay contradicción sin resolver sobre el mismo dato y ámbito, o un intervalo de empleados cruza niveles sin otra señal suficiente.
 
-#### 3. `offer_match` (Peso: 20) — Correspondencia con el catálogo de Veryfi
-- **`1.0` (Señal fuerte):**
-  - El problema observado conecta directamente con al menos una solución específica de Veryfi demostrada en los decks:
-    - Captura móvil/web (`lens`) + extracción estructurada (`document_ocr_api`) para apps FinTech/ERP.
-    - `loyalty_whatsapp` (`WhatsApp Bot`) + `validation_enrichment` (`Product Intelligence` / *cross-basket insights*) + `antifraud` para promociones CPG en LATAM.
-    - Prevención de fraude *upstream* (`antifraud`: detección de duplicados, edición digital o imágenes generadas por IA) en reembolsos, *bill pay* o promociones.
-- **`0.5` (Señal parcial):**
-  - Encaje plausible con una capacidad de Veryfi, pero falta confirmar si el flujo requiere captura de documentos no estructurados o si opera únicamente con facturación electrónica estructurada XML sin imagen/PDF ni captura en campo.
-- **`0.0` / `null`:**
-  - `0.0` si busca una solución ajena a Veryfi (p. ej. pasarela de cobro pura o CRM de ventas salientes); `null` si no hay base para determinarlo.
+Cada señal requiere fuente, fecha y ámbito de la cuenta. Los datos de una matriz no se atribuyen a sus filiales o marcas; pueden aplicarse a la cuenta si ella es la propia matriz o grupo y su identidad está confirmada. La financiación es contexto, no puntuación. No se inventa tamaño, ingreso ni volumen a partir de un tier o la notoriedad de una marca.
 
-#### 4. `adoption_capacity` (Peso: 10)
-- **`1.0`:**
-  - En **FinTech/Software**: cuenta con app móvil (iOS/Android), plataforma web, API para desarrolladores o integraciones ERP donde embeber el SDK de *Lens* o consumir la API JSON en <3 segundos.
-  - En **CPG/Fidelización**: cuenta con canal oficial de WhatsApp, sitio web promocional/PWA, app de lealtad (ej. *Joy*) o trabaja con agencia digital/CRM integrable (Veryfi ofrece además solución *turnkey end-to-end* de WhatsApp Bot sin exigir equipo móvil propio a la marca).
-- **`0.5`:** infraestructura digital básica comprobada, sin detalle del canal de integración.
-
-#### 5. `opportunity_timing` (Peso: 5)
-- **`1.0`:** promoción o campaña de fidelización vigente/reciente en CO/MX, lanzamiento de módulo de gastos/cuentas por pagar, expansión regional o búsqueda activa de perfiles en el área del caso de uso.
-- **`0.5`:** actividad comercial o digital reciente sin calendario explícito.
+La necesidad documental, la correspondencia con la oferta, la capacidad de adopción y el momento de oportunidad conservan su semántica y validaciones de `rubric_v1`. Los materiales comerciales anteriores aportan contexto, sin añadir criterios nuevos a esos cuatro valores.
 
 ### 4.3. Reglas de corte (evitar falsos positivos por tamaño)
 
 Para cumplir los criterios de aceptación de **T14**:
 1. **Un gran conglomerado sin caso de uso no recibe prioridad alta:** para `high`, siguen siendo obligatorios `document_need == 1.0` respaldado por fuente primaria, `offer_match >= 0.5`, `coverage >= 0.75` y `fit_score >= 75`. Una empresa con `scale_potential = 1.0` (35 puntos) pero `document_need = 0.5` o sin fuente primaria nunca alcanza `high`.
-2. **Separación de matriz, filial y marca (T13):** cada señal de escala (`empleados`, `ingresos`, `presencia`) debe conservar su ámbito (`group`, `entity`, `country`). No se atribuyen los empleados globales de una multinacional a una filial local sin indicar que el dato corresponde al grupo matriz.
+2. **Separación de matriz, filial y marca (T13):** cada señal de escala (`empleados`, `ingresos`, `presencia`) conserva su ámbito (`group`, `entity`, `country`). Los datos del grupo no puntúan una filial ni una marca por compartir matriz.
 
 ---
 
