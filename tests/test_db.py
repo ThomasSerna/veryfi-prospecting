@@ -648,13 +648,13 @@ def test_new_rubric_version_preserves_the_previous_campaign_snapshot(
     revised_rubric["criteria"]["document_need"]["strong_signal"] = (
         "Definición sintética registrada con una versión distinta."
     )
-    fields["rubrics"]["rubric_v2"] = revised_rubric
+    fields["rubrics"]["rubric_synthetic_revision_v1"] = revised_rubric
     snapshot = type(records.campaign.config_snapshot).model_validate(fields)
-    campaign = make_campaign(config_snapshot=snapshot, rubric_version="rubric_v2")
+    campaign = make_campaign(config_snapshot=snapshot, rubric_version="rubric_synthetic_revision_v1")
     database.save_campaign(campaign)
     database.save_run_item(RunItem(campaign_id=campaign.id, company_id=records.company.id))
     assessment = make_assessment(
-        campaign.id, records.company.id, rubric_version="rubric_v2"
+        campaign.id, records.company.id, rubric_version="rubric_synthetic_revision_v1"
     )
     database.save_assessment(assessment)
     assert database.get_campaign(campaign.id).config_snapshot == snapshot
