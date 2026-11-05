@@ -1,7 +1,8 @@
-"""Evaluación offline de T10: instantáneas congeladas, revisión atribuida y métricas reproducibles.
+"""Evaluación offline T10/T14 con instantáneas congeladas y revisión atribuida.
 
 No abre bases ni llama proveedores. Un replay valida una respuesta ya guardada;
-una rúbrica candidata solo recalcula pesos/umbrales, nunca prueba otro prompt.
+el contrafactual conserva semántica y el modo manual separa la nueva escala.
+Ninguna modalidad prueba otro prompt ni mide respuestas de modelo no capturadas.
 """
 
 import argparse
@@ -14,6 +15,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from types import SimpleNamespace
 from typing import Annotated, Literal
 import unicodedata
 from uuid import UUID
@@ -28,7 +30,7 @@ from prospecting.models import (
 from prospecting.qualification import (
     classify, compute_score, identity_confirmed, material_contradiction, parse_output, primary_support,
     QualificationError, allowed_roles, rubric_for, validate_output,
-    SEARCH_RESULT_CLAIM,
+    SEARCH_RESULT_CLAIM, enterprise_sort_key,
 )
 from prospecting.sources import is_search_hit
 from prospecting.text import clip
@@ -126,6 +128,35 @@ class EvaluationLabel(Contract):
     products_status: Literal["resolved", "pending"] = "pending"
     products: list[Text] = Field(default_factory=list)
     audits: list[ClaimAudit] = Field(default_factory=list)
+
+
+class ReviewedCondition(Contract):
+    value: StrictBool | None
+    evidence_ids: ReferenceIds = Field(default_factory=list)
+    reason: Text
+
+    @model_validator(mode="after")
+    def check_evidence(self):
+        if self.value is True and not self.evidence_ids:
+            raise ValueError("Una condición confirmada necesita evidencia.")
+        if self.value is None and self.evidence_ids:
+            raise ValueError("Una condición pendiente no tiene respaldo decidido.")
+        return self
+
+
+class ManualCaseReview(Contract):
+    case_id: CaseId
+    snapshot_sha256: Digest
+    scale_label: EvaluationLabel | None = None
+    excluded: ReviewedCondition
+    contradiction: ReviewedCondition
+
+
+class EnterpriseReviews(Contract):
+    schema_version: Literal["enterprise_reviews_v1"]
+    rubric_version: Literal["rubric_v2"]
+    rubric_sha256: Digest
+    cases: list[ManualCaseReview]
 
 
 class TraceManifest(Contract):
@@ -348,6 +379,9 @@ def validate_snapshot(snapshot, case, label):
     references += snapshot.selected_evidence_ids or []
     if case.country not in campaign.countries or case.segment not in campaign.segments or not set(references) <= ids:
         raise ValueError("La procedencia o el país/segmento no corresponde al caso.")
+    if (company.operating_countries is not None and case.country not in company.operating_countries
+            or company.segments is not None and case.segment not in company.segments):
+        raise ValueError("El país/segmento del caso contradice la atribución conocida de la empresa.")
     assessment = snapshot.assessment
     if assessment is not None:
         if not {"id", "created_at"} <= assessment.model_fields_set:
@@ -628,7 +662,256 @@ def paired_comparison(first, second):
              "changed": left[key]["priority"] != right[key]["priority"]} for key in sorted(left)]
 
 
+def compatible_enterprise_rubric(original, candidate):
+    """La revisión manual de T14 cambia únicamente pesos y significado de escala."""
+    before, after = original.model_dump(), candidate.model_dump()
+    for item in (before, after):
+        item["criteria"].pop("scale_potential")
+        for definition in item["criteria"].values():
+            definition.pop("weight")
+    if before != after:
+        raise ValueError("T14 no permite cambiar umbrales ni semántica de otros criterios.")
+
+
+def _manual_inputs(path, candidate, reviews_path, split):
+    if split not in {"development", "evaluation"}:
+        raise ValueError("Partición manual desconocida.")
+    if any(Path(item).drive.startswith("\\\\") for item in (path, reviews_path)):
+        raise ValueError("El evaluador solo lee archivos locales.")
+    path, reviews_path = Path(path).resolve(), Path(reviews_path).resolve()
+    manifest = EvaluationManifest.model_validate(read_json(path))
+    reviews = EnterpriseReviews.model_validate(read_json(reviews_path))
+    if candidate["version"] != "rubric_v2" or reviews.rubric_sha256 != digest(candidate["rubric"].model_dump(mode="json")):
+        raise ValueError("La revisión de escala no corresponde a rubric_v2 y su hash.")
+    by_case = {item.case_id: item for item in reviews.cases}
+    if len(by_case) != len(reviews.cases) or not set(by_case) <= {case.case_id for case in manifest.cases}:
+        raise ValueError("Las revisiones duplican o inventan casos.")
+    seen, entities, partitions, selected = set(), set(), {"development": set(), "evaluation": set()}, []
+    for case in manifest.cases:
+        if case.case_id in seen:
+            raise ValueError("Identificador de caso duplicado.")
+        seen.add(case.case_id)
+        snapshot, response, _, usage, _ = load_snapshot(path.parent, case)
+        if response is not None or usage is not None or snapshot.assessment is not None:
+            raise ValueError("El modo manual requiere instantáneas sin evaluación ni respuesta de modelo.")
+        validate_snapshot(snapshot, case, None)
+        if snapshot.campaign.rubric_version != "rubric_v1":
+            raise ValueError("La referencia manual base debe corresponder a rubric_v1.")
+        compatible_enterprise_rubric(rubric_for(snapshot.campaign), candidate["rubric"])
+        if snapshot.company.id in entities:
+            raise ValueError("Una empresa está repetida en el conjunto.")
+        entities.add(snapshot.company.id)
+        keys = group_keys(snapshot, case)
+        if keys & partitions["evaluation" if case.split == "development" else "development"]:
+            raise ValueError("Una entidad/dominio/alias/grupo aparece en ambas particiones.")
+        if case.split == "evaluation" and keys & partitions["evaluation"]:
+            raise ValueError("Las cuentas independientes comparten entidad/dominio/alias/grupo.")
+        if case.split == "evaluation" and keys & set(manifest.inventory.historical_group_keys):
+            raise ValueError("El conjunto de evaluación reutiliza una entidad del inventario histórico.")
+        partitions[case.split].update(keys)
+        label_path = None if case.label is None else checked_file(path.parent, case.label)
+        if case.split != split:
+            continue
+        label = None if label_path is None else EvaluationLabel.model_validate(read_json(label_path))
+        validate_snapshot(snapshot, case, label)
+        review = by_case.get(case.case_id)
+        if review is not None:
+            if review.snapshot_sha256 != case.artifact.sha256:
+                raise ValueError("La revisión manual referencia otra instantánea.")
+            if review.scale_label is not None:
+                validate_snapshot(snapshot, case, review.scale_label)
+                if set(review.scale_label.criteria) != {"scale_potential"}:
+                    raise ValueError("La revisión v2 solo puede contener scale_potential.")
+            ids = {item.id for item in snapshot.evidence}
+            allowed = ids if snapshot.selected_evidence_ids is None else set(snapshot.selected_evidence_ids)
+            if any(not set(condition.evidence_ids) <= allowed for condition in (review.excluded, review.contradiction)):
+                raise ValueError("Una condición cita evidencia ajena o no suministrada.")
+        for annotation in (label, None if review is None else review.scale_label):
+            if annotation is not None and (annotation.reference_type != "academic" or annotation.prediction_visible):
+                raise ValueError("T14 requiere revisiones académicas ciegas.")
+        complete = (label is not None and set(label.criteria) == set(rubric_for(snapshot.campaign).criteria)
+                    and all(item.status == "resolved" for item in label.criteria.values())
+                    and label.acceptance != "pending" and review is not None
+                    and review.scale_label is not None and review.scale_label.criteria["scale_potential"].status == "resolved"
+                    and review.excluded.value is not None and review.contradiction.value is not None
+                    and snapshot.error_reason is None)
+        selected.append((case, snapshot, label, review, bool(complete)))
+    return path, manifest, reviews_path, selected
+
+
+def _manual_cell_verified(case, snapshot):
+    facts = {item.id: item for item in snapshot.evidence}
+    available = set(facts) if snapshot.selected_evidence_ids is None else set(snapshot.selected_evidence_ids)
+    return all(value in (getattr(snapshot.company, field) or []) and any(
+        ref in available and facts[ref].kind == "observed"
+        for ref in snapshot.company.provenance.get(field, []))
+        for field, value in (("operating_countries", case.country), ("segments", case.segment)))
+
+
+def _manual_gate(rows, *, eligible, reasons):
+    selected = lambda result: result is not None and result["priority"] in {"high", "medium"}
+    completed = [row for row in rows if row["complete"] and row["scenarios"]]
+    new_false_positives = [row["case_id"] for row in completed if row["acceptance"] == "rejected"
+        and not selected(row["scenarios"]["v1"]) and selected(row["scenarios"]["v2"])]
+    lost_accepted = [row["case_id"] for row in completed if row["acceptance"] == "accepted" and row["document_need"] == 1
+        and selected(row["scenarios"]["v1"]) and not selected(row["scenarios"]["v2"])]
+    cohort = [row for row in completed if row["acceptance"] == "accepted" and row["scale_v2"] == 1]
+    before = None if not cohort else sum(row["scenarios"]["v1"]["position"] for row in cohort) / len(cohort)
+    after = None if not cohort else sum(row["scenarios"]["v2"]["position"] for row in cohort) / len(cohort)
+    if not cohort:
+        reasons = [*reasons, "no_accepted_enterprise_cohort"]
+    if len(completed) != len(rows):
+        reasons = [*reasons, "incomplete_reviews"]
+    passed = not new_false_positives and not lost_accepted and before is not None and after < before
+    return {"status": "pending" if not eligible or reasons else "passed" if passed else "failed",
+            "pending_reasons": reasons, "new_false_positives": new_false_positives,
+            "lost_accepted_documented": lost_accepted, "enterprise_cohort": [row["case_id"] for row in cohort],
+            "mean_position_before": before, "mean_position_after": after}
+
+
+def _open_holdout(path, manifest, metadata, protocol_path):
+    if protocol_path is None:
+        raise ValueError("La evaluación independiente requiere un protocolo congelado tras desarrollo.")
+    if Path(protocol_path).drive.startswith("\\\\"):
+        raise ValueError("El evaluador solo lee archivos locales.")
+    protocol = read_json(protocol_path)
+    if protocol.get("schema_version") != "enterprise_protocol_v1" or any(protocol.get(key) != metadata[key]
+            for key in ("selection_sha256", "development_labels_sha256", "development_reviews_sha256", "candidate_sha256", "evaluator_sha256")):
+        raise ValueError("El conjunto, las revisiones, el evaluador o la candidata cambiaron tras congelar el protocolo.")
+    if protocol.get("development_status") != "passed" or not isinstance(protocol.get("development_report_sha256"), str):
+        raise ValueError("El protocolo requiere desarrollo completo y aprobado.")
+    cohort = sorted((case.case_id, case.artifact.sha256) for case in manifest.cases if case.split == "evaluation")
+    marker = path.parent / f".holdout-{digest(cohort)}.json"
+    write_new(marker, {"schema_version": "enterprise_holdout_opened_v1", "protocol_sha256": digest(protocol), **metadata})
+
+
+def evaluate_manual(path, candidate, reviews_path, *, split="development", protocol_path=None):
+    """Compara reglas sobre referencias humanas; no evalúa ni simula la precisión de Haiku."""
+    path, manifest, reviews_path, entries = _manual_inputs(path, candidate, reviews_path, split)
+    metadata = {"manifest_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "reviews_sha256": hashlib.sha256(reviews_path.read_bytes()).hexdigest(),
+                "selection_sha256": digest({"dataset_version": manifest.dataset_version,
+                    "inventory": manifest.inventory.model_dump(mode="json"),
+                    "cases": [case.model_dump(mode="json", exclude={"label"}) for case in manifest.cases]}),
+                "development_labels_sha256": digest([{ "case_id": case.case_id,
+                    "label": None if case.label is None else case.label.model_dump(mode="json")}
+                    for case in manifest.cases if case.split == "development"]),
+                "development_reviews_sha256": digest([item.model_dump(mode="json") for item in
+                    EnterpriseReviews.model_validate(read_json(reviews_path)).cases
+                    if item.case_id in {case.case_id for case in manifest.cases if case.split == "development"}]),
+                "candidate_sha256": digest({"version": candidate["version"], "rubric": candidate["rubric"].model_dump(mode="json")}),
+                "evaluator_sha256": digest({name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
+                    for name in ("evaluate_qualification.py", "prospecting/qualification.py", "prospecting/models.py")})}
+    cells = Counter(f"{case.country}:{case.segment}" for case, *_ in entries)
+    expected = 3 if split == "development" else 5
+    correct_size = len(entries) == expected * 4 and all(cells[f"{country}:{segment}"] == expected
+        for country in ("CO", "MX") for segment in ("fintech_software", "cpg_loyalty"))
+    independent = manifest.inventory.status == manifest.inventory.historical_coverage == "verified" and bool(manifest.inventory.historical_group_keys)
+    reasons = ([] if independent else ["independence_pending"]) + ([] if correct_size else ["sample_incomplete"])
+    if any(not _manual_cell_verified(case, snapshot) for case, snapshot, *_ in entries):
+        reasons.append("cell_attribution_pending")
+    if any(case.origin == "synthetic" for case, *_ in entries):
+        reasons.append("synthetic_cases")
+    calculate = split == "development" or (not reasons and all(item[-1] for item in entries))
+    if split == "evaluation" and calculate:
+        _open_holdout(path, manifest, metadata, protocol_path)
+    rows, transient = [], {}
+    for case, snapshot, label, review, complete in entries:
+        row = {"case_id": case.case_id, "country": case.country, "segment": str(case.segment), "origin": case.origin,
+               "artifact_sha256": case.artifact.sha256, "complete": complete,
+               "cell_verified": _manual_cell_verified(case, snapshot),
+               "error_reason": snapshot.error_reason,
+               "acceptance": "pending" if label is None else label.acceptance,
+               "document_need": None if label is None or "document_need" not in label.criteria else label.criteria["document_need"].value,
+               "scale_v2": None if review is None or review.scale_label is None else review.scale_label.criteria["scale_potential"].value,
+               "scenarios": {}}
+        rows.append(row)
+        if not complete or not calculate:
+            continue
+        criteria = {name: Criterion(value=item.value, evidence_ids=item.evidence_ids, justification=item.reason)
+                    for name, item in label.criteria.items()}
+        reviewed = review.scale_label.criteria["scale_potential"]
+        changed = dict(criteria, scale_potential=Criterion(value=reviewed.value, evidence_ids=reviewed.evidence_ids, justification=reviewed.reason))
+        base = rubric_for(snapshot.campaign)
+        weights = base.model_copy(deep=True)
+        for name, definition in weights.criteria.items():
+            definition.weight = candidate["rubric"].criteria[name].weight
+        selected = snapshot.evidence if snapshot.selected_evidence_ids is None else [fact for fact in snapshot.evidence if fact.id in snapshot.selected_evidence_ids]
+        for name, values, rubric in (("v1", criteria, base), ("weights_only", criteria, weights),
+                                    ("scale_v2", changed, candidate["rubric"]), ("v2", changed, candidate["rubric"])):
+            cited = {ref for value in values.values() for ref in value.evidence_ids}
+            result = classify(values, rubric, excluded=review.excluded.value,
+                identity_confirmed=identity_confirmed(snapshot.company),
+                contradiction=review.contradiction.value or any(fact.contradiction_ids for fact in selected if fact.id in cited),
+                primary_support=primary_support(values, selected))
+            row["scenarios"][name] = {"priority": str(result.priority), "fit_score": result.fit_score,
+                                       "coverage": result.coverage, "reason": result.reason}
+            transient[case.case_id, name] = (snapshot.company, SimpleNamespace(priority=result.priority, fit_score=result.fit_score, criteria=values))
+    for name in ("v1", "weights_only", "scale_v2", "v2"):
+        available = [row for row in rows if name in row["scenarios"]]
+        def key(row):
+            company, decision = transient[row["case_id"], name]
+            order = enterprise_sort_key(company, decision)
+            return order if name == "v2" else (order[0], *order[2:])
+        for position, row in enumerate(sorted(available, key=key), 1):
+            row["scenarios"][name]["position"] = position
+    checks = _manual_gate(rows, eligible=bool(entries), reasons=reasons)
+    summaries = []
+    for country, segment in [(None, None), *((country, None) for country in ("CO", "MX")),
+                            *((None, segment) for segment in ("fintech_software", "cpg_loyalty")),
+                            *((country, segment) for country in ("CO", "MX") for segment in ("fintech_software", "cpg_loyalty"))]:
+        group = [row for row in rows if (country is None or row["country"] == country)
+                 and (segment is None or row["segment"] == segment)]
+        summaries.append({"country": country, "segment": segment, "cases": len(group),
+            "pending": sum(not row["complete"] for row in group),
+            "evaluated": sum(bool(row["scenarios"]) for row in group),
+            "false_positives_academic": {name: None if not any(name in row["scenarios"] for row in group) else sum(row["acceptance"] == "rejected" and row["scenarios"].get(name, {}).get("priority") in {"high", "medium"} for row in group)
+                                          for name in ("v1", "weights_only", "scale_v2", "v2")}})
+    return {"schema_version": "enterprise_evaluation_report_v1", "dataset_version": manifest.dataset_version,
+            "partition": split, "basis": "manual_academic_reference", "haiku_validated": False,
+            "independence": "verified" if independent else "pending", "sample_counts": dict(cells),
+            "candidate": {"version": candidate["version"], "sha256": metadata["candidate_sha256"]}, **metadata,
+            "development_checks": checks if split == "development" else None,
+            "activation_gate": checks if split == "evaluation" else {"status": "pending", "pending_reasons": ["development_only"]},
+            "cases": rows, "summaries": summaries}
+
+
+def freeze_manual_protocol(report, path):
+    if report["partition"] != "development" or report["development_checks"]["status"] != "passed":
+        raise ValueError("Solo se congela una candidata con desarrollo completo y aprobado.")
+    write_new(Path(path), {"schema_version": "enterprise_protocol_v1", "development_status": "passed",
+        "development_report_sha256": digest(report), **{key: report[key] for key in
+            ("selection_sha256", "development_labels_sha256", "development_reviews_sha256", "candidate_sha256", "evaluator_sha256")}})
+
+
 def render_markdown(report):
+    if report.get("schema_version") == "enterprise_evaluation_report_v1":
+        lines = ["# Evaluación académica de rubric_v2", "",
+                 f"Partición: `{report['partition']}`. Independencia: **{report['independence']}**.",
+                 f"Activación: **{report['activation_gate']['status']}**.", "",
+                 "Las entradas son anotaciones humanas ciegas: este informe compara reglas y no mide la precisión de Haiku ni valida comercialmente a Veryfi.", "",
+                 "| País / segmento | N | Evaluados | Pendientes | FP académicos v1 / pesos / escala / v2 |",
+                 "|---|---:|---:|---:|---|"]
+        for item in report["summaries"]:
+            values = " / ".join("No calculable" if item["false_positives_academic"][name] is None else str(item["false_positives_academic"][name]) for name in ("v1", "weights_only", "scale_v2", "v2"))
+            lines.append(f"| {item['country'] or 'Todos'} / {item['segment'] or 'Todos'} | {item['cases']} | {item['evaluated']} | {item['pending']} | {values} |")
+        lines += ["", "Los cuatro escenarios aíslan pesos, semántica de escala y orden. Las posiciones no se calculan sobre holdout incompleto.", "",
+                  "| Caso | Escenario | Score | Cobertura | Prioridad | Posición | Δ posición anterior |",
+                  "|---|---|---:|---:|---|---:|---:|"]
+        for row in report["cases"]:
+            previous = None
+            for name, result in row["scenarios"].items():
+                delta = "—" if previous is None else str(result["position"] - previous)
+                lines.append(f"| {row['case_id']} | {name} | {result['fit_score']} | {result['coverage']:.0%} | {result['priority']} | {result['position']} | {delta} |")
+                previous = result["position"]
+        checks = report["development_checks"] or report["activation_gate"]
+        lines += ["", f"Comprobación: `{checks['status']}`. Pendientes: {', '.join(checks['pending_reasons']) or 'ninguno'}.",
+                  "", f"Cohorte enterprise aceptada: {', '.join(checks['enterprise_cohort']) or 'vacía'}.",
+                  f"Posición media v1 → v2: {checks['mean_position_before']} → {checks['mean_position_after']}.",
+                  f"Nuevos falsos positivos académicos: {', '.join(checks['new_false_positives']) or 'ninguno entre los casos calculados'}.",
+                  f"Aceptadas documentadas que pierden selección: {', '.join(checks['lost_accepted_documented']) or 'ninguna entre los casos calculados'}.",
+                  "", "Sin llamadas, tokens, latencias ni resultados de modelo simulados. Los casos sintéticos no permiten activar v2."]
+        return "\n".join(lines) + "\n"
     lines = ["# Evaluación de calificación T10", "", f"Conjunto: `{report['dataset_version']}`. Independencia: **{report['independence']}**.", "",
              "Las revisiones son atribuciones documentadas; no autentican al revisor ni validan criterios pendientes.", "",
              "| Partición | Origen | Revisión | N | TP / FP / FN / TN | Precisión |", "|---|---|---|---:|---|---|"]
@@ -641,23 +924,35 @@ def render_markdown(report):
     return "\n".join(lines) + "\n"
 
 
-def prepare_blind(manifest_path, output):
+def prepare_blind(manifest_path, output, *, manual_candidate=None):
     manifest_path, output = Path(manifest_path).resolve(), Path(output)
     manifest = EvaluationManifest.model_validate(read_json(manifest_path))
     if any(case.origin != "synthetic" for case in manifest.cases) and not output.resolve().is_relative_to(DATA_ROOT.resolve()):
         raise ValueError("Las fichas reales deben permanecer bajo data/.")
-    evaluate_manifest(manifest_path)
+    if manual_candidate is None:
+        evaluate_manifest(manifest_path)
+    else:
+        if manual_candidate["version"] != "rubric_v2":
+            raise ValueError("Las fichas enterprise requieren rubric_v2.")
+        for case in manifest.cases:
+            snapshot, response, _, usage, _ = load_snapshot(manifest_path.parent, case)
+            if snapshot.assessment is not None or response is not None or usage is not None:
+                raise ValueError("Las fichas manuales requieren instantáneas sin predicciones.")
+            validate_snapshot(snapshot, case, None)
     output.mkdir(parents=True, exist_ok=False)
     for case in manifest.cases:
         snapshot, _, _, _, metadata = load_snapshot(manifest_path.parent, case)
         facts = snapshot.evidence if snapshot.selected_evidence_ids is None else [item for item in snapshot.evidence if item.id in snapshot.selected_evidence_ids]
         data = {"case_id": case.case_id, "snapshot_sha256": case.artifact.sha256,
-                "company": snapshot.company.model_dump(mode="json", include={"id", "name", "domain", "aliases", "operating_countries", "segments", "identity_status"}),
+                "company": snapshot.company.model_dump(mode="json", include={"id", "name", "domain", "aliases", "operating_countries", "segments", "identity_status", "size", "entity_name", "entity_type", "parent_company_id", "provenance"}),
                 "evidence": [] if metadata.get("submitted_messages") is not None else [item.model_dump(mode="json") for item in facts],
                 "submitted_messages": metadata.get("submitted_messages"),
                 "evidence_scope": "available_only" if snapshot.selected_evidence_ids is None else "submitted",
                 "catalog": snapshot.campaign.config_snapshot.catalog.model_dump(mode="json"),
                 "rubric_version": snapshot.campaign.rubric_version, "rubric": rubric_for(snapshot.campaign).model_dump(mode="json")}
+        if manual_candidate is not None:
+            data["scale_rubric_version"] = manual_candidate["version"]
+            data["scale_rubric"] = manual_candidate["rubric"].criteria["scale_potential"].model_dump(mode="json")
         write_new(output / f"{case.case_id}-blind.json", data)
         label = {"schema_version": "evaluation_label_v1", "label_id": f"{case.case_id}-review", "version": "labels_v1", "case_id": case.case_id,
                  "snapshot_sha256": case.artifact.sha256, "assessment_id": None, "reference_type": "academic",
@@ -665,6 +960,17 @@ def prepare_blind(manifest_path, output):
                  "reason": None, "acceptance": "pending", "prediction_visible": False,
                  "criteria": {}, "products_status": "pending", "products": [], "audits": []}
         write_new(output / f"{case.case_id}-label-template.json", label)
+        if manual_candidate is not None:
+            scale = dict(label, label_id=f"{case.case_id}-scale-v2-review", version="scale_labels_v2",
+                         criteria={"scale_potential": {"status": "pending", "value": None, "evidence_ids": [], "reason": "Pendiente de revisión académica."}})
+            write_new(output / f"{case.case_id}-scale-label-template.json", scale)
+    if manual_candidate is not None:
+        write_new(output / "manual-reviews-template.json", {"schema_version": "enterprise_reviews_v1", "rubric_version": "rubric_v2",
+            "rubric_sha256": digest(manual_candidate["rubric"].model_dump(mode="json")),
+            "cases": [{"case_id": case.case_id, "snapshot_sha256": case.artifact.sha256, "scale_label": None,
+                       "excluded": {"value": None, "evidence_ids": [], "reason": "Pendiente de comprobar exclusiones."},
+                       "contradiction": {"value": None, "evidence_ids": [], "reason": "Pendiente de comprobar contradicciones."}}
+                      for case in manifest.cases]})
 
 
 def write_new(path, value):
@@ -682,18 +988,49 @@ def main():
     parser.add_argument("--rubric", type=Path)
     parser.add_argument("--compare", type=Path)
     parser.add_argument("--prepare-blind", type=Path)
+    parser.add_argument("--manual-reviews", type=Path)
+    parser.add_argument("--partition", choices=("development", "evaluation"))
+    parser.add_argument("--protocol", type=Path)
+    parser.add_argument("--freeze-protocol", type=Path)
     args = parser.parse_args()
     try:
+        if args.manual_reviews:
+            partition = args.partition or "development"
+            if args.freeze_protocol and partition != "development" or args.protocol and partition != "evaluation":
+                raise ValueError("Congelar corresponde a desarrollo; abrir un protocolo corresponde a evaluación.")
+        paths = [output.resolve() for output in (args.output, args.prepare_blind, args.freeze_protocol) if output is not None]
+        if any(left.is_relative_to(right) or right.is_relative_to(left) for index, left in enumerate(paths) for right in paths[index + 1:]):
+            raise ValueError("Los destinos de salida deben ser independientes.")
+        for output in (args.output, args.prepare_blind, args.freeze_protocol):
+            if output is not None and output.exists():
+                raise FileExistsError("La salida ya existe.")
+            if output is not None and any(parent.exists() and not parent.is_dir() for parent in output.parents):
+                raise FileExistsError("Un antecesor de la salida no es un directorio.")
+        source_manifest = EvaluationManifest.model_validate(read_json(args.manifest))
+        if any(case.origin != "synthetic" for case in source_manifest.cases):
+            for output in (args.output, args.prepare_blind, args.freeze_protocol):
+                if output is not None and not output.resolve().is_relative_to(DATA_ROOT.resolve()):
+                    raise ValueError("Los artefactos reales deben permanecer bajo data/.")
         candidate = None if args.rubric is None else read_json(args.rubric)
         if candidate is not None:
             if set(candidate) != {"version", "rubric"} or not isinstance(candidate["version"], str) or not candidate["version"].strip():
                 raise ValueError("La candidata necesita version y rubric.")
             candidate["rubric"] = Rubric.model_validate(candidate["rubric"])
-        report = evaluate_manifest(args.manifest, candidate)
+        if args.manual_reviews:
+            if candidate is None or args.compare:
+                raise ValueError("El modo manual requiere --rubric y no admite --compare.")
+            report = evaluate_manual(args.manifest, candidate, args.manual_reviews,
+                                     split=args.partition or "development", protocol_path=args.protocol)
+        else:
+            if args.partition or args.protocol or args.freeze_protocol:
+                raise ValueError("La partición y el protocolo pertenecen al modo manual.")
+            report = evaluate_manifest(args.manifest, candidate)
         if args.compare:
             report["paired_comparison"] = paired_comparison(evaluate_manifest(args.compare), report)
         if args.prepare_blind:
-            prepare_blind(args.manifest, args.prepare_blind)
+            prepare_blind(args.manifest, args.prepare_blind, manual_candidate=candidate if args.manual_reviews else None)
+        if args.freeze_protocol:
+            freeze_manual_protocol(report, args.freeze_protocol)
         if args.output:
             if any(row["origin"] != "synthetic" for row in report["cases"]) and not args.output.resolve().is_relative_to(DATA_ROOT.resolve()):
                 raise ValueError("Los informes con casos reales deben permanecer bajo data/.")
