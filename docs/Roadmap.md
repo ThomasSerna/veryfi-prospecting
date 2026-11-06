@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-01 (America/Bogota). Instantánea de los 22 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 cerrado el 2026-11-01 y T13 a T22 abiertos desde el 2026-11-01. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
+- **Fecha de corte:** 2026-11-06 (America/Bogota). Instantánea de los 22 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05 y T15 a T22 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -22,8 +22,8 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T10 | [#10](https://github.com/ThomasSerna/veryfi-prospecting/issues/10) | Incorporar revisión de Veryfi y validar la calificación con Haiku | Cerrado 2026-10-13 | — | — | T09 |
 | T11 | [#11](https://github.com/ThomasSerna/veryfi-prospecting/issues/11) | Preparar entrega y condiciones del piloto | Cerrado 2026-10-14 | — | — | T09 y T10 |
 | T12 | [#13](https://github.com/ThomasSerna/veryfi-prospecting/issues/13) | Migrar completamente la búsqueda y enriquecimiento de personas de Hunter a Apollo | Cerrado 2026-11-01 | P0 crítica | Migración de proveedor/backend | ninguna |
-| T13 | [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14) | Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes | Abierto | P0 | Discovery/backend | T12 (migración a Apollo) |
-| T14 | [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15) | Diseñar y evaluar rubric_v2 que priorice cuentas enterprise | Abierto | P0 | Scoring/backend | T12, T13 |
+| T13 | [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14) | Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes | Cerrado 2026-11-01 | P0 | Discovery/backend | T12 (migración a Apollo) |
+| T14 | [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15) | Diseñar y evaluar rubric_v2 que priorice cuentas enterprise | Cerrado 2026-11-05 | P0 | Scoring/backend | T12, T13 |
 | T15 | [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16) | Configurar cargos de referencia de Veryfi para búsqueda en Apollo | Abierto | P0 | Reglas de negocio/búsqueda | T12, T13 |
 | T16 | [#17](https://github.com/ThomasSerna/veryfi-prospecting/issues/17) | Buscar múltiples personas relevantes por cuenta usando Apollo | Abierto | P0 | Pipeline/backend | T12, T15, T18 |
 | T17 | [#18](https://github.com/ThomasSerna/veryfi-prospecting/issues/18) | Validar costos, acceso, confiabilidad y limpieza de la migración a Apollo | Abierto | P0 | QA/operación de proveedor único | T12 |
@@ -37,29 +37,29 @@ Las prioridades y los tipos solo existen en los issues T12 a T22. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 cerrada:
+Derivado de las dependencias y prioridades del tracker. Con T12, T13 y T14 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Listas para empezar | T13 (P0) y T17 (P0) | Su única dependencia, T12, está cerrada. T13 desbloquea T14 y T15. T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
-| Paralelizable | T20 (P1) | Es solo UX/UI y no toca el pipeline. Necesita los escenarios enterprise de T13 para cerrarse |
-| Bloqueadas | T14 y T15 (esperan T13), T18 (espera T15), T16 y T19 (esperan T15 y T18), T21 (espera T13 a T18) y T22 (espera T21) | Dependencias abiertas |
+| Listas para empezar | T15 (P0) y T17 (P0) | Sus dependencias están cerradas. T15 configura los cargos; T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
+| Paralelizable | T20 (P1) | Es solo UX/UI y no toca el pipeline; T12 y T13 están cerradas |
+| Bloqueadas | T18 (espera T15), T16 y T19 (esperan T15 y T18), T21 (espera T15 a T18) y T22 (espera T17, T16, T18 y T21) | Dependencias abiertas |
 
-Orden sugerido por olas: T13, T17 y T20; después T14 y T15; después T18; después T16 y T19; después T21; al final T22.
+Orden sugerido por olas: T15, T17 y T20; después T18; después T16 y T19; después T21; al final T22.
 
 ## Dependencias entre tareas
 
 ```mermaid
 flowchart LR
     T12["T12 Migración a Apollo (cerrada)"]:::closed
-    T13["T13 ICP enterprise"]:::ready
-    T14["T14 rubric_v2"]
-    T15["T15 Cargos de referencia"]
+    T13["T13 ICP enterprise (cerrada)"]:::closed
+    T14["T14 rubric_v2 (cerrada)"]:::closed
+    T15["T15 Cargos de referencia"]:::ready
     T16["T16 Múltiples personas"]
     T17["T17 Validar Apollo y retirar Hunter"]:::ready
     T18["T18 Empleo vigente y canales"]
     T19["T19 contact_match_v2"]
-    T20["T20 Alternativas de interfaz"]
+    T20["T20 Alternativas de interfaz"]:::ready
     T21["T21 Validación enterprise"]
     T22["T22 Spike Snov.io"]
     T12 --> T13
@@ -85,18 +85,18 @@ flowchart LR
     classDef ready fill:#fff3cd,stroke:#b8860b
 ```
 
-Verde: cerrada. Amarillo: lista para empezar. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). Todas las tareas abiertas dependen de T12, que ya está cerrada; solo se dibujan sus aristas hacia las tareas listas. T22 depende además de forma directa de T12, T16 y T18, que llegan a T22 a través de T21.
+Verde: cerrada. Amarillo: lista para empezar. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). Todas las tareas abiertas dependen de T12, que ya está cerrada; se dibujan únicamente sus aristas hacia T13 y T17. T22 depende además de forma directa de T12, T16 y T18, que llegan a T22 a través de T21.
 
 ## Copia del backlog
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
 
-### Enterprise sobre Apollo (T13 a T21, abiertas)
+### Enterprise sobre Apollo (T13 y T14 cerradas; T15 a T21 abiertas)
 
 #### T13 · Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes
 
 - **Issue:** [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14)
-- **Estado:** Abierto
+- **Estado:** Cerrado
 - **Prioridad:** P0
 - **Dependencias:** T12 (migración a Apollo)
 - **Tipo:** Discovery/backend
@@ -124,7 +124,7 @@ Como responsable comercial de Veryfi, quiero descubrir y clasificar empresas gra
 #### T14 · Diseñar y evaluar rubric_v2 que priorice cuentas enterprise
 
 - **Issue:** [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15)
-- **Estado:** Abierto
+- **Estado:** Cerrado
 - **Prioridad:** P0
 - **Dependencias:** T12, T13
 - **Tipo:** Scoring/backend
@@ -461,7 +461,7 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
 
 - **T13:** las reglas de descubrimiento e identidad están en [Business-rules.md](Business-rules.md#descubrimiento) y los perfiles en [Project-context.md](Project-context.md#clientes-objetivo-señales-y-personas). Si se habilita una operación nueva de Apollo (Organization Search o Organization Enrichment), hay que añadirla a `READ_OPERATIONS` en `tests/test_architecture.py` y documentarla en [Library-docs.md](Library-docs.md#apollo-personas-y-correos-profesionales). Las llamadas reales requieren autorización de gasto.
 - **T14:** `rubric_v1`, su fórmula y sus umbrales ([Business-rules.md](Business-rules.md#calificación-explicable)) siguen vigentes y deben reproducirse para las campañas históricas. Una versión nueva de rúbrica requiere aprobación y su identificador se suma a las versiones de [persistence.md](persistence.md#identificadores-persistidos).
-- **T15:** los cargos viven en `config/veryfi.json` y las reglas de selección en [Business-rules.md](Business-rules.md#persona-y-canal-útiles). La búsqueda por cargos de Apollo se arma en `people_search_request` (`person_titles`). Sin datos personales en el repositorio, fixtures ni logs.
+- **T15:** la taxonomía de cargos versionada vive en `config/veryfi.json` y las reglas de selección en [Business-rules.md](Business-rules.md#persona-y-canal-útiles). La búsqueda de Apollo se arma en `people_search_request` con títulos y, cuando corresponda, seniority. Sin datos personales en el repositorio, fixtures ni logs. El estado del issue sigue siendo el del tracker.
 - **T16:** cambia reglas vigentes de [Business-rules.md](Business-rules.md#esfuerzo-de-búsqueda-y-parada): hoy la empresa se detiene al lograr un contacto pertinente con correo o teléfono utilizable y la prioridad alta admite hasta 3 personas. Los topes de gasto siguen en [Budget-policy.md](Budget-policy.md). Requiere aprobación antes de modificar la regla.
 - **T17:** afecta a [Library-docs.md](Library-docs.md), [provider-check.md](provider-check.md), [budget-providers.md](budget-providers.md) y `README.md`. Las llamadas reales solo se hacen con autorización explícita del responsable del cupo (proveedor, operación y tope).
 - **T18:** `hunter_signal` aparece en `prospecting/contacts.py` y `prospecting/pipeline/campaign.py` como base de vigencia para mostrar. Antes de renombrarlo hay que comprobar si algún valor se guarda ([persistence.md](persistence.md)). Reglas afectadas: [Business-rules.md](Business-rules.md#reglas-por-canal) y el Historial de Hunter.

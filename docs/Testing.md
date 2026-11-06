@@ -17,6 +17,9 @@ Pruebas unitarias/integración sin red por defecto; llamadas reales separadas y 
 | Entrada hostil | Texto de página que pide enviar datos, subir presupuesto o cambiar reglas no altera el flujo |
 | Salida/URL insegura | CSV no ejecuta fórmulas; rutas privadas/redirects y HTML arbitrario son rechazados |
 | Trazabilidad | Referencias de modelo inexistentes se rechazan; la ficha conserva evidencia al exportar |
+| Caso de uso y función | Perfiles y citas ajenos, inventados o contradictorios se rechazan; sin perfil respaldado no se llama a Apollo; cargos ambiguos permanecen pendientes sin responsabilidades nominales corporativas pertinentes; una contradicción posterior de la fuente original invalida la responsabilidad derivada |
+| Migración y campañas históricas | La migración v1→v2 conserva resultados y consumo; un fallo revierte el cambio; la reapertura y la caché no duplican solicitudes, y el match histórico sigue siendo reproducible |
+| Búsqueda acotada por cargos | Las consultas usan dominio y cargos específicos, respetan el límite de títulos y no excluyen especialistas con un seniority supuesto; la pertinencia por campaña es consistente en búsqueda, ficha y CSV |
 | Reorganización altera datos guardados | Huellas, claves de `attempts`, `identity_key`, ids deterministas, textos de resultado de buscador y esquema SQLite no cambian al mover código |
 | Dependencias invertidas | Los módulos de negocio no importan `db`, `budget`, `providers` ni `pipeline`; las importaciones no forman ciclos |
 

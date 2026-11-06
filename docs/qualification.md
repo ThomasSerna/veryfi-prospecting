@@ -8,8 +8,10 @@ campaña. Haiku propone y Python decide:
   confirmada o sin evidencia útil recibe `insufficient_evidence`, con los cinco
   criterios en `null`.
 - **Solicitud:** usa el modelo `claude-haiku-5-5`, *thinking* desactivado y
-  *effort* `low`. `rubric_v1` conserva el prompt `haiku_assessment_v3`;
-  la candidata `rubric_v2` usa `haiku_assessment_v4` para interpretar escala.
+  *effort* `low`. Las campañas sin taxonomía conservan `haiku_assessment_v3` con
+  `rubric_v1` y `haiku_assessment_v4` con `rubric_v2`. Las campañas con
+  `role_taxonomy_v1` usan `haiku_assessment_v5`, con el criterio de escala de la
+  rúbrica elegida y perfiles respaldados por citas.
   V1 sigue predeterminada hasta cumplir la [condición de activación de v2](Business-rules.md#candidata-enterprise-rubric_v2).
   - La salida es JSON con esquema. El límite de entrada es
     `limits.llm.max_input_tokens` (9.000 tokens) y el de salida,
@@ -35,6 +37,12 @@ campaña. Haiku propone y Python decide:
   faltantes. Python rechaza los ids no suministrados, los valores conocidos sin
   evidencia, los productos o cargos fuera de la configuración y los `1` que solo se
   apoyan en resultados del buscador. No los corrige.
+- **Perfiles:** v5 propone `profile_matches` con `profile_id` y citas literales
+  (`evidence_id`, `quote`). Python acepta solo perfiles de la empresa y la campaña,
+  respaldados por evidencia empresarial observada suministrada, sin contradicción,
+  distinta de revisiones manuales y resultados de búsqueda. Los productos compartidos
+  no prueban por sí solos un perfil.
+  Sin perfil respaldado, la lista queda vacía y no se busca en Apollo.
 - **Puntuación:** Python calcula `fit_score` y `coverage` con los pesos de la
   rúbrica de la instantánea de campaña. `null` no suma peso ni equivale a cero. La prioridad sigue las reglas
   de IDEA.md §8.2 con los umbrales de la rúbrica: `high` exige además que la

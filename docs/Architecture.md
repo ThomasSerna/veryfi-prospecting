@@ -4,7 +4,7 @@ Pila tecnológica, límites del sistema, estructura de carpetas, flujo de datos 
 
 ## Pila tecnológica
 
-**Python + Django + SQLite**, en una aplicación local de una sola instancia. Django sirve la interfaz de revisión con plantillas renderizadas en el servidor y JavaScript local mínimo, en el lenguaje que domina el equipo; sustituyó a Streamlit por decisión aprobada el 13 de octubre de 2026. Se usa sin ORM, migraciones, cuentas de usuario ni panel de administración: SQLite, gestionada por `prospecting.db`, conserva resultados, uso y estados. La sesión firmada y la memoria del proceso solo guardan estado de presentación y de la ejecución en curso, nunca el presupuesto ni la única copia de una ejecución. El servidor es el de desarrollo de Django, limitado a loopback y no apto para producción [W8].
+**Python + Django + SQLite**, en una aplicación local de una sola instancia. Django sirve la interfaz de revisión con plantillas renderizadas en el servidor y JavaScript local mínimo, en el lenguaje que domina el equipo; sustituyó a Streamlit por decisión aprobada el 13 de octubre de 2026. Se usa sin ORM, migraciones de Django, cuentas de usuario ni panel de administración: SQLite, gestionada por `prospecting.db`, conserva resultados, uso y estados. La sesión firmada y la memoria del proceso solo guardan estado de presentación y de la ejecución en curso, nunca el presupuesto ni la única copia de una ejecución. El servidor es el de desarrollo de Django, limitado a loopback y no apto para producción [W8].
 
 Usar Pydantic para contratos en límites externos y validación de respuestas; `sqlite3`, `csv`, `json`, `datetime` y otras bibliotecas estándar para persistencia/exportación. Un cliente HTTP compartido y el SDK de Haiku que simplifique la integración. Incluir solamente dependencias necesarias y fijar versiones comprobadas.
 
@@ -194,10 +194,10 @@ Los valores con los que se reanuda sin repetir trabajo ni gasto se guardan en SQ
 
 | Objeto | Campos mínimos |
 |---|---|
-| `Campaign` | id, países, segmentos, filtros, máximo de empresas, límites, versión de rúbrica, estado, timestamps |
+| `Campaign` | id, países, segmentos, filtros, máximo de empresas, límites, versión de rúbrica, instantánea de configuración y taxonomía de cargos, estado, timestamps |
 | `Company` | id, nombre, dominio, entidad/alias, país de operación, matriz si conocida, segmento, tamaño con fuente |
 | `Evidence` | id, company_id, contact_id opcional, afirmación, URL/proveedor, referencia externa, extracto breve, retrieved_at, published_at/updated_at opcionales, tipo y contradicciones |
-| `Assessment` | campaign_id, company_id, valores y evidence_ids por criterio, score, coverage, prioridad, productos, cargos, modelo/prompt/rúbrica, explicación |
+| `Assessment` | campaign_id, company_id, valores y evidence_ids por criterio, score, coverage, prioridad, productos, cargos, perfiles con citas, modelo/prompt/rúbrica, explicación |
 | `Contact` | id, company_id, nombre, cargo, función, alcance geográfico, evidencia de empleo, vigencia |
 | `Channel` | contact_id, tipo, valor, procedencia, estado original/normalizado, fechas, confirmación manual y advertencias |
 | `RunItem` | campaign_id, company_id, etapa, resultado comercial, intentos, límites consumidos, stop_reason, revisión y motivo |
@@ -207,7 +207,7 @@ No es necesario crear una tabla por cada clase. Opción concreta: tablas `campai
 
 ### Esquema SQLite
 
-`prospecting.db.Database` crea `data/prospecting.sqlite3` solo cuando la ruta no existe. Activa `PRAGMA foreign_keys=ON` en la conexión y fija `PRAGMA user_version=1` al crear la base. No hay migraciones ni funciones de borrado: reabrir una base compatible conserva checkpoints y consumo, y un esquema incompatible, incompleto o corrupto produce un error sin recrear tablas. Las columnas que guardan JSON se validan con `json_valid`; el dinero y los créditos se guardan como texto decimal exacto. El esquema es el de `_SCHEMA` en `prospecting/db.py`.
+`prospecting.db.Database` crea `data/prospecting.sqlite3` solo cuando la ruta no existe y activa `PRAGMA foreign_keys=ON`. La versión actual del esquema es `user_version=2`. Al abrir una base v1 compatible, la migración aditiva transaccional agrega `assessments.profile_matches` como JSON vacío para evaluaciones antiguas; conserva resultados, checkpoints, evidencia y consumo. Si falla la validación o migración, devuelve un error sin recrear tablas ni borrar datos. Las columnas JSON se validan con `json_valid`; el dinero y los créditos se guardan como texto decimal exacto. No hay funciones de borrado ni migraciones de Django.
 
 ```mermaid
 erDiagram
@@ -231,7 +231,7 @@ erDiagram
 | `contacts` | `id`, `company_id`, `name`, `title`, `name_complete`, `current_employment`, `relevant_function`, `identity_status`, `buying_role`, `geographic_scope`, `employment_evidence_ids`, `provenance`, `channels` |
 | `evidence` | `id`, `company_id`, `contact_id`, `claim`, `url`, `provider`, `external_reference`, `excerpt`, `retrieved_at`, `published_at`, `updated_at`, `kind`, `source_type`, `contradiction_ids` |
 | `run_items` | `campaign_id`, `company_id`, `last_assessment_id`, `stage`, `business_status`, `attempts`, `consumed_limits`, `stop_reason`, `error_message`, `error_stage`, `review_status`, `review_reason`, `reviewed_at`, `updated_at` |
-| `assessments` | `id`, `campaign_id`, `company_id`, `criteria`, `fit_score`, `coverage`, `priority`, `products`, `target_roles`, `model_id`, `prompt_version`, `rubric_version`, `explanation`, `created_at`, `revision_of` |
+| `assessments` | `id`, `campaign_id`, `company_id`, `criteria`, `fit_score`, `coverage`, `priority`, `products`, `target_roles`, `model_id`, `prompt_version`, `rubric_version`, `explanation`, `created_at`, `revision_of`, `profile_matches` |
 | `usage` | `request_id`, `campaign_id`, `company_id`, `provider`, `operation`, `request_fingerprint`, `account_ref`, `reserved_cost_usd`, `reserved_credits`, `reserved_tokens`, `tokens`, `credits`, `estimated_cost_usd`, `final_cost_usd`, `outlay_usd`, `funding_source`, `status`, `outcome`, `error_message`, `created_at`, `finished_at`, `reconciled_at` |
 
 Claves, valores permitidos e índices de cada tabla:
@@ -252,7 +252,7 @@ Las reglas de escritura, la procedencia, las transacciones y los identificadores
 
 | Archivo | Contenido | En Git |
 |---|---|---|
-| `config/veryfi.json` | Catálogo provisional, perfiles, cargos, `rubric_v1` y límites iniciales (`VeryfiConfig`); cada campaña guarda una instantánea | Sí |
+| `config/veryfi.json` | Catálogo provisional, perfiles, `role_taxonomy_v1`, rúbricas y límites iniciales (`VeryfiConfig`); cada campaña guarda una instantánea | Sí |
 | `config/contact_match.json` | Pesos de `contact_match_v1` (`ContactMatchConfig`); `PROSPECTING_CONTACT_MATCH_PATH` permite usar otro archivo | Sí |
 | `data/exclusions.json` | Lista local de exclusiones comerciales; no tiene tabla propia | No |
 | `data/provider-access.json` | Cupos y referencias de acceso comprobadas (`ProviderAccess`); nunca claves ni permisos | No |

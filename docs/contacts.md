@@ -25,10 +25,11 @@ El orden de trabajo es:
 
 1. Reutilizar personas, canales y evidencia de la generación Apollo. Si ya existe un canal
    preferido utilizable, terminar sin nuevas llamadas.
-2. Consultar People API Search sobre el dominio confirmado, primero sin filtro de cargo
-   y, si queda un segundo intento, por los cargos objetivo. Cada consulta pide como
-   máximo 10 candidatos en la primera página. Search no devuelve correo ni teléfono;
-   sus nombres pueden ser parciales y permanecen pendientes.
+2. Consultar People API Search sobre el dominio confirmado y con cargos específicos
+   de los casos de uso respaldados. Se agrupan cargos con seniority inequívoco y
+   especialistas o jerarquías ambiguas sin ese filtro, hasta dos consultas. Cada
+   consulta pide como máximo 10 candidatos en la primera página. Search no devuelve
+   correo ni teléfono; sus nombres pueden ser parciales y permanecen pendientes.
 3. Enriquecer selectivamente los candidatos pertinentes con un identificador observado
    de Apollo, autorización y cupo. People Enrichment no solicita emails personales,
    teléfonos ni waterfall. No completar apellidos con IA ni construir direcciones.
@@ -43,19 +44,19 @@ El orden de trabajo es:
    detenerse al primer correo, teléfono o WhatsApp profesional utilizable.
 
 Todos los candidatos devueltos se guardan con su procedencia, también los que
-superan el cupo o tienen un cargo fuera del perfil (`relevant_function=False`):
-quedan pendientes y explican por qué no resultaron elegibles. El cupo de personas
+superan el cupo. En campañas con taxonomía, la pertinencia se calcula en una copia:
+un cargo claramente fuera del perfil resulta `relevant_function=False` y uno
+ambiguo sin respaldo de función queda `None`. Ninguno es elegible. El cupo de personas
 (`contacts:person:`) solo lo ocupa quien supera `validate_contact` al investigarla,
 así un candidato poco pertinente hallado primero no desplaza a uno idóneo hallado
-después. Las personas se recorren por nombre completo, cargo pertinente, posición de
-su cargo en la lista de la empresa y canal verificado; las búsquedas nominales en la
-web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes:
-consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
-no se recuperan.
+después. Entre candidatos de calidad comparable se favorecen familias distintas y se
+priorizan promotores de negocio, técnicos y posibles compradores económicos. Las
+búsquedas nominales en la web omiten a quien ya se sabe fuera del perfil. Esta
+selección no amplía topes: consultas, páginas y enriquecimientos siguen contándose
+igual y las llamadas hechas no se recuperan.
 
-La prioridad media permite 1 persona, 2 búsquedas Apollo (la segunda, por cargos,
-solo si la primera no dejó un canal preferido), hasta 1 enriquecimiento Apollo, 2 consultas
-web, 2 páginas y 90 segundos adicionales. La alta permite
+La prioridad media permite 1 persona, hasta 2 búsquedas Apollo, hasta 1 enriquecimiento
+Apollo, 2 consultas web, 2 páginas y 90 segundos adicionales. La prioridad alta permite
 hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos, 4 consultas web, 4 páginas
 y 180 segundos. Las reducciones de configuración y los límites económicos
 siguen vigentes; esos máximos no obligan a agotarlos.
@@ -119,12 +120,33 @@ report = find_contacts(
 ## Validación de personas y canales
 
 Una persona utilizable tiene nombre completo, entidad confirmada, cargo respaldado,
-función pertinente y empleo vigente sin contradicciones pendientes. Los cargos
-son todos los de los perfiles de la campaña para el segmento de la empresa
-(`target_roles`), primero los elegidos en la evaluación seleccionada; ese orden guía
-las búsquedas y la prioridad entre candidatos. Un título
-o el indicador de autoridad del proveedor no asignan automáticamente un papel de
-compra; `buying_role` permanece `unknown` sin respaldo específico.
+función pertinente y empleo vigente sin contradicciones pendientes. En campañas con
+`role_taxonomy_v1`, `target_roles` reúne los cargos de familias asociadas a perfiles
+con citas verificadas en la evaluación; sin perfil respaldado no hay consulta Apollo.
+Las familias incluyen variantes ES/EN, departamentos, seniority, funciones y
+exclusiones; el departamento es clasificación interna, no un filtro de People API
+Search. Los cargos genéricos sin función no bastan. Un título o el indicador de
+autoridad del proveedor no asignan automáticamente un papel de compra;
+`buying_role` permanece `unknown` sin respaldo específico.
+
+El catálogo editable está en `config/veryfi.json` bajo `role_taxonomy`: sus doce
+familias identifican perfiles, títulos, niveles admitidos, términos de función,
+exclusiones, procedencia, fecha y estado de validación. `function_id` agrupa las
+variantes de jerarquía de una misma función para seleccionar diversidad. Una lista
+de seniorities vacía indica que no se exige ese filtro. La configuración se valida
+al cargarla; las campañas ya creadas conservan su instantánea. Las familias siguen
+pendientes de validación comercial y no incluyen nombres ni enlaces de personas.
+El archivo privado de perfiles contiene enlaces, pero no cargos normalizados
+verificables: su extracción manual sigue pendiente. Las familias operativas son
+propuestas basadas en el ICP y los documentos comerciales, sin atribuirlas a un
+perfil privado concreto.
+
+La pertinencia se calcula según la instantánea y las evidencias de cada campaña,
+también al recuperar candidatos o consultar ficha y CSV. Un cargo ambiguo requiere
+responsabilidades citadas nominalmente de una fuente corporativa vigente para
+acreditar la función. Un responsable regional puede servir aunque resida fuera del
+país de la cuenta si su ámbito lo cubre. Las campañas sin taxonomía conservan sus
+reglas y solicitudes históricas.
 
 Apollo proporciona candidatos y datos profesionales sujetos a validación. Una fecha
 de consulta o de actualización del perfil no se convierte en fecha del puesto ni
@@ -143,15 +165,22 @@ hacer llamadas, así que también se aplica a contactos ya guardados. La ficha y
 la muestran como inferida y piden confirmar el cargo antes de contactar. Esta
 inferencia no se extiende a los candidatos de Apollo.
 
-La extracción pública usa `contacts_extraction_v1` con el mismo Haiku que la
-calificación. Si toda la evidencia vigente cabe en el límite de entrada, se envía
-completa y en el mismo orden de siempre, con la misma huella. Si hay que recortar,
+La extracción pública usa `contacts_extraction_v2` para campañas con taxonomía y
+`contacts_extraction_v1` para instantáneas históricas, con el mismo Haiku que la
+calificación. La versión nueva puede citar responsabilidades para evaluar una
+función ambigua, sin una llamada adicional de IA. Si toda la evidencia vigente
+cabe en el límite de entrada, se envía completa y en el mismo orden de siempre,
+con la misma huella para el mismo prompt. Si hay que recortar,
 entran primero las fuentes primarias de directorios o páginas de equipo, luego las
 que mencionan un cargo objetivo o una persona conocida, y las más recientes antes,
 para no perder información nominal. Cada hecho cita un `evidence_id` suministrado y una cita literal
 asociada nominalmente a la persona. Python rechaza referencias inexistentes,
 resúmenes del buscador usados como prueba, citas ajenas al fragmento y homónimos
 ambiguos. Los candidatos incompletos conservan sus hechos conocidos como pendientes.
+Una responsabilidad derivada conserva el identificador de su fuente original. Solo
+respalda la función mientras esa fuente corporativa y la cita sigan disponibles,
+vigentes y sin contradicciones, incluidas las posteriores; una responsabilidad
+negada no valida la función.
 Si una fuente contrasta el cargo o la entidad de una persona ya guardada, conserva
 ambas evidencias, marca la identidad como contradictoria y suspende listo, sin
 reasignar la empresa. El contenido externo no puede
@@ -193,7 +222,7 @@ la pertinencia del cargo:
 
 | Componente | Peso | Niveles y puntos |
 |---|---:|---|
-| Cargo | 50 | Elegido en la calificación, 50; otro cargo de los perfiles del segmento, 35; fuera de los perfiles, 0; sin cargo con fuente, 0 (pendiente) |
+| Cargo | 50 | Elegido en la calificación, 50; otro cargo de los perfiles respaldados, 35; fuera de los perfiles, 0; sin cargo con fuente, 0 (pendiente) |
 | Canal | 25 | Correo, teléfono o WhatsApp que supera `channel_is_usable`, 25; LinkedIn u otro canal confirmado, 18; correo, teléfono o WhatsApp sin comprobar, 10; LinkedIn u otro canal sin confirmar, 7; ninguno, 0 (pendiente) |
 | Identidad | 15 | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 (pendiente) |
 | Vigencia del empleo | 10 | Evidencia del puesto, 10; inferida de Hunter, 6; sin comprobar, 0 (pendiente) |

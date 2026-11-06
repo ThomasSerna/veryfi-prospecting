@@ -72,6 +72,11 @@ global mostrado por la ejecución vive en memoria; los motivos por empresa perma
 en SQLite. El historial permite revisar resultados y exportar personas actualmente
 listas o, explícitamente, todos los resultados.
 
+Al abrir una base SQLite v1 compatible, la aplicación la actualiza
+transaccionalmente a v2 y conserva resultados y consumo. Un esquema incompatible
+produce un error sin recrear la base. La base v2 requiere una versión compatible
+del código; una versión anterior no la abre.
+
 La configuración local de acceso se guarda en `data/provider-access.json`, ignorado
 por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reutilizables.
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.

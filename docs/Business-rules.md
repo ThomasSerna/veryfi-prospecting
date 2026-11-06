@@ -103,12 +103,12 @@ La prioridad decide cuánto investigar, no autoriza gasto ilimitado. Todos los n
 | Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Hasta 3 personas; hasta 3 enriquecimientos por proveedor habilitado | 180 s adicionales |
 | Prioridad baja/excluida | Ninguna adicional | Ninguna adicional | Ninguno | Detener |
 
-En búsqueda de personas, permitir como máximo dos consultas al proveedor especializado para prioridad media y alta: la primera sin filtro de cargo y la segunda por cargos, solo si la primera no dejó un canal preferido. Cada consulta trae hasta 10 candidatos, con paginación acotada. Los cargos son todos los de los perfiles del segmento de la empresa, primero los elegidos en la evaluación. Los límites de personas y enriquecimientos permanecen vigentes. No recorrer paginación ilimitada ni repetir búsquedas agotadas.
+En campañas con `role_taxonomy_v1`, buscar personas por los casos de uso respaldados en la evaluación y por el dominio confirmado. Sin un caso de uso respaldado, la búsqueda queda pendiente. Permitir como máximo dos consultas al proveedor especializado para prioridad media y alta, ambas con cargos específicos: agrupar los que tienen seniority inequívoco y los especialistas o cargos de jerarquía ambigua sin exigir ese filtro. Cada consulta trae hasta 10 candidatos de la primera página. Los límites de personas y enriquecimientos permanecen vigentes. No ampliar la búsqueda silenciosamente ni repetir búsquedas agotadas. Las campañas históricas sin taxonomía conservan sus reglas anteriores.
 
 Secuencia de menor a mayor esfuerzo:
 
 1. Revisar evidencia ya obtenida, páginas corporativas y canales laborales publicados.
-2. Consultar Apollo People API Search sobre el dominio confirmado, primero sin filtro de cargo y después por los cargos del perfil, si la cuenta tiene acceso y cupo; complementar candidatos con búsqueda web pública mediante Tavily cuando haga falta.
+2. Consultar Apollo People API Search sobre el dominio confirmado, con cargos de los casos de uso respaldados, si la cuenta tiene acceso y cupo; complementar candidatos con búsqueda web pública mediante Tavily cuando haga falta.
 3. Conservar la identidad parcial como pendiente y seleccionar candidatos con función pertinente encontrados por el dominio. Enriquecerlos solo con autorización y dentro de los límites; no solicitar correos personales ni inventar apellidos.
 4. Con Apollo People Enrichment, obtener los datos profesionales disponibles y contrastar independientemente nombre completo, entidad, cargo, vigencia y canal. Una respuesta de Search por sí sola no hace contactable al candidato; no fabricar direcciones.
 5. Usar teléfono directo/extensión o WhatsApp profesional publicado cuando haya asociación explícita a la persona.
@@ -125,6 +125,8 @@ Tope inicial global de ejecución: 45 minutos, además de los límites de llamad
 ### Requisitos de la persona
 
 Nombre completo identificado, empresa/entidad correcta, cargo respaldado, función relevante y evidencia de relación vigente sin contradicciones pendientes. Guardar función en la compra como `business_champion`, `technical_champion`, `economic_buyer` o `unknown`; un título por sí solo no confirma autoridad de compra.
+
+La taxonomía versionada distingue familias, equivalencias de cargos y funciones, pero sus categorías de compra son objetivos de búsqueda, no una atribución individual. Priorizar promotores de negocio, técnicos y posibles compradores económicos, en ese orden; entre candidatos de calidad comparable favorecer familias distintas. Un título inequívocamente ajeno queda fuera; un título ambiguo permanece pendiente salvo que responsabilidades nominales citadas de una fuente corporativa vigente respalden una función del caso de uso. Aceptar un responsable regional que cubra el país de la cuenta aunque resida fuera de Colombia o México, si el alcance está respaldado.
 
 Cuando Apollo o una búsqueda web entreguen identificadores o nombres incompletos, conservarlos como candidatos; no completar apellidos con IA. Resolver identidad con evidencia del proveedor o fuentes públicas antes de marcar listo.
 

@@ -25,11 +25,20 @@ with Database(Path("data/prospecting.sqlite3")) as db:
 ```
 
 La configuración contiene un catálogo provisional, los cuatro perfiles de
-IDEA.md, `rubric_v1`, la candidata `rubric_v2` y los límites iniciales. No
-representa capacidades ni reglas certificadas comercialmente. Cada campaña
+IDEA.md, la taxonomía de cargos `role_taxonomy_v1`, `rubric_v1`, la candidata
+`rubric_v2` y los límites iniciales. No representa capacidades ni reglas
+certificadas comercialmente. Cada campaña
 conserva una instantánea de esta configuración; actualizar el archivo no cambia
 campañas ya guardadas. V2 no es el valor predeterminado mientras no cumpla la
 [condición de activación](Business-rules.md#candidata-enterprise-rubric_v2).
+
+La taxonomía de cargos, sus fuentes y su estado de validación también forman parte
+de esa instantánea. Cuando falta, la campaña conserva el comportamiento anterior;
+no se reconstruyen casos de uso históricos a partir de productos o cargos. En las
+evaluaciones nuevas, `profile_matches` guarda el `profile_id` y sus citas literales
+con `evidence_id`; las referencias se verifican para la empresa y campaña. Si después
+aparece una contradicción, la evaluación histórica se conserva y la pertinencia se
+recalcula con la evidencia disponible para la campaña.
 
 La instantánea identifica la generación de contactos mediante `people_provider`:
 las campañas anteriores, sin ese campo, son históricas; las nuevas utilizan `apollo`.
@@ -104,12 +113,14 @@ y referencias de acceso. No contiene claves ni permisos. Cada ejecución crea
 autorizaciones frescas después de abrir `Budget`; el consumo permanece en `Usage`
 y sigue descontándose de los cupos al reiniciar. La sesión firmada de Django solo
 guarda el borrador de la campaña en preparación (`draft_id`); los filtros viajan en
-la URL. Este flujo no cambia el esquema SQLite ni requiere migraciones.
+la URL.
 
-La base se crea únicamente cuando la ruta no existe. Reabrir una base compatible
+La base se crea únicamente cuando la ruta no existe. Una base v1 compatible se
+migra transaccionalmente a v2 al abrirla: añade la columna JSON `profile_matches`
+a `assessments` con `[]` para registros históricos. Reabrir una base compatible
 conserva checkpoints y uso; un esquema incompatible, incompleto o corrupto genera
-un error, sin recrear tablas. No hay funciones de borrado ni migraciones
-automáticas. Conserva la base y sus archivos auxiliares al cerrar la aplicación;
+un error, sin recrear tablas. Una migración fallida se revierte. No hay funciones de
+borrado. Conserva la base y sus archivos auxiliares al cerrar la aplicación;
 contienen resultados y consumo que no deben descartarse.
 
 La persistencia no calcula puntuaciones ni determina si un prospecto está listo.
@@ -125,13 +136,14 @@ y las instantáneas de las pruebas del pipeline los fijan:
 
 - `Usage.request_fingerprint`: SHA-256 de proveedor, operación, cuenta, query o
   payload, método, endpoint y cabeceras. El payload de Haiku incluye el esquema
-  JSON; el de contactos contiene los nombres de las clases `HaikuContacts`,
-  `HaikuContactCandidate` y `CitedContactFact`. La búsqueda de descubrimiento envía
+  JSON; el de contactos v1 contiene los nombres de las clases `HaikuContacts`,
+  `HaikuContactCandidate` y `CitedContactFact`, conservados para el historial.
+  La búsqueda de descubrimiento envía
   `NON_BUSINESS_DOMAINS` en `exclude_domains`: ampliar esa lista cambia la huella, así que
   los directorios nuevos van en `LOCAL_NON_BUSINESS_DOMAINS`, que solo se aplica localmente.
-  Domain Search pide primero todas las personas del dominio, sin `job_titles`, y después
-  por cargos: la consulta por cargos conserva su huella anterior y su caché sigue
-  reutilizable; la amplia tiene huella propia.
+  Las búsquedas Apollo con los filtros de la taxonomía producen huellas según su
+  payload; un cambio en el catálogo que no altere la solicitud no fuerza otra llamada.
+  Los payloads y huellas históricos se conservan.
 - Claves de `RunItem.attempts`: `tavily_extract`, las de la ampliación de evidencia
   (`research:expansion`, `research:web_queries`, `research:pages`) y las de contactos
   (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,
@@ -143,10 +155,12 @@ y las instantáneas de las pruebas del pipeline los fijan:
   empieza por `Tavily devolvió esta página` y `external_reference` que empieza
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
-  `research_queries_v1`, `haiku_assessment_v3`, `haiku_assessment_v4`,
-  `contacts_extraction_v1`, `rubric_v1`, `rubric_v2` y el esquema SQLite `user_version=1`.
-  V1 conserva `haiku_assessment_v3`; v2 usa `haiku_assessment_v4` sin reinterpretar
-  las solicitudes ni evaluaciones históricas.
+  `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
+  `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
+  `contacts_extraction_v2`, `rubric_v1`, `rubric_v2` y el esquema SQLite `user_version=2`.
+  Las instantáneas sin taxonomía conservan los prompts v3/v4 según rúbrica y
+  `contacts_extraction_v1`; las nuevas usan v5 y `contacts_extraction_v2` sin
+  reinterpretar solicitudes ni evaluaciones históricas.
 
 Estos valores de Hunter siguen identificando el historial y no se reinterpretan
 como operaciones, contactos ni consumo de Apollo. La nueva ruta conserva sus propios
@@ -162,6 +176,11 @@ identificadores sin reescribir el ledger anterior:
 - Referencias `apollo_v1:<id>:<request_id>#<campo>` para hechos de Apollo y
   `apollo_public_v1:<request_id>#contact:<campo>` para hechos públicos de la generación
   nueva; conservan la procedencia y no convierten una búsqueda en verificación.
+- La responsabilidad citada por `contacts_extraction_v2` usa
+  `apollo_public_v1:<request_id>#contact:responsibilities:<source_id>` para enlazar
+  la fuente original. La variante no Apollo usa el prefijo `public_extraction_v2`.
+  Este sufijo solo identifica el nuevo hecho de responsabilidad; las demás
+  referencias históricas mantienen su formato.
 
 El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
 recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera

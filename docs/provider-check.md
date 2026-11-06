@@ -33,6 +33,12 @@ Documentación oficial consultada el 2026-11-01:
   para Free son 50 solicitudes por minuto, 200 por hora y 600 por día, por equipo
   y endpoint. El acceso efectivo y sus límites siguen pendientes de comprobación.
 
+Para T15 se volvió a consultar People API Search el 2026-11-06: documenta
+`person_titles[]`, `person_seniorities[]` e `include_similar_titles`; sumar títulos
+o niveles amplía los resultados y el total de títulos incluidos y excluidos debe ser
+menor que 100. La referencia de ese endpoint no documenta un filtro de departamento.
+Esta consulta documental no verifica el acceso de la cuenta ni sus resultados reales.
+
 ## Tavily
 
 | Campo | Valor observado |
