@@ -12,14 +12,15 @@ from pydantic import Field
 from prospecting.haiku import CHARS_PER_TOKEN, prompt_json, structured_request
 from prospecting.models import (
     CRITERION_NAMES, Assessment, Campaign, Company, Contract, Criterion, CriterionName, CriterionValue,
-    EntityType, Evidence, IdentityStatus, Priority, Rubric, Text,
+    EntityType, Evidence, IdentityStatus, Priority, ProfileMatch, Rubric, Text,
 )
-from prospecting.sources import is_search_hit
+from prospecting.sources import is_search_evidence, is_search_hit
 from prospecting.text import clip
 
 
 PROMPT_VERSION = "haiku_assessment_v3"
 ENTERPRISE_PROMPT_VERSION = "haiku_assessment_v4"
+PROFILE_PROMPT_VERSION = "haiku_assessment_v5"
 SEARCH_RESULT_CLAIM = ("La página apareció en una búsqueda web; el extracto es el resumen del buscador "
                        "y no confirma hechos de la empresa.")
 CLAIM_CHARS = 300
@@ -67,12 +68,20 @@ class HaikuAssessment(Contract):
     explanation: Text
 
 
+class HaikuProfileAssessment(HaikuAssessment):
+    """V5 añade perfiles citados sin alterar el esquema de respuestas históricas."""
+
+    profile_matches: list[ProfileMatch]
+
+
 def rubric_for(campaign: Campaign) -> Rubric:
     return campaign.config_snapshot.rubrics[campaign.rubric_version]
 
 
-def prompt_version_for(rubric_version: str) -> str:
+def prompt_version_for(rubric_version: str, *, role_taxonomy: bool = False) -> str:
     """La nueva interpretación no invalida las solicitudes ni evaluaciones históricas de v1."""
+    if role_taxonomy:
+        return PROFILE_PROMPT_VERSION
     return ENTERPRISE_PROMPT_VERSION if rubric_version == "rubric_v2" else PROMPT_VERSION
 
 
@@ -224,6 +233,12 @@ def select_evidence(evidence: list[Evidence], max_chars: int) -> list[Evidence]:
 
 
 def allowed_roles(campaign: Campaign) -> list[str]:
+    if campaign.config_snapshot.role_taxonomy is not None:
+        roles = [title for family in campaign.config_snapshot.role_taxonomy.families
+                 if any(profile.id in family.profile_ids and profile.segment in campaign.segments
+                        for profile in campaign.config_snapshot.profiles)
+                 for title in [*family.titles_en, *family.titles_es]]
+        return list(dict.fromkeys(roles))
     roles = [role for profile in campaign.config_snapshot.profiles
              if profile.segment in campaign.segments for role in profile.target_roles]
     return list(dict.fromkeys(roles))
@@ -299,6 +314,19 @@ Escala enterprise (haiku_assessment_v4):
   por sí sola. No infieras equivalencias monetarias ni volúmenes documentales a partir del tamaño.
 - Empleados e ingresos de niveles distintos no son por sí solos una contradicción factual. No sustituyas
   necesidad documental, compatibilidad ni calidad de evidencia por tamaño, notoriedad o intención de compra."""
+    if campaign.config_snapshot.role_taxonomy is not None:
+        profiles = [{"profile_id": profile.id, "segment": str(profile.segment), "signals": profile.signals,
+                     "products": profile.products}
+                    for profile in campaign.config_snapshot.profiles if profile.segment in campaign.segments]
+        system += """
+
+Perfiles respaldados (haiku_assessment_v5):
+- profile_matches contiene únicamente perfiles cuyo caso de uso está demostrado en la evidencia de esta empresa.
+- Cada perfil necesita citations con evidence_id y quote literal del fragmento o claim suministrado.
+  No basta la industria, un producto compartido, un cargo sugerido ni el resumen de un buscador.
+- No cites fuentes contradictorias, inferencias ni hechos de personas. Sin respaldo devuelve [].
+- Las familias de cargos son hipótesis pendientes de validación comercial; no acreditan autoridad de compra.
+Perfiles permitidos: """ + prompt_json(profiles)
     return system
 
 
@@ -315,7 +343,7 @@ def response_schema(campaign: Campaign) -> dict:
         "required": ["value", "evidence_ids", "justification"],
         "additionalProperties": False,
     }
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "criteria": {
@@ -335,6 +363,23 @@ def response_schema(campaign: Campaign) -> dict:
                      "uncertainties", "explanation"],
         "additionalProperties": False,
     }
+    if campaign.config_snapshot.role_taxonomy is not None:
+        schema["properties"]["profile_matches"] = {
+            "type": "array", "items": {
+                "type": "object", "properties": {
+                    "profile_id": {"enum": [profile.id for profile in campaign.config_snapshot.profiles
+                                             if profile.segment in campaign.segments]},
+                    "citations": {"type": "array", "minItems": 1, "items": {
+                        "type": "object", "properties": {
+                            "evidence_id": {"type": "string", "format": "uuid"},
+                            "quote": {"type": "string"},
+                        }, "required": ["evidence_id", "quote"], "additionalProperties": False,
+                    }},
+                }, "required": ["profile_id", "citations"], "additionalProperties": False,
+            },
+        }
+        schema["required"].append("profile_matches")
+    return schema
 
 
 def build_haiku_request(company: Company, evidence: list[Evidence],
@@ -369,19 +414,22 @@ def build_haiku_request(company: Company, evidence: list[Evidence],
     return structured_request(system, user, schema, limits.max_output_tokens), selected
 
 
-def parse_output(text: str, stop_reason: str | None) -> HaikuAssessment:
+def parse_output(text: str, stop_reason: str | None, *, campaign: Campaign | None = None) -> HaikuAssessment:
     if stop_reason == "refusal":
         raise QualificationError("refusal", "Haiku rechazó la solicitud.")
     if stop_reason == "max_tokens":
         raise QualificationError("max_tokens", "La respuesta de Haiku quedó truncada por el límite de salida.")
     try:
-        return HaikuAssessment.model_validate_json(text)
+        model = (HaikuProfileAssessment if campaign is not None and campaign.config_snapshot.role_taxonomy is not None
+                 else HaikuAssessment)
+        return model.model_validate_json(text)
     except ValueError:
         raise QualificationError("invalid_output", "La respuesta de Haiku no cumple el contrato.") from None
 
 
 def validate_output(output: HaikuAssessment, supplied: list[Evidence],
-                    campaign: Campaign) -> dict[str, Criterion]:
+                    campaign: Campaign, *, company: Company | None = None,
+                    all_evidence: list[Evidence] | None = None) -> dict[str, Criterion]:
     """Rechaza referencias, productos o cargos que no existen en la entrada; no los corrige."""
     supplied_ids = {item.id for item in supplied}
     if set(output.criteria) != CRITERION_NAMES:
@@ -394,6 +442,30 @@ def validate_output(output: HaikuAssessment, supplied: list[Evidence],
     if not set(output.target_roles) <= set(allowed_roles(campaign)):
         raise QualificationError("unknown_role", "Haiku propuso cargos fuera de los perfiles.")
     by_id = {item.id: item for item in supplied}
+    if campaign.config_snapshot.role_taxonomy is not None:
+        if not isinstance(output, HaikuProfileAssessment) or company is None:
+            raise QualificationError("invalid_output", "La taxonomía necesita perfiles citados y una empresa identificada.")
+        allowed_profiles = {profile.id for profile in campaign.config_snapshot.profiles
+                            if profile.segment in campaign.segments and profile.segment in (company.segments or [])}
+        profile_ids = [match.profile_id for match in output.profile_matches]
+        if len(profile_ids) != len(set(profile_ids)) or not set(profile_ids) <= allowed_profiles:
+            raise QualificationError("unknown_profile", "Haiku propuso perfiles repetidos o ajenos a la empresa y campaña.")
+        conflicts = {reference for item in (all_evidence if all_evidence is not None else supplied)
+                     if item.company_id == company.id for reference in item.contradiction_ids}
+        conflicts.update(output.contradiction_evidence_ids)
+        for match in output.profile_matches:
+            for citation in match.citations:
+                source = by_id.get(citation.evidence_id)
+                if source is None:
+                    raise QualificationError("unknown_evidence", "Haiku citó evidencia de perfil que no se le suministró.")
+                if (source.company_id != company.id or source.contact_id is not None or source.kind != "observed"
+                        or source.source_type == "manual" or is_search_evidence(source)):
+                    raise QualificationError("unsupported_profile", "El perfil necesita evidencia observada de la empresa, no de personas o búsquedas.")
+                if source.contradiction_ids or source.id in conflicts:
+                    raise QualificationError("contradicted_profile", "El perfil cita evidencia con contradicciones pendientes.")
+                if not any(citation.quote in text for text in (clip(source.excerpt, EXCERPT_CHARS) or "",
+                                                               clip(source.claim, CLAIM_CHARS) or "")):
+                    raise QualificationError("unsupported_quote", "La cita del perfil no aparece literalmente en la evidencia suministrada.")
     if any(item.value == 1 and item.evidence_ids
            and all(is_search_hit(by_id[evidence_id]) for evidence_id in item.evidence_ids)
            for item in output.criteria.values()):

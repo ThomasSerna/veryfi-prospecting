@@ -29,7 +29,7 @@ from prospecting.models import (
 )
 from prospecting.qualification import (
     classify, compute_score, identity_confirmed, material_contradiction, parse_output, primary_support,
-    QualificationError, allowed_roles, rubric_for, validate_output,
+    HaikuProfileAssessment, QualificationError, allowed_roles, rubric_for, validate_output,
     SEARCH_RESULT_CLAIM, enterprise_sort_key,
 )
 from prospecting.sources import is_search_hit
@@ -398,6 +398,17 @@ def validate_snapshot(snapshot, case, label):
                 not math.isclose(fit, assessment.fit_score, rel_tol=1e-9, abs_tol=1e-9)) or not math.isclose(coverage, assessment.coverage, abs_tol=1e-9):
             raise ValueError("La puntuación/cobertura no corresponde a los criterios congelados.")
         selected = facts if snapshot.selected_evidence_ids is None else [fact for fact in facts if fact.id in snapshot.selected_evidence_ids]
+        if campaign.config_snapshot.role_taxonomy is not None:
+            saved_output = HaikuProfileAssessment(
+                criteria={name: criterion.model_dump() for name, criterion in assessment.criteria.items()},
+                products=assessment.products, target_roles=assessment.target_roles,
+                profile_matches=assessment.profile_matches, explanation=assessment.explanation,
+            )
+            try:
+                validate_output(saved_output, selected, campaign, company=company,
+                                all_evidence=[fact for fact in facts if fact.retrieved_at <= assessment.created_at])
+            except QualificationError as error:
+                raise ValueError("Los perfiles o citas de la evaluación no corresponden al caso congelado.") from error
         cited = {ref for criterion in assessment.criteria.values() for ref in criterion.evidence_ids}
         if snapshot.selected_evidence_ids is not None and not cited <= set(snapshot.selected_evidence_ids):
             raise ValueError("La evaluación cita evidencia que no se envió.")
@@ -544,8 +555,10 @@ def evaluate_manifest(path, candidate=None):
         result = None
         if response is not None and mode == "replay":
             try:
-                output = parse_output(response.text, response.stop_reason)
-                criteria = validate_output(output, selected, snapshot.campaign)
+                output = parse_output(response.text, response.stop_reason, campaign=snapshot.campaign)
+                criteria = validate_output(output, selected, snapshot.campaign, company=snapshot.company,
+                                           all_evidence=[fact for fact in snapshot.evidence
+                                                         if assessment is None or fact.retrieved_at <= assessment.created_at])
                 result = classify(criteria, rubric_for(snapshot.campaign), excluded=False,
                                   identity_confirmed=identity_confirmed(snapshot.company),
                                   contradiction=material_contradiction(output, criteria, selected),
@@ -553,7 +566,8 @@ def evaluate_manifest(path, candidate=None):
                 if (assessment is None or criteria != assessment.criteria or result.priority != assessment.priority
                         or result.fit_score != assessment.fit_score or result.coverage != assessment.coverage
                         or list(dict.fromkeys(output.products)) != assessment.products
-                        or list(dict.fromkeys(output.target_roles)) != assessment.target_roles):
+                        or list(dict.fromkeys(output.target_roles)) != assessment.target_roles
+                        or getattr(output, "profile_matches", []) != assessment.profile_matches):
                     raise ValueError("El replay no reproduce la evaluación capturada.")
             except QualificationError as failure:
                 if assessment is not None:

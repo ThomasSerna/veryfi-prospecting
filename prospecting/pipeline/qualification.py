@@ -121,7 +121,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     if campaign is None or run_item is None or company is None:
         raise ValueError("La empresa no pertenece a la campaña.")
     base = {"campaign_id": campaign_id, "company_id": company_id}
-    prompt_version = prompt_version_for(campaign.rubric_version)
+    prompt_version = prompt_version_for(campaign.rubric_version,
+                                        role_taxonomy=campaign.config_snapshot.role_taxonomy is not None)
     previous = [item for item in db.list_assessments(campaign_id, company_id)
                 if item.rubric_version == campaign.rubric_version]
     latest = previous[-1] if previous else None
@@ -282,8 +283,8 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
              "estimated_cost_usd": call.estimated_cost_usd}
     capture("response.json", call.model_dump(mode="json"))
     try:
-        output = parse_output(call.text, call.stop_reason)
-        criteria = validate_output(output, selected, campaign)
+        output = parse_output(call.text, call.stop_reason, campaign=campaign)
+        criteria = validate_output(output, selected, campaign, company=company, all_evidence=evidence)
     except QualificationError as error:
         return pending(error.code, error.message, **spent)
     result = classify(
@@ -295,6 +296,7 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         **base, criteria=criteria, fit_score=result.fit_score, coverage=result.coverage,
         priority=result.priority, products=list(dict.fromkeys(output.products)),
         target_roles=list(dict.fromkeys(output.target_roles)), model_id=call.model,
+        profile_matches=getattr(output, "profile_matches", []),
         prompt_version=prompt_version, rubric_version=campaign.rubric_version,
         explanation=explanation_text(output), revision_of=None if latest is None else latest.id,
     ), stop_reason={
