@@ -11,8 +11,8 @@ from pydantic import Field, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, contact_context, derive_readiness, merge_contact, role_position, target_roles,
-    validate_contact,
+    ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, derive_readiness,
+    matched_role_family, merge_contact, role_families, role_position, target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.models import (
@@ -69,9 +69,12 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         if contact.id not in {item.id for item in people}:
             raise ValueError("El contacto no pertenece al flujo Apollo de esta campaña.")
         now = utc_now()
-        roles = None if assessment is None else target_roles(company, assessment, campaign)
+        stored_contact = contact
+        roles = None if assessment is None else target_roles(company, assessment, campaign, evidence=evidence)
+        if assessment is not None:
+            contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
         if (assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED
-                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now, roles)):
+                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)):
             raise ValueError("La persona necesita identidad, cargo y empleo pertinente vigentes antes de confirmar un canal.")
         channel = next((item for item in contact.channels
                         if (item.type, item.value) == (channel_type, channel_value)), None)
@@ -88,14 +91,14 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
             "manual_confirmation_reason": reason, "professional": True, "direct": True,
             "evidence_ids": channel.evidence_ids + [fact.id],
         })
-        updated = Contact.model_validate(contact.model_copy(update={"channels": [
+        updated = Contact.model_validate(stored_contact.model_copy(update={"channels": [
             updated_channel if item == channel else item for item in contact.channels]}))
         if not channel_is_usable(updated_channel, updated, evidence + [fact], campaign.limits, now, company):
             raise ValueError("El canal conserva evidencia contradictoria o con fecha futura; no se puede confirmar.")
         db.save_contact(updated, evidence=[fact])
         people, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
         readiness = derive_readiness(assessment, people, evidence,
-                                     campaign.limits, now, company, roles)
+                                     campaign.limits, now, company, roles, campaign=campaign)
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 
@@ -145,7 +148,7 @@ class _ContactStage:
         self.claude_funding_source = claude_funding_source
         self.base = {"campaign_id": campaign.id, "company_id": company.id}
         self.effort = campaign.limits.effort[str(assessment.priority)]
-        self.roles = target_roles(company, assessment, campaign)
+        self.roles = target_roles(company, assessment, campaign, evidence=self.facts())
         self.requests, self.evidence_ids, self.warnings = [], [], []
         self.tick = time.monotonic()
         local_deadline = self.tick + max(0.0, self.effort.active_seconds - run.consumed_limits.contacts_active_seconds)
@@ -182,11 +185,30 @@ class _ContactStage:
     def selected(self) -> set[UUID]:
         """Personas que ocupan el cupo; una selección antigua de un cargo fuera del perfil no lo ocupa (T09)."""
         ids = {UUID(key.split(":")[-1]) for key in self.run.attempts if key.startswith(PERSON_KEY)}
+        if self.campaign.config_snapshot.role_taxonomy is not None:
+            return ids.intersection(item.id for item in self.people() if item.relevant_function is True)
         return ids - {item.id for item in self.db.list_contacts(self.company.id) if item.relevant_function is False}
 
     def ranked_people(self):
         selected = self.selected()
-        return sorted(self.people(), key=lambda item: _rank(item, self.roles, selected))
+        people = sorted(self.people(), key=lambda item: _rank(item, self.roles, selected))
+        if self.campaign.config_snapshot.role_taxonomy is None:
+            return people
+        families = role_families(self.company, self.assessment, self.campaign, evidence=self.facts())
+        positions = {}
+        for family in families:
+            positions.setdefault(family.function_id, len(positions))
+        occurrences, ordered = {}, []
+        facts, now = self.facts(), utc_now()
+        for contact in people:
+            family, _ = matched_role_family(contact, self.company, self.assessment, self.campaign, facts, now)
+            base = _rank(contact, self.roles, selected)
+            quality = base[:3] + (base[-2],)
+            key = quality, None if family is None else family.function_id
+            occurrence = occurrences.get(key, 0)
+            occurrences[key] = occurrence + 1
+            ordered.append((quality, occurrence, positions.get(key[1], len(positions)), base, contact))
+        return [item[-1] for item in sorted(ordered, key=lambda item: item[:-1])]
 
     def people(self):
         now = utc_now()
@@ -194,11 +216,12 @@ class _ContactStage:
                      and now - timedelta(days=self.campaign.limits.cache.contact_days) <= item.retrieved_at <= now}
         people, _ = contact_context(self.campaign, self.db.list_contacts(self.company.id),
                                     self.db.list_evidence(self.company.id))
-        return [item for item in people if item.id in fresh_ids]
+        return [apply_campaign_roles(item, self.company, self.assessment, self.campaign, self.facts(), now)
+                for item in people if item.id in fresh_ids]
 
     def readiness(self):
         return derive_readiness(self.assessment, self.people(), self.facts(), self.campaign.limits, utc_now(),
-                                self.company, self.roles)
+                                self.company, self.roles, campaign=self.campaign)
 
     def finish(self, reason, *, status="checked", message=None):
         state = self.readiness()
@@ -308,7 +331,15 @@ class _ContactStage:
                     channel.model_copy(update={"contact_id": match.id}) for channel in candidate.channels]})
                 source = [item.model_copy(update={"contact_id": match.id}) if item.contact_id == old_id else item for item in source]
                 candidate = merge_contact(match, candidate, facts + source)
-            saved.append((apply_target_roles(candidate, self.roles), source))
+            if self.campaign.config_snapshot.role_taxonomy is not None:
+                provenance = {field: ids for field, ids in candidate.provenance.items() if field != "relevant_function"}
+                if match is not None and match.provenance.get("relevant_function"):
+                    provenance["relevant_function"] = match.provenance["relevant_function"]
+                candidate = candidate.model_copy(update={"relevant_function": None if match is None else match.relevant_function,
+                                                         "provenance": provenance})
+            else:
+                candidate = apply_target_roles(candidate, self.roles)
+            saved.append((candidate, source))
         return saved, []
 
     # Fases, de menor a mayor esfuerzo (§9).
@@ -354,7 +385,8 @@ class _ContactStage:
     def _reuse_known_people(self):
         """Un canal preferido ya guardado termina la etapa; las personas válidas ocupan su cupo."""
         existing_eligible = [item for item in self.ranked_people() if validate_contact(
-            item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles)]
+            item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles,
+            campaign=self.campaign)]
         if existing_eligible:
             selected = self.selected()
             additions = {}
@@ -370,8 +402,20 @@ class _ContactStage:
     def _search_apollo(self):
         """Busca candidatos del dominio; el segundo intento acota los cargos, sin paginación."""
         access, company = self.apollo_access, self.company
-        for index in range(self.effort.people_queries):
-            request = people_search_request(company, self.roles, access.account_ref, by_roles=bool(index))
+        if self.campaign.config_snapshot.role_taxonomy is None:
+            requests = [people_search_request(company, self.roles, access.account_ref, by_roles=bool(index))
+                        for index in range(self.effort.people_queries)]
+        else:
+            families = role_families(company, self.assessment, self.campaign, evidence=self.facts())
+            requests = []
+            for with_seniority in (True, False):
+                group = [family for family in families if bool(family.seniorities) == with_seniority]
+                titles = list(dict.fromkeys(title for family in group for title in family.titles_en + family.titles_es))
+                if titles:
+                    seniorities = list(dict.fromkeys(level for family in group for level in family.seniorities))
+                    requests.append(people_search_request(company, titles, access.account_ref, by_roles=True,
+                                                         seniorities=seniorities))
+        for request in requests[:self.effort.people_queries]:
             self.perform(request, ApolloSearchResponse, credits=0,
                          count_key=PEOPLE_SEARCH_KEY, cap=self.effort.people_queries,
                          consumed={"people_queries": 1}, funding=access.funding_source,
@@ -516,15 +560,18 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
             or company.domain is None or is_non_business(company.domain)):
         return ContactReport(**base, status="skipped", business_status=run.business_status,
                              stop_reason="contact_preconditions")
+    stage = _ContactStage(db, budget, client, campaign, company, run, assessment, apollo_access=apollo_access,
+                          authorizations=authorizations, tavily_account_ref=tavily_account_ref, claude=claude,
+                          claude_account_ref=claude_account_ref, claude_funding_source=claude_funding_source,
+                          deadline=deadline)
+    if not stage.roles and campaign.config_snapshot.role_taxonomy is not None:
+        return stage.finish("no_target_roles", status="pending",
+                            message="No hay un caso de uso respaldado para seleccionar cargos.")
     try:
         require_apollo_access(campaign, apollo_access, budget)
     except ValueError as error:
         return ContactReport(**base, status="pending", business_status=run.business_status,
                              stop_reason="apollo_access_unverified", error_message=str(error))
-    stage = _ContactStage(db, budget, client, campaign, company, run, assessment, apollo_access=apollo_access,
-                          authorizations=authorizations, tavily_account_ref=tavily_account_ref, claude=claude,
-                          claude_account_ref=claude_account_ref, claude_funding_source=claude_funding_source,
-                          deadline=deadline)
     if not stage.roles:
         return ContactReport(**base, status="skipped", stop_reason="no_target_roles")
     return stage.execute()

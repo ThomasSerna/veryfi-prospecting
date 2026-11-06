@@ -17,7 +17,7 @@ from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
 from prospecting.contacts import (
-    ContactMatch, ContactMatchConfig, channel_is_usable, contact_context, contact_match, derive_readiness, employment_basis, load_contact_match,
+    ContactMatch, ContactMatchConfig, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness, employment_basis, load_contact_match,
     match_sort_key, target_roles, validate_contact,
 )
 from prospecting.db import Database
@@ -229,21 +229,24 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 excluded = item.business_status == BusinessStatus.EXCLUDED or match is not None and match.strength == "confirmed"
                 assessment = None if item.last_assessment_id is None else db.get_assessment(item.last_assessment_id)
                 contacts, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
-                roles = None if assessment is None else target_roles(company, assessment, campaign)
+                roles = None if assessment is None else target_roles(company, assessment, campaign, evidence=evidence)
+                if assessment is not None:
+                    contacts = [apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
+                                for contact in contacts]
                 results = []
                 for contact in contacts:
                     eligible = not excluded and match is None and assessment is not None and validate_contact(
-                        contact, company, assessment, evidence, campaign.limits, now, roles)
+                        contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
                     basis = employment_basis(contact, company, evidence, campaign.limits, now) if eligible else None
                     ranking = None if weights is None or assessment is None else contact_match(
-                        contact, company, assessment, evidence, campaign.limits, now, roles, weights)
+                        contact, company, assessment, evidence, campaign.limits, now, roles, weights, campaign=campaign)
                     results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable,
                                                  employment_basis=basis, match=ranking))
                 results.sort(key=lambda item: match_sort_key(item.match, item.eligible, item.contact, roles or []))
                 status = None if assessment is None else derive_readiness(
-                    assessment, contacts, evidence, campaign.limits, now, company, roles)
+                    assessment, contacts, evidence, campaign.limits, now, company, roles, campaign=campaign)
                 if excluded:
                     status = BusinessStatus.EXCLUDED
                 elif match is not None:
@@ -639,7 +642,8 @@ class _Run:
                 people, evidence = contact_context(self.campaign, self.db.list_contacts(company_id), self.db.list_evidence(company_id))
                 state = BusinessStatus.EXCLUDED if item.business_status == BusinessStatus.EXCLUDED else derive_readiness(
                     assessment, people, evidence,
-                    self.campaign.limits, utc_now(), company, target_roles(company, assessment, self.campaign))
+                    self.campaign.limits, utc_now(), company, target_roles(company, assessment, self.campaign, evidence=evidence),
+                    campaign=self.campaign)
                 self.complete(company_id, state, item.stop_reason if state == BusinessStatus.EXCLUDED else report.stop_reason)
             self.notify(company_id)
             if report.status == "pending" and not exhausted and self.halt(report.stop_reason):

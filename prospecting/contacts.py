@@ -54,13 +54,43 @@ def parse_source_date(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def target_roles(company: Company, assessment: Assessment, campaign: Campaign) -> list[str]:
+def target_roles(company: Company, assessment: Assessment, campaign: Campaign, *,
+                 evidence: list[Evidence] | None = None) -> list[str]:
     """Todos los cargos de los perfiles de la empresa, primero los elegidos en la evaluación."""
+    if campaign.config_snapshot.role_taxonomy is not None:
+        return list(dict.fromkeys(title for family in role_families(company, assessment, campaign, evidence=evidence)
+                                  for title in family.titles_en + family.titles_es))
     allowed = list(dict.fromkeys(role for profile in campaign.config_snapshot.profiles
                                 if profile.segment in (company.segments or []) and profile.segment in campaign.segments
                                 for role in profile.target_roles))
     selected = [role for role in assessment.target_roles if role in allowed]
     return list(dict.fromkeys(selected + allowed))
+
+
+def role_families(company: Company, assessment: Assessment, campaign: Campaign, *,
+                  evidence: list[Evidence] | None = None) -> list:
+    """Familias del caso de uso sustentado, sin atribuir autoridad a la persona."""
+    taxonomy = campaign.config_snapshot.role_taxonomy
+    if taxonomy is None or assessment.company_id != company.id or assessment.campaign_id != campaign.id:
+        return []
+    allowed = {profile.id for profile in campaign.config_snapshot.profiles
+               if profile.segment in (company.segments or []) and profile.segment in campaign.segments}
+    matches = assessment.profile_matches
+    if evidence is not None:
+        by_id = {fact.id: fact for fact in evidence if fact.company_id == company.id}
+        contradicted = {identifier for fact in by_id.values() for identifier in fact.contradiction_ids}
+        matches = [match for match in matches if all(
+            citation.evidence_id in by_id and citation.evidence_id not in contradicted
+            and not by_id[citation.evidence_id].contradiction_ids
+            and by_id[citation.evidence_id].contact_id is None and by_id[citation.evidence_id].kind == "observed"
+            and not is_search_evidence(by_id[citation.evidence_id])
+            and any(citation.quote in text for text in
+                    (by_id[citation.evidence_id].claim, by_id[citation.evidence_id].excerpt or ""))
+            for citation in match.citations)]
+    profiles = allowed.intersection(match.profile_id for match in matches)
+    priority = {"business_champion": 0, "technical_champion": 1, "economic_buyer": 2}
+    return sorted((family for family in taxonomy.families if profiles.intersection(family.profile_ids)),
+                  key=lambda family: priority[family.buying_role])
 
 
 def fold_words(value: str) -> str:
@@ -209,13 +239,96 @@ def _valid_refs(ids: list[UUID], contact: Contact, evidence: list[Evidence]) -> 
     return facts
 
 
+def _family_title(title: str, family) -> bool:
+    observed = fold_words(title)
+    if any(mentions(observed, excluded) for excluded in family.excluded_titles):
+        return False
+    # El ámbito regional puede acompañar un cargo; otras palabras cambian su función.
+    observed = " ".join(re.sub(r"\b(?:regional|global)\b", "", observed).split())
+    scope = r"(?:latam|latin america|latinoamerica|colombia|mexico|regional|global|worldwide|and|y|de|para|for|in|en|co|mx)"
+    return any(re.fullmatch(re.escape(fold_words(alias)) + r"(?:\s+" + scope + r")*", observed)
+               for alias in family.titles_en + family.titles_es)
+
+
+def matched_role_family(contact: Contact, company: Company, assessment: Assessment, campaign: Campaign,
+                        evidence: list[Evidence], now: datetime):
+    """Devuelve familia y fuentes observadas; una responsabilidad no se deduce del título."""
+    families = role_families(company, assessment, campaign, evidence=evidence)
+    if not contact.title or not contact.name or not families:
+        return None, []
+    contradicted = {identifier for fact in evidence if fact.company_id == company.id for identifier in fact.contradiction_ids}
+    title_facts = _valid_refs(contact.provenance.get("title", []), contact, evidence)
+    title_facts = [fact for fact in title_facts if fact.id not in contradicted and fact.kind == "observed" and fact.retrieved_at <= now
+                   and mentions(fact.excerpt or fact.claim, contact.title)
+                   and (mentions(fact.excerpt or fact.claim, contact.name) or
+                        fact.source_type == "provider" and fact.contact_id == contact.id)]
+    if not title_facts:
+        return None, []
+    if re.search(r"\b(?:assistant\s+to|asistente(?:\s+ejecutiv[oa])?\s+(?:de|del))\b", fold_words(contact.title)):
+        return None, []
+    for family in families:
+        if _family_title(contact.title, family):
+            return family, [fact.id for fact in title_facts]
+    for fact in evidence:
+        if (fact.contact_id != contact.id or not fact.claim.startswith("Hecho nominal publicado: responsibilities=")
+                or fact.id in contradicted or not _valid_refs([fact.id], contact, evidence) or fact.kind != "observed"
+                or fact.source_type != "primary" or not _corporate(company, fact)
+                or not employment_fresh(fact, company, campaign.limits, now)
+                or not mentions(fact.excerpt or "", contact.name)
+                or employment_ended(fact.excerpt or "", contact.name, contact.title)):
+            continue
+        reference = re.fullmatch(
+            r"(?:apollo_public_v1|public_extraction_v2):[^#]+#contact:responsibilities:"
+            r"([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})", fact.external_reference or "")
+        originals = [] if reference is None else _valid_refs([UUID(reference[1])], contact, evidence)
+        if (not originals or originals[0].id in contradicted or originals[0].kind != "observed"
+                or originals[0].source_type != "primary" or not _corporate(company, originals[0])
+                or not employment_fresh(originals[0], company, campaign.limits, now)
+                or originals[0].url != fact.url or not fact.excerpt
+                or fact.excerpt not in (originals[0].excerpt or "")[:800]):
+            continue
+        for family in families:
+            responsibility = fact.claim.split("responsibilities=", 1)[1]
+            if (not any(mentions(contact.title, excluded) for excluded in family.excluded_titles)
+                    and not re.search(r"\b(?:no|not|never|nunca|sin|neither)\b",
+                                      fold_words(responsibility + " " + (fact.excerpt or "")))
+                    and any(mentions(responsibility, term) for term in family.function_terms)):
+                return family, [fact.id]
+    return None, []
+
+
+def apply_campaign_roles(contact: Contact, company: Company, assessment: Assessment, campaign: Campaign,
+                         evidence: list[Evidence], now: datetime) -> Contact:
+    """Reclasifica en una copia según la campaña; nunca reutiliza un booleano global como prueba."""
+    if campaign.config_snapshot.role_taxonomy is None:
+        return contact
+    family, ids = matched_role_family(contact, company, assessment, campaign, evidence, now)
+    relevant = True if family is not None else None
+    if contact.title and contact.provenance.get("title"):
+        all_families = campaign.config_snapshot.role_taxonomy.families
+        rejected = (not role_families(company, assessment, campaign, evidence=evidence)
+                    or re.search(r"\b(?:assistant\s+to|asistente(?:\s+ejecutiv[oa])?\s+(?:de|del))\b", fold_words(contact.title))
+                    or any(mentions(contact.title, excluded) for item in role_families(company, assessment, campaign, evidence=evidence)
+                           for excluded in item.excluded_titles)
+                    or any(_family_title(contact.title, item) for item in all_families))
+        if family is None and rejected:
+            relevant, ids = False, contact.provenance["title"]
+    provenance = {field: list(values) for field, values in contact.provenance.items() if field != "relevant_function"}
+    if ids:
+        provenance["relevant_function"] = ids
+    return contact.model_copy(update={"relevant_function": relevant, "provenance": provenance})
+
+
 def validate_contact(contact: Contact, company: Company, assessment: Assessment,
                      evidence: list[Evidence], limits: CampaignLimits, now: datetime,
-                     roles: list[str] | None = None) -> bool:
+                     roles: list[str] | None = None, *, campaign: Campaign | None = None) -> bool:
     """La identidad y el empleo no se deducen del email ni del momento de consulta.
 
     `roles` son los cargos de los perfiles (`target_roles`); sin ellos solo valen los elegidos en la evaluación.
     """
+    taxonomy = campaign is not None and campaign.config_snapshot.role_taxonomy is not None
+    if taxonomy:
+        contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
     if (company.id != contact.company_id or assessment.company_id != company.id or
             company.identity_status != IdentityStatus.CONFIRMED or
             assessment.priority not in (Priority.HIGH, Priority.MEDIUM) or
@@ -231,13 +344,15 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
         facts = _valid_refs(contact.provenance.get(field, []), contact, evidence)
         if not facts or any(item.kind != "observed" for item in facts):
             return False
+        if taxonomy and field == "relevant_function":
+            continue
         value = contact.name if field == "name" else contact.title
         if not any(mentions(item.excerpt or item.claim, value) and
                    (mentions(item.excerpt or item.claim, contact.name) or
                     item.source_type == "provider" and item.contact_id == contact.id)
                    for item in facts):
             return False
-    if not role_matches(contact.title, roles if roles is not None else assessment.target_roles):
+    if not taxonomy and not role_matches(contact.title, roles if roles is not None else assessment.target_roles):
         return False
     if contact.geographic_scope and (not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence)
                                      or not _scope_covers(contact.geographic_scope, company)):
@@ -353,14 +468,15 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
 
 def derive_readiness(assessment: Assessment, contacts: list[Contact], evidence: list[Evidence],
                      limits: CampaignLimits, now: datetime, company: Company,
-                     roles: list[str] | None = None) -> BusinessStatus:
+                     roles: list[str] | None = None, *, campaign: Campaign | None = None) -> BusinessStatus:
     if assessment.priority == Priority.EXCLUDED:
         return BusinessStatus.EXCLUDED
     if assessment.priority == Priority.LOW:
         return BusinessStatus.LOW_FIT
     if assessment.priority == Priority.INSUFFICIENT_EVIDENCE or company.identity_status != IdentityStatus.CONFIRMED:
         return BusinessStatus.INSUFFICIENT_EVIDENCE
-    eligible = [contact for contact in contacts if validate_contact(contact, company, assessment, evidence, limits, now, roles)]
+    eligible = [contact for contact in contacts if validate_contact(contact, company, assessment, evidence, limits, now, roles,
+                                                               campaign=campaign)]
     usable = [channel for contact in eligible for channel in contact.channels
               if channel_is_usable(channel, contact, evidence, limits, now, company)]
     if any(channel.type in (ChannelType.EMAIL, ChannelType.PHONE, ChannelType.WHATSAPP) for channel in usable):
@@ -438,11 +554,17 @@ def load_contact_match(path: Path) -> ContactMatchConfig:
 
 
 def contact_match(contact: Contact, company: Company, assessment: Assessment, evidence: list[Evidence],
-                  limits: CampaignLimits, now: datetime, roles: list[str], config: ContactMatchConfig) -> ContactMatch:
+                  limits: CampaignLimits, now: datetime, roles: list[str], config: ContactMatchConfig, *,
+                  campaign: Campaign | None = None) -> ContactMatch:
     """Match determinístico, sin red ni IA, con las mismas reglas de persona y canal (§10)."""
     selected = [role for role in assessment.target_roles if role in roles]
-    if not contact.title or not contact.provenance.get("title"):
+    taxonomy = campaign is not None and campaign.config_snapshot.role_taxonomy is not None
+    if taxonomy:
+        contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
+    if not contact.title or not contact.provenance.get("title") or taxonomy and contact.relevant_function is None:
         role = "unknown"
+    elif taxonomy:
+        role = ("selected_role" if role_matches(contact.title, selected) else "profile_role") if contact.relevant_function is True else "outside_profile"
     elif role_matches(contact.title, selected):
         role = "selected_role"
     elif role_matches(contact.title, roles):

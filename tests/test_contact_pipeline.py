@@ -10,7 +10,7 @@ import pytest
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
 from prospecting.contacts import contact_context, target_roles
 from prospecting.db import Database
-from prospecting.models import BusinessStatus, Channel, Contact, Evidence, IdentityStatus, RunItem, Usage, utc_now
+from prospecting.models import Assessment, BusinessStatus, Channel, Contact, Evidence, IdentityStatus, RunItem, Usage, utc_now
 from prospecting.pipeline import find_contacts
 from prospecting.providers import ClaudeClient, HttpResponse, ProviderClient
 from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess, ApolloSearchResponse, parse_search, person_id
@@ -104,6 +104,58 @@ def contact_case(database, config, make_campaign, make_company, make_assessment,
 def add_candidate(case, identifier="persona-sintetica", title="Product Manager"):
     case.people.append({"id": identifier, "first_name": "Persona Sintética", "last_name_obfuscated": "U***",
         "title": title, "last_refreshed_at": utc_now().isoformat(), "organization": {"name": case.company.name}})
+
+
+def enable_role_taxonomy(case, role_config, *, matched=True):
+    case.campaign = case.campaign.model_copy(update={"id": uuid4(), "config_snapshot": role_config})
+    case.db.save_campaign(case.campaign)
+    case.db.save_run_item(RunItem(campaign_id=case.campaign.id, company_id=case.company.id, stage="assessed"))
+    matches = []
+    if matched:
+        source = Evidence(company_id=case.company.id, claim="Caso de uso sintético de gastos", kind="observed", source_type="primary",
+                          url=f"https://{case.company.domain}/producto", retrieved_at=utc_now(),
+                          excerpt="La empresa permite gestionar recibos y reembolsos.")
+        case.db.save_evidence(source)
+        matches = [{"profile_id": "expense_reimbursement", "citations": [{"evidence_id": source.id, "quote": source.excerpt}]}]
+    case.assessment = Assessment.model_validate(case.assessment.model_dump() | {
+        "id": uuid4(), "campaign_id": case.campaign.id, "profile_matches": matches})
+    case.db.save_assessment(case.assessment)
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    case.db.save_run_item(run.model_copy(update={"last_assessment_id": case.assessment.id}))
+
+
+def test_taxonomy_without_evidenced_case_is_pending_without_consumption(contact_case, role_config):
+    case = contact_case
+    enable_role_taxonomy(case, role_config, matched=False)
+    report = case.find(**case.public)
+    assert report.status == "pending" and report.stop_reason == "no_target_roles"
+    assert case.calls == [] and case.model_calls == [] and case.db.list_usage() == []
+
+
+def test_taxonomy_search_filters_first_query_and_reuses_processed_requests(contact_case, role_config):
+    case = contact_case
+    enable_role_taxonomy(case, role_config)
+    report = case.find()
+    requests = [payload for operation, payload, _ in case.calls if operation == "people_search"]
+    assert len(requests) == 2
+    assert requests[0]["person_seniorities"]
+    assert "person_seniorities" not in requests[1]
+    assert all(payload["person_titles"] and payload["include_similar_titles"] is False for payload in requests)
+    assert report.business_status == "qualified_no_contact"
+    assert case.find().status == "already_checked" and len(case.calls) == 2
+
+
+def test_later_profile_contradiction_prevents_search_without_rewriting_assessment(contact_case, role_config):
+    case = contact_case
+    enable_role_taxonomy(case, role_config)
+    citation = case.assessment.profile_matches[0].citations[0]
+    case.db.save_evidence(Evidence(company_id=case.company.id, kind="observed", source_type="primary", retrieved_at=utc_now(),
+        url=f"https://{case.company.domain}/producto", claim="La información sintética anterior queda contradicha.",
+        contradiction_ids=[citation.evidence_id]))
+    report = case.find()
+    assert report.status == "pending" and report.stop_reason == "no_target_roles"
+    assert case.calls == [] and case.db.list_usage() == []
+    assert case.db.get_assessment(case.assessment.id).profile_matches
 
 
 @pytest.mark.parametrize("change", ["absent", "access", "work_email", "operation"])

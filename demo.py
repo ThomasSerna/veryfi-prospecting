@@ -19,7 +19,7 @@ from prospecting.db import Database
 from prospecting.identity import ExclusionEntry, ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, Company, Contact, Criterion, Evidence, RunItem,
-    RunStage, VeryfiConfig, utc_now,
+    ProfileMatch, RunStage, VeryfiConfig, utc_now,
 )
 from prospecting.pipeline import confirm_alternative_channel
 from prospecting.qualification import classify, primary_support, rubric_for
@@ -39,21 +39,25 @@ COMPANIES = [
     {"name": "Empresa sintética Pagos", "domain": "pagos-sintetica.example", "country": "CO",
      "segment": "fintech_software", "values": (1, 1, 0.5, 1, None), "products": ["document_ocr_api", "lens"],
      "need": "La aplicación ficticia pide a sus usuarios fotografiar recibos para reembolsar gastos.",
+     "profile": "expense_reimbursement",
      "person": ("Persona Sintética Uno", "Head of Product"), "channel": "email",
      "stop_reason": "preferred_channel_found"},
     {"name": "Empresa sintética Gastos", "domain": "gastos-sintetica.example", "country": "MX",
      "segment": "fintech_software", "values": (1, 1, 1, 0.5, 0.5), "products": ["document_ocr_api", "antifraud"],
      "need": "La plataforma ficticia concilia tarjetas corporativas con facturas que suben los empleados.",
+     "profile": "expense_reimbursement",
      "person": ("Persona Sintética Dos", "CTO"), "channel": "linkedin", "confirm": True,
      "stop_reason": "contact_plan_exhausted"},
     {"name": "Empresa sintética Promociones", "domain": "promociones-sintetica.example", "country": "MX",
      "segment": "cpg_loyalty", "values": (0.5, 0.5, 0.5, 1, None), "products": ["validation_enrichment"],
      "need": "La marca ficticia publica una promoción que pide subir el ticket de compra para participar.",
+     "profile": "cpg_brands",
      "person": ("Persona Sintética Tres", "Brand Manager"), "channel": "linkedin",
      "stop_reason": "contact_plan_exhausted"},
     {"name": "Empresa sintética Fidelización", "domain": "fidelizacion-sintetica.example", "country": "CO",
      "segment": "cpg_loyalty", "values": (1, 0.5, None, 0.5, None), "products": ["loyalty_whatsapp"],
-     "need": "El programa ficticio de puntos acumula compras validadas con comprobantes.",
+     "need": "La plataforma ficticia implementa para marcas programas de puntos con compras validadas mediante comprobantes.",
+     "profile": "loyalty_platforms_agencies",
      "partial_person": ("Persona S.", "Loyalty Manager"), "stop_reason": "contact_plan_exhausted"},
     {"name": "Empresa sintética Facturas", "domain": "facturas-sintetica.example", "country": "CO",
      "segment": "fintech_software", "values": (None, 0.5, 1, None, None), "products": [],
@@ -103,6 +107,8 @@ def _assessment(campaign: Campaign, company: Company, spec: dict, evidence: list
     return Assessment(campaign_id=campaign.id, company_id=company.id, criteria=criteria, fit_score=result.fit_score,
                       coverage=result.coverage, priority=result.priority, products=spec["products"],
                       target_roles=roles, rubric_version=campaign.rubric_version, created_at=now,
+                      profile_matches=[] if "profile" not in spec else [ProfileMatch.model_validate({
+                          "profile_id": spec["profile"], "citations": [{"evidence_id": need.id, "quote": need.excerpt}]})],
                       explanation=f"Evaluación exclusivamente sintética para la demostración: {spec['need']}")
 
 
@@ -188,7 +194,7 @@ def build_demo(directory: Path, now: datetime) -> Campaign:
             db.save_company(company, evidence=company_facts)
             review = {} if "review" not in spec else {"review_status": spec["review"][0],
                                                       "review_reason": spec["review"][1], "reviewed_at": now}
-            status = derive_readiness(assessment, contacts, evidence, campaign.limits, now, company)
+            status = derive_readiness(assessment, contacts, evidence, campaign.limits, now, company, campaign=campaign)
             db.save_run_item(item.model_copy(update={"business_status": status} | review))
             for contact in contacts:
                 db.save_contact(contact, evidence=[fact for fact in evidence if fact.contact_id == contact.id])

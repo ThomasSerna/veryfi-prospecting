@@ -108,13 +108,22 @@ class ApolloEnrichmentResponse(BaseModel):
 
 
 def people_search_request(company: Company, roles: list[str], account_ref: str, *,
-                          by_roles: bool = False) -> ProviderRequest:
+                          by_roles: bool = False, seniorities: list[str] | None = None) -> ProviderRequest:
     if company.identity_status != IdentityStatus.CONFIRMED or company.domain is None:
         raise ContactError("identity_unconfirmed", "Apollo necesita el dominio de una entidad confirmada.")
     payload = {"q_organization_domains_list": [company.domain], "page": 1, "per_page": 10}
-    if by_roles and roles:
+    if seniorities is not None and not roles:
+        raise ContactError("no_target_roles", "La búsqueda por catálogo requiere títulos específicos.")
+    if (by_roles or seniorities is not None) and roles:
         payload["person_titles"] = list(dict.fromkeys(roles))
         payload["include_similar_titles"] = False
+        if len(payload["person_titles"]) >= 100:
+            raise ContactError("invalid_role_filters", "Apollo admite menos de cien títulos por búsqueda.")
+        if seniorities:
+            allowed = {"owner", "founder", "c_suite", "partner", "vp", "head", "director", "manager", "senior", "entry", "intern"}
+            if not set(seniorities) <= allowed:
+                raise ContactError("invalid_role_filters", "Apollo recibió un nivel de seniority no admitido.")
+            payload["person_seniorities"] = list(dict.fromkeys(seniorities))
     return ProviderRequest(provider=PROVIDER, operation="people_search", account_ref=account_ref, payload=payload)
 
 
