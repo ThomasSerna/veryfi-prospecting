@@ -245,5 +245,501 @@
       "paid_phone_enrichment": false
     },
     "llm": {"max_input_tokens": 9000, "max_output_tokens": 1000}
+  },
+  "role_taxonomy": {
+    "version": "role_taxonomy_v1",
+    "source_date": "2026-11-06",
+    "validation_status": "pending",
+    "families": [
+      {
+        "id": "product_leadership",
+        "function_id": "product",
+        "profile_ids": [
+          "expense_reimbursement",
+          "payments_ap_erp",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Head of Product",
+          "Director of Product",
+          "VP of Product"
+        ],
+        "titles_es": [
+          "Director de Producto",
+          "Vicepresidente de Producto"
+        ],
+        "departments": [
+          "Product",
+          "Product Management"
+        ],
+        "seniorities": [
+          "head",
+          "director",
+          "vp"
+        ],
+        "function_terms": [
+          "product roadmap",
+          "hoja de ruta del producto",
+          "gestión de producto",
+          "gestiona el producto"
+        ],
+        "excluded_titles": [
+          "Product Marketing",
+          "Marketing de Producto",
+          "Product Sales"
+        ],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "product_owners",
+        "function_id": "product",
+        "profile_ids": [
+          "expense_reimbursement",
+          "payments_ap_erp",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Product Manager",
+          "Senior Product Manager",
+          "Group Product Manager"
+        ],
+        "titles_es": [
+          "Gerente de Producto",
+          "Product Manager Senior",
+          "Líder de Producto",
+          "Responsable de Producto"
+        ],
+        "departments": [
+          "Product",
+          "Product Management"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "product roadmap",
+          "hoja de ruta del producto",
+          "gestión de producto",
+          "gestiona el producto"
+        ],
+        "excluded_titles": [
+          "Product Marketing",
+          "Marketing de Producto",
+          "Product Sales"
+        ],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "engineering_leadership",
+        "function_id": "engineering",
+        "profile_ids": [
+          "expense_reimbursement",
+          "payments_ap_erp",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "technical_champion",
+        "titles_en": [
+          "Engineering Manager",
+          "Engineering Director",
+          "Director of Engineering",
+          "VP of Engineering",
+          "CTO",
+          "Chief Technology Officer",
+          "Chief Technical Officer"
+        ],
+        "titles_es": [
+          "Gerente de Ingeniería",
+          "Director de Ingeniería",
+          "Vicepresidente de Ingeniería",
+          "Director de Tecnología"
+        ],
+        "departments": [
+          "Engineering",
+          "Information Technology"
+        ],
+        "seniorities": [
+          "manager",
+          "director",
+          "vp",
+          "c_suite"
+        ],
+        "function_terms": [
+          "API integration",
+          "integración de APIs",
+          "software engineering",
+          "ingeniería de software"
+        ],
+        "excluded_titles": [
+          "Sales Engineering",
+          "Recruiting",
+          "Recruitment",
+          "Reclutamiento"
+        ],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "engineering_specialists",
+        "function_id": "engineering",
+        "profile_ids": [
+          "expense_reimbursement",
+          "payments_ap_erp",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "technical_champion",
+        "titles_en": [
+          "Solutions Architect",
+          "Principal Software Engineer",
+          "Lead Software Engineer",
+          "Enterprise Architect"
+        ],
+        "titles_es": [
+          "Arquitecto de Soluciones",
+          "Ingeniero de Software Principal",
+          "Líder de Ingeniería de Software",
+          "Arquitecto Empresarial"
+        ],
+        "departments": [
+          "Engineering",
+          "Information Technology"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "API integration",
+          "integración de APIs",
+          "software architecture",
+          "arquitectura de software"
+        ],
+        "excluded_titles": [
+          "Sales",
+          "Ventas"
+        ],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "financial_process",
+        "function_id": "financial_process",
+        "profile_ids": [
+          "payments_ap_erp"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Accounts Payable Manager",
+          "Accounts Payable Lead",
+          "Financial Operations Director",
+          "Financial Operations Lead",
+          "Financial Systems Manager"
+        ],
+        "titles_es": [
+          "Gerente de Cuentas por Pagar",
+          "Responsable de Cuentas por Pagar",
+          "Director de Operaciones Financieras",
+          "Responsable de Operaciones Financieras",
+          "Gerente de Sistemas Financieros"
+        ],
+        "departments": [
+          "Finance",
+          "Operations",
+          "Executive"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "accounts payable",
+          "cuentas por pagar",
+          "financial operations",
+          "operaciones financieras"
+        ],
+        "excluded_titles": [
+          "Sales",
+          "Ventas"
+        ],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "fintech_economic_targets",
+        "function_id": "fintech_economic",
+        "profile_ids": [
+          "expense_reimbursement",
+          "payments_ap_erp"
+        ],
+        "buying_role": "economic_buyer",
+        "titles_en": [
+          "Chief Product Officer",
+          "CPO",
+          "CFO",
+          "Chief Financial Officer",
+          "CIO"
+        ],
+        "titles_es": [
+          "Director General de Producto",
+          "Director Financiero",
+          "Director de Sistemas"
+        ],
+        "departments": [
+          "Finance",
+          "Operations",
+          "Executive"
+        ],
+        "seniorities": [
+          "director",
+          "c_suite"
+        ],
+        "function_terms": [
+          "presupuesto del producto",
+          "product budget",
+          "presupuesto de automatización",
+          "automation budget"
+        ],
+        "excluded_titles": [],
+        "source_reference": "How Veryfi Sells, págs. 6, 9 y 18; docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "marketing_leadership",
+        "function_id": "marketing",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Marketing Director",
+          "Director of Marketing"
+        ],
+        "titles_es": [
+          "Director de Marketing",
+          "Director de Mercadeo"
+        ],
+        "departments": [
+          "Marketing",
+          "Brand Management",
+          "CRM & Loyalty",
+          "Trade Marketing"
+        ],
+        "seniorities": [
+          "director",
+          "head"
+        ],
+        "function_terms": [
+          "promotional campaigns",
+          "campañas promocionales",
+          "loyalty programs",
+          "programas de fidelización"
+        ],
+        "excluded_titles": [],
+        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "marketing_owners",
+        "function_id": "marketing",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Brand Manager",
+          "Senior Brand Manager",
+          "Loyalty Manager",
+          "CRM Manager",
+          "Trade Marketing Manager",
+          "Shopper Marketing Manager",
+          "Digital Marketing Manager"
+        ],
+        "titles_es": [
+          "Gerente de Marca",
+          "Gerente Senior de Marca",
+          "Responsable de Fidelización",
+          "Gerente de Lealtad",
+          "Responsable de CRM",
+          "Gerente de Trade Marketing",
+          "Gerente de Shopper Marketing",
+          "Gerente de Marketing Digital"
+        ],
+        "departments": [
+          "Marketing",
+          "Brand Management",
+          "CRM & Loyalty",
+          "Trade Marketing"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "promotional campaigns",
+          "campañas promocionales",
+          "loyalty programs",
+          "programas de fidelización",
+          "recompensas por compra"
+        ],
+        "excluded_titles": [],
+        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "consumer_insights",
+        "function_id": "insights",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "technical_champion",
+        "titles_en": [
+          "Consumer Insights Manager",
+          "Shopper Insights Manager",
+          "Marketing Analytics Manager",
+          "Business Intelligence Manager"
+        ],
+        "titles_es": [
+          "Gerente de Consumer Insights",
+          "Gerente de Shopper Insights",
+          "Gerente de Analítica de Marketing",
+          "Gerente de Inteligencia de Negocios"
+        ],
+        "departments": [
+          "Consumer Insights",
+          "Business Intelligence",
+          "Marketing Technology",
+          "Information Technology"
+        ],
+        "seniorities": [
+          "manager",
+          "head",
+          "director"
+        ],
+        "function_terms": [
+          "purchase analytics",
+          "analítica de compras",
+          "consumer insights",
+          "investigación del consumidor",
+          "datos de canasta"
+        ],
+        "excluded_titles": [],
+        "source_reference": "Sales Deck (2026, Product Intelligence); docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "marketing_technology",
+        "function_id": "martech",
+        "profile_ids": [
+          "cpg_brands",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "technical_champion",
+        "titles_en": [
+          "Marketing Technology Manager",
+          "MarTech Lead",
+          "Digital Transformation Manager"
+        ],
+        "titles_es": [
+          "Gerente de Tecnología de Marketing",
+          "Líder de MarTech",
+          "Gerente de Transformación Digital"
+        ],
+        "departments": [
+          "Consumer Insights",
+          "Business Intelligence",
+          "Marketing Technology",
+          "Information Technology"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "CRM integration",
+          "integración con CRM",
+          "marketing technology",
+          "tecnología de marketing",
+          "datos de canasta"
+        ],
+        "excluded_titles": [],
+        "source_reference": "Sales Deck (2026, Product Intelligence); docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "cpg_economic_targets",
+        "function_id": "cpg_economic",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "economic_buyer",
+        "titles_en": [
+          "CMO",
+          "Chief Marketing Officer",
+          "VP of Marketing",
+          "Commercial Director"
+        ],
+        "titles_es": [
+          "Director General de Mercadeo",
+          "Vicepresidente de Marketing",
+          "Director Comercial"
+        ],
+        "departments": [
+          "Marketing",
+          "Commercial",
+          "Executive"
+        ],
+        "seniorities": [
+          "director",
+          "vp",
+          "c_suite"
+        ],
+        "function_terms": [
+          "marketing budget",
+          "presupuesto de marketing",
+          "presupuesto de promociones",
+          "promotions budget"
+        ],
+        "excluded_titles": [],
+        "source_reference": "How Veryfi Sells y Sales Deck (2026); docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      },
+      {
+        "id": "loyalty_accounts",
+        "function_id": "loyalty_accounts",
+        "profile_ids": [
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Account Director",
+          "Loyalty Lead",
+          "Loyalty Manager"
+        ],
+        "titles_es": [
+          "Director de Cuentas",
+          "Líder de Fidelización",
+          "Responsable de Fidelización"
+        ],
+        "departments": [
+          "Marketing",
+          "Commercial",
+          "Executive"
+        ],
+        "seniorities": [],
+        "function_terms": [
+          "loyalty programs",
+          "programas de fidelización",
+          "purchase validation",
+          "validación de compras"
+        ],
+        "excluded_titles": [
+          "Advertising Sales",
+          "Venta de Publicidad"
+        ],
+        "source_reference": "How Veryfi Sells y Sales Deck (2026); docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
+        "validation_status": "pending"
+      }
+    ]
   }
 }

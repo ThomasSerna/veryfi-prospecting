@@ -174,7 +174,16 @@ def test_deterministic_ids_do_not_change(config):
         "2427ceee-90ce-55f7-8a19-f9a85648f26a", "a69153b4-d402-564b-9bca-eaf990a4ee2c"]
 
 
-def test_sqlite_schema_does_not_change(tmp_path):
+def test_sqlite_schema_versions_are_fixed(tmp_path):
+    from prospecting.db import _SCHEMA_V1
+
+    with sqlite3.connect(":memory:") as legacy:
+        legacy.executescript(_SCHEMA_V1)
+        original = legacy.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
+        ).fetchall()
+    assert hashlib.sha256(json.dumps(original, ensure_ascii=False).encode("utf-8")).hexdigest() == (
+        "041bdf146760695410c12672702ddcdec7a3c19a301f5a623d197ca0e66dff47")
     path = tmp_path / "synthetic-schema.sqlite3"
     with Database(path):
         pass
@@ -185,7 +194,7 @@ def test_sqlite_schema_does_not_change(tmp_path):
         ).fetchall()
     connection.close()
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode("utf-8")).hexdigest()
-    assert (version, digest) == (1, "041bdf146760695410c12672702ddcdec7a3c19a301f5a623d197ca0e66dff47")
+    assert (version, digest) == (2, "14880148696ceb55146937607e51777ff4a43f37a647582a580b37bc09c1d486")
 
 
 def test_reserved_model_has_a_published_price():

@@ -217,6 +217,42 @@ class Profile(Contract):
     source_reference: Text
 
 
+ApolloSeniority = Literal["owner", "founder", "c_suite", "partner", "vp", "head", "director", "manager", "senior", "entry", "intern"]
+
+
+class RoleFamily(Contract):
+    id: Text
+    function_id: Text
+    profile_ids: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    buying_role: Literal["business_champion", "technical_champion", "economic_buyer"]
+    titles_en: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    titles_es: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    departments: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    seniorities: Annotated[list[ApolloSeniority], AfterValidator(_unique)]
+    function_terms: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
+    excluded_titles: Annotated[list[Text], AfterValidator(_unique)]
+    source_reference: Text
+    source_date: date
+    validation_status: Literal["pending", "validated"]
+
+
+class RoleTaxonomy(Contract):
+    version: Literal["role_taxonomy_v1"]
+    source_date: date
+    validation_status: Literal["pending", "validated"]
+    families: Annotated[list[RoleFamily], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_families(self) -> Self:
+        _unique([family.id for family in self.families])
+        for bounded in (True, False):
+            titles = {title.casefold() for family in self.families if bool(family.seniorities) == bounded
+                      for title in family.titles_en + family.titles_es}
+            if len(titles) >= 100:
+                raise ValueError("Cada grupo de búsqueda admite menos de 100 títulos únicos.")
+        return self
+
+
 class CriterionDefinition(Contract):
     name: Text
     weight: Annotated[StrictInt, Field(gt=0, le=100)]
@@ -394,12 +430,17 @@ class VeryfiConfig(Contract):
     profiles: Annotated[list[Profile], Field(min_length=1)]
     rubrics: dict[Text, Rubric]
     defaults: Defaults
+    role_taxonomy: RoleTaxonomy | None = None
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
         product_ids = [product.id for product in self.catalog.products]
         _unique(product_ids)
         _unique([profile.id for profile in self.profiles])
+        if self.role_taxonomy is not None:
+            profile_ids = {profile.id for profile in self.profiles}
+            if any(not set(family.profile_ids) <= profile_ids for family in self.role_taxonomy.families):
+                raise ValueError("Una familia de cargos referencia perfiles inexistentes.")
         for profile in self.profiles:
             if not set(profile.products) <= set(product_ids):
                 raise ValueError("Un perfil referencia productos inexistentes.")
@@ -684,6 +725,16 @@ class Criterion(Contract):
         return self
 
 
+class ProfileCitation(Contract):
+    evidence_id: UUID
+    quote: Annotated[Text, Field(max_length=600)]
+
+
+class ProfileMatch(Contract):
+    profile_id: Text
+    citations: Annotated[list[ProfileCitation], Field(min_length=1)]
+
+
 class Assessment(Contract):
     id: UUID = Field(default_factory=uuid4)
     campaign_id: UUID
@@ -700,9 +751,11 @@ class Assessment(Contract):
     explanation: Text
     created_at: UtcDatetime = Field(default_factory=utc_now)
     revision_of: UUID | None = None
+    profile_matches: list[ProfileMatch] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_structure(self) -> Self:
+        _unique([match.profile_id for match in self.profile_matches])
         if set(self.criteria) != CRITERION_NAMES:
             raise ValueError("La evaluación requiere los cinco criterios.")
         if (self.model_id is None) != (self.prompt_version is None):

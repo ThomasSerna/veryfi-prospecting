@@ -42,7 +42,18 @@ def reject_external_network(monkeypatch):
 
 @pytest.fixture
 def config():
-    """Carga el catálogo propuesto, sin afirmar validación comercial."""
+    """Conserva la instantánea histórica para las pruebas previas a T15."""
+    from prospecting.models import VeryfiConfig
+
+    current = VeryfiConfig.model_validate_json(
+        (PROJECT_ROOT / "config" / "veryfi.json").read_text(encoding="utf-8")
+    )
+    return current.model_copy(update={"role_taxonomy": None})
+
+
+@pytest.fixture
+def role_config():
+    """Catálogo operativo T15, todavía pendiente de validación comercial."""
     from prospecting.models import VeryfiConfig
 
     return VeryfiConfig.model_validate_json(

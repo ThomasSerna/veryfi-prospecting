@@ -16,13 +16,13 @@ _TABLES = {
     Campaign: ("campaigns", ("id",), {"countries", "segments", "filters", "limits", "config_snapshot"}),
     Company: ("companies", ("id",), {"aliases", "operating_countries", "segments", "size", "provenance"}),
     Evidence: ("evidence", ("id",), {"contradiction_ids"}),
-    Assessment: ("assessments", ("id",), {"criteria", "products", "target_roles"}),
+    Assessment: ("assessments", ("id",), {"criteria", "products", "target_roles", "profile_matches"}),
     Contact: ("contacts", ("id",), {"employment_evidence_ids", "provenance", "channels"}),
     RunItem: ("run_items", ("campaign_id", "company_id"), {"attempts", "consumed_limits"}),
     Usage: ("usage", ("request_id",), {"reserved_tokens", "tokens"}),
 }
 
-_SCHEMA = """
+_SCHEMA_V1 = """
 CREATE TABLE campaigns (
     id TEXT PRIMARY KEY NOT NULL,
     countries TEXT NOT NULL CHECK(json_valid(countries)),
@@ -139,6 +139,9 @@ CREATE INDEX usage_by_account ON usage(provider, account_ref, status);
 CREATE INDEX usage_by_fingerprint ON usage(request_fingerprint);
 """
 
+_MIGRATION_V2 = "ALTER TABLE assessments ADD COLUMN profile_matches TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(profile_matches));"
+_SCHEMA = _SCHEMA_V1 + _MIGRATION_V2
+
 
 def _schema_signature(connection: sqlite3.Connection) -> list[tuple]:
     return [tuple(row) for row in connection.execute(
@@ -166,18 +169,24 @@ class Database:
             self._connection.execute("PRAGMA foreign_keys=ON")
             if is_new:
                 self._connection.executescript(
-                    "BEGIN IMMEDIATE;\n" + _SCHEMA + "\nPRAGMA user_version=1;\nCOMMIT;"
+                    "BEGIN IMMEDIATE;\n" + _SCHEMA + "\nPRAGMA user_version=2;\nCOMMIT;"
                 )
+            elif self._connection.execute("PRAGMA user_version").fetchone()[0] == 1:
+                with self.transaction():
+                    self._verify_schema(version=1)
+                    self._connection.execute(_MIGRATION_V2)
+                    self._connection.execute("PRAGMA user_version=2")
+                    self._verify_schema()
             self._verify_schema()
         except BaseException:
             self._connection.close()
             raise
 
-    def _verify_schema(self) -> None:
-        if self._connection.execute("PRAGMA user_version").fetchone()[0] != 1:
+    def _verify_schema(self, *, version: int = 2) -> None:
+        if self._connection.execute("PRAGMA user_version").fetchone()[0] != version:
             raise sqlite3.DatabaseError("Versión de base de datos incompatible; no se modificó el esquema.")
         with sqlite3.connect(":memory:") as expected:
-            expected.executescript(_SCHEMA)
+            expected.executescript(_SCHEMA_V1 if version == 1 else _SCHEMA)
             if _schema_signature(self._connection) != _schema_signature(expected):
                 raise sqlite3.DatabaseError("Esquema incompleto o incompatible; no se recreó la base.")
         if self._connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
@@ -306,7 +315,7 @@ class Database:
             if contact_id is not None and row["contact_id"] not in (None, str(contact_id)):
                 raise ValueError("La evidencia pertenece a otra persona.")
 
-    def _check_references(self, model):
+    def _check_references(self, model, *, writing: bool = False):
         if isinstance(model, Company):
             for ids in model.provenance.values():
                 self._evidence_refs(ids, model.id)
@@ -367,8 +376,33 @@ class Database:
             if not set(model.products).issubset(product_ids):
                 raise ValueError("La evaluación referencia productos fuera del catálogo de campaña.")
             roles = {role for profile in campaign.config_snapshot.profiles for role in profile.target_roles}
+            taxonomy = campaign.config_snapshot.role_taxonomy
+            if taxonomy is not None:
+                roles |= {title for family in taxonomy.families for title in family.titles_en + family.titles_es}
             if not set(model.target_roles).issubset(roles):
                 raise ValueError("La evaluación referencia cargos fuera de los perfiles de campaña.")
+            profiles = {profile.id: profile for profile in campaign.config_snapshot.profiles}
+            company = self._load(Company, model.company_id)
+            for match in model.profile_matches:
+                profile = profiles.get(match.profile_id)
+                if (taxonomy is None or profile is None or company is None
+                        or profile.segment not in campaign.segments
+                        or writing and profile.segment not in (company.segments or [])):
+                    raise ValueError("El perfil respaldado no corresponde a la empresa y campaña.")
+                self._evidence_refs([citation.evidence_id for citation in match.citations], model.company_id)
+                for citation in match.citations:
+                    fact = self._load(Evidence, citation.evidence_id)
+                    contradicted = self._connection.execute(
+                        "SELECT 1 FROM evidence, json_each(evidence.contradiction_ids) AS cited "
+                        "WHERE evidence.company_id=? AND cited.value=? LIMIT 1",
+                        (str(model.company_id), str(fact.id)),
+                    ).fetchone()
+                    if (fact.contact_id is not None or fact.kind != "observed" or fact.source_type == "manual" or fact.contradiction_ids
+                            or writing and contradicted or (fact.external_reference or "").startswith("contacts_search:")
+                            or fact.provider == "tavily" and fact.source_type == "secondary"
+                            and fact.claim.startswith("Tavily devolvió esta página")
+                            or not any(citation.quote in text for text in (fact.excerpt or "", fact.claim))):
+                        raise ValueError("El perfil requiere una cita empresarial observada y sin contradicciones.")
 
     def save_campaign(self, campaign: Campaign) -> Campaign:
         campaign = self._validated(Campaign, campaign)
@@ -437,7 +471,7 @@ class Database:
         assessment = self._validated(Assessment, assessment)
         with self._atomic():
             self._store(assessment, immutable=True)
-            self._check_references(assessment)
+            self._check_references(assessment, writing=True)
         return self.get_assessment(assessment.id)
 
     def get_assessment(self, id: UUID) -> Assessment | None:
