@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-06 (America/Bogota). Instantánea de los 22 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05 y T15 a T22 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
+- **Fecha de corte:** 2026-11-07 (America/Bogota). Instantánea de los 22 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15 cerrado el 2026-11-07 y T16 a T22 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -24,7 +24,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T12 | [#13](https://github.com/ThomasSerna/veryfi-prospecting/issues/13) | Migrar completamente la búsqueda y enriquecimiento de personas de Hunter a Apollo | Cerrado 2026-11-01 | P0 crítica | Migración de proveedor/backend | ninguna |
 | T13 | [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14) | Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes | Cerrado 2026-11-01 | P0 | Discovery/backend | T12 (migración a Apollo) |
 | T14 | [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15) | Diseñar y evaluar rubric_v2 que priorice cuentas enterprise | Cerrado 2026-11-05 | P0 | Scoring/backend | T12, T13 |
-| T15 | [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16) | Configurar cargos de referencia de Veryfi para búsqueda en Apollo | Abierto | P0 | Reglas de negocio/búsqueda | T12, T13 |
+| T15 | [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16) | Configurar cargos de referencia de Veryfi para búsqueda en Apollo | Cerrado 2026-11-07 | P0 | Reglas de negocio/búsqueda | T12, T13 |
 | T16 | [#17](https://github.com/ThomasSerna/veryfi-prospecting/issues/17) | Buscar múltiples personas relevantes por cuenta usando Apollo | Abierto | P0 | Pipeline/backend | T12, T15, T18 |
 | T17 | [#18](https://github.com/ThomasSerna/veryfi-prospecting/issues/18) | Validar costos, acceso, confiabilidad y limpieza de la migración a Apollo | Abierto | P0 | QA/operación de proveedor único | T12 |
 | T18 | [#19](https://github.com/ThomasSerna/veryfi-prospecting/issues/19) | Verificar empleo vigente y canales profesionales de contactos Apollo | Abierto | P0 | Calidad de datos/backend | T12, T15 |
@@ -37,15 +37,15 @@ Las prioridades y los tipos solo existen en los issues T12 a T22. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12, T13 y T14 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T15 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Listas para empezar | T15 (P0) y T17 (P0) | Sus dependencias están cerradas. T15 configura los cargos; T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
+| Listas para empezar | T18 (P0) y T17 (P0) | Sus dependencias están cerradas. T18 separa el empleo declarado por Apollo de la evidencia corporativa vigente; T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
 | Paralelizable | T20 (P1) | Es solo UX/UI y no toca el pipeline; T12 y T13 están cerradas |
-| Bloqueadas | T18 (espera T15), T16 y T19 (esperan T15 y T18), T21 (espera T15 a T18) y T22 (espera T17, T16, T18 y T21) | Dependencias abiertas |
+| Bloqueadas | T16 y T19 (esperan T18), T21 (espera T16, T17 y T18) y T22 (espera T17, T16, T18 y T21) | Dependencias abiertas |
 
-Orden sugerido por olas: T15, T17 y T20; después T18; después T16 y T19; después T21; al final T22.
+Orden sugerido por olas: T17 y T20 (primera ola) junto con T18; después T16 y T19; después T21; al final T22.
 
 ## Dependencias entre tareas
 
@@ -54,10 +54,10 @@ flowchart LR
     T12["T12 Migración a Apollo (cerrada)"]:::closed
     T13["T13 ICP enterprise (cerrada)"]:::closed
     T14["T14 rubric_v2 (cerrada)"]:::closed
-    T15["T15 Cargos de referencia"]:::ready
+    T15["T15 Cargos de referencia (cerrada)"]:::closed
     T16["T16 Múltiples personas"]
     T17["T17 Validar Apollo y retirar Hunter"]:::ready
-    T18["T18 Empleo vigente y canales"]
+    T18["T18 Empleo vigente y canales"]:::ready
     T19["T19 contact_match_v2"]
     T20["T20 Alternativas de interfaz"]:::ready
     T21["T21 Validación enterprise"]
@@ -91,7 +91,7 @@ Verde: cerrada. Amarillo: lista para empezar. La línea punteada marca una depen
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
 
-### Enterprise sobre Apollo (T13 y T14 cerradas; T15 a T21 abiertas)
+### Enterprise sobre Apollo (T13 a T15 cerradas; T16 a T21 abiertas)
 
 #### T13 · Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes
 
@@ -152,7 +152,7 @@ Como ejecutivo de ventas, quiero una calificación explicable que priorice empre
 #### T15 · Configurar cargos de referencia de Veryfi para búsqueda en Apollo
 
 - **Issue:** [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-07
 - **Prioridad:** P0
 - **Dependencias:** T12, T13
 - **Tipo:** Reglas de negocio/búsqueda
