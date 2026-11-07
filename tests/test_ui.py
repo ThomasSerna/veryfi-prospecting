@@ -302,14 +302,36 @@ def test_manual_confirmation_preserves_filters_and_company_sequence(ui_results, 
 
 @pytest.mark.parametrize("ui_results", ["legacy"], indirect=True)
 def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client, make_hunter_contact):
+    """El historial de Hunter se muestra con su origen y pide revisión; no deja lista a la persona (T18)."""
     case = ui_results
     contact, evidence = make_hunter_contact(case.companies[0], case.now)
     with Database(case.paths.db) as db:
         db.save_contact(contact, evidence=evidence)
     shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
-    assert "Pertinente" in shown
-    assert "Inferida de Hunter; confirmar antes de contactar" in shown
+    assert "Pertinente" in shown and "Por confirmar" in shown
+    assert "Inferida del historial de Hunter; no prueba el puesto" in shown
+    assert "Inferido del historial de Hunter; sin evidencia del puesto" in shown
+    assert "Requiere revisión humana" in shown
     assert "Vigente según evidencia del puesto" in shown
+    assert "Vigente según fuente corporativa o pública" in shown
+
+
+def test_company_detail_explains_stale_employment_and_disables_confirmation(ui_results, client):
+    case = ui_results
+    old = Evidence(company_id=case.companies[0].id, contact_id=case.contact.id, kind="observed", source_type="primary",
+                   provider="anthropic", external_reference=f"apollo_public_v1:synthetic-old:{case.contact.id}",
+                   url=f"https://{case.companies[0].domain}/team", retrieved_at=case.now - timedelta(days=40),
+                   claim="Directorio profesional sintético antiguo.",
+                   excerpt=f"Persona Sintética Uno, CTO de {case.companies[0].name}, perfil profesional nominal.")
+    with Database(case.paths.db) as db:
+        db.save_contact(case.contact.model_copy(update={"employment_evidence_ids": [old.id]}), evidence=[old])
+    view = read_campaign(case.paths.db, case.campaign.id)
+    [person] = next(item for item in view.companies if item.company.id == case.companies[0].id).contacts
+    assert (person.eligible, person.employment.state, person.employment.reason) == (False, "unknown", "stale_source")
+    assert person.employment.evidence_ids == [old.id]
+    page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    assert "Sin comprobar." in page and "La fuente del puesto está vencida." in page
+    assert "Requiere evidencia vigente del puesto. La fuente del puesto está vencida." in page
 
 
 def test_confirmation_of_ineligible_person_does_not_modify_channel(ui_results, client):

@@ -94,6 +94,7 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
     assert row["company_id"] == str(case.company.id) and row["contact_id"] == str(case.contacts[0].id)
     assert row["fit_score"] == "88.9" and row["coverage"] == "0.9"
     assert row["contact_ready"] == "True" and row["business_status"] == "ready_preferred"
+    assert row["employment_status"] == "corporate_evidence" and row["employment_reason"] == ""
     assert row["phone"] == "'\t+571234567890"
     channels = json.loads(row["channels"])
     assert channels[0]["normalized_status"] == "published_professional" and channels[0]["verified_at"] is None
@@ -123,6 +124,8 @@ def test_employment_inferred_from_hunter_is_exported_as_claim_with_its_warning(c
     exported = {row["contact_id"]: row for row in rows(export_csv(view, include_all=True))}
     assert exported[str(contact.id)]["contact_ready"] == "False"
     assert exported[str(contact.id)]["contact_eligible"] == "False"
+    assert exported[str(contact.id)]["employment_status"] == "provider_claim"
+    assert exported[str(contact.id)]["employment_reason"] == "historical_inference"
     assert HUNTER_EMPLOYMENT_WARNING in exported[str(contact.id)]["warnings"]
     assert str(case.contacts[0].id) not in exported
 

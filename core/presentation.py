@@ -9,8 +9,8 @@ from prospecting.pipeline import CampaignView, read_campaign
 from prospecting.sources import validate_public_url
 
 
-HUNTER_EMPLOYMENT_WARNING = ("Vigencia del puesto inferida de Hunter (correo verificado y fuente vista hace poco); "
-                             "confirmar antes de contactar.")
+HUNTER_EMPLOYMENT_WARNING = ("Vigencia inferida del historial de Hunter (correo verificado y fuente vista hace poco); "
+                             "no prueba el puesto ni deja lista a la persona.")
 
 LABELS = {
     "CO": "Colombia", "MX": "México",
@@ -65,11 +65,33 @@ MATCH_LABELS = {
     "identity:complete_pending": "Nombre completo; identidad sin confirmar",
     "identity:incomplete": "Nombre incompleto o pendiente",
     "employment:evidence": "Vigente según evidencia del puesto",
-    "employment:hunter_signal": "Inferida de Hunter; confirmar antes de contactar",
+    "employment:hunter_signal": "Inferida del historial de Hunter; no prueba el puesto",
     "employment:unverified": "Sin comprobar",
     "identity_contradicted": "su identidad tiene contradicciones",
     "employment_ended": "una fuente indica que ya no ocupa el puesto",
     "scope_mismatch": "su alcance geográfico no cubre los países de la empresa",
+}
+# Vigencia del empleo (T18): estado, origen y motivo calculados al leer; solo la evidencia del puesto habilita.
+EMPLOYMENT_LABELS = {
+    "corporate_evidence": "Vigente según fuente corporativa o pública",
+    "provider_claim:apollo": "Declarado por Apollo; sin evidencia del puesto",
+    "provider_claim:hunter": "Inferido del historial de Hunter; sin evidencia del puesto",
+    "contradicted": "Contradicho por una fuente",
+    "unknown": "Sin comprobar",
+}
+EMPLOYMENT_REASONS = {
+    "employment_ended": "Una fuente indica que ya no ocupa el puesto o que trabaja en otra entidad.",
+    "title_changed": "Una fuente corporativa muestra otro cargo; revisa cuál está vigente.",
+    "contradicted_source": "La fuente del puesto tiene contradicciones pendientes.",
+    "future_date": "La fuente del puesto tiene una fecha futura.",
+    "stale_source": "La fuente del puesto está vencida.",
+    "undated_source": "La fuente no permite estimar la vigencia del puesto; requiere revisión.",
+    "ambiguous_source": "La fuente no nombra a la persona; requiere revisión.",
+    "title_unconfirmed": "Ninguna fuente vigente confirma el cargo actual; requiere revisión.",
+    "incomplete_name": "Falta el nombre completo para contrastar el puesto.",
+    "provider_claim_only": "Solo el proveedor declara el empleo; falta una fuente corporativa vigente.",
+    "historical_inference": "Inferencia histórica de Hunter: correo verificado y fuente aún publicada, sin fecha del puesto.",
+    "no_employment_evidence": "Sin evidencia del puesto.",
 }
 READY = {"ready_preferred", "ready_alternative"}
 STOP_MESSAGES = {
@@ -172,6 +194,20 @@ def match_label(value):
     return MATCH_LABELS.get(key, key)
 
 
+def employment_label(status):
+    """Estado de la vigencia del empleo; una afirmación del proveedor nombra su origen."""
+    if status is None or status == "":
+        return "Sin comprobar"
+    key = f"{status.state}:{status.origin}" if status.state == "provider_claim" else status.state
+    return EMPLOYMENT_LABELS.get(key, EMPLOYMENT_LABELS["unknown"])
+
+
+def employment_reason(status):
+    """Motivo en lenguaje comercial; vacío cuando la evidencia del puesto está vigente."""
+    reason = getattr(status, "reason", None)
+    return "" if reason is None else EMPLOYMENT_REASONS.get(reason, "Comprobación de empleo pendiente.")
+
+
 def money(value):
     return "Desconocido" if value is None else f"USD {value:.6f}"
 
@@ -225,6 +261,9 @@ def ineligible_reason(person):
         return "Faltan datos comprobados de la persona."
     if not contact.name_complete or contact.identity_status != "confirmed":
         return "Requiere nombre completo e identidad confirmada."
+    employment = getattr(person, "employment", None)
+    if employment is not None and employment.state != "corporate_evidence":
+        return f"Requiere evidencia vigente del puesto. {employment_reason(employment)}".strip()
     if not contact.current_employment:
         return "Requiere empleo actual confirmado."
     if not contact.relevant_function:
@@ -269,7 +308,7 @@ CSV_FIELDS = (
     "campaign_id", "company_id", "contact_id", "company_name", "domain", "entity_name",
     "countries", "segments", "stage", "business_status", "stored_business_status", "stop_reason", "error_message",
     "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
-    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready",
+    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready", "employment_status", "employment_reason",
     "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
     "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
@@ -308,6 +347,8 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "buying_role": None if contact is None else contact.buying_role,
                 "contact_eligible": None if person is None else person.eligible,
                 "contact_ready": None if person is None else person.eligible and bool(person.usable_channels),
+                "employment_status": None if person is None else person.employment.state,
+                "employment_reason": None if person is None else person.employment.reason,
                 # Sin match la celda queda vacía, nunca 0.
                 "contact_match": None if match is None else match.score,
                 "contact_match_version": None if match is None else match.version,
