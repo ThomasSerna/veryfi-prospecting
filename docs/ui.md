@@ -188,8 +188,12 @@ La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
 La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
-match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. La
-tabla de la campaña muestra cuántas personas tiene cada empresa y su mejor match. El match
+match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. Cada
+persona muestra su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
+o Lista) y, si Apollo no la confirmó al enriquecerla, el motivo. Encima, un resumen indica el
+objetivo del nivel y cuántas personas son candidatas, pertinentes y listas; sin
+`people_policy` se omite el objetivo. La tabla de la campaña muestra cuántas personas tiene
+cada empresa, cuántas son pertinentes y listas, y su mejor match. El match
 ordena la revisión; «listo» sigue dependiendo de las reglas de persona y canal. Si falta
 un `config/contact_match.json` válido, la ficha lo avisa y muestra a las personas sin
 porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
@@ -230,7 +234,9 @@ score y cobertura, criterios, canales, fuentes con fechas, revisión, advertenci
 motivos. También incluye el porcentaje de match de cada persona, su versión, el motivo
 de descarte y el desglose; las filas de cada empresa siguen ese orden. Las columnas
 `employment_status` y `employment_reason` llevan el estado y el motivo de la vigencia
-del empleo, recalculados al descargar. Un valor desconocido queda vacío, nunca se
+del empleo, recalculados al descargar. `person_stage` lleva la etapa de la persona;
+`people_candidates`, `people_relevant`, `people_ready`, `people_target` y
+`people_policy_version` repiten en cada fila los conteos y el objetivo de su empresa. Un valor desconocido queda vacío, nunca se
 convierte en cero.
 
 La descarga usa UTF-8 con BOM, `csv` estándar y todos los campos entrecomillados.

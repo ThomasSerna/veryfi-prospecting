@@ -1938,6 +1938,14 @@ a.sequence-link:hover {
 }
 
 /* Contactos y canales */
+.company-panel > p.people-summary {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .contact-detail {
   margin-top: 24px;
   padding-top: 24px;

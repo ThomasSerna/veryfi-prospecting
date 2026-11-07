@@ -2,7 +2,7 @@
 
 Reglas vigentes de descubrimiento, identidad, evidencia, calificación, esfuerzo de búsqueda, personas y canales. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Las cifras son propuestas iniciales (`rubric_v1`, `contact_match_v1`) pendientes de validación con Veryfi. El flujo de etapas está en [Architecture.md](Architecture.md#flujo-de-investigación). Los topes de gasto están en [Budget-policy.md](Budget-policy.md).
 
-T14 propone `rubric_v2` para evaluación académica; su activación queda condicionada a la comparación indicada más abajo. `rubric_v1` sigue vigente para las campañas históricas y como valor predeterminado mientras no se cumpla esa condición. La vigencia del empleo neutral al proveedor de T18 ya rige (aprobada por el usuario el 7 de noviembre de 2026). Los issues T16 (parada y número de personas por cuenta) y T19 (`contact_match_v2`) proponen modificar otras reglas de este archivo.
+T14 propone `rubric_v2` para evaluación académica; su activación queda condicionada a la comparación indicada más abajo. `rubric_v1` sigue vigente para las campañas históricas y como valor predeterminado mientras no se cumpla esa condición. La vigencia del empleo neutral al proveedor de T18 y la política multicontacto de T16 (`people_policy_v1`) ya rigen (aprobadas por el usuario el 7 de noviembre de 2026). El issue T19 (`contact_match_v2`) propone modificar otras reglas de este archivo.
 
 ## Descubrimiento
 
@@ -99,8 +99,8 @@ La prioridad decide cuánto investigar, no autoriza gasto ilimitado. Todos los n
 |---|---:|---:|---|---:|
 | Análisis inicial | Hasta 2 consultas | Hasta 3 páginas | Sin enriquecimiento | 90 s |
 | Evidencia insuficiente | 1 consulta adicional | Hasta 2 páginas adicionales | Ninguno hasta recalificar | 45 s adicionales |
-| Prioridad media | Hasta 2 consultas adicionales | Hasta 2 páginas adicionales | 1 persona; hasta 1 enriquecimiento por proveedor habilitado | 90 s adicionales |
-| Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Hasta 3 personas; hasta 3 enriquecimientos por proveedor habilitado | 180 s adicionales |
+| Prioridad media | Hasta 2 consultas adicionales | Hasta 2 páginas adicionales | Objetivo de 2 personas pertinentes; hasta 3 personas y 3 enriquecimientos por proveedor habilitado | 90 s adicionales |
+| Prioridad alta | Hasta 4 consultas adicionales | Hasta 4 páginas adicionales | Objetivo de 3 personas pertinentes; hasta 5 personas y 5 enriquecimientos por proveedor habilitado | 180 s adicionales |
 | Prioridad baja/excluida | Ninguna adicional | Ninguna adicional | Ninguno | Detener |
 
 En campañas con `role_taxonomy_v1`, buscar personas por los casos de uso respaldados en la evaluación y por el dominio confirmado. Sin un caso de uso respaldado, la búsqueda queda pendiente. Permitir como máximo dos consultas al proveedor especializado para prioridad media y alta, ambas con cargos específicos: agrupar los que tienen seniority inequívoco y los especialistas o cargos de jerarquía ambigua sin exigir ese filtro. Cada consulta trae hasta 10 candidatos de la primera página. Los límites de personas y enriquecimientos permanecen vigentes. No ampliar la búsqueda silenciosamente ni repetir búsquedas agotadas. Las campañas históricas sin taxonomía conservan sus reglas anteriores.
@@ -114,7 +114,9 @@ Secuencia de menor a mayor esfuerzo:
 5. Usar teléfono directo/extensión o WhatsApp profesional publicado cuando haya asociación explícita a la persona.
 6. Mantener LinkedIn como alternativa; si es el único canal, pedir confirmación humana de que ventas puede usar mensajería.
 
-Detener la empresa cuando se consiga un contacto pertinente con correo/teléfono utilizable. Si solo hay LinkedIn, agotar únicamente el cupo restante de ese nivel para intentar un canal preferido. Hasta tres personas es un máximo, no una obligación de consumir más después de encontrar un resultado útil.
+Con `people_policy_v1` (campañas nuevas, T16), encontrar un canal utilizable no detiene la empresa. Los enriquecimientos siguen, por pertinencia y diversidad de funciones, hasta reunir el objetivo de personas pertinentes del nivel o hasta agotar el tope. Si ya se reunió el número pero queda por intentar un candidato de otra función, solo se enriquecen candidatos de otras funciones hasta cubrir dos. Cumplido el objetivo no se enriquece a nadie más; el objetivo es experimental, no se garantiza ni obliga a consumir el tope. Un candidato que Apollo no confirma queda como candidato con su motivo, y la etapa sigue con el siguiente sin repetir esa llamada. Después se ejecutan la búsqueda pública y la extracción con Haiku dentro de sus cupos, para corroborar el empleo. La empresa se detiene con `people_target_reached`, `enrichment_limit` (tope agotado sin objetivo) o `contact_plan_exhausted`.
+
+Las campañas guardadas sin `people_policy` conservan sus topes anteriores (media 1 persona y 1 enriquecimiento; alta 3 y 3) y la regla anterior: detener la empresa cuando se consiga un contacto pertinente con correo/teléfono utilizable. Si solo hay LinkedIn, agotar únicamente el cupo restante de ese nivel para intentar un canal preferido. Hasta tres personas es un máximo, no una obligación de consumir más después de encontrar un resultado útil.
 
 También detener por tiempo, presupuesto, cuota, falta de nuevas fuentes, proveedor no disponible o límite de intentos. Guardar `stop_reason`. Una búsqueda «exhaustiva» significa agotar ese plan acotado, no explorar toda la web.
 
@@ -160,6 +162,18 @@ Distinguir lo que declara el proveedor de la evidencia del puesto. Python asigna
 Ni un correo, ni su verificación, ni la fecha de actualización de un perfil, ni un dato del proveedor prueban el empleo. Una persona sin `corporate_evidence` nunca aparece como lista; la interfaz y el CSV muestran el estado y el motivo (por ejemplo, fuente vencida, fecha futura, fuente sin fecha, fuente que no nombra a la persona, cargo sin confirmar, nombre incompleto o solo afirmación del proveedor). Los casos ambiguos (otro cargo, fuente sin fecha o sin la persona, cargo sin confirmar e inferencia histórica de Hunter) quedan marcados para revisión humana. Las páginas corporativas y directorios localizados con Tavily son la vía de corroboración; justificar el empleo nunca exige enviar mensajes.
 
 La vigencia inferida que se aplicó a los datos históricos de Hunter se conserva en el [Historial](#historial) como afirmación del proveedor.
+
+### Etapas de persona
+
+Python clasifica cada persona al consultar, sin guardarlo ni llamar a proveedores, en etapas acumulativas:
+
+- **Candidata:** persona observada. Un resultado de Apollo Search, con apellido ofuscado y sin correo, nunca pasa de aquí ni ocupa el cupo de listo.
+- **Identidad verificada:** identidad confirmada con nombre completo; en Apollo, además, enriquecida.
+- **Pertinente:** además, función pertinente, empleo no contradicho y alcance compatible. Es la etapa que cuenta para el objetivo de T16; no exige canal ni evidencia corporativa del puesto.
+- **Pertinente con canal:** además, un canal que cumple las reglas por canal.
+- **Lista:** cumple todos los requisitos de la persona, incluida la [vigencia del empleo](#vigencia-del-empleo), y tiene un canal utilizable.
+
+La interfaz y el CSV muestran la etapa de cada persona y, por empresa, cuántas son candidatas, pertinentes y listas, con el objetivo del nivel.
 
 ### Estados de negocio
 

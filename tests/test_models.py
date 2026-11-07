@@ -63,15 +63,24 @@ def test_configuration_keeps_proposed_rubric_and_catalog(config):
     assert VeryfiConfig.model_validate_json(config.model_dump_json()) == config
 
 
-def test_default_limits_keep_the_documented_initial_values(config):
-    """Topes iniciales de IDEA §7.1, §7.3, §9, §10.2, §12.1 y §14; cambiarlos debe ser explícito."""
-    defaults = config.defaults
+def test_default_limits_keep_the_documented_initial_values(role_config, config):
+    """Topes iniciales de IDEA §7.1, §7.3, §9, §10.2, §12.1 y §14; cambiarlos debe ser explícito.
+
+    T16 amplía personas y enriquecimientos (media 3/3, alta 5/5); la instantánea histórica conserva 1/1 y 3/3.
+    """
+    defaults = role_config.defaults
     assert {level: (item.web_queries, item.pages, item.people, item.enrichments_per_provider, item.people_queries,
                     item.active_seconds) for level, item in defaults.effort.items()} == {
         "initial": (2, 3, 0, 0, 0, 90), "insufficient_evidence": (1, 2, 0, 0, 0, 45),
-        "medium": (2, 2, 1, 1, 2, 90), "high": (4, 4, 3, 3, 2, 180),
+        "medium": (2, 2, 3, 3, 2, 90), "high": (4, 4, 5, 5, 2, 180),
         "low": (0, 0, 0, 0, 0, 0), "excluded": (0, 0, 0, 0, 0, 0),
     }
+    assert [(config.defaults.effort[level].people, config.defaults.effort[level].enrichments_per_provider)
+            for level in ("medium", "high")] == [(1, 1), (3, 3)]
+    policy = role_config.people_policy
+    assert (policy.version, policy.validation_status, policy.target, policy.min_functions) == (
+        "people_policy_v1", "pending", {"medium": 2, "high": 3}, 2)
+    assert config.people_policy is None
     assert (defaults.active_seconds, defaults.max_companies) == (2700, 20)
     assert (defaults.email_verifications_per_channel, defaults.evidence_expansions_per_company) == (1, 1)
     discovery = defaults.discovery
@@ -86,6 +95,32 @@ def test_default_limits_keep_the_documented_initial_values(config):
     assert (defaults.cache.web_days, defaults.cache.contact_days) == (30, 30)
     assert (defaults.freshness.email_days, defaults.freshness.employment_days) == (30, 365)
     assert (defaults.llm.max_input_tokens, defaults.llm.max_output_tokens) == (9000, 1000)
+
+
+@pytest.mark.parametrize("change", [
+    lambda raw: raw.pop("role_taxonomy"),
+    lambda raw: raw.pop("people_provider"),
+    lambda raw: raw["people_policy"]["target"].update(high=6),
+    lambda raw: raw["people_policy"]["target"].pop("medium"),
+    lambda raw: raw["people_policy"].update(min_functions=0),
+    lambda raw: raw["people_policy"].update(version="people_policy_v2"),
+    lambda raw: raw["defaults"]["effort"]["high"].update(people=2, enrichments_per_provider=2),
+    lambda raw: raw["defaults"]["effort"]["high"].update(people=6),
+    lambda raw: raw["defaults"]["effort"]["medium"].update(enrichments_per_provider=4),
+])
+def test_people_policy_requires_taxonomy_apollo_and_bounded_targets(role_config, change):
+    """El objetivo de personas (T16) no supera los topes ni existe sin taxonomía o Apollo."""
+    raw = role_config.model_dump(mode="json")
+    change(raw)
+    with pytest.raises(ValidationError):
+        VeryfiConfig.model_validate(raw)
+
+
+def test_snapshot_without_people_policy_still_loads(role_config):
+    """Las campañas guardadas antes de T16 no tienen objetivo y conservan su parada histórica."""
+    raw = role_config.model_dump(mode="json")
+    raw.pop("people_policy")
+    assert VeryfiConfig.model_validate(raw).people_policy is None
 
 
 @pytest.mark.parametrize("change", [

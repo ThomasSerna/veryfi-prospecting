@@ -12,7 +12,8 @@ from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthori
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
     ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, derive_readiness,
-    matched_role_family, merge_contact, role_families, role_position, target_roles, validate_contact,
+    matched_role_family, merge_contact, people_progress, people_target, person_function, role_families, role_position,
+    target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.models import (
@@ -121,6 +122,8 @@ WEB_QUERIES_KEY = "contacts:web_queries"
 PAGES_KEY = "contacts:pages"
 EXTRACT_KEY = "contacts:extract"
 ENRICHMENTS_KEY = "contacts:apollo_enrichments"
+# T16: Apollo no confirmó a esa persona (`<código>:<contact_id>`); su resultado queda procesado y no se repite.
+REJECTED_KEY = "contacts:apollo_rejected:"
 
 
 def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
@@ -136,6 +139,8 @@ class _ContactStage:
     `run` es siempre el último RunItem guardado. Los candidatos se guardan todos con su
     procedencia; el cupo de personas (`contacts:person:`) solo lo ocupa quien supera la
     validación al investigarla. Cada fase devuelve un ContactReport cuando la etapa termina, o None para seguir.
+    Sin `people_policy` (instantáneas anteriores a T16) la etapa termina en el primer canal preferido; con ella,
+    los enriquecimientos siguen hasta el objetivo de personas pertinentes o el tope del nivel.
     """
 
     def __init__(self, db, budget, client, campaign, company, run, assessment, *, apollo_access, authorizations,
@@ -148,6 +153,8 @@ class _ContactStage:
         self.claude_funding_source = claude_funding_source
         self.base = {"campaign_id": campaign.id, "company_id": company.id}
         self.effort = campaign.limits.effort[str(assessment.priority)]
+        self.policy, self.target = campaign.config_snapshot.people_policy, people_target(campaign, assessment)
+        self.parsed_attempts = {}
         self.roles = target_roles(company, assessment, campaign, evidence=self.facts())
         self.requests, self.evidence_ids, self.warnings = [], [], []
         self.tick = time.monotonic()
@@ -307,8 +314,52 @@ class _ContactStage:
         except (ValueError, TypeError):
             self.checkpoint(attempts=attempts, consumed=consumed)
             raise BudgetError("invalid_contact_data", "La respuesta no respalda los datos de contacto esperados.", usage.request_id) from None
-        self.checkpoint(attempts=attempts | {f"{PROCESSED_KEY}{fingerprint}": 1}, consumed=consumed,
+        extra, self.parsed_attempts = self.parsed_attempts, {}
+        self.checkpoint(attempts=attempts | extra | {f"{PROCESSED_KEY}{fingerprint}": 1}, consumed=consumed,
                         aggregates=aggregates, facts=facts)
+
+    def goal(self):
+        """Estado del objetivo de la política (T16): `(cumplido, funciones cubiertas)`.
+
+        Las funciones cubiertas solo se devuelven cuando ya hay personas suficientes pero falta diversidad y
+        queda un candidato de otra función por intentar: entonces solo se enriquece a candidatos de otras funciones.
+        """
+        people, facts, now = self.people(), self.facts(), utc_now()
+        progress = people_progress(people, self.company, self.assessment, facts, now, self.roles, campaign=self.campaign)
+        if self.target is None or progress.relevant < self.target:
+            return False, None
+        covered = set(progress.function_ids)
+        if len(covered) >= self.policy.min_functions:
+            return True, None
+        others = any(self.enrichable(item, facts) and person_function(
+            item, self.company, self.assessment, self.campaign, facts, now) not in covered | {None} for item in people)
+        return (False, covered) if others else (True, None)
+
+    def goal_reached(self) -> bool:
+        """Sin política, el primer canal preferido (histórico); con política, el objetivo y su diversidad."""
+        if self.policy is None:
+            return self.readiness() == BusinessStatus.READY_PREFERRED
+        return self.goal()[0]
+
+    def enrichable(self, contact, facts) -> bool:
+        """Candidato pertinente con identificador de Apollo que aún no se enriqueció ni se intentó enriquecer."""
+        identifier = person_id(contact, facts)
+        if (identifier is None or contact.relevant_function is not True
+                or contact.identity_status == IdentityStatus.CONTRADICTED or contact.current_employment is False
+                or any(item.contact_id == contact.id and (item.external_reference or "").endswith("#enrichment")
+                       for item in facts)):
+            return False
+        fingerprint = self.client.fingerprint(enrichment_request(identifier, self.apollo_access.account_ref))
+        return not self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0)
+
+    def exhausted_reason(self) -> str:
+        """Motivo de cierre al agotar el plan: objetivo cumplido, tope de enriquecimientos o plan agotado."""
+        if self.policy is not None:
+            if self.goal_reached():
+                return "people_target_reached"
+            if self.run.attempts.get(ENRICHMENTS_KEY, 0) >= min(self.effort.people, self.effort.enrichments_per_provider):
+                return "enrichment_limit"
+        return "contact_plan_exhausted"
 
     def save_candidates(self, parsed):
         """Fusiona candidatos con personas conocidas y los conserva todos con su procedencia (T09).
@@ -355,7 +406,7 @@ class _ContactStage:
                 report = phase()
                 if report is not None:
                     return report
-            return self.finish("contact_plan_exhausted")
+            return self.finish(self.exhausted_reason())
         except (BudgetError, ProviderError, ContactError) as error:
             if getattr(error, "request_id", None) is not None:
                 self.requests.append(error.request_id)
@@ -383,7 +434,7 @@ class _ContactStage:
         return None
 
     def _reuse_known_people(self):
-        """Un canal preferido ya guardado termina la etapa; las personas válidas ocupan su cupo."""
+        """Las personas válidas ocupan su cupo; sin política, un canal preferido ya guardado termina la etapa."""
         existing_eligible = [item for item in self.ranked_people() if validate_contact(
             item, self.company, self.assessment, self.facts(), self.campaign.limits, utc_now(), self.roles,
             campaign=self.campaign)]
@@ -395,13 +446,15 @@ class _ContactStage:
                     selected.add(item.id)
                     additions[f"{PERSON_KEY}{item.id}"] = 1
             self.checkpoint(attempts=additions)
-        if self.readiness() == BusinessStatus.READY_PREFERRED:
+        if self.policy is None and self.readiness() == BusinessStatus.READY_PREFERRED:
             return self.finish("preferred_channel_found")
         return None
 
     def _search_apollo(self):
         """Busca candidatos del dominio; el segundo intento acota los cargos, sin paginación."""
         access, company = self.apollo_access, self.company
+        if self.policy is not None and self.goal_reached():
+            return None
         if self.campaign.config_snapshot.role_taxonomy is None:
             requests = [people_search_request(company, self.roles, access.account_ref, by_roles=bool(index))
                         for index in range(self.effort.people_queries)]
@@ -509,8 +562,19 @@ class _ContactStage:
         return None
 
     def _enrich_people(self):
-        """Resuelve candidatos pertinentes por ID antes de exigir nombre completo y empleo público."""
+        """Resuelve candidatos pertinentes por ID antes de exigir nombre completo y empleo público.
+
+        Con política, el orden por pertinencia y diversidad de funciones se mantiene y el bucle se corta al
+        cumplir el objetivo; un canal utilizable ya no termina la etapa (T16).
+        """
         for contact in self.ranked_people():
+            if self.policy is not None:
+                reached, covered = self.goal()
+                if reached:
+                    break
+                if covered is not None and person_function(
+                        contact, self.company, self.assessment, self.campaign, self.facts(), utc_now()) in covered:
+                    continue
             report = self._enrich(contact)
             if report is not None:
                 return report
@@ -523,12 +587,22 @@ class _ContactStage:
                 contact.identity_status == IdentityStatus.CONTRADICTED or contact.current_employment is False):
             return None
         request = enrichment_request(identifier, access.account_ref)
+
+        def parse(data, request_id):
+            try:
+                return self.save_candidates([parse_enrichment(contact, company, data, request_id, utc_now())])
+            except ContactError as error:
+                # Con política, una persona no confirmada no detiene a las demás: queda candidata con su motivo.
+                if self.policy is None:
+                    raise
+                self.parsed_attempts[f"{REJECTED_KEY}{error.code}:{contact.id}"] = 1
+                self.warnings.append(f"Apollo no confirmó a una persona candidata: {error.message}")
+                return [], []
+
         self.perform(request, ApolloEnrichmentResponse, credits=access.enrichment_credit_bound,
                      count_key=ENRICHMENTS_KEY, cap=min(self.effort.people, self.effort.enrichments_per_provider),
-                     consumed={"enrichments": 1}, funding=access.funding_source,
-                     parse=lambda data, request_id: self.save_candidates([parse_enrichment(
-                         contact, company, data, request_id, utc_now())]))
-        if self.readiness() == BusinessStatus.READY_PREFERRED:
+                     consumed={"enrichments": 1}, funding=access.funding_source, parse=parse)
+        if self.policy is None and self.readiness() == BusinessStatus.READY_PREFERRED:
             return self.finish("preferred_channel_found")
         return None
 

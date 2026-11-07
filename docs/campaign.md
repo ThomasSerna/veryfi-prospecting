@@ -99,7 +99,10 @@ el proceso. Las APIs anteriores desde Python se conservan.
    descendente. En `rubric_v2`, dentro de cada prioridad precede la necesidad documental `1`
    y después el encaje descendente; nombre e identificador resuelven empates. La candidata
    v2 solo se activa tras la [evaluación acordada](Business-rules.md#candidata-enterprise-rubric_v2).
-   La empresa se cierra con el resultado comercial derivado.
+   La empresa se cierra con el resultado comercial derivado. Con `people_policy_v1`, la
+   etapa de contactos de cada empresa termina con `people_target_reached`,
+   `enrichment_limit` o `contact_plan_exhausted`, sin detenerse en el primer canal
+   ([Varias personas por cuenta](contacts.md#varias-personas-por-cuenta-t16)).
 
 Una empresa cerrada queda en la etapa `completed` con su `business_status` y su `stop_reason`.
 

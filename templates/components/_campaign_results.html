@@ -86,7 +86,7 @@
           <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
           <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
           <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
-          <td class="numeric">{{ result.contacts|length }}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
+          <td class="numeric">{{ result.contacts|length }}{% if result.people %}<span class="cell-note">{{ result.people|people_counts }}</span>{% endif %}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
         </tr>
         {% endfor %}
       </tbody>

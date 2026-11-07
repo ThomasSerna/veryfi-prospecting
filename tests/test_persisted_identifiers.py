@@ -218,7 +218,7 @@ def test_apollo_v1_request_fingerprints_are_fixed():
 
 
 def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
-    from prospecting.pipeline.contacts import PEOPLE_SEARCH_KEY, ENRICHMENTS_KEY
+    from prospecting.pipeline.contacts import PEOPLE_SEARCH_KEY, ENRICHMENTS_KEY, REJECTED_KEY
     from prospecting.providers.apollo import ApolloSearchResponse, parse_search
 
     data = ApolloSearchResponse.model_validate({"total_entries": 1, "people": [{
@@ -237,3 +237,9 @@ def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
     assert str(public.id) == "c238a15c-f22a-5ac2-aa08-ae55ab7f7ac8"
     assert all((item.external_reference or "").startswith(f"apollo_public_v1:{REQUEST_ID}") for item in public_facts)
     assert (PEOPLE_SEARCH_KEY, ENRICHMENTS_KEY) == ("contacts:apollo_search", "contacts:apollo_enrichments")
+    assert REJECTED_KEY == "contacts:apollo_rejected:"
+
+
+def test_people_policy_version_is_fixed(role_config):
+    """La versión del objetivo de personas (T16) identifica la regla de parada guardada en cada instantánea."""
+    assert role_config.people_policy.version == "people_policy_v1"

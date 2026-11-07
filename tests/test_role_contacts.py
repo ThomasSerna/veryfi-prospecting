@@ -202,7 +202,7 @@ def test_role_queries_are_bounded_and_diversity_does_not_increase_limits(role_ca
     stage.people, stage.facts, stage.selected = lambda: contacts, lambda: facts, lambda: set()
     assert [contact.title for contact in stage.ranked_people()] == ["Head of Product", "Principal Software Engineer", "CFO", "Head of Product"]
     stage.apollo_access = SimpleNamespace(account_ref="cuenta-sintetica", funding_source="free_credit")
-    stage.effort = case.campaign.limits.effort["high"]
+    stage.effort, stage.policy = case.campaign.limits.effort["high"], case.campaign.config_snapshot.people_policy
     requests = []
     stage.perform = lambda request, *args, **kwargs: requests.append(request)
     stage._search_apollo()

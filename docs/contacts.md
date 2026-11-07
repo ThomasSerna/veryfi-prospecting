@@ -40,8 +40,11 @@ El orden de trabajo es:
 5. Comprobar independientemente identidad, empresa actual, cargo, vigencia y canal.
    Una fecha de consulta no es una fecha de verificación: un correo sin esta fecha
    permanece pendiente salvo publicación nominal corporativa vigente.
-6. Guardar contactos y evidencia con cada resultado, conservar el consumo y
-   detenerse al primer correo, teléfono o WhatsApp profesional utilizable.
+6. Guardar contactos y evidencia con cada resultado y conservar el consumo. Con
+   `people_policy_v1`, seguir enriqueciendo hasta el objetivo de personas pertinentes
+   o el tope (ver [Varias personas por cuenta](#varias-personas-por-cuenta-t16)). Las
+   instantáneas sin esa política se detienen al primer correo, teléfono o WhatsApp
+   profesional utilizable.
 
 Todos los candidatos devueltos se guardan con su procedencia, también los que
 superan el cupo. En campañas con taxonomía, la pertinencia se calcula en una copia:
@@ -55,11 +58,52 @@ búsquedas nominales en la web omiten a quien ya se sabe fuera del perfil. Esta
 selección no amplía topes: consultas, páginas y enriquecimientos siguen contándose
 igual y las llamadas hechas no se recuperan.
 
-La prioridad media permite 1 persona, hasta 2 búsquedas Apollo, hasta 1 enriquecimiento
+La prioridad media permite hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos
 Apollo, 2 consultas web, 2 páginas y 90 segundos adicionales. La prioridad alta permite
-hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos, 4 consultas web, 4 páginas
-y 180 segundos. Las reducciones de configuración y los límites económicos
-siguen vigentes; esos máximos no obligan a agotarlos.
+hasta 5 personas, 2 búsquedas Apollo, 5 enriquecimientos, 4 consultas web, 4 páginas
+y 180 segundos. Las campañas guardadas antes de T16 conservan sus topes (media 1/1,
+alta 3/3). Las reducciones de configuración y los límites económicos siguen
+vigentes; esos máximos no obligan a agotarlos.
+
+### Varias personas por cuenta (T16)
+
+`config/veryfi.json` define `people_policy` (`people_policy_v1`, pendiente de
+validación comercial): objetivo de 2 personas pertinentes en media y 3 en alta, y
+`min_functions=2`. La configuración exige la taxonomía de cargos, Apollo y que cada
+objetivo no supere el tope de personas del nivel; si la campaña reduce ese tope, el
+objetivo baja con él. Las instantáneas sin `people_policy` conservan la parada
+anterior.
+
+`person_stage` y `people_progress` (`prospecting.contacts`) clasifican a cada persona
+al leer: `candidate`, `identity_verified`, `relevant`, `channel_usable` o `ready`
+([Etapas de persona](Business-rules.md#etapas-de-persona)). Una persona pertinente
+tiene identidad confirmada con nombre completo, función pertinente, empleo no
+contradicho y alcance compatible; no necesita canal ni `corporate_evidence`, que siguen
+siendo requisitos de `ready`. `function_ids` agrupa las pertinentes por el
+`function_id` de su familia de cargos.
+
+Con política, la etapa de contactos:
+
+- ocupa el cupo `contacts:person:` como antes, pero un canal preferido ya no la termina;
+- omite People Search si el objetivo ya se cumple con datos vigentes;
+- enriquece en el orden de pertinencia y diversidad y comprueba el objetivo antes de cada
+  enriquecimiento. Si hay personas suficientes de una sola función y queda un candidato de
+  otra por intentar, solo enriquece candidatos de otras funciones;
+- registra un rechazo de identidad o entidad de People Enrichment (`identity_unconfirmed`,
+  `identity_mismatch`, `entity_mismatch`) como resultado procesado con la clave
+  `contacts:apollo_rejected:<código>:<contact_id>`. La persona queda candidata con su
+  motivo, la etapa continúa y la llamada no se repite al reanudar. Sin política, ese
+  rechazo sigue dejando la empresa pendiente;
+- ejecuta después la búsqueda y extracción públicas dentro de sus cupos;
+- termina con `people_target_reached`, `enrichment_limit` (tope agotado sin objetivo) o
+  `contact_plan_exhausted`.
+
+No hay paginación: siguen dos búsquedas de hasta 10 candidatos. Cada enriquecimiento
+reserva su crédito antes de llamar y respeta permisos, cupos de cuenta, topes de
+campaña y empresa y el tiempo de contactos. Una cuenta alta puede usar hasta 7
+llamadas a Apollo (2 búsquedas y 5 enriquecimientos), frente a los 200 por hora
+publicados del plan Free. Las pruebas son sintéticas: el rendimiento con datos
+reales queda por medir en T17/T21.
 
 `ContactReport` devuelve `status` (`checked`, `already_checked`, `pending` o
 `skipped`), `business_status`, identificadores de contactos, evidencias y solicitudes,
