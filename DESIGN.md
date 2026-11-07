@@ -2,15 +2,15 @@
 name: Veryfi Prospecting
 description: Interfaz local de campañas y revisión comercial.
 colors:
-  canvas: "#0C0D0F"
-  surface: "#151719"
-  sidebar: "#111315"
-  accent: "#84D6AC"
-  accent-hover: "#A0E9C3"
-  accent-text: "#10251A"
-  text: "#F1F3F4"
-  text-muted: "#A0A6B1"
-  border: "#282B30"
+  canvas: "#0D0F14"
+  surface: "#15171D"
+  sidebar: "#10151A"
+  accent: "#80DFF3"
+  accent-hover: "#A8ECF9"
+  accent-text: "#10252C"
+  text: "#F0F2F6"
+  text-muted: "#A4AAB8"
+  border: "#2B2E38"
   border-strong: "#68727F"
   soft: "#1C1F23"
   info: "#A2C2FF"
@@ -21,7 +21,7 @@ colors:
   error-background: "#352123"
   success: "#98DFB6"
   success-background: "#1C3026"
-  violet: "#B3A1EE"
+  violet: "#B7A5FA"
   blue: "#97BDF1"
 typography:
   heading:
@@ -85,42 +85,47 @@ components:
 
 Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
 investigación y revisar empresas, personas y evidencia. El inicio destaca la
-campaña activa o, si no existe, la última guardada. El progreso y las acciones
-pendientes preceden a los indicadores de calidad; el presupuesto tiene un lugar
-secundario y conserva el contexto de la campaña consultada.
+campaña activa o, si no existe, la última guardada. Sus indicadores resumen
+empresas, revisión y contacto listo; el presupuesto conserva el contexto de la
+campaña consultada.
 
-La interfaz usa un único tema oscuro, inspirado en el
-[dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales).
-La guía visual se adapta al flujo y los datos reales de Veryfi Prospecting. La
-demostración identifica sus datos como exclusivamente sintéticos.
+La dirección oscura combina grafito, cian y violeta con el nombre Veryfi
+Prospecting. El marco compartido, el inicio y el historial aplican esta dirección;
+las propuestas de campaña y ficha son estáticas, con datos exclusivamente
+sintéticos, y están pendientes de revisión antes de extender sus distribuciones
+a las vistas operativas. La demostración identifica sus datos como sintéticos.
 
 ## Sistema visual
 
-- Lienzo oscuro (`--ivory`), paneles grafito (`--surface`), navegación
-  (`--navy`) y bordes discretos (`--line`).
-- Texto principal (`--ink`), secundario (`--muted`) y acento verde (`--green`).
-  Azul y violeta distinguen información
-  complementaria; los estados también usan texto, no solo color.
+- Lienzo oscuro (`--ivory`), paneles grafito (`--surface`), navegación con
+  fondo `#10151A` y bordes discretos (`--line`). La variable `--navy`
+  conserva `#111315` para otros controles.
+- Texto principal (`--ink`), secundario (`--muted`) y acento cian (`--cyan`).
+  Verde, azul y violeta distinguen información complementaria; los estados
+  también usan texto, no solo color.
 - Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes
   sans locales como alternativa. La fuente procede del
   [repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia
   SIL Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
 - Paneles con bordes sutiles y radios de `12–16 px`; controles y etiquetas de
   menor radio. Los números de tablas, puntuaciones y presupuesto usan cifras
-  tabulares. El logotipo blanco de Veryfi permanece como recurso local.
-- Los componentes de navegación, pestañas, tarjetas y progreso se inspiran en
-  [21st.dev](https://21st.dev/community/components) y se implementan con
-  plantillas Django, CSS y JavaScript locales.
+  tabulares. El logotipo blanco de Veryfi permanece como recurso local y, en
+  móvil, se muestra a 52 × 20 px junto al nombre Prospecting.
+- El cajón se inspira en el
+  [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
+  y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
+  Se implementan con plantillas Django, CSS y JavaScript locales. El inicio
+  combina luz y bordes reactivos al cursor con una inclinación ligera del panel
+  destacado.
 
 ## Composición y flujos
 
-- La navegación lateral reúne la creación, Resumen, Historial y las campañas
-  recientes. La barra superior identifica la campaña y muestra su disponible,
+- La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
+  campaña. La barra superior identifica la campaña y muestra su disponible,
   con acceso al presupuesto detallado. Durante el sondeo de la campaña, el
   resumen se actualiza junto con los resultados.
-- El inicio muestra el avance, las empresas por revisar, la disponibilidad de
-  contacto, la distribución de prioridades y el historial. Los indicadores
-  corresponden a la campaña destacada, no a la suma de todo el historial.
+- El inicio muestra el avance y tres indicadores de la campaña destacada; el
+  historial está en una vista independiente. Las cifras no suman campañas.
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar
   la campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
 - La campaña muestra avance, prioridades, filtros, tabla y presupuesto. El
@@ -132,10 +137,13 @@ demostración identifica sus datos como exclusivamente sintéticos.
 
 ## Interacción y accesibilidad
 
-El menú tiene control explícito y, en móvil, se abre como cajón con el fondo
-oscurecido y desenfocado. Los indicadores y las barras incluyen sus valores en
-texto. Las pestañas, los formularios y los avisos conservan etiquetas, foco y
-estados identificables. Las transiciones respetan `prefers-reduced-motion`.
+El menú se abre como cajón con el fondo oscurecido y desenfocado. Con JavaScript,
+contiene el foco y permite cerrar con Escape, el fondo o su botón, devolviendo el
+foco al control; sin JavaScript conserva la apertura y cierre nativos. Los
+indicadores y las barras incluyen sus valores en texto. Las pestañas, los
+formularios y los avisos conservan etiquetas, foco y estados identificables.
+Las transiciones respetan `prefers-reduced-motion` y el movimiento posicional
+se desactiva en dispositivos táctiles.
 
 El contenido externo conserva el autoescape de Django. La actualización de
 resultados durante la ejecución mantiene las secciones y controles necesarios

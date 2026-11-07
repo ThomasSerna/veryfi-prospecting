@@ -1,13 +1,14 @@
 # Plan propuesto de rediseño de la interfaz
 
-Estado: **implementado**. Este documento conserva la propuesta que
-guio el rediseño; [DESIGN.md](../DESIGN.md) describe el sistema visual actual y
+Estado: **propuesta original implementada; prototipo de la nueva iteración
+implementado y pendiente de revisión**.
+Este documento conserva la propuesta que guio el rediseño anterior;
+[DESIGN.md](../DESIGN.md) describe el sistema visual actual y
 [la guía de interfaz](ui.md) documenta su uso y verificaciones. El plan no
 sustituye los requisitos de producto ni las reglas de negocio.
 
-Las comprobaciones finales usaron datos sintéticos. Quedan sin verificar el zoom
-real al 200 %, la usabilidad con el equipo de ventas y llamadas a proveedores
-reales desde este rediseño.
+Las comprobaciones del rediseño anterior usaron datos sintéticos. Los resultados
+y límites de la iteración actual están en [la guía de interfaz](ui.md).
 
 El 7 de noviembre de 2026 se revisaron en navegador la referencia y las cuatro
 pantallas anteriores mediante la demo exclusivamente sintética. Durante la
@@ -19,8 +20,39 @@ La regla existente de bloqueo se aplica a campañas en estado `running` o
 de la propuesta debe leerse con ese alcance: este rediseño no amplía los estados
 que impiden preparar otra campaña.
 
-Las secciones siguientes conservan la propuesta original y sus criterios de
-aceptación, no afirman por sí mismas que estos se hayan verificado.
+La siguiente iteración sustituye las decisiones anteriores sobre inicio,
+historial y navegación. Las secciones posteriores conservan la propuesta
+original y sus criterios, sin afirmar por sí mismas que se hayan verificado.
+
+## Nueva iteración acordada
+
+La interfaz conserva el nombre Veryfi Prospecting y una identidad propia, con
+predominio tipográfico de Prospecting, fondo grafito y acentos cian y violeta.
+Las distribuciones propuestas para campaña y ficha esperan la revisión del
+prototipo con el usuario antes de aplicarse a las vistas operativas.
+
+- El inicio (`/`) es un panel compacto de hasta aproximadamente 1040 px. La
+  campaña activa o, en su ausencia, la última guardada ocupa el bloque principal,
+  con estado, progreso conocido y acción disponible. Tres indicadores cuentan
+  empresas encontradas, empresas sin revisar y empresas con contacto listo, siempre
+  de esa campaña. El presupuesto sigue contextualizado en la barra superior.
+- El historial tiene una vista independiente en `/campaigns/`; el inicio ofrece
+  acceso a ella sin mostrar listas de campañas. El menú incluye únicamente
+  Resumen, Historial y Nueva campaña, sin campañas recientes.
+- La navegación comienza cerrada en todas las pantallas y se abre con un botón
+  sobre el contenido desenfocado. Ofrece cierre explícito, teclado, foco visible
+  y una alternativa para movimiento reducido.
+- El movimiento de la barra se inspira en el cajón del
+  [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
+  y el efecto al pasar el cursor del panel, en el
+  [bento interactivo de 21st.dev](https://21st.dev/@themeocean/components/interactive-tech-stack-bento-grid-with-hover-effects).
+  Los patrones se adaptaron a las plantillas Django y a CSS y JavaScript locales.
+
+La primera entrega incluye inicio, historial y navegación, junto con propuestas
+visuales sintéticas de [campaña](../static/prototypes/campaign.html) y
+[ficha](../static/prototypes/company.html). Estas últimas no usan el backend ni
+guardan cambios. La dirección y las propuestas están pendientes de revisión con
+el usuario antes de extender sus distribuciones al resto de las vistas.
 
 ## Objetivo y decisiones confirmadas
 

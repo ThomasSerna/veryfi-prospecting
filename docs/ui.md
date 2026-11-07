@@ -22,18 +22,25 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Inicio y navegación
 
-El inicio muestra la campaña activa o, si no la hay, la última guardada. Sus
-indicadores corresponden a esa campaña: empresas encontradas, investigación
-terminada, contacto listo y revisión pendiente. «Para revisar» permite abrir una
-empresa con revisión pendiente o consultar las empresas con canal por confirmar;
-las acciones sujetas a bloqueo se habilitan cuando termina la ejecución.
-La distribución por prioridad y el historial completan el panorama; no suman
-empresas de campañas distintas.
+El inicio muestra la campaña activa o, si no la hay, la última guardada. El
+panel resume su avance y cuenta las empresas encontradas, sin revisar y con
+contacto listo; no suma resultados de campañas distintas. Desde «Sin revisar»
+se puede abrir la siguiente empresa pendiente cuando no hay una investigación
+en curso. Si no existen campañas, se ofrece preparar la primera.
 
-La navegación lateral reúne Resumen, Historial, Nueva campaña y las campañas
-recientes. El encabezado muestra el disponible de la campaña en contexto y
-enlaza al desglose; sin campaña seleccionada lo indica. Un importe desconocido
-o pendiente de conciliación conserva esa condición.
+El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
+navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Al
+abrirla, el contenido queda detrás de una capa oscurecida y desenfocada. Con
+JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
+sin JavaScript funciona el control nativo de apertura y cierre. El encabezado
+muestra el disponible de la campaña en contexto y enlaza al desglose; un
+importe desconocido o pendiente conserva esa condición.
+
+Las propuestas de [campaña](../static/prototypes/campaign.html) y
+[ficha](../static/prototypes/company.html) están disponibles en el servidor
+local bajo `/static/prototypes/`. Contienen únicamente datos sintéticos y
+controles ilustrativos desactivados; no investigan ni guardan cambios. Sus
+distribuciones esperan revisión antes de aplicarse a las vistas operativas.
 
 ## Preparar y ejecutar
 
@@ -238,7 +245,35 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
 
-## Verificación del rediseño del 7 de noviembre de 2026
+## Verificación del prototipo del 7 de noviembre de 2026
+
+- `uv run --locked python manage.py check` pasó. Pasaron 171 pruebas
+  seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
+  identificadores persistidos, con bases temporales y datos sintéticos.
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs`:
+  14 pruebas pasaron con DOM sintético. La reducción de movimiento y la
+  alternativa sin JavaScript se revisaron mediante código y pruebas, sin
+  emulación manual en el navegador.
+- En una demo temporal sin claves ni llamadas a proveedores, se revisó el inicio
+  a 1280, 1366, 1440 y 390 px sin desbordamiento global, y se comprobó la
+  separación del historial. Se comprobaron el cierre del menú con Escape, el
+  retorno y la contención del foco, y la visibilidad del presupuesto y el aviso
+  sintético. Las propuestas se revisaron a 1440 y 390 px; sus tablas desplazan
+  contenido sin desplazar la página.
+- La revisión independiente de código no encontró hallazgos materiales; incluyó
+  los flujos de autorización y sondeo.
+- La revisión visual independiente no observó otros defectos materiales en las
+  capturas iniciales. Tras corregir el logotipo, confirmó que Veryfi y Prospecting
+  se leen sin solapamientos en inicio e historial a 390 px. Sigue pendiente la
+  revisión del usuario antes de extender las distribuciones de campaña y ficha.
+- Se comprobaron ocho pares principales de la paleta, con un contraste mínimo de
+  7.70:1. Esta comprobación no es una auditoría completa de la interfaz.
+- El detector de diseño señaló Inter, el resplandor radial y la deriva de la
+  versión anterior de `DESIGN.md`; no interpretó las plantillas Django. Quedan
+  pendientes el zoom real al 200 %, un lector de pantalla real, la evaluación
+  con ventas y las llamadas a proveedores reales.
+
+## Verificación del rediseño anterior del 7 de noviembre de 2026
 
 - Tras integrar los cambios de `main`, la suite completa pasó con **1209 pruebas**;
   `uv lock --check` y `uv run --locked python manage.py check` también pasaron.
