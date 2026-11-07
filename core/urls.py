@@ -8,6 +8,7 @@ app_name = "webapp"
 
 urlpatterns = [
     path("", views.campaigns, name="campaigns"),
+    path("campaigns/", views.campaign_history, name="campaign_history"),
     path("campaigns/new/", views.new_campaign, name="new_campaign"),
     path("campaigns/<uuid:campaign_id>/", views.campaign, name="campaign"),
     path("campaigns/<uuid:campaign_id>/status/", views.status, name="status"),

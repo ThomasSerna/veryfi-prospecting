@@ -2,49 +2,7 @@
   'use strict';
 
   const body = document.body;
-  const menu = document.querySelector('.menu-toggle');
-  const sidebar = document.getElementById('navigation');
-  const workspace = document.getElementById('workspace-main');
-  const mobile = window.matchMedia('(max-width: 760px)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const backdrop = document.querySelector('.navigation-backdrop');
-  const sidebarClose = document.querySelector('.sidebar-close');
-
-  function setNavigation(open, focus = false) {
-    body.dataset.navOpen = String(open);
-    if (menu) {
-      menu.setAttribute('aria-expanded', String(open));
-      menu.setAttribute('aria-label', open ? 'Contraer navegación' : 'Abrir navegación');
-    }
-    if (sidebar) sidebar.inert = !open;
-    if (workspace) workspace.inert = mobile.matches && open;
-    if (backdrop) backdrop.hidden = !mobile.matches || !open;
-    if (focus && open && mobile.matches) sidebarClose?.focus();
-    if (focus && !open) menu?.focus();
-  }
-
-  if (menu && sidebar) {
-    setNavigation(!mobile.matches);
-    menu.addEventListener('click', () => setNavigation(body.dataset.navOpen !== 'true', true));
-    sidebarClose?.addEventListener('click', () => setNavigation(false, true));
-    backdrop?.addEventListener('click', () => setNavigation(false, true));
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && body.dataset.navOpen === 'true') {
-        setNavigation(false, true);
-      }
-      if (event.key === 'Tab' && mobile.matches && body.dataset.navOpen === 'true') {
-        const items = Array.from(sidebar.querySelectorAll('a[href]:not([aria-disabled="true"]), button:not([disabled])'));
-        const first = items[0];
-        const last = items[items.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-      }
-    });
-    document.addEventListener('click', event => {
-      if (mobile.matches && body.dataset.navOpen === 'true' && sidebar.contains(event.target) && event.target.closest?.('a[href]:not([aria-disabled="true"])')) setNavigation(false, true);
-    });
-    mobile.addEventListener('change', () => setNavigation(!mobile.matches));
-  }
 
   const previewForm = document.querySelector('[data-campaign-preview]');
   if (previewForm) {

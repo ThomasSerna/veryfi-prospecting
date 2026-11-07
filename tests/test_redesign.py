@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import django
 import pytest
 from django.test import Client, RequestFactory, override_settings
+from django.urls import reverse
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
@@ -104,6 +105,57 @@ def test_dashboard_labels_the_latest_without_an_active_campaign(redesign_paths, 
     context = views.campaigns(RequestFactory().get("/"))
     assert context["highlighted_campaign"].id == latest.id
     assert context["highlighted_is_active"] is False
+
+
+def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_paths, make_campaign):
+    active = make_campaign(status="paused_budget", countries=["CO"])
+    latest = make_campaign(status="completed", countries=["MX"], created_at=active.created_at + timedelta(seconds=1))
+    with Database(redesign_paths.db) as db:
+        db.save_campaign(active)
+        db.save_campaign(latest)
+    client = Client(SERVER_NAME="localhost")
+    home = client.get(reverse("webapp:campaigns"))
+    content = home.content.decode()
+    assert home.status_code == 200
+    assert "<table" not in content and "Campañas recientes" not in content
+    assert "Prioridad de empresas" not in content
+    assert str(active.id) in content and str(latest.id) not in content
+    assert content.count('class="home-metric ') == 3
+    assert 'href="/campaigns/"' in content
+    history = client.get(reverse("webapp:campaign_history"))
+    content = history.content.decode()
+    assert history.status_code == 200
+    assert 'aria-label="Historial de campañas"' in content
+    assert str(active.id) in content and str(latest.id) in content
+    assert 'aria-current="page">' in content
+
+
+def test_history_reads_only_one_campaign_for_budget_and_global_execution(redesign_paths, make_campaign, monkeypatch):
+    active = make_campaign(status="running")
+    with Database(redesign_paths.db) as db:
+        db.save_campaign(active)
+        db.save_campaign(make_campaign(status="completed", created_at=active.created_at + timedelta(seconds=1)))
+    calls = []
+    original = views.read_campaign
+
+    def observed(db_path, campaign_id, **kwargs):
+        calls.append(campaign_id)
+        return original(db_path, campaign_id, **kwargs)
+
+    monkeypatch.setattr(views, "read_campaign", observed)
+    monkeypatch.setattr(execution, "snapshot", lambda campaign_id: {"is_executing": True})
+    response = Client(SERVER_NAME="localhost").get("/campaigns/")
+    assert response.status_code == 200 and calls == [active.id]
+    assert "Hay una investigación en curso." in response.content.decode()
+    assert 'aria-disabled="true"' in response.content.decode()
+
+
+def test_empty_history_is_read_only_and_does_not_create_database(redesign_paths):
+    client = Client(SERVER_NAME="localhost")
+    response = client.get(reverse("webapp:campaign_history"))
+    assert response.status_code == 200 and "Sin campañas registradas" in response.content.decode()
+    assert client.post(reverse("webapp:campaign_history")).status_code == 405
+    assert not redesign_paths.db.exists()
 
 
 def test_preparation_keeps_its_groups_and_active_campaign_block(redesign_paths, make_campaign):

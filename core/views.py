@@ -48,7 +48,7 @@ def _base():
             access_error = execution.error_message(error)
     active = next((item for item in campaigns if item.status in ("running", "paused_budget")), None)
     return {"campaigns": list(reversed(campaigns)), "active_campaign": active,
-            "access": access, "access_error": access_error, "nav_active": "campaigns"}
+            "access": access, "access_error": access_error, "nav_active": "campaign_history"}
 
 
 def _error_response(request, error, status=400):
@@ -204,27 +204,39 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
     evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
-                   confirmation_forms=forms, nav_active="campaigns",
+                   confirmation_forms=forms, nav_active="campaign_history",
                    prev_company=prev_company, next_company=next_company,
                    sequence_position=idx + 1, sequence_total=len(sequence),
                    evidence_items=evidence_items)
     return context
 
 
-@require_GET
-@_handled
-def campaigns(request):
+def _summary_context():
     context = _base()
     highlighted = context["active_campaign"] or next(iter(context["campaigns"]), None)
     view = _campaign_view(highlighted.id, context) if highlighted else None
     state = execution.snapshot(highlighted.id if highlighted else None)
     state["is_executing"] = state["is_executing"] or bool(view and view.is_executing)
-    context.update(highlighted_campaign=highlighted, highlighted_view=view,
+    context.update(nav_active="campaigns", highlighted_campaign=highlighted, highlighted_view=view,
                    highlighted_is_active=context["active_campaign"] is not None,
                    campaign_insights=_campaign_insights(view) if view else None,
                    budget_view=view.budget if view else None, budget_campaign=highlighted,
                    execution=state, is_executing=state["is_executing"])
-    return render(request, "pages/campaigns.html", context)
+    return context
+
+
+@require_GET
+@_handled
+def campaigns(request):
+    return render(request, "pages/campaigns.html", _summary_context())
+
+
+@require_GET
+@_handled
+def campaign_history(request):
+    context = _summary_context()
+    context["nav_active"] = "campaign_history"
+    return render(request, "pages/history.html", context)
 
 
 @require_http_methods(["GET", "POST"])

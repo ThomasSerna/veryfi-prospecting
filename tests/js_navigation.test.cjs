@@ -5,13 +5,13 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function navigationPage(isMobile = false, withPreview = false) {
+function navigationPage({ isMobile = false, withPreview = false, reducedMotion = false } = {}) {
   const document = { activeElement: null };
   function element() {
     const handlers = new Map();
     const attributes = new Map();
     return {
-      dataset: {}, inert: false, hidden: false,
+      dataset: {}, inert: false, open: false,
       addEventListener(type, callback) {
         handlers.set(type, [...(handlers.get(type) || []), callback]);
       },
@@ -19,12 +19,15 @@ function navigationPage(isMobile = false, withPreview = false) {
         for (const callback of handlers.get(type) || []) callback(event);
       },
       setAttribute: (name, value) => attributes.set(name, value),
+      removeAttribute: name => attributes.delete(name),
       getAttribute: name => attributes.get(name) ?? null,
+      getBoundingClientRect: () => ({ width: 288 }),
       closest: () => null,
       focus() { document.activeElement = this; },
     };
   }
   const body = element();
+  const drawer = element();
   const menu = element();
   const sidebar = element();
   const workspace = element();
@@ -32,10 +35,10 @@ function navigationPage(isMobile = false, withPreview = false) {
   const backdrop = element();
   const firstLink = element();
   const lastLink = element();
-  const focusable = [firstLink, close, lastLink];
+  const focusable = [close, firstLink, lastLink];
   sidebar.contains = target => focusable.includes(target);
   sidebar.querySelectorAll = () => focusable;
-  const mobile = { matches: isMobile, addEventListener: (_, callback) => { mobile.change = callback; } };
+  const mobile = { matches: isMobile, addEventListener() {} };
   const preview = element();
   const outputs = {};
   for (const name of ['countries', 'segments', 'max']) {
@@ -63,16 +66,27 @@ function navigationPage(isMobile = false, withPreview = false) {
       '.menu-toggle': menu, '.navigation-backdrop': backdrop, '.sidebar-close': close,
       '[data-campaign-preview]': withPreview ? preview : null,
     })[selector] ?? null,
-    getElementById: id => ({ navigation: sidebar, 'workspace-main': workspace })[id] ?? null,
+    getElementById: id => ({ 'navigation-drawer': drawer, navigation: sidebar, 'workspace-main': workspace })[id] ?? null,
     querySelectorAll: () => [],
   });
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/app.js'), 'utf8'), {
+  const timers = new Map();
+  const pageEvents = element();
+  let nextTimer = 0;
+  const context = {
     document,
-    window: { matchMedia: query => query === '(max-width: 760px)' ? mobile : { matches: false } },
+    window: {
+      addEventListener: pageEvents.addEventListener,
+      matchMedia: query => query === '(max-width: 760px)' ? mobile : { matches: reducedMotion },
+      clearTimeout: id => timers.delete(id),
+      setTimeout(callback, delay) { timers.set(++nextTimer, { callback, delay }); return nextTimer; },
+    },
     navigator: {},
-  });
+  };
+  for (const script of ['app.js', 'navigation.js']) {
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, `../static/js/${script}`), 'utf8'), context);
+  }
   return {
-    body, menu, sidebar, workspace, close, backdrop, firstLink, lastLink, document,
+    body, drawer, menu, sidebar, workspace, close, backdrop, firstLink, lastLink, document, timers,
     preview, choices, maximum, outputs,
     click(target) {
       target.focus();
@@ -85,62 +99,59 @@ function navigationPage(isMobile = false, withPreview = false) {
       events.dispatch('keydown', { key, shiftKey, preventDefault() { prevented = true; } });
       return prevented;
     },
-    resize(matches) { mobile.matches = matches; mobile.change(); },
+    resize(matches) { mobile.matches = matches; },
+    restorePage() { pageEvents.dispatch('pageshow', { persisted: true }); },
+    finishClosing() {
+      for (const [id, timer] of timers) { timers.delete(id); timer.callback(); }
+    },
   };
 }
 
-test('Escritorio conserva el espacio de trabajo operable al contraer la navegación', () => {
-  const page = navigationPage();
-  assert.equal(page.body.dataset.navOpen, 'true');
-  assert.equal(page.menu.getAttribute('aria-expanded'), 'true');
-  assert.equal(page.sidebar.inert, false);
-  assert.equal(page.workspace.inert, false);
-  assert.equal(page.backdrop.hidden, true);
-  page.click(page.menu);
-  assert.equal(page.body.dataset.navOpen, 'false');
-  assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
-  assert.equal(page.sidebar.inert, true);
-  assert.equal(page.workspace.inert, false);
-  page.click(page.menu);
-  assert.equal(page.sidebar.inert, false);
-  assert.equal(page.workspace.inert, false);
-});
-
-test('El cajón móvil aísla el foco y devuelve el control al cerrar por sus tres vías', () => {
-  const page = navigationPage(true);
-  assert.equal(page.sidebar.inert, true);
-  assert.equal(page.workspace.inert, false);
-  assert.equal(page.backdrop.hidden, true);
-  for (const close of [() => page.key('Escape'), () => page.click(page.backdrop), () => page.click(page.close)]) {
-    page.click(page.menu);
-    assert.equal(page.body.dataset.navOpen, 'true');
-    assert.equal(page.sidebar.inert, false);
-    assert.equal(page.workspace.inert, true);
-    assert.equal(page.backdrop.hidden, false);
-    assert.equal(page.document.activeElement, page.close);
-    close();
+for (const isMobile of [false, true]) {
+  test(`El menú de ${isMobile ? 'móvil' : 'escritorio'} carga cerrado y aísla el fondo al abrir`, () => {
+    const page = navigationPage({ isMobile });
     assert.equal(page.body.dataset.navOpen, 'false');
+    assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
+    assert.equal(page.drawer.open, false);
     assert.equal(page.sidebar.inert, true);
     assert.equal(page.workspace.inert, false);
-    assert.equal(page.backdrop.hidden, true);
-    assert.equal(page.document.activeElement, page.menu);
-  }
-});
+    for (const close of [() => page.key('Escape'), () => page.click(page.backdrop), () => page.click(page.close)]) {
+      page.click(page.menu);
+      assert.equal(page.body.dataset.navOpen, 'true');
+      assert.equal(page.drawer.open, true);
+      assert.equal(page.sidebar.getAttribute('role'), 'dialog');
+      assert.equal(page.sidebar.getAttribute('aria-modal'), 'true');
+      assert.equal(page.sidebar.inert, false);
+      assert.equal(page.workspace.inert, true);
+      assert.equal(page.document.activeElement, page.close);
+      close();
+      assert.equal(page.body.dataset.navOpen, 'false');
+      assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
+      assert.equal(page.sidebar.inert, true);
+      assert.equal(page.workspace.inert, false);
+      assert.equal(page.document.activeElement, page.menu);
+      assert.equal(page.sidebar.getAttribute('aria-modal'), null);
+      assert.equal([...page.timers.values()][0].delay, 200);
+      page.finishClosing();
+      assert.equal(page.drawer.open, false);
+    }
+  });
+}
 
-test('Tab y Mayús+Tab circulan dentro del cajón móvil abierto', () => {
-  const page = navigationPage(true);
+test('Tab y Mayús+Tab circulan dentro del panel sin entrar al fondo', () => {
+  const page = navigationPage();
   page.click(page.menu);
   page.lastLink.focus();
   assert.equal(page.key('Tab'), true);
-  assert.equal(page.document.activeElement, page.firstLink);
+  assert.equal(page.document.activeElement, page.close);
   assert.equal(page.key('Tab', true), true);
   assert.equal(page.document.activeElement, page.lastLink);
-  page.close.focus();
+  page.firstLink.focus();
   assert.equal(page.key('Tab'), false);
-  assert.equal(page.document.activeElement, page.close);
+  assert.equal(page.document.activeElement, page.firstLink);
 });
 
-test('El cambio de ancho restablece el cajón móvil y la navegación de escritorio', () => {
+test('El cambio de ancho conserva la decisión de abrir y cada carga comienza cerrada', () => {
   const page = navigationPage();
   page.resize(true);
   assert.equal(page.body.dataset.navOpen, 'false');
@@ -150,12 +161,36 @@ test('El cambio de ancho restablece el cajón móvil y la navegación de escrito
   page.resize(false);
   assert.equal(page.body.dataset.navOpen, 'true');
   assert.equal(page.sidebar.inert, false);
+  assert.equal(page.workspace.inert, true);
+  assert.equal(navigationPage().body.dataset.navOpen, 'false');
+  page.restorePage();
+  assert.equal(page.drawer.open, false);
   assert.equal(page.workspace.inert, false);
-  assert.equal(page.backdrop.hidden, true);
+});
+
+test('Reabrir durante la salida cancela el cierre pendiente', () => {
+  const page = navigationPage();
+  page.click(page.menu);
+  page.click(page.close);
+  assert.equal(page.drawer.open, true);
+  page.click(page.menu);
+  page.finishClosing();
+  assert.equal(page.drawer.open, true);
+  assert.equal(page.workspace.inert, true);
+});
+
+test('Movimiento reducido cierra sin esperar y un enlace operativo también cierra', () => {
+  const page = navigationPage({ reducedMotion: true });
+  page.click(page.menu);
+  page.firstLink.closest = () => page.firstLink;
+  page.sidebar.dispatch('click', { target: page.firstLink });
+  assert.equal(page.drawer.open, false);
+  assert.equal(page.workspace.inert, false);
+  assert.equal(page.timers.size, 0);
 });
 
 test('El resumen actualiza países, segmentos y máximo como texto de sus etiquetas', () => {
-  const page = navigationPage(false, true);
+  const page = navigationPage({ withPreview: true });
   assert.equal(page.outputs.countries.textContent, 'Colombia');
   assert.equal(page.outputs.segments.textContent, 'FinTech y software');
   assert.equal(page.outputs.max.textContent, '12');

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load prospecting_ui %}
 {% block title %}{{ result.company.name }} · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><a href="{% url 'webapp:campaign' campaign.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ campaign|campaign_short_title }}</a><span>/</span><span>{{ result.company.name }}</span>{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaign_history' %}">Historial</a><span>/</span><a href="{% url 'webapp:campaign' campaign.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ campaign|campaign_short_title }}</a><span>/</span><span>{{ result.company.name }}</span>{% endblock %}
 {% block topbar_actions %}
 {% if sequence_total %}
 <nav class="sequence-nav" aria-label="Navegación secuencial de empresas">

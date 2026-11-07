@@ -8,45 +8,40 @@
   <meta name="color-scheme" content="dark">
   <title>{% block title %}Veryfi Prospecting{% endblock %}</title>
   <link rel="preload" href="{% static 'fonts/InterVariable.woff2' %}" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=redesign-5">
-  <script src="{% static 'js/app.js' %}?v=redesign-5" defer></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=workspace-1">
+  <link rel="stylesheet" href="{% static 'css/workspace.css' %}?v=workspace-1">
+  <link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=workspace-1">
+  <link rel="stylesheet" href="{% static 'css/motion.css' %}?v=workspace-1">
+  <script src="{% static 'js/app.js' %}?v=workspace-1" defer></script>
+  <script src="{% static 'js/navigation.js' %}?v=workspace-1" defer></script>
+  <script src="{% static 'js/motion.js' %}?v=workspace-1" defer></script>
 </head>
 <body data-running="{% if is_executing or execution.is_executing %}true{% else %}false{% endif %}" {% if campaign %}data-status-url="{% url 'webapp:status' campaign.id %}"{% elif active_campaign %}data-status-url="{% url 'webapp:status' active_campaign.id %}"{% elif execution.campaign_id and execution.campaign_id != 'None' %}data-status-url="{% url 'webapp:status' execution.campaign_id %}"{% endif %}>
-  <a class="skip-link" href="#main">Saltar al contenido</a>
   <div class="app-shell">
-    <aside class="sidebar" id="navigation" aria-label="Navegación principal">
+    <details class="navigation-drawer" id="navigation-drawer">
+      <summary class="menu-toggle" aria-label="Menú principal" aria-controls="navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></summary>
+      <button class="navigation-backdrop" type="button" aria-label="Cerrar navegación" tabindex="-1"></button>
+    <div class="sidebar" id="navigation">
       <button class="sidebar-close" type="button" aria-label="Cerrar navegación"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
       <a href="{% url 'webapp:campaigns' %}" class="brand" aria-label="Veryfi Prospecting, inicio">
         <img src="{% static 'img/veryfi-logo.svg' %}" alt="Veryfi" width="112" height="42">
         <span>Prospecting</span>
       </a>
-      <a href="{% url 'webapp:new_campaign' %}" class="button button-primary sidebar-create" data-idle-only {% if nav_active == 'new_campaign' %}aria-current="page"{% endif %} {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>
       <nav class="main-nav" aria-label="Secciones principales">
-        <a href="{% url 'webapp:campaigns' %}#overview" {% if nav_active == 'campaigns' and not campaign %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Resumen</span></a>
-        <a href="{% url 'webapp:campaigns' %}#history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span>Historial</span></a>
+        <a href="{% url 'webapp:campaigns' %}" {% if nav_active == 'campaigns' and not campaign %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Resumen</span><svg class="navigation-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="{% url 'webapp:campaign_history' %}" {% if nav_active == 'campaign_history' %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span>Historial</span><svg class="navigation-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="{% url 'webapp:new_campaign' %}" class="navigation-create" data-idle-only {% if nav_active == 'new_campaign' %}aria-current="page"{% endif %} {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nueva campaña</span><svg class="navigation-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
       </nav>
-      {% if campaigns %}
-      <div class="sidebar-history">
-        <p class="sidebar-label">Recientes</p>
-        <nav aria-label="Campañas recientes">
-          {% for saved in campaigns|slice:":5" %}
-          <a href="{% url 'webapp:campaign' saved.id %}" class="history-link" {% if campaign and saved.id == campaign.id %}aria-current="page"{% endif %}>
-            <span>{{ saved|campaign_short_title }}</span>
-            <small>{{ saved.status|label }} · {{ saved.created_at|date:"d M" }}</small>
-          </a>
-          {% endfor %}
-        </nav>
-      </div>
-      {% endif %}
       <div class="sidebar-footer">
         <span class="local-indicator">{% if is_executing or execution.is_executing %}Investigación activa{% else %}Servicio local{% endif %}</span>
         <small>Ventas decide. La evidencia respalda.</small>
       </div>
-    </aside>
-    <button class="navigation-backdrop" type="button" aria-label="Cerrar navegación" tabindex="-1" hidden></button>
+    </div>
+    </details>
     <div class="workspace" id="workspace-main">
+      <a class="skip-link" href="#main">Saltar al contenido</a>
       <header class="topbar">
-        <button type="button" class="menu-toggle" aria-expanded="true" aria-controls="navigation" aria-label="Contraer navegación"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+        <a class="workspace-brand" href="{% url 'webapp:campaigns' %}" aria-label="Veryfi Prospecting, inicio"><img src="{% static 'img/veryfi-logo.svg' %}" alt="" width="70" height="26"><span>Prospecting</span></a>
         <nav class="breadcrumb" aria-label="Ruta de navegación">{% block breadcrumb %}<span>Campañas</span>{% endblock %}</nav>
         <div class="topbar-budget" data-budget-summary>
           {% include 'components/_budget_summary.html' %}
