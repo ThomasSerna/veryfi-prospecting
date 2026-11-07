@@ -321,7 +321,8 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "review_status": item.review_status, "review_reason": item.review_reason,
                 "reviewed_at": None if item.reviewed_at is None else item.reviewed_at.isoformat(),
                 "warnings": " | ".join(
-                    ([HUNTER_EMPLOYMENT_WARNING] if person is not None and person.employment_basis == "hunter_signal" else [])
+                    ([HUNTER_EMPLOYMENT_WARNING] if person is not None and person.employment.state == "provider_claim"
+                     and person.employment.origin == "hunter" else [])
                     + [warning for channel in channels for warning in channel.warnings]),
             }
             row.update({kind: " | ".join(channel.value for channel in channels if channel.type == kind)

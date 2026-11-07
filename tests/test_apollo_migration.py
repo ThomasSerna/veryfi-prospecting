@@ -110,7 +110,10 @@ def test_shared_company_keeps_legacy_contacts_and_spend_separate_from_apollo(
     after = read_campaign(path, current.id).companies[0]
     assert [item.contact.id for item in before.contacts] == [old_contact.id]
     assert [item.contact.id for item in after.contacts] == [new_contact.id]
-    assert before.business_status == "ready_preferred"
+    # T18: la inferencia histórica de Hunter se lee como afirmación del proveedor y ya no deja lista a la persona.
+    assert before.contacts[0].employment.state == "provider_claim" and before.contacts[0].employment.origin == "hunter"
+    assert before.business_status == "qualified_no_contact"
+    assert after.contacts[0].employment.state == "provider_claim" and after.contacts[0].employment.origin == "apollo"
     assert after.business_status != "ready_preferred"
     assert not any(item.provider == "hunter" for item in after.evidence)
     assert after.contacts[0].contact.channels[0].verified_at is None

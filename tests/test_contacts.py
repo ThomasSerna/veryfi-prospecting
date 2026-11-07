@@ -11,7 +11,7 @@ from prospecting.contact_extraction import (
     CONTACTS_PROMPT_VERSION, HaikuContacts, build_contacts_request, parse_contacts_output,
 )
 from prospecting.contacts import (
-    ContactError, apply_target_roles, channel_is_usable, derive_readiness, employment_basis, merge_contact, role_matches,
+    ContactError, apply_target_roles, channel_is_usable, derive_readiness, employment_status, merge_contact, role_matches,
     target_roles, validate_contact,
 )
 from prospecting.models import Channel, ChannelStatus, Contact, Evidence, utc_now
@@ -101,14 +101,18 @@ def hunter_candidate(company, **changes):
     return apply_target_roles(contact, [TITLE]), evidence
 
 
-def test_verified_hunter_mailbox_and_recent_source_infer_current_employment(eligible):
-    """La vigencia se infiere al validar, sin marcar el empleo como comprobado (§10.2)."""
+def test_verified_hunter_mailbox_and_recent_source_are_only_a_historical_claim(eligible):
+    """La inferencia de Hunter se lee como afirmación del proveedor y nunca deja lista a la persona (T18)."""
     company, campaign, assessment, _, _ = eligible
     contact, evidence = hunter_candidate(company)
     assert contact.current_employment is None
-    assert employment_basis(contact, company, evidence, campaign.limits, NOW) == "hunter_signal"
-    assert validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
-    assert derive_readiness(assessment, [contact], evidence, campaign.limits, NOW, company) == "ready_preferred"
+    status = employment_status(contact, company, evidence, campaign.limits, NOW)
+    assert (status.state, status.origin, status.reason, status.review_required) == (
+        "provider_claim", "hunter", "historical_inference", True)
+    assert status.evidence_ids and all(
+        item.provider == "hunter" for item in evidence if item.id in status.evidence_ids)
+    assert not validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
+    assert derive_readiness(assessment, [contact], evidence, campaign.limits, NOW, company) == "qualified_no_contact"
 
 
 @pytest.mark.parametrize("changes", [
@@ -123,7 +127,8 @@ def test_verified_hunter_mailbox_and_recent_source_infer_current_employment(elig
 def test_hunter_signal_needs_fresh_verified_mailbox_and_source_still_published(eligible, changes):
     company, campaign, assessment, _, _ = eligible
     contact, evidence = hunter_candidate(company, **changes)
-    assert employment_basis(contact, company, evidence, campaign.limits, NOW) is None
+    status = employment_status(contact, company, evidence, campaign.limits, NOW)
+    assert (status.state, status.reason) == ("unknown", "no_employment_evidence")
     assert not validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
 
 
@@ -135,42 +140,49 @@ def test_hunter_signal_respects_employment_window_and_future_dates(eligible):
         seen = (NOW - timedelta(days=age)).date().isoformat()
         contact, evidence = hunter_candidate(company, sources=[
             {"uri": "https://example.com/team", "last_seen_on": seen, "still_on_page": True}])
-        assert validate_contact(contact, company, assessment, evidence, campaign.limits, NOW) is expected
+        status = employment_status(contact, company, evidence, campaign.limits, NOW)
+        assert (status.state == "provider_claim") is expected
+        assert not validate_contact(contact, company, assessment, evidence, campaign.limits, NOW)
 
 
 def test_hunter_signal_never_overrides_departure_contradiction_or_negative_employment(eligible):
     company, campaign, assessment, _, _ = eligible
     contact, evidence = hunter_candidate(company)
-    assert not validate_contact(contact.model_copy(update={"current_employment": False}), company, assessment,
-                                evidence, campaign.limits, NOW)
+    ended = contact.model_copy(update={"current_employment": False})
+    assert employment_status(ended, company, evidence, campaign.limits, NOW).reason == "employment_ended"
     departure = Evidence(company_id=company.id, contact_id=contact.id, claim="Noticia sintética.",
                          excerpt=f"{NAME} dejó la empresa en septiembre.", url="https://example.com/news",
                          retrieved_at=NOW, kind="observed", source_type="secondary")
-    assert not validate_contact(contact, company, assessment, evidence + [departure], campaign.limits, NOW)
+    status = employment_status(contact, company, evidence + [departure], campaign.limits, NOW)
+    assert (status.state, status.reason, status.evidence_ids) == ("contradicted", "employment_ended", [departure.id])
     contradicted = [item.model_copy(update={"contradiction_ids": [uuid4()]}) if "source:" in item.external_reference
                     else item for item in evidence]
-    assert not validate_contact(contact, company, assessment, contradicted, campaign.limits, NOW)
+    assert employment_status(contact, company, contradicted, campaign.limits, NOW).state != "provider_claim"
+    for facts, person in ((evidence, ended), (evidence + [departure], contact), (contradicted, contact)):
+        assert not validate_contact(person, company, assessment, facts, campaign.limits, NOW)
 
 
-@pytest.mark.parametrize("basis", ["evidence", "hunter_signal"])
+@pytest.mark.parametrize("origin", ["corporate", "hunter"])
 @pytest.mark.parametrize(("statement", "expected"), [
     (f"{NAME} dejó la empresa en septiembre.", False),
     ("Otra Persona Sintética dejó la empresa en septiembre.", True),
     (f"{NAME} fue nombrado CTO de Empresa sintética.", True),
 ])
-def test_nominal_departure_overrides_coexisting_positive_employment(eligible, basis, statement, expected):
+def test_nominal_departure_overrides_coexisting_positive_employment(eligible, origin, statement, expected):
     company, campaign, assessment, contact, evidence = eligible
-    if basis == "hunter_signal":
+    if origin == "hunter":
         contact, evidence = hunter_candidate(company)
-    assert employment_basis(contact, company, evidence, campaign.limits, NOW) == basis
+    state = "corporate_evidence" if origin == "corporate" else "provider_claim"
+    assert employment_status(contact, company, evidence, campaign.limits, NOW).state == state
     observation = Evidence(company_id=company.id, contact_id=contact.id, claim="Noticia sintética.",
                            excerpt=statement, url="https://example.com/news", retrieved_at=NOW,
                            kind="observed", source_type="secondary")
     facts = evidence + [observation]
-    assert employment_basis(contact, company, facts, campaign.limits, NOW) == (basis if expected else None)
-    assert validate_contact(contact, company, assessment, facts, campaign.limits, NOW) is expected
+    assert employment_status(contact, company, facts, campaign.limits, NOW).state == (state if expected else "contradicted")
+    ready = expected and origin == "corporate"
+    assert validate_contact(contact, company, assessment, facts, campaign.limits, NOW) is ready
     assert derive_readiness(assessment, [contact], facts, campaign.limits, NOW, company) == (
-        "ready_preferred" if expected else "qualified_no_contact")
+        "ready_preferred" if ready else "qualified_no_contact")
 
 
 @pytest.mark.parametrize("changes", [{"last_name": None}, {"last_name": "S."}, {"verification": {"status": "valid", "date": None}}])

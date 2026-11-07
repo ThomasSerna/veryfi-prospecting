@@ -371,7 +371,7 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
     if contact.geographic_scope and (not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence)
                                      or not _scope_covers(contact.geographic_scope, company)):
         return False
-    return employment_basis(contact, company, evidence, limits, now) is not None
+    return employment_status(contact, company, evidence, limits, now).state == "corporate_evidence"
 
 
 def _scope_covers(scope: str, company: Company) -> bool:
@@ -392,49 +392,132 @@ def _employment_contradicted(contact: Contact, evidence: list[Evidence]) -> bool
         employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in evidence)
 
 
-def _employment_from_evidence(contact: Contact, company: Company, evidence: list[Evidence],
-                              limits: CampaignLimits, now: datetime) -> bool:
-    if contact.current_employment is not True:
-        return False
-    facts = _valid_refs(contact.employment_evidence_ids, contact, evidence)
-    if any(item.contact_id == contact.id and item.provider == "apollo" for item in evidence):
-        facts = [item for item in facts if item.source_type in ("primary", "secondary")]
-    if any(item.kind == "observed" and employment_ended(item.excerpt or item.claim, contact.name, contact.title) for item in facts):
-        return False
-    return bool(facts) and any(item.kind == "observed" and not is_search_evidence(item) and
-                              employment_fresh(item, company, limits, now) for item in facts)
+EmploymentState = Literal["corporate_evidence", "provider_claim", "contradicted", "unknown"]
+EmploymentReason = Literal[
+    "employment_ended", "title_changed", "contradicted_source", "future_date", "stale_source", "undated_source",
+    "ambiguous_source", "title_unconfirmed", "incomplete_name", "provider_claim_only", "historical_inference",
+    "no_employment_evidence",
+]
+# Fallos de corroboración en orden de gravedad: se informa el primero presente.
+_CORROBORATION_ORDER = ("future_date", "stale_source", "undated_source", "ambiguous_source", "title_unconfirmed")
+_FRESHNESS_REASONS = {"future": "future_date", "stale": "stale_source", "undated": "undated_source"}
+_REVIEW_REASONS = frozenset({"title_changed", "undated_source", "ambiguous_source", "title_unconfirmed",
+                             "historical_inference"})
 
 
-def hunter_employment_signal(contact: Contact, company: Company, evidence: list[Evidence],
-                             limits: CampaignLimits, now: datetime) -> bool:
-    """Vigencia inferida: buzón nominal verificado vigente y fuente de Hunter aún publicada y vista hace poco.
+class EmploymentStatus(Contract):
+    """Vigencia del empleo calculada al leer, sin guardarse ni decidir gasto (T18).
 
-    No prueba el puesto; la interfaz lo advierte y pide confirmarlo antes de contactar (§10.2).
+    Solo `corporate_evidence` habilita a la persona: una afirmación de proveedor (Apollo o el historial
+    de Hunter) nunca prueba el puesto. `reason` explica por qué no hay evidencia vigente.
+    """
+
+    state: EmploymentState
+    origin: Literal["apollo", "hunter"] | None = None
+    reason: EmploymentReason | None = None
+    evidence_ids: list[UUID] = Field(default_factory=list)
+    review_required: StrictBool = False
+
+
+def _employment(state: EmploymentState, origin: str | None, reason: str | None, ids) -> EmploymentStatus:
+    return EmploymentStatus(state=state, origin=origin, reason=reason, evidence_ids=list(dict.fromkeys(ids)),
+                            review_required=reason in _REVIEW_REASONS)
+
+
+def _hunter_history_claim(contact: Contact, company: Company, evidence: list[Evidence],
+                          limits: CampaignLimits, now: datetime) -> list[UUID]:
+    """Vigencia inferida del historial de Hunter: buzón verificado y fuente aún publicada y vista hace poco.
+
+    Se conserva para leer registros históricos; es una afirmación del proveedor y no prueba el puesto.
     """
     if not contact.name or _employment_contradicted(contact, evidence):
-        return False
+        return []
     if not any(channel.type == ChannelType.EMAIL and channel.normalized_status == ChannelStatus.VERIFIED and
                _fresh(channel.verified_at, limits.freshness.email_days, now) and
                channel_is_usable(channel, contact, evidence, limits, now, company) for channel in contact.channels):
-        return False
-    return any(item.provider == "hunter" and item.source_type == "provider" and item.kind == "observed" and
-               item.contact_id == contact.id and item.retrieved_at <= now and
-               re.search(r"#\d+:source:\d+$", item.external_reference or "") and
-               "still_on_page=True" in (item.excerpt or "") and
-               _fresh(item.updated_at, limits.freshness.employment_days, now) and
-               _valid_refs([item.id], contact, evidence) for item in evidence)
+        return []
+    return [item.id for item in evidence
+            if item.provider == "hunter" and item.source_type == "provider" and item.kind == "observed" and
+            item.contact_id == contact.id and item.retrieved_at <= now and
+            re.search(r"#\d+:source:\d+$", item.external_reference or "") and
+            "still_on_page=True" in (item.excerpt or "") and
+            _fresh(item.updated_at, limits.freshness.employment_days, now) and
+            _valid_refs([item.id], contact, evidence)]
 
 
-def employment_basis(contact: Contact, company: Company, evidence: list[Evidence],
-                     limits: CampaignLimits, now: datetime) -> Literal["evidence", "hunter_signal"] | None:
-    """Base de la vigencia del empleo: evidencia del puesto o, en su defecto, la señal de Hunter (§10.2)."""
-    if _employment_contradicted(contact, evidence):
-        return None
-    if _employment_from_evidence(contact, company, evidence, limits, now):
-        return "evidence"
-    if hunter_employment_signal(contact, company, evidence, limits, now):
-        return "hunter_signal"
-    return None
+def _title_confirmed(contact: Contact, company: Company, fact: Evidence, by_id: dict[UUID, Evidence],
+                     limits: CampaignLimits, now: datetime) -> bool:
+    """El cargo actual figura junto al nombre en una fuente pública vigente, no solo en el proveedor."""
+    sources = [fact] + [by_id[id] for id in contact.provenance.get("title", []) if id in by_id]
+    return any(item.source_type in ("primary", "secondary") and item.kind == "observed" and not is_search_evidence(item)
+               and employment_freshness(item, company, limits, now) == "fresh"
+               and mentions(item.excerpt or item.claim, contact.name or "")
+               and mentions(item.excerpt or item.claim, contact.title or "") for item in sources)
+
+
+def employment_status(contact: Contact, company: Company, evidence: list[Evidence],
+                      limits: CampaignLimits, now: datetime) -> EmploymentStatus:
+    """Separa lo que declara el proveedor de la evidencia pública del puesto (T18, §10.2).
+
+    Orden: contradicción, evidencia corporativa o pública vigente, afirmación del proveedor y desconocido.
+    Ni el correo, ni su verificación, ni la fecha de actualización del perfil de Apollo prueban el empleo.
+    """
+    by_id = {item.id: item for item in evidence if item.company_id == contact.company_id}
+    own = [item for item in by_id.values() if item.contact_id == contact.id]
+    apollo = any(item.provider == "apollo" and (item.external_reference or "").startswith("apollo_v1:") for item in own)
+    origin = "apollo" if apollo else None
+    cited = [by_id[id] for id in contact.employment_evidence_ids if id in by_id]
+    # 1. Contradicción: salida nominal, cargo distinto o fuente del puesto contradicha (en ambos sentidos).
+    ended = [item.id for item in own + cited if contact.name and item.kind == "observed"
+             and employment_ended(item.excerpt or item.claim, contact.name, contact.title)]
+    if _employment_contradicted(contact, evidence) or ended:
+        return _employment("contradicted", origin, "employment_ended", ended)
+    title_ids = set(contact.provenance.get("title", []))
+    changed = [item.id for item in own if title_ids.intersection(item.contradiction_ids)]
+    if changed:
+        return _employment("contradicted", origin, "title_changed", changed)
+    disputed = {id for item in by_id.values() for id in item.contradiction_ids}
+    conflicting = [item.id for item in cited if item.contradiction_ids or item.id in disputed]
+    if conflicting:
+        return _employment("contradicted", origin, "contradicted_source", conflicting)
+    # 2. Evidencia del puesto: fuente pública u corporativa observada, vigente y nominal; nunca un proveedor.
+    failures: dict[str, list[UUID]] = {}
+    justified = []
+    complete = contact.name_complete is True and bool(contact.name) and "*" not in (contact.name or "")
+    if complete:
+        for item in _valid_refs(contact.employment_evidence_ids, contact, evidence):
+            if item.kind != "observed" or item.source_type not in ("primary", "secondary"):
+                continue
+            freshness = employment_freshness(item, company, limits, now)
+            if freshness != "fresh":
+                failures.setdefault(_FRESHNESS_REASONS[freshness], []).append(item.id)
+            elif not mentions(item.excerpt or item.claim, contact.name):
+                failures.setdefault("ambiguous_source", []).append(item.id)
+            elif apollo and not _title_confirmed(contact, company, item, by_id, limits, now):
+                failures.setdefault("title_unconfirmed", []).append(item.id)
+            else:
+                justified.append(item.id)
+        if justified and contact.current_employment is True:
+            return _employment("corporate_evidence", origin, None, justified)
+    reason = next((item for item in _CORROBORATION_ORDER if item in failures), None)
+    failed = failures.get(reason, []) if reason else []
+    if not complete:
+        reason, failed = "incomplete_name", []
+    # 3. Afirmación del proveedor: Apollo declara el empleo actual o el historial de Hunter lo infiere.
+    claim = [item.id for item in own if apollo and item.provider == "apollo" and item.source_type == "provider"
+             and item.kind == "observed" and (item.external_reference or "").endswith("#enrichment")
+             and _fresh(item.retrieved_at, limits.cache.contact_days, now)]
+    if claim:
+        return _employment("provider_claim", "apollo", reason or "provider_claim_only", claim + failed)
+    hunter = _hunter_history_claim(contact, company, evidence, limits, now)
+    if hunter:
+        return _employment("provider_claim", "hunter", "historical_inference", hunter)
+    # 4. Sin evidencia vigente ni afirmación reciente del proveedor.
+    stale_claim = [item.id for item in own if apollo and item.provider == "apollo" and item.source_type == "provider"
+                   and (item.external_reference or "").endswith("#enrichment")]
+    if reason is None and stale_claim:
+        reason, failed = "stale_source", stale_claim
+    return _employment("unknown", origin, reason or "no_employment_evidence", failed)
 
 
 def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidence],
@@ -562,6 +645,15 @@ class ContactMatch(Contract):
     blocked_reason: BlockedReason | None = None
 
 
+def _v1_employment_level(status: EmploymentStatus) -> str:
+    """Niveles históricos de `contact_match_v1`: «hunter_signal» solo nombra el origen de Hunter."""
+    if status.state == "corporate_evidence":
+        return "evidence"
+    if status.state == "provider_claim" and status.origin == "hunter":
+        return "hunter_signal"
+    return "unverified"
+
+
 def load_contact_match(path: Path) -> ContactMatchConfig:
     """Falla si el archivo falta o no es válido: nunca se usan pesos por defecto."""
     return ContactMatchConfig.model_validate_json(Path(path).read_text(encoding="utf-8"))
@@ -600,7 +692,7 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
         channel = "none"
     identity = ("confirmed_complete" if contact.identity_status == IdentityStatus.CONFIRMED and contact.name_complete is True
                 else "complete_pending" if contact.name_complete is True else "incomplete")
-    employment = employment_basis(contact, company, evidence, limits, now) or "unverified"
+    employment = _v1_employment_level(employment_status(contact, company, evidence, limits, now))
     components = [MatchComponent(name=name, level=level, points=config.components[name].levels[level],
                                  weight=config.components[name].weight, pending=level in PENDING_LEVELS)
                   for name, level in (("role", role), ("channel", channel), ("identity", identity),

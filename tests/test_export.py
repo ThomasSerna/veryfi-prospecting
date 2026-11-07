@@ -106,7 +106,8 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
     assert all(len(parsed) == len(CSV_FIELDS) for parsed in csv.reader(StringIO(content.decode("utf-8-sig"))))
 
 
-def test_employment_inferred_from_hunter_is_exported_with_its_warning(csv_case, make_hunter_contact):
+def test_employment_inferred_from_hunter_is_exported_as_claim_with_its_warning(csv_case, make_hunter_contact):
+    """El historial de Hunter se exporta legible, pero su inferencia nunca deja lista a la persona (T18)."""
     case = csv_case
     contact, evidence = make_hunter_contact(case.company, case.now)
     legacy = case.campaign.model_copy(update={"id": uuid4(), "config_snapshot": case.campaign.config_snapshot.model_copy(update={"people_provider": None})})
@@ -117,8 +118,11 @@ def test_employment_inferred_from_hunter_is_exported_with_its_warning(csv_case, 
         db.save_assessment(assessment)
         db.save_run_item(RunItem(campaign_id=legacy.id, company_id=case.company.id, stage="completed", last_assessment_id=assessment.id))
         db.save_contact(contact, evidence=evidence)
-    exported = {row["contact_id"]: row for row in rows(export_csv(read_campaign(case.path, legacy.id)))}
-    assert exported[str(contact.id)]["contact_ready"] == "True"
+    view = read_campaign(case.path, legacy.id)
+    assert rows(export_csv(view)) == []
+    exported = {row["contact_id"]: row for row in rows(export_csv(view, include_all=True))}
+    assert exported[str(contact.id)]["contact_ready"] == "False"
+    assert exported[str(contact.id)]["contact_eligible"] == "False"
     assert HUNTER_EMPLOYMENT_WARNING in exported[str(contact.id)]["warnings"]
     assert str(case.contacts[0].id) not in exported
 
