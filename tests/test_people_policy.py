@@ -62,6 +62,11 @@ def test_progress_counts_cumulative_stages_without_a_policy(case):
             progress.ready) == (2, 1, 1, 0, 0)
     assert (progress.target, progress.policy_version, progress.function_ids) == (None, None, [])
     assert PERSON_STAGES == ("candidate", "identity_verified", "relevant", "channel_usable", "ready")
+    from core.presentation import people_counts, people_summary
+
+    assert people_summary(progress) == "2 candidatas · 1 pertinente · 0 listas"
+    assert people_counts(progress.model_copy(update={"ready": 1})) == "1 pertinente · 1 lista"
+    assert people_summary(None) == people_counts(None) == ""
 
 
 @pytest.mark.parametrize("priority, people, expected", [

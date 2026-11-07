@@ -71,7 +71,7 @@
           <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
           <td class="numeric">{{ result.assessment.fit_score|score }}</td>
           <td class="numeric">{{ result.assessment.coverage|percentage }}</td>
-          <td class="numeric">{{ result.contacts|length }}{% if result.people %}<span class="cell-note">{{ result.people.relevant }} pertinentes · {{ result.people.ready }} listas</span>{% endif %}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
+          <td class="numeric">{{ result.contacts|length }}{% if result.people %}<span class="cell-note">{{ result.people|people_counts }}</span>{% endif %}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
           <td>
             {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}
             <span class="cell-note">{% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>

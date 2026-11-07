@@ -294,11 +294,22 @@ def enrichment_rejection(code):
     return ENRICHMENT_REJECTIONS.get(code, "Apollo no confirmó a esta persona.") if code else ""
 
 
+def _count(number, singular, plural):
+    return f"{number} {singular if number == 1 else plural}"
+
+
+def people_counts(people):
+    """Pertinentes y listas de una empresa para la tabla de la campaña."""
+    if people is None:
+        return ""
+    return f"{_count(people.relevant, 'pertinente', 'pertinentes')} · {_count(people.ready, 'lista', 'listas')}"
+
+
 def people_summary(people):
     """Resumen de personas de una empresa; sin política no hay objetivo, nunca un objetivo de cero."""
     if people is None:
         return ""
-    parts = [f"{people.candidates} candidatas", f"{people.relevant} pertinentes", f"{people.ready} listas"]
+    parts = [_count(people.candidates, "candidata", "candidatas"), people_counts(people)]
     if people.target is not None:
         parts.insert(0, f"Objetivo {people.target}")
     return " · ".join(parts)
