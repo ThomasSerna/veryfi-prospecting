@@ -585,6 +585,92 @@ def derive_readiness(assessment: Assessment, contacts: list[Contact], evidence: 
     return BusinessStatus.QUALIFIED_NO_CONTACT
 
 
+# Etapas de persona (T16): separan lo observado de lo pertinente y lo listo; no deciden gasto ni listo.
+PersonStage = Literal["candidate", "identity_verified", "relevant", "channel_usable", "ready"]
+PERSON_STAGES: tuple[PersonStage, ...] = ("candidate", "identity_verified", "relevant", "channel_usable", "ready")
+PERTINENT_STAGES = frozenset({"relevant", "channel_usable", "ready"})
+
+
+def person_stage(contact: Contact, company: Company, assessment: Assessment, evidence: list[Evidence],
+                 limits: CampaignLimits, now: datetime, roles: list[str] | None = None, *,
+                 campaign: Campaign | None = None) -> PersonStage:
+    """Etapa acumulativa de una persona, calculada al leer y sin persistirse (T16).
+
+    - `candidate`: persona observada; un resultado de Search con apellido ofuscado nunca pasa de aquí.
+    - `identity_verified`: identidad confirmada con nombre completo; en Apollo, además, enriquecida.
+    - `relevant`: función pertinente, empleo no contradicho y alcance compatible. No exige canal ni
+      evidencia corporativa del puesto.
+    - `channel_usable`: además, un canal que supera `channel_is_usable`.
+    - `ready`: supera `validate_contact` y tiene un canal utilizable; es la misma condición de listo.
+    """
+    if campaign is not None and campaign.config_snapshot.role_taxonomy is not None:
+        contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
+    apollo = [item for item in evidence if item.contact_id == contact.id and item.provider == "apollo"
+              and (item.external_reference or "").startswith("apollo_v1:")]
+    enriched = not apollo or any((item.external_reference or "").endswith("#enrichment") for item in apollo)
+    if (contact.company_id != company.id or contact.identity_status != IdentityStatus.CONFIRMED
+            or contact.name_complete is not True or not contact.name or "*" in contact.name or not enriched):
+        return "candidate"
+    if (contact.relevant_function is not True
+            or employment_status(contact, company, evidence, limits, now).state == "contradicted"
+            or contact.geographic_scope and not _scope_covers(contact.geographic_scope, company)):
+        return "identity_verified"
+    if not any(channel_is_usable(channel, contact, evidence, limits, now, company) for channel in contact.channels):
+        return "relevant"
+    if validate_contact(contact, company, assessment, evidence, limits, now, roles, campaign=campaign):
+        return "ready"
+    return "channel_usable"
+
+
+class PeopleProgress(Contract):
+    """Personas de una empresa por etapa acumulada y objetivo de la política (T16); se calcula al leer.
+
+    `relevant` incluye a quienes además tienen canal o están listas. `target` es `None` sin `people_policy`:
+    las campañas históricas no tienen objetivo, no un objetivo de cero.
+    """
+
+    candidates: StrictInt
+    identity_verified: StrictInt
+    relevant: StrictInt
+    channel_usable: StrictInt
+    ready: StrictInt
+    function_ids: list[Text] = Field(default_factory=list)
+    target: StrictInt | None = None
+    policy_version: Text | None = None
+
+
+def people_target(campaign: Campaign, assessment: Assessment) -> int | None:
+    """Objetivo de personas pertinentes del nivel, nunca mayor que el tope de personas de la campaña."""
+    policy = campaign.config_snapshot.people_policy
+    level = str(assessment.priority)
+    if policy is None or level not in policy.target:
+        return None
+    return min(policy.target[level], campaign.limits.effort[level].people)
+
+
+def person_function(contact: Contact, company: Company, assessment: Assessment, campaign: Campaign,
+                    evidence: list[Evidence], now: datetime) -> str | None:
+    """Función de la taxonomía que respalda el cargo; agrupa variantes de jerarquía para medir diversidad."""
+    family, _ = matched_role_family(contact, company, assessment, campaign, evidence, now)
+    return None if family is None else family.function_id
+
+
+def people_progress(contacts: list[Contact], company: Company, assessment: Assessment, evidence: list[Evidence],
+                    now: datetime, roles: list[str] | None = None, *, campaign: Campaign) -> PeopleProgress:
+    stages = [person_stage(item, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
+              for item in contacts]
+    level = {stage: index for index, stage in enumerate(PERSON_STAGES)}
+    reached = lambda stage: sum(level[item] >= level[stage] for item in stages)
+    functions = [person_function(item, company, assessment, campaign, evidence, now)
+                 for item, stage in zip(contacts, stages) if stage in PERTINENT_STAGES]
+    policy = campaign.config_snapshot.people_policy
+    return PeopleProgress(candidates=len(contacts), identity_verified=reached("identity_verified"),
+                          relevant=reached("relevant"), channel_usable=reached("channel_usable"), ready=reached("ready"),
+                          function_ids=sorted({item for item in functions if item is not None}),
+                          target=people_target(campaign, assessment),
+                          policy_version=None if policy is None else policy.version)
+
+
 # Porcentaje de match: ordena a las personas para que ventas elija; no decide elegibilidad,
 # listo ni gasto. El código fija componentes y niveles; config/contact_match.json, sus puntos.
 MatchComponentName = Literal["role", "channel", "identity", "employment"]
