@@ -113,3 +113,41 @@ test('Al terminar, el aviso sale animado, llegan empresas y enlace nuevos y lo e
   assert.deepEqual(bento.childNodes[1].childNodes.map(node => node.nodeName), ['A']);
   assert.equal(feature.childNodes[1].childNodes.filter(node => node.getAttribute('class').includes('is-done')).length, 3);
 });
+
+function table(order, labels = {}) {
+  return h('tbody', {}, order.flatMap(id => ['\n  ', h('tr', { 'data-key': id }, [
+    h('td', {}, [labels[id] || `Empresa sintética ${id}`]),
+  ])]).concat('\n'));
+}
+
+test('Una empresa que sube en el orden se traslada sin recrear las filas que deja atrás', () => {
+  const morph = loadMorph();
+  const current = table(['a', 'b', 'c']);
+  const rows = Object.fromEntries(current.childNodes.filter(node => node.nodeType === 1)
+    .map(node => [node.getAttribute('data-key'), node]));
+  const entered = [];
+  morph(current, table(['c', 'a', 'b'], { c: 'Empresa sintética c · Alta' }), entered);
+  const order = current.childNodes.filter(node => node.nodeType === 1);
+  assert.deepEqual(order.map(node => node.getAttribute('data-key')), ['c', 'a', 'b']);
+  assert.deepEqual(order, [rows.c, rows.a, rows.b]);
+  assert.equal(rows.c.childNodes[0].childNodes[0].nodeValue, 'Empresa sintética c · Alta');
+  assert.deepEqual(entered.filter(node => node.nodeType === 1), []);
+  assert.equal(order.some(node => node.hasAttribute('data-morph-skip')), false);
+});
+
+test('El servidor no cierra un desplegable abierto ni reactiva la entrada terminada', () => {
+  const morph = loadMorph();
+  const details = h('details', { class: 'budget-details', open: '' }, [h('summary', {}, ['Cuentas'])]);
+  const page = h('div', { id: 'campaign-page' }, [details]);
+  const current = h('main', {}, [page]);
+  const entered = [];
+  const incoming = h('main', {}, [h('div', { id: 'campaign-page', 'data-entering': '' }, [
+    h('details', { class: 'budget-details' }, [h('summary', {}, ['Cuentas'])]),
+  ])]);
+  morph(current, incoming, entered);
+  assert.equal(current.childNodes[0], page);
+  assert.equal(page.childNodes[0], details);
+  assert.equal(details.hasAttribute('open'), true);
+  assert.equal(page.hasAttribute('data-entering'), false);
+  assert.deepEqual(entered, []);
+});

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Resumen vivo: la entrada se reproduce una vez y el sondeo actualiza en su sitio, sin reiniciarla.
+  // Actualización viva: la entrada se reproduce una vez y el sondeo actualiza en su sitio, sin reiniciarla.
   const EASE = 'cubic-bezier(.16, 1, .3, 1)';
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const motionless = () => reduced.matches;
@@ -18,13 +18,19 @@
     return node;
   }
 
+  // Atributos que decide el cliente: el puntero escribe `style`, quien lee abre un desplegable
+  // y la entrada termina una sola vez; el servidor no los revierte.
+  function owned(node, name) {
+    return name === 'data-entering' || (name === 'open' && node.nodeName === 'DETAILS');
+  }
+
   function syncAttributes(node, next) {
     for (const { name } of Array.from(node.attributes)) {
-      // `style` también lo escribe motion.js; solo se sustituye cuando el servidor lo envía.
-      if (name !== 'style' && !next.hasAttribute(name)) node.removeAttribute(name);
+      // `style` solo se sustituye cuando el servidor lo envía.
+      if (name !== 'style' && !owned(node, name) && !next.hasAttribute(name)) node.removeAttribute(name);
     }
     for (const { name, value } of Array.from(next.attributes)) {
-      if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+      if (!owned(node, name) && node.getAttribute(name) !== value) node.setAttribute(name, value);
     }
   }
 
@@ -34,17 +40,42 @@
       node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
       return;
     }
+    const delay = Math.min(order, 10) * 70;
     if (node.classList.contains('progress-segment')) {
       node.animate([
         { opacity: 0, transform: 'scaleX(.15)' },
         { opacity: 1, transform: 'none' },
-      ], { duration: 620, delay: order * 70, easing: EASE, fill: 'backwards' });
+      ], { duration: 620, delay, easing: EASE, fill: 'backwards' });
+      return;
+    }
+    // Una empresa nueva sube a su fila y conserva un instante la luz del descubrimiento.
+    if (node.nodeName === 'TR') {
+      node.animate([
+        { opacity: 0, transform: 'translateY(12px)', backgroundColor: 'rgb(128 223 243 / 16%)' },
+        { opacity: 1, transform: 'none', backgroundColor: 'rgb(128 223 243 / 10%)', offset: 0.35 },
+        { opacity: 1, transform: 'none', backgroundColor: 'rgb(128 223 243 / 0%)' },
+      ], { duration: 1600, delay, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'backwards' });
       return;
     }
     node.animate([
       { opacity: 0, filter: 'blur(6px)', transform: 'translateY(8px)' },
       { opacity: 1, filter: 'blur(0)', transform: 'none' },
-    ], { duration: 520, delay: order * 70, easing: EASE, fill: 'backwards' });
+    ], { duration: 520, delay, easing: EASE, fill: 'backwards' });
+  }
+
+  // Una tabla que llega entera presenta sus filas en cascada en lugar de aparecer como un bloque.
+  function entrance(entered) {
+    let order = 0;
+    for (const node of entered) {
+      if (node.nodeType !== 1) continue;
+      const rows = node.nodeName === 'TR' ? [] : Array.from(node.querySelectorAll?.('tr[data-key]') || []);
+      if (!rows.length) {
+        enter(node, order++);
+        continue;
+      }
+      node.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
+      rows.forEach(row => enter(row, order++));
+    }
   }
 
   function leave(node) {
@@ -53,6 +84,14 @@
       return;
     }
     node.setAttribute('data-morph-skip', '');
+    if (node.nodeName === 'TR') {
+      const exit = node.animate([
+        { opacity: 1, transform: 'none' },
+        { opacity: 0, transform: 'translateX(-14px)' },
+      ], { duration: 240, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' });
+      exit.finished.then(() => node.remove(), () => node.remove());
+      return;
+    }
     const { height } = node.getBoundingClientRect();
     node.style.overflow = 'hidden';
     const exit = node.animate([
@@ -73,6 +112,13 @@
         const wanted = key(next);
         for (let probe = cursor; probe; probe = significant(probe.nextSibling)) {
           if (probe.nodeType === 1 && key(probe) === wanted) { match = probe; break; }
+        }
+        // Un nodo con `data-key` que cambió de orden se traslada; los que quedan entre ambos no se recrean.
+        if (match && match !== cursor && next.hasAttribute('data-key')) {
+          from.insertBefore(match, cursor);
+          syncAttributes(match, next);
+          morph(match, next, entered);
+          continue;
         }
       }
       if (!match) {
@@ -105,9 +151,14 @@
     return {
       values: new Map(Array.from(root.querySelectorAll('[data-delta]'), node => [node, Number(node.dataset.value)])),
       done: new Set(root.querySelectorAll('.progress-segment.is-done')),
-      swaps: new Map(Array.from(document.querySelectorAll('[data-live-swap]'), node => [node, node.textContent.trim()])),
-      live: Boolean(root.querySelector('.home-feature.is-live')),
+      swaps: new Map(Array.from(root.querySelectorAll('[data-live-swap]'), node => [node, node.textContent.trim()])),
+      live: matches(root, '.is-live'),
+      rows: new Map(Array.from(root.querySelectorAll('[data-key]'), node => [node, { top: node.getBoundingClientRect().top, text: node.textContent }])),
     };
+  }
+
+  function matches(root, selector) {
+    return Boolean(root.matches?.(selector) || root.querySelector(selector));
   }
 
   function materialize(node) {
@@ -147,7 +198,15 @@
     ], { duration: 1200, delay: order * 110, easing: 'ease-out' });
   }
 
-  // Señala solo lo que cambió entre dos lecturas: cifras, empresas terminadas y estados.
+  // Una fila cuyo contenido cambió se ilumina y se apaga: el color explica el cambio también sin movimiento.
+  function glow(row) {
+    row.animate?.([
+      { backgroundColor: 'rgb(128 223 243 / 14%)' },
+      { backgroundColor: 'rgb(128 223 243 / 0%)' },
+    ], { duration: motionless() ? 900 : 1600, easing: 'ease-out' });
+  }
+
+  // Señala solo lo que cambió entre dos lecturas: cifras, empresas terminadas, estados y orden de filas.
   function signal(root, before) {
     before.swaps.forEach((text, node) => {
       if (node.isConnected && node.textContent.trim() !== text) materialize(node);
@@ -161,12 +220,31 @@
       if (!before.done.has(segment)) flash(segment, order++);
     });
     const bar = root.querySelector('.progress-segments');
-    if (before.live && bar && !root.querySelector('.home-feature.is-live') && !motionless()) {
+    if (before.live && bar && !matches(root, '.is-live') && !motionless()) {
       bar.animate?.([
         { backgroundPosition: '160% 0', opacity: 1 },
         { backgroundPosition: '-60% 0', opacity: 1 },
       ], { duration: 1400, delay: order * 110, easing: 'cubic-bezier(.65, 0, .35, 1)', pseudoElement: '::after' });
     }
+    // FLIP: cada fila conservada parte de donde estaba y se desliza a su nuevo puesto.
+    before.rows.forEach((was, row) => {
+      if (!row.isConnected) return;
+      const shift = was.top - row.getBoundingClientRect().top;
+      if (Math.abs(shift) > 1 && !motionless()) {
+        row.animate?.([{ transform: `translateY(${shift}px)` }, { transform: 'none' }], { duration: 560, easing: EASE });
+      }
+      if (row.textContent !== was.text) glow(row);
+    });
+  }
+
+  // Actualiza una región con la versión del servidor y anima solo sus diferencias.
+  function update(current, next) {
+    const before = snapshot(current);
+    const entered = [];
+    syncAttributes(current, next);
+    morph(current, next, entered);
+    entrance(entered);
+    signal(current, before);
   }
 
   function apply(root, next) {
@@ -177,7 +255,7 @@
       if (incoming) morph(region, incoming, entered);
     });
     document.body.dataset.running = next.body?.dataset.running === 'true' ? 'true' : 'false';
-    entered.forEach((node, order) => enter(node, order));
+    entrance(entered);
     signal(root, before);
   }
 
@@ -190,10 +268,9 @@
   }
 
   function start() {
+    document.querySelectorAll('[data-entering]').forEach(settle);
     const root = document.querySelector('[data-live-dashboard]');
-    if (!root) return;
-    settle(root);
-    if (document.body.dataset.running !== 'true') return;
+    if (!root || document.body.dataset.running !== 'true') return;
     const poll = async () => {
       try {
         const response = await fetch(window.location.href, {
@@ -212,7 +289,12 @@
     window.setTimeout(poll, 2000);
   }
 
-  // Las pruebas sin navegador cargan el módulo para ejercitar la comparación con un DOM sintético.
-  if (typeof module === 'object' && module) module.exports = { morph };
-  else start();
+  // Las pruebas sin navegador cargan el módulo para ejercitar la comparación con un DOM sintético;
+  // en la página, la campaña reutiliza `update` para su propio sondeo.
+  const api = { morph, update };
+  if (typeof module === 'object' && module) module.exports = api;
+  else {
+    window.ProspectingLive = api;
+    start();
+  }
 })();
