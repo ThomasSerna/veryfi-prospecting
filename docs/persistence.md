@@ -160,7 +160,8 @@ y las instantáneas de las pruebas del pipeline los fijan:
 - Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
   `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
   `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
-  `contacts_extraction_v2`, `rubric_v1`, `rubric_v2` y el esquema SQLite `user_version=2`.
+  `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`, `people_policy_v1` y el esquema
+  SQLite `user_version=2`.
   Las instantáneas sin taxonomía conservan los prompts v3/v4 según rúbrica y
   `contacts_extraction_v1`; las nuevas usan v5 y `contacts_extraction_v2` sin
   reinterpretar solicitudes ni evaluaciones históricas.
@@ -173,6 +174,9 @@ identificadores sin reescribir el ledger anterior:
   ausente identifica campañas históricas.
 - Claves `contacts:apollo_search` y `contacts:apollo_enrichments` para los intentos
   de búsqueda y enriquecimiento; las claves compartidas mantienen su significado.
+- Clave `contacts:apollo_rejected:<código>:<contact_id>` (T16) para una persona que
+  People Enrichment no confirmó; su llamada queda procesada y no se repite. Las
+  etapas de persona y los conteos por empresa no se guardan: se recalculan al leer.
 - `uuid5(company_id, "apollo:<id>")` para candidatos Apollo y
   `uuid5(company_id, "public_apollo_v1:<valor_del_canal>")` para contactos públicos nuevos
   con correo o LinkedIn, separados de los identificadores históricos.
