@@ -28,6 +28,15 @@ contacto listo; no suma resultados de campañas distintas. Desde «Sin revisar»
 se puede abrir la siguiente empresa pendiente cuando no hay una investigación
 en curso. Si no existen campañas, se ofrece preparar la primera.
 
+El avance dibuja un segmento por empresa encontrada y enciende los terminados;
+sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
+permanece en el documento para lectores de pantalla. Durante una investigación,
+el inicio vuelve a leer su propia página cada dos segundos y actualiza en su
+sitio avance, cifras, estado, navegación y presupuesto, sin recargar ni repetir
+la entrada; al terminar muestra el estado final y habilita la revisión. Con
+movimiento reducido, el contenido aparece en su estado final y los cambios solo
+se funden.
+
 El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
 navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Al
 abrirla, el contenido queda detrás de una capa oscurecida y desenfocada. Con
@@ -250,6 +259,30 @@ y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde l
 y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
+
+## Verificación del movimiento del resumen del 7 de noviembre de 2026
+
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
+  17 pruebas pasaron con DOM sintético. Cubren la actualización en su sitio del
+  sondeo, que conserva nodos y estilos del puntero, el brillo por proximidad y
+  la navegación.
+- `uv run --locked python manage.py check` pasó, igual que 195 pruebas
+  seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
+  identificadores persistidos, con bases temporales y datos sintéticos.
+- En Chrome 157 sin interfaz, sin claves y con bases temporales exclusivamente
+  sintéticas, se revisaron cuadros de la entrada a velocidad reducida, el brillo
+  por proximidad, la inclinación, el reflejo del botón, el foco por teclado, el
+  cajón con su indicador, el estado vacío, el historial y la campaña. En 1440 y
+  390 px no hubo desbordamiento global; con movimiento reducido, el inicio
+  apareció en su estado final sin animaciones activas.
+- Un arnés temporal fuera del repositorio simuló una campaña sintética en curso
+  durante 36 s, con sondeos cada dos segundos. El panel destacado, la tarjeta de
+  revisión, el primer segmento y el botón conservaron sus nodos; no se reinició
+  ninguna animación de entrada y solo corrieron las señales de cambio.
+- El detector de Impeccable no dejó advertencias tras retirar una transición de
+  altura; conserva avisos consultivos por medidas fuera de la paleta mínima de
+  `DESIGN.md`. Quedan pendientes Firefox, Safari, un lector de pantalla real, el
+  zoom al 200 %, la revisión con ventas y una investigación con proveedores reales.
 
 ## Verificación del prototipo del 7 de noviembre de 2026
 
