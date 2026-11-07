@@ -1,0 +1,2 @@
+{# Cifra con rodillos: la cifra real queda en el DOM y el rodillo solo la dibuja. #}
+<span class="ticker" aria-hidden="true">{% for digit in value|stringformat:"d" %}<span class="ticker-digit" style="--d: {{ digit }}">{{ digit }}</span>{% endfor %}</span><span class="sr-only">{{ value }}</span>

@@ -1,40 +1,93 @@
-/* Resumen compacto: una campaña y tres cifras, sin agregados ni historial. */
-.home-panel { max-width: 1040px; margin: 42px auto 0; }
-.home-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
-.home-heading h1 { font-size: clamp(1.5rem, 2.3vw, 2rem); font-weight: 550; margin-bottom: 8px; }
-.home-heading p { margin: 0; color: var(--muted); font-size: .9375rem; }
-.home-history-link { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: .8125rem; }
+/* Resumen: la campaña destacada, su avance por empresa y tres indicadores, sin agregados ni historial. */
+.home-panel { max-width: 1080px; margin: 36px auto 0; }
+.home-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.home-title { margin-bottom: 10px; font-size: 2.375rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.08; }
+.reveal-line { display: inline-block; overflow: clip; padding-bottom: .12em; margin-bottom: -.12em; vertical-align: bottom; }
+.reveal-line > span { display: inline-block; }
+.home-intro { margin: 0; color: var(--muted); font-size: .9375rem; }
+.home-history-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 0; color: var(--muted); font-size: .8125rem; white-space: nowrap; text-decoration: none; }
+.home-history-link:hover { color: var(--ink); }
 .home-history-link svg { width: 16px; height: 16px; }
-.home-bento { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 16px; }
-.home-feature { padding: 30px; display: flex; flex-direction: column; min-width: 0; }
-.home-feature-meta { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.home-feature-meta h2 { font-size: .8125rem; font-weight: 500; margin: 0; color: var(--muted); }
-.home-market { margin: 34px 0 26px; }
-.home-market h3 { font-size: clamp(1.6rem, 2.7vw, 2.125rem); letter-spacing: -.035em; font-weight: 550; margin-bottom: 12px; }
-.home-market p { font-size: .875rem; color: var(--muted); max-width: 45ch; margin: 0; }
+.home-live-notice { margin-bottom: 18px; }
+
+.home-bento { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; }
+
+/* Panel destacado: estado, mercado y un segmento por empresa encontrada. */
+.home-feature { display: flex; flex-direction: column; min-width: 0; padding: 26px 30px 30px; border-color: #30343f; background: linear-gradient(180deg, #191c23, var(--surface) 58%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%); }
+.home-feature-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.feature-status, .feature-kind { display: inline-flex; align-items: center; }
+.feature-kind { gap: 2px; margin: 0; color: var(--muted); font-size: .8125rem; }
+.feature-kind time { font-variant-numeric: tabular-nums; }
+.home-market { margin: 40px 0 30px; }
+.home-market h2 { margin-bottom: 14px; font-size: 2.5rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.05; }
+.home-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.home-tags li { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgb(255 255 255 / 2%); color: var(--muted); font-size: .75rem; font-weight: 500; }
 .home-progress { margin-top: auto; }
-.home-progress .progress-meter { height: 6px; }
-.home-progress .progress-meter::-webkit-progress-value { background: var(--cyan); }
-.home-progress .progress-meter::-moz-progress-bar { background: var(--cyan); }
-.home-feature-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; margin-top: 26px; }
-.home-saved { font-size: .75rem; color: var(--muted); }
-.home-metrics { display: grid; grid-template-rows: repeat(3, 1fr); gap: 14px; margin: 0; min-width: 0; }
-.home-metric { padding: 19px 22px; min-width: 0; display: grid; grid-template-columns: min-content 1fr; gap: 6px 18px; align-items: baseline; }
-.home-metric dt { grid-column: 2; grid-row: 1; font-size: .875rem; font-weight: 500; }
-.home-metric dd { display: contents; }
-.home-metric-value { grid-column: 1; grid-row: 1; font-size: 1.875rem; font-weight: 450; letter-spacing: -.035em; font-variant-numeric: tabular-nums; min-width: 1.4ch; color: var(--cyan); }
-.home-metric-review .home-metric-value { color: var(--violet); }
+.progress-figure { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; max-width: none; margin: 0 0 14px; font-variant-numeric: tabular-nums; }
+.progress-figure-value { position: relative; color: var(--ink); font-size: 2rem; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+.progress-figure-total { color: var(--ink); font-size: 1rem; font-weight: 500; }
+.progress-figure-label { color: var(--muted); font-size: .8125rem; }
+.progress-hint { margin: 12px 0 0; color: var(--muted); font-size: .8125rem; }
+.progress-segments { position: relative; display: flex; gap: 5px; height: 22px; }
+.progress-segment { position: relative; flex: 1 1 0; min-width: 2px; border-radius: 5px; background: var(--soft); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%); }
+.progress-segment::before { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, #8fe6f6, #5ccde8); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%); content: ''; opacity: 0; transform: scaleX(0); transform-origin: left; transition: transform 760ms var(--ease-out-expo), opacity 260ms ease; }
+.progress-segment.is-done::before { opacity: 1; transform: none; }
+.progress-segment.is-active, .progress-segment.is-searching { background-color: var(--info-bg); box-shadow: inset 0 0 0 1px rgb(128 223 243 / 28%); }
+.progress-segment.is-active::after, .progress-segment.is-searching::after { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, transparent 30%, rgb(128 223 243 / 55%) 50%, transparent 70%) no-repeat; background-size: 300% 100%; content: ''; animation: segment-scan 1.8s var(--ease-in-out-quart) infinite; }
+.progress-segment.is-searching::after { animation-duration: 2.6s; }
+.progress-segments::after { position: absolute; inset: -6px 0; border-radius: 10px; background: linear-gradient(100deg, transparent 0 42%, rgb(255 255 255 / 70%) 50%, transparent 58% 100%) no-repeat; background-size: 250% 100%; background-position: 160% 0; content: ''; opacity: 0; pointer-events: none; }
+.home-feature-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin-top: 26px; }
+
+/* La investigación en curso recorre el borde del panel destacado. */
+.feature-beam { position: absolute; inset: -1px; z-index: 3; padding: 1.5px; overflow: hidden; border-radius: inherit; opacity: 0; pointer-events: none; transition: opacity 900ms ease; }
+.home-feature.is-live { border-color: rgb(128 223 243 / 22%); }
+.home-feature.is-live .feature-beam { opacity: 1; }
+@supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
+  .feature-beam { -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; }
+  .feature-beam::before { position: absolute; top: 50%; left: 50%; width: 200%; aspect-ratio: 1; background: conic-gradient(from 0deg, transparent 0deg 250deg, rgb(128 223 243 / 0%) 250deg, rgb(128 223 243 / 90%) 336deg, #fff 352deg, transparent 360deg); content: ''; translate: -50% -50%; }
+  .home-feature.is-live .feature-beam::before { animation: beam-spin 4.4s linear infinite; }
+}
+.home-panel .status-running::before { animation: status-pulse 1.8s ease-out infinite; }
+
+/* Botón principal: un reflejo cruza una vez al señalarlo. */
+.home-cta { position: relative; overflow: hidden; isolation: isolate; }
+.home-cta::after { position: absolute; inset: 0; z-index: -1; background: linear-gradient(110deg, transparent 28%, rgb(255 255 255 / 60%) 47%, rgb(255 255 255 / 60%) 53%, transparent 72%); content: ''; pointer-events: none; translate: -115% 0; }
+
+/* Indicadores: el pendiente de revisión manda; total y contacto listo lo acompañan. */
+.home-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; min-width: 0; margin: 0; }
+.home-metric { display: flex; flex-direction: column; min-width: 0; padding: 20px 22px; }
+.home-metric-review { grid-column: 1 / -1; padding: 24px 24px 22px; }
+.home-metric dt { margin-bottom: 14px; color: var(--ink); font-size: .8125rem; font-weight: 500; }
+.home-metric dd { display: flex; flex: 1; flex-direction: column; gap: 12px; margin: 0; }
+.home-metric-value { position: relative; align-self: flex-start; color: var(--cyan); font-size: 2.25rem; font-weight: 550; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+.home-metric-review .home-metric-value { color: var(--violet); font-size: 3rem; }
 .home-metric-ready .home-metric-value { color: var(--success); }
-.home-metric-note { grid-column: 1 / -1; font-size: .75rem; color: var(--muted); }
-.home-metric .text-link { display: inline-flex; align-items: center; gap: 7px; font-size: inherit; color: var(--muted); }
-.home-metric .text-link:hover { color: var(--ink); }
+.home-metric-share { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metric-meter { position: relative; flex: 1; height: 4px; overflow: hidden; border-radius: 2px; background: var(--ivory-deep); }
+.metric-meter > span { position: absolute; inset: 0; border-radius: inherit; background: var(--cyan); transform: scaleX(calc(var(--share, 0) / 100)); transform-origin: left; transition: transform 900ms var(--ease-out-expo); }
+.home-metric-review .metric-meter > span { background: var(--violet); }
+.home-metric-ready .metric-meter > span { background: var(--success); }
+.home-metric-note { display: inline-block; margin-top: auto; color: var(--muted); font-size: .75rem; line-height: 1.45; }
+.home-metric .text-link { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: .8125rem; text-decoration: none; }
+.home-metric .text-link:hover { color: var(--violet); }
 .home-metric .motion-arrow { width: 14px; height: 14px; }
-.home-footnote { font-size: .75rem; color: var(--muted); margin: 20px 0 0; max-width: 90ch; }
-.home-empty { padding: 44px; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-.home-empty .empty-mark { color: var(--cyan); width: 56px; height: 56px; margin-bottom: 28px; stroke-width: 1; }
-.home-empty h2 { font-size: 1.5rem; max-width: 22ch; margin-bottom: 14px; }
-.home-empty p { color: var(--muted); max-width: 47ch; margin-bottom: 24px; }
-.home-empty-note { font-size: .75rem; color: var(--muted); margin-top: 18px; }
+.home-footnote { display: block; max-width: 90ch; margin: 20px 0 0; color: var(--muted); font-size: .75rem; }
+
+/* Cifras con rodillo: el dígito real fija ancho y línea base; el rodillo es solo dibujo. */
+.ticker { display: inline-flex; line-height: 1.15; }
+.ticker-digit { position: relative; display: inline-block; clip-path: inset(0 -.1em); visibility: hidden; }
+.ticker-digit::before { position: absolute; top: 0; right: 0; left: 0; content: '0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9'; text-align: center; white-space: pre; visibility: visible; transform: translateY(calc(var(--d, 0) * -1.15em)); transition: transform 1100ms var(--ease-out-expo); }
+.delta-chip { position: absolute; bottom: 72%; left: 100%; margin-left: 2px; padding: 2px 7px; border: 1px solid rgb(128 223 243 / 35%); border-radius: 999px; background: #17262c; color: var(--cyan); font-size: .6875rem; font-weight: 600; letter-spacing: 0; line-height: 1.3; pointer-events: none; white-space: nowrap; }
+
+/* Estado vacío: el radar se dibuja una vez y barre mientras no haya campañas. */
+.home-empty { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 48px; }
+.empty-radar { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 28px; color: var(--cyan); }
+.empty-radar::before { position: absolute; inset: 6px; border-radius: 50%; background: conic-gradient(from 0deg, rgb(128 223 243 / 0%) 0deg, rgb(128 223 243 / 30%) 70deg, rgb(128 223 243 / 0%) 71deg); content: ''; animation: beam-spin 5s linear infinite; }
+.empty-mark { position: relative; width: 64px; height: 64px; stroke-width: 1; }
+.home-empty h2 { max-width: 22ch; margin-bottom: 14px; font-size: 1.5rem; }
+.home-empty p { max-width: 47ch; margin-bottom: 24px; color: var(--muted); }
+.home-empty-note { margin-top: 18px; color: var(--muted); font-size: .75rem; }
+
 .history-page { max-width: 1160px; margin: 28px auto 0; }
 .history-surface { overflow: hidden; }
 .history-surface .data-table { min-width: 760px; }
@@ -42,19 +95,87 @@
 .history-surface .table-action .motion-arrow { display: inline-block; margin-left: 6px; }
 .history-surface .data-table tbody tr:hover { background: rgb(128 223 243 / .035); }
 
+/* Entrada: el título se descubre por líneas, el panel se enfoca y el avance se enciende empresa a empresa. */
+[data-entering] .home-title .reveal-line > span { animation: enter-line 820ms var(--ease-out-expo) backwards; }
+[data-entering] .home-title .reveal-line + .reveal-line > span { animation-delay: 90ms; }
+[data-entering] .home-intro { animation: enter-rise 700ms var(--ease-out-expo) 180ms backwards; }
+[data-entering] .home-history-link { animation: enter-fade 600ms ease 320ms backwards; }
+[data-entering] .home-live-notice { animation: enter-rise 600ms var(--ease-out-expo) 140ms backwards; }
+[data-entering] .home-feature, [data-entering] .home-empty { animation: enter-focus 900ms var(--ease-out-expo) 100ms backwards; }
+[data-entering] .home-feature-meta { animation: enter-rise 700ms var(--ease-out-expo) 300ms backwards; }
+[data-entering] .home-market h2 { animation: enter-rise 800ms var(--ease-out-expo) 360ms backwards; }
+[data-entering] .home-tags li { animation: enter-rise 600ms var(--ease-out-expo) backwards; animation-delay: calc(440ms + var(--i, 0) * 60ms); }
+[data-entering] .progress-figure { animation: enter-rise 700ms var(--ease-out-expo) 480ms backwards; }
+[data-entering] .progress-segment { animation: segment-in 640ms var(--ease-out-expo) backwards; animation-delay: calc(460ms + var(--i, 0) * min(40ms, 600ms / var(--count, 1))); transform-origin: left; }
+[data-entering] .progress-segment.is-done::before { animation: segment-fill 600ms var(--ease-out-expo) backwards; animation-delay: calc(560ms + var(--i, 0) * min(75ms, 900ms / var(--count, 1))); }
+[data-entering] .ticker-digit::before { animation: ticker-roll var(--roll-duration, 1000ms) cubic-bezier(.33, 1, .68, 1) var(--roll-delay, 420ms) backwards; }
+[data-entering] .progress-figure-value { --roll-delay: 560ms; --roll-duration: calc(600ms + var(--roll-steps, 1) * min(75ms, 900ms / var(--count, 1))); }
+[data-entering] .progress-figure-total { --roll-delay: 460ms; --roll-duration: 800ms; }
+[data-entering] .home-feature-actions { animation: enter-rise 700ms var(--ease-out-expo) 560ms backwards; }
+[data-entering] .home-metric { animation: enter-side 800ms var(--ease-out-expo) backwards; }
+[data-entering] .home-metric:nth-child(1) { --roll-delay: 460ms; animation-delay: 200ms; }
+[data-entering] .home-metric:nth-child(2) { --roll-delay: 540ms; animation-delay: 280ms; }
+[data-entering] .home-metric:nth-child(3) { --roll-delay: 620ms; animation-delay: 360ms; }
+[data-entering] .metric-meter > span { animation: meter-fill 1000ms var(--ease-out-expo) backwards; animation-delay: var(--roll-delay, 600ms); }
+[data-entering] .home-footnote { animation: enter-fade 700ms ease 700ms backwards; }
+[data-entering] .home-empty h2 { animation: enter-rise 800ms var(--ease-out-expo) 300ms backwards; }
+[data-entering] .home-empty p, [data-entering] .home-empty .home-cta { animation: enter-rise 700ms var(--ease-out-expo) 420ms backwards; }
+[data-entering] .home-empty-note { animation: enter-fade 700ms ease 620ms backwards; }
+[data-entering] .empty-mark circle, [data-entering] .empty-mark path { animation: draw-on 1400ms var(--ease-out-expo) 260ms backwards; stroke-dasharray: 1; }
+[data-entering] .empty-mark circle + circle { animation-delay: 380ms; }
+[data-entering] .empty-mark path { animation-delay: 520ms; }
+
+@keyframes enter-line { from { transform: translateY(108%); } }
+@keyframes enter-rise { from { opacity: 0; filter: blur(6px); translate: 0 12px; } }
+@keyframes enter-focus { from { opacity: 0; filter: blur(10px); scale: .97; translate: 0 26px; } }
+@keyframes enter-side { from { opacity: 0; filter: blur(8px); translate: 28px 0; } }
+@keyframes enter-fade { from { opacity: 0; } }
+@keyframes segment-in { from { opacity: 0; transform: scaleX(.2); } }
+@keyframes segment-fill { from { opacity: 1; transform: scaleX(0); } }
+@keyframes meter-fill { from { transform: scaleX(0); } }
+@keyframes ticker-roll { from { transform: translateY(0); } }
+@keyframes draw-on { from { stroke-dashoffset: 1; } }
+@keyframes segment-scan { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes beam-spin { to { rotate: 1turn; } }
+@keyframes status-pulse { 0% { box-shadow: 0 0 0 0 rgb(162 194 255 / 60%); } 75%, 100% { box-shadow: 0 0 0 7px rgb(162 194 255 / 0%); } }
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .home-cta:hover::after { translate: 115% 0; transition: translate 760ms cubic-bezier(.45, 0, .25, 1); }
+}
+
+/* En táctil, la entrada conserva el recorrido sin desenfoques costosos. */
+@media (hover: none), (pointer: coarse) {
+  @keyframes enter-rise { from { opacity: 0; translate: 0 10px; } }
+  @keyframes enter-focus { from { opacity: 0; scale: .98; translate: 0 18px; } }
+  @keyframes enter-side { from { opacity: 0; translate: 0 16px; } }
+}
+
+@media (max-width: 980px) {
+  .home-bento { grid-template-columns: minmax(0, 1fr); }
+  .home-feature { min-height: 0; }
+}
+
 @media (max-width: 760px) {
   .home-panel { margin-top: 20px; }
   .home-heading { align-items: flex-start; flex-direction: column; gap: 14px; margin-bottom: 22px; }
-  .home-bento { grid-template-columns: minmax(0, 1fr); }
-  .home-feature { padding: 24px; }
-  .home-market { margin: 28px 0; }
-  .home-metric { padding: 18px 22px; }
-  .home-metric-value { font-size: 1.625rem; }
+  .home-title { font-size: 1.875rem; }
+  .home-feature { padding: 22px; }
+  .home-market { margin: 28px 0 24px; }
+  .home-market h2 { font-size: 1.875rem; }
+  .home-metric { padding: 18px; }
+  .home-metric-review { padding: 20px; }
+  .home-metric-value { font-size: 1.875rem; }
+  .home-metric-review .home-metric-value { font-size: 2.5rem; }
   .home-footnote { line-height: 1.6; }
   .home-empty { padding: 28px 24px; }
   .history-page { margin-top: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-feature .progress-meter { transition: none; }
+  .feature-beam::before { background: linear-gradient(135deg, rgb(128 223 243 / 70%), rgb(183 165 250 / 45%)); }
+}
+
+@media (forced-colors: active) {
+  .progress-segment { border: 1px solid CanvasText; }
+  .progress-segment.is-done { background: Highlight; }
 }

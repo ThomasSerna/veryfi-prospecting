@@ -195,6 +195,8 @@
 
   const campaignPage = document.getElementById('campaign-page');
   if (!campaignPage) {
+    // El resumen se actualiza en su sitio desde dashboard.js; recargarlo reiniciaría su entrada.
+    if (document.querySelector('[data-live-dashboard]')) return;
     if (body.dataset.running === 'true' && body.dataset.statusUrl) {
       const check = async () => {
         try {
