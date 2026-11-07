@@ -253,6 +253,26 @@ class RoleTaxonomy(Contract):
         return self
 
 
+class PeoplePolicy(Contract):
+    """Objetivo de personas pertinentes por cuenta (T16); propuesta pendiente de validación comercial.
+
+    Es un objetivo, no una cuota: los topes de `limits.effort` y del presupuesto siguen mandando.
+    """
+
+    version: Literal["people_policy_v1"]
+    validation_status: Literal["pending", "validated"]
+    source_reference: Text
+    source_date: date
+    target: dict[Literal["medium", "high"], Annotated[StrictInt, Field(ge=1, le=5)]]
+    min_functions: Annotated[StrictInt, Field(ge=1, le=5)]
+
+    @model_validator(mode="after")
+    def validate_target(self) -> Self:
+        if set(self.target) != {"medium", "high"}:
+            raise ValueError("El objetivo de personas necesita los niveles medio y alto.")
+        return self
+
+
 class CriterionDefinition(Contract):
     name: Text
     weight: Annotated[StrictInt, Field(gt=0, le=100)]
@@ -325,8 +345,8 @@ class DiscoveryLimits(Contract):
 class EffortLimits(Contract):
     web_queries: Count
     pages: Count
-    people: Annotated[Count, Field(le=3)]
-    enrichments_per_provider: Annotated[Count, Field(le=3)]
+    people: Annotated[Count, Field(le=5)]
+    enrichments_per_provider: Annotated[Count, Field(le=5)]
     people_queries: Annotated[Count, Field(le=2)]
     active_seconds: Count
 
@@ -402,8 +422,8 @@ class CampaignLimits(Contract):
         caps = {
             "initial": (2, 3, 0, 0, 0, 90),
             "insufficient_evidence": (1, 2, 0, 0, 0, 45),
-            "medium": (2, 2, 1, 1, 2, 90),
-            "high": (4, 4, 3, 3, 2, 180),
+            "medium": (2, 2, 3, 3, 2, 90),
+            "high": (4, 4, 5, 5, 2, 180),
             "low": (0, 0, 0, 0, 0, 0),
             "excluded": (0, 0, 0, 0, 0, 0),
         }
@@ -431,6 +451,7 @@ class VeryfiConfig(Contract):
     rubrics: dict[Text, Rubric]
     defaults: Defaults
     role_taxonomy: RoleTaxonomy | None = None
+    people_policy: PeoplePolicy | None = None
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
@@ -441,6 +462,11 @@ class VeryfiConfig(Contract):
             profile_ids = {profile.id for profile in self.profiles}
             if any(not set(family.profile_ids) <= profile_ids for family in self.role_taxonomy.families):
                 raise ValueError("Una familia de cargos referencia perfiles inexistentes.")
+        if self.people_policy is not None:
+            if self.role_taxonomy is None or self.people_provider != "apollo":
+                raise ValueError("El objetivo de personas requiere la taxonomía de cargos y Apollo.")
+            if any(target > self.defaults.effort[level].people for level, target in self.people_policy.target.items()):
+                raise ValueError("El objetivo de personas supera el tope de personas del nivel.")
         for profile in self.profiles:
             if not set(profile.products) <= set(product_ids):
                 raise ValueError("Un perfil referencia productos inexistentes.")

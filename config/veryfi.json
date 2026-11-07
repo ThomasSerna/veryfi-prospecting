@@ -218,8 +218,8 @@
     "effort": {
       "initial": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 90},
       "insufficient_evidence": {"web_queries": 1, "pages": 2, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 45},
-      "medium": {"web_queries": 2, "pages": 2, "people": 1, "enrichments_per_provider": 1, "people_queries": 2, "active_seconds": 90},
-      "high": {"web_queries": 4, "pages": 4, "people": 3, "enrichments_per_provider": 3, "people_queries": 2, "active_seconds": 180},
+      "medium": {"web_queries": 2, "pages": 2, "people": 3, "enrichments_per_provider": 3, "people_queries": 2, "active_seconds": 90},
+      "high": {"web_queries": 4, "pages": 4, "people": 5, "enrichments_per_provider": 5, "people_queries": 2, "active_seconds": 180},
       "low": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0},
       "excluded": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0}
     },
@@ -245,6 +245,14 @@
       "paid_phone_enrichment": false
     },
     "llm": {"max_input_tokens": 9000, "max_output_tokens": 1000}
+  },
+  "people_policy": {
+    "version": "people_policy_v1",
+    "validation_status": "pending",
+    "source_reference": "Issue T16 (#17); objetivo y topes aprobados por el usuario el 2026-11-07",
+    "source_date": "2026-11-07",
+    "target": {"medium": 2, "high": 3},
+    "min_functions": 2
   },
   "role_taxonomy": {
     "version": "role_taxonomy_v1",

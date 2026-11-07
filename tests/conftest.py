@@ -1,6 +1,7 @@
 """Fixtures sintéticas y bloqueo de red externa para las pruebas locales."""
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 import socket
 from types import SimpleNamespace
@@ -42,13 +43,18 @@ def reject_external_network(monkeypatch):
 
 @pytest.fixture
 def config():
-    """Conserva la instantánea histórica para las pruebas previas a T15."""
+    """Conserva la instantánea histórica para las pruebas previas a T15 y T16.
+
+    Sin taxonomía ni objetivo de personas y con los topes anteriores (media 1/1, alta 3/3).
+    """
     from prospecting.models import VeryfiConfig
 
-    current = VeryfiConfig.model_validate_json(
-        (PROJECT_ROOT / "config" / "veryfi.json").read_text(encoding="utf-8")
-    )
-    return current.model_copy(update={"role_taxonomy": None})
+    raw = json.loads((PROJECT_ROOT / "config" / "veryfi.json").read_text(encoding="utf-8"))
+    raw.pop("role_taxonomy")
+    raw.pop("people_policy")
+    for level, people in (("medium", 1), ("high", 3)):
+        raw["defaults"]["effort"][level] |= {"people": people, "enrichments_per_provider": people}
+    return VeryfiConfig.model_validate(raw)
 
 
 @pytest.fixture
