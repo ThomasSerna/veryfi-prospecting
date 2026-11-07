@@ -29,7 +29,7 @@ function motionPage({ reduced = false, precise = true } = {}) {
     cancelAnimationFrame(id) { frames.delete(id); },
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/motion.js'), 'utf8'), { document, window });
-  function surface(tilt = false) {
+  function surface(tilt = false, box = { left: 10, top: 20, width: 200, height: 100 }) {
     const styles = new Map();
     const target = {
       isConnected: true,
@@ -37,7 +37,7 @@ function motionPage({ reduced = false, precise = true } = {}) {
       styles,
       style: { setProperty: (name, value) => styles.set(name, value), removeProperty: name => styles.delete(name) },
       hasAttribute: name => name === 'data-motion-tilt' && tilt,
-      getBoundingClientRect() { this.measurements += 1; return { left: 10, top: 20, width: 200, height: 100 }; },
+      getBoundingClientRect() { this.measurements += 1; return box; },
       closest: () => target,
       contains: node => node === target || node?.parent === target,
     };
@@ -68,8 +68,8 @@ test('El seguimiento agrupa movimientos por cuadro y limita la inclinación del 
   page.flush();
   assert.equal(card.styles.get('--motion-x'), '200px');
   assert.equal(card.styles.get('--motion-y'), '0px');
-  assert.equal(card.styles.get('--motion-rotate-x'), '1.2deg');
-  assert.equal(card.styles.get('--motion-rotate-y'), '1.2deg');
+  assert.equal(card.styles.get('--motion-rotate-x'), '1.5deg');
+  assert.equal(card.styles.get('--motion-rotate-y'), '1.5deg');
   page.pointer('pointerout', child, 0, 0, { relatedTarget: card });
   assert.equal(card.styles.size, 4);
   page.pointer('pointerout', card, 0, 0, { relatedTarget: null });
@@ -128,5 +128,29 @@ test('Scroll, resize y pestaña oculta cancelan cuadros pendientes y retiran coo
   page.document.dispatch('visibilitychange');
   assert.equal(card.styles.size, 0);
   page.pointer('pointermove', card);
+  assert.equal(page.frames.size, 0);
+});
+
+test('El borde de las superficies cercanas apunta al puntero por el camino más corto y se apaga al alejarse', () => {
+  const page = motionPage();
+  const near = page.surface();
+  const far = page.surface(false, { left: 1000, top: 20, width: 200, height: 100 });
+  page.document.querySelectorAll = () => [near, far];
+  const background = { closest: () => null };
+  page.pointer('pointermove', background, 110, 0);
+  page.flush();
+  assert.equal(near.styles.get('--motion-glow'), '1');
+  assert.equal(near.styles.get('--motion-angle'), '0.0deg');
+  assert.equal(near.styles.has('--motion-x'), false);
+  assert.equal(far.styles.has('--motion-glow'), false);
+  page.pointer('pointermove', background, -20, 70);
+  page.flush();
+  assert.equal(near.styles.get('--motion-angle'), '-90.0deg');
+  page.pointer('pointermove', background, 600, 900);
+  page.flush();
+  assert.equal(near.styles.has('--motion-glow'), false);
+  page.pointer('pointermove', background, 110, 0);
+  page.window.dispatch('blur');
+  assert.equal(near.styles.has('--motion-glow'), false);
   assert.equal(page.frames.size, 0);
 });
