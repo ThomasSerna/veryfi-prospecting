@@ -174,7 +174,7 @@ body:has(.navigation-drawer[open]) { overflow: hidden; }
 @media (max-width: 760px) {
   .menu-toggle { left: 20px; top: 14px; }
   .topbar { padding-left: 76px; min-height: 68px; }
-  .workspace-brand img { display: none; }
+  .workspace-brand img { width: 52px; height: 20px; }
   .topbar .breadcrumb { flex-basis: 0; }
   body:not([data-nav-open]) .navigation-drawer[open] > .menu-toggle { left: min(228px, calc(88vw - 58px)); top: 24px; }
 }
