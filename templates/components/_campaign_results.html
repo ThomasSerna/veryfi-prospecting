@@ -1,113 +1,151 @@
 {% load prospecting_ui %}
-<section class="campaign-overview" data-live-section="overview" aria-label="Estado y avance de campaña">
-  <div class="overview-status">
-    <span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span>
-  </div>
-  <div class="campaign-counts">
-    <div><strong>{{ counts.total }}</strong><span>Empresas</span></div>
-    <div><strong>{{ counts.ready }}</strong><span>Con contacto listo</span></div>
-    <div><strong>{{ counts.pending }}</strong><span>Sin contacto listo</span></div>
-    <div><strong>{{ counts.accepted }}</strong><span>Aceptadas</span></div>
-  </div>
-  {% if is_executing %}
-  <div class="execution-progress" role="status">
-    <div class="progress-copy">
-      <strong>Investigación en curso</strong>
-      <span>{% if counts.total %}{{ counts.completed }} de {{ counts.total }} empresas{% else %}Buscando empresas…{% endif %}</span>
-    </div>
+<section class="campaign-pulse surface{% if is_executing %} is-live{% endif %}" data-live-section="overview" data-motion-surface data-motion-still aria-label="Estado y avance de campaña">
+  <span class="feature-beam" aria-hidden="true"></span>
+  <div class="pulse-progress" style="--count: {{ counts.total|default:1 }}">
+    <span class="pulse-status" role="status"><span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span></span>
     {% if counts.total %}
-    <progress value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas terminadas">{{ counts.completed }} de {{ counts.total }}</progress>
+    <p class="pulse-figure">
+      <span class="pulse-figure-value" data-value="{{ counts.completed }}" data-delta style="--roll-steps: {{ counts.completed }}">{% include 'components/_ticker.html' with value=counts.completed %}</span>
+      <span class="pulse-figure-total">de {% include 'components/_ticker.html' with value=counts.total %}</span>
+      <span class="pulse-figure-label">investigadas</span>
+    </p>
+    <progress class="sr-only" value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas investigadas">{{ counts.completed }} de {{ counts.total }}</progress>
     {% else %}
-    <progress aria-label="Descubrimiento en curso"></progress>
+    <p class="pulse-figure pulse-figure-empty">{% if is_executing %}Buscando empresas…{% else %}Sin empresas investigadas{% endif %}</p>
     {% endif %}
+    {# ponytail: un segmento por empresa; legible hasta unas 40 empresas, después conviene una barra continua. #}
+    <div class="progress-segments" aria-hidden="true">{% for result in view.companies %}<span class="progress-segment{% if forloop.counter <= counts.completed %} is-done{% elif is_executing and forloop.counter0 == counts.completed %} is-active{% endif %}" style="--i: {{ forloop.counter0 }}"></span>{% empty %}<span class="progress-segment is-placeholder{% if is_executing %} is-searching{% endif %}" style="--i: 0"></span>{% endfor %}</div>
+  </div>
+  <dl class="pulse-stats">
+    <div class="pulse-stat pulse-stat-review">
+      <dt>Sin revisar</dt>
+      <dd>
+        <span class="pulse-stat-value" data-value="{{ campaign_insights.review_pending }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.review_pending %}</span>
+        {% if counts.total %}<span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio campaign_insights.review_pending counts.total 100 %}"></span></span>{% endif %}
+      </dd>
+    </div>
+    <div class="pulse-stat pulse-stat-ready">
+      <dt>Contacto listo</dt>
+      <dd>
+        <span class="pulse-stat-value" data-value="{{ counts.ready }}" data-delta>{% include 'components/_ticker.html' with value=counts.ready %}</span>
+        {% if counts.total %}<span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio counts.ready counts.total 100 %}"></span></span>{% endif %}
+      </dd>
+    </div>
+    <div class="pulse-stat pulse-stat-accepted">
+      <dt>Aceptadas</dt>
+      <dd>
+        <span class="pulse-stat-value" data-value="{{ counts.accepted }}" data-delta>{% include 'components/_ticker.html' with value=counts.accepted %}</span>
+        {% if counts.total %}<span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio counts.accepted counts.total 100 %}"></span></span>{% endif %}
+      </dd>
+    </div>
+  </dl>
+  {% if counts.total %}
+  <div class="pulse-priority">
+    <h2 id="priority-chart-title">Prioridad</h2>
+    <div class="priority-stack" aria-hidden="true">{% for item in campaign_insights.priority_distribution %}{% if item.count %}<span data-tone="{{ item.tone }}" style="--count: {{ item.count }}; --i: {{ forloop.counter0 }}"></span>{% endif %}{% endfor %}</div>
+    <ul class="priority-legend" aria-labelledby="priority-chart-title">{% for item in campaign_insights.priority_distribution %}{% if item.count %}<li data-tone="{{ item.tone }}" style="--i: {{ forloop.counter0 }}">{% if item.query %}<a href="{% url 'webapp:campaign' campaign.id %}?{{ item.query }}"><i aria-hidden="true"></i>{{ item.label }} <strong>{{ item.count }}</strong></a>{% else %}<span><i aria-hidden="true"></i>{{ item.label }} <strong>{{ item.count }}</strong></span>{% endif %}</li>{% endif %}{% endfor %}</ul>
   </div>
   {% endif %}
 </section>
-<section class="result-filters" data-live-filters aria-label="Filtrar empresas" {% if not counts.total and not has_active_filters %}hidden{% endif %}>
-  <form method="get" class="filter-form">
-    <div class="filter-fields">
-      {% include 'components/_field.html' with field=filter_form.q %}
-      {% include 'components/_filter.html' with field=filter_form.countries %}
-      {% include 'components/_filter.html' with field=filter_form.segments %}
-      {% include 'components/_filter.html' with field=filter_form.priorities %}
-      {% include 'components/_filter.html' with field=filter_form.availability %}
-    </div>
-    <div class="filter-actions">
-      <button type="submit" class="button button-small button-navy">Aplicar filtros{% if active_filter_count %} ({{ active_filter_count }}){% endif %}</button>
-      {% if has_active_filters %}<a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Limpiar filtros</a>{% else %}<a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Restablecer</a>{% endif %}
-    </div>
-  </form>
-</section>
-<section class="surface results-section" data-live-section="results" aria-labelledby="results-title">
-  <div class="section-heading section-heading-row">
+<div class="results-card surface">
+  <div class="results-head" data-live-section="results-head">
     <h2 id="results-title">Empresas</h2>
     <span class="result-count">{{ results|length }} de {{ counts.total }}</span>
   </div>
-  {% if results %}
-  <div class="table-scroll" tabindex="0" role="region" aria-label="Empresas de la campaña">
-    <table class="data-table results-table">
-      <thead>
-        <tr>
-          <th>Empresa</th>
-          <th>Prioridad</th>
-          <th>Disponibilidad</th>
-          <th>Revisión</th>
-          <th class="numeric">Encaje</th>
-          <th class="numeric">Cobertura</th>
-          <th class="numeric">Contactos</th>
-          <th>Mercado</th>
-          <th>Etapa</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for result in results %}
-        <tr>
-          <th scope="row">
-            <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}</a>
-            <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
-          </th>
-          <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
-          <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
-          <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
-          <td class="numeric">{{ result.assessment.fit_score|score }}</td>
-          <td class="numeric">{{ result.assessment.coverage|percentage }}</td>
-          <td class="numeric">{{ result.contacts|length }}{% if result.people %}<span class="cell-note">{{ result.people|people_counts }}</span>{% endif %}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
-          <td>
-            {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}
-            <span class="cell-note">{% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
-          </td>
-          <td>{{ result.run_item.stage|label }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% elif counts.total %}
-  <div class="empty-state">
-    <h3>Ninguna empresa coincide con estos filtros.</h3>
-    <a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Ver todas las empresas</a>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <h3>{% if is_executing %}Buscando empresas…{% else %}Sin empresas registradas{% endif %}</h3>
-  </div>
-  {% endif %}
-</section>
+  <form method="get" class="results-toolbar" data-live-filters aria-label="Filtrar empresas" {% if not counts.total and not has_active_filters %}hidden{% endif %}>
+    <label class="results-search"><span class="sr-only">{{ filter_form.q.label }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>{{ filter_form.q|render_field }}</label>
+    {% include 'components/_filter.html' with field=filter_form.countries %}
+    {% include 'components/_filter.html' with field=filter_form.segments %}
+    {% include 'components/_filter.html' with field=filter_form.priorities %}
+    {% include 'components/_filter.html' with field=filter_form.availability %}
+    <div class="results-toolbar-actions">
+      <button type="submit" class="button button-small button-secondary">Aplicar{% if active_filter_count %} <span class="button-count">{{ active_filter_count }}</span>{% endif %}</button>
+      {% if has_active_filters %}<a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Limpiar</a>{% endif %}
+    </div>
+    {% if filter_form.q.errors %}<p class="field-errors" role="alert">{{ filter_form.q.errors.0 }}</p>{% endif %}
+  </form>
+  <section class="results-section" data-live-section="results" aria-labelledby="results-title">
+    {% if results %}
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Empresas de la campaña">
+      <table class="data-table results-table">
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th class="numeric">Encaje</th>
+            <th>Prioridad</th>
+            <th>Disponibilidad</th>
+            <th>Revisión</th>
+            <th class="numeric">Contactos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr class="result-row" data-key="{{ result.company.id }}" style="--i: {{ forloop.counter0 }}">
+            <th scope="row">
+              <div class="company-cell">
+                <span class="company-avatar" data-tone="{% if result.business_status == 'excluded' %}excluded{% else %}{{ result.assessment.priority|default:'pending' }}{% endif %}" aria-hidden="true">{{ result.company.name|slice:':1'|upper }}</span>
+                <div class="company-cell-copy">
+                  <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}<svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+                  <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
+                  <span class="cell-note">{% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
+                  {% if result.run_item.stage != 'completed' %}<span class="stage-chip">{{ result.run_item.stage|label }}</span>{% endif %}
+                </div>
+              </div>
+            </th>
+            <td class="numeric">
+              <span class="fit-cell{% if result.assessment.fit_score == None %} is-unknown{% endif %}">
+                <strong>{{ result.assessment.fit_score|score }}</strong>
+                {% if result.assessment.fit_score != None %}<span class="fit-meter" aria-hidden="true"><span style="--value: {{ result.assessment.fit_score|floatformat:'0' }}"></span></span>{% endif %}
+                <span class="cell-note">{% if result.assessment.coverage != None %}Cobertura {{ result.assessment.coverage|percentage }}{% else %}Cobertura pendiente{% endif %}</span>
+              </span>
+            </td>
+            <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
+            <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
+            <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
+            <td class="numeric">
+              <span class="contacts-cell">
+                <span class="contacts-count"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/></svg>{{ result.contacts|length }}</span>
+                {% if result.people %}<span class="cell-note">{{ result.people|people_counts }}</span>{% endif %}
+                {% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif counts.total %}
+    <div class="empty-state results-empty">
+      <svg class="results-empty-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg>
+      <h3>Ninguna empresa coincide con estos filtros.</h3>
+      <a href="{% url 'webapp:campaign' campaign.id %}" class="text-link">Ver todas las empresas</a>
+    </div>
+    {% elif is_executing %}
+    <div class="empty-state results-empty is-searching">
+      <span class="empty-radar" aria-hidden="true"><svg class="empty-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23" pathLength="1"/><circle cx="32" cy="32" r="12" pathLength="1"/><path d="M32 5v12m0 30v12M5 32h12m30 0h12" pathLength="1"/></svg></span>
+      <h3>Buscando empresas…</h3>
+    </div>
+    {% else %}
+    <div class="empty-state results-empty">
+      <svg class="results-empty-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
+      <h3>Sin empresas registradas</h3>
+    </div>
+    {% endif %}
+  </section>
+</div>
 <section class="surface budget-section" data-live-section="budget" aria-labelledby="budget-title">
-  <div class="section-heading">
+  <div class="budget-head">
     <h2 id="budget-title">Presupuesto</h2>
+    {% if view.budget.reservation_overrun or view.budget.operating.unknown or view.budget.campaign.unknown %}
+    <div class="notice notice-warning"><strong>Consumo pendiente de conciliación.</strong></div>
+    {% endif %}
   </div>
-  <dl class="budget-summary">
-    <div><dt>Disponible</dt><dd class="budget-available">{{ view.budget.campaign.available|money_summary }}</dd></div>
+  <dl class="budget-ledger">
+    <div class="budget-available"><dt>Disponible</dt><dd>{{ view.budget.campaign.available|money_summary }}</dd></div>
     <div><dt>Confirmado</dt><dd>{{ view.budget.campaign.confirmed|money_summary }}</dd></div>
     <div><dt>Estimado</dt><dd>{{ view.budget.campaign.estimated|money_summary }}</dd></div>
     <div><dt>Reservado</dt><dd>{{ view.budget.campaign.reserved|money_summary }}</dd></div>
   </dl>
-  {% if view.budget.reservation_overrun or view.budget.operating.unknown or view.budget.campaign.unknown %}
-  <div class="notice notice-warning">
-    <strong>Consumo pendiente de conciliación.</strong>
-  </div>
-  {% endif %}
   <details class="budget-details">
     <summary>Cuentas</summary>
     {% for account in view.budget.accounts %}

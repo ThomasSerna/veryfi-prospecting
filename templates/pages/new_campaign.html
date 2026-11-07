@@ -6,6 +6,7 @@
 <header class="page-heading">
   <div>
     <h1>Nueva campaña</h1>
+    <p>Define el mercado y el alcance de tu próxima investigación.</p>
   </div>
 </header>
 {% if is_executing or execution.is_executing %}
@@ -15,23 +16,40 @@
 {% elif blocking_campaign %}
 <div class="notice notice-warning" role="status">
   <strong>Hay una campaña sin terminar.</strong>
+  <p>Retómala o ciérrala conservando sus resultados antes de preparar otra.</p>
   <p><a href="{% url 'webapp:campaign' blocking_campaign.id %}" class="text-link">Abrir campaña ({{ blocking_campaign|campaign_short_title }})</a></p>
 </div>
 {% endif %}
 <div class="preparation-layout">
-  <form method="post" class="surface preparation-form" data-idle-form>
+  <form method="post" class="surface preparation-form" data-idle-form data-campaign-preview>
     {% csrf_token %}
     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
     {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-    <fieldset {% if is_executing or execution.is_executing or blocking_campaign %}disabled{% endif %}>
+    <fieldset class="preparation-fields" {% if is_executing or execution.is_executing or blocking_campaign %}disabled{% endif %}>
       <legend class="sr-only">Criterios de campaña</legend>
+      <fieldset class="preparation-section">
+      <legend>Mercado</legend>
+      <p class="muted">Selecciona dónde buscar y qué tipos de empresas te interesan.</p>
       <div class="form-grid">
         {% include 'components/_field.html' with field=form.countries %}
         {% include 'components/_field.html' with field=form.segments %}
       </div>
-      <div class="form-divider"></div>
+      </fieldset>
+      <fieldset class="preparation-section">
+      <legend>Alcance</legend>
+      <p class="muted">Acota la búsqueda. El máximo es un límite, no una promesa de resultados.</p>
+      <div class="form-grid">
       {% include 'components/_field.html' with field=form.keywords %}
       {% include 'components/_field.html' with field=form.max_companies %}
+      </div>
+      </fieldset>
+      <fieldset class="preparation-section preparation-summary">
+      <legend>Resumen</legend>
+      <dl class="preparation-preview">
+        <div><dt>Países</dt><dd data-preview-countries>{% for code in form.countries.value %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Sin seleccionar{% endfor %}</dd></div>
+        <div><dt>Segmentos</dt><dd data-preview-segments>{% for segment in form.segments.value %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Sin seleccionar{% endfor %}</dd></div>
+        <div><dt>Máximo de empresas</dt><dd data-preview-max>{{ form.max_companies.value|default_if_none:"Sin definir" }}</dd></div>
+      </dl>
       <dl class="budget-limits">
         <div>
           <dt>Tope por campaña</dt>
@@ -42,6 +60,8 @@
           <dd>{{ config.defaults.budget.company_usd|money_summary }}</dd>
         </div>
       </dl>
+      <p class="muted">Crear la campaña guarda estos criterios sin consumir proveedores. Autorizarás las operaciones y sus topes antes de investigar.</p>
+      </fieldset>
       <div class="form-actions">
         <button type="submit" class="button button-primary" data-idle-only>Crear campaña</button>
         <a href="{% url 'webapp:campaigns' %}" class="button button-secondary">Cancelar</a>

@@ -2,42 +2,24 @@
   'use strict';
 
   const body = document.body;
-  const menu = document.querySelector('.menu-toggle');
-  const sidebar = document.getElementById('navigation');
-  const workspace = document.getElementById('workspace-main');
-  const mobile = window.matchMedia('(max-width: 760px)');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  // Con JavaScript, las filas de empresas se abren completas (ver el clic delegado).
+  body.dataset.rowLinks = 'true';
 
-  function closeNavigation() {
-    body.dataset.navOpen = 'false';
-    if (menu) {
-      menu.setAttribute('aria-expanded', 'false');
-      menu.setAttribute('aria-label', 'Abrir navegación');
-    }
-    if (sidebar) sidebar.inert = mobile.matches;
-    if (workspace) workspace.inert = false;
-  }
-
-  if (menu && sidebar) {
-    closeNavigation();
-    menu.addEventListener('click', () => {
-      const open = body.dataset.navOpen !== 'true';
-      body.dataset.navOpen = String(open);
-      menu.setAttribute('aria-expanded', String(open));
-      menu.setAttribute('aria-label', open ? 'Cerrar navegación' : 'Abrir navegación');
-      sidebar.inert = mobile.matches && !open;
-      if (workspace) workspace.inert = mobile.matches && open;
-      if (open) sidebar.querySelector('a')?.focus();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && body.dataset.navOpen === 'true') {
-        closeNavigation();
-        menu.focus();
-      }
-    });
-    document.addEventListener('click', event => {
-      if (body.dataset.navOpen === 'true' && !sidebar.contains(event.target) && !menu.contains(event.target)) closeNavigation();
-    });
-    mobile.addEventListener('change', closeNavigation);
+  const previewForm = document.querySelector('[data-campaign-preview]');
+  if (previewForm) {
+    const updatePreview = () => {
+      ['countries', 'segments'].forEach(name => {
+        const target = previewForm.querySelector(`[data-preview-${name}]`);
+        const selected = Array.from(previewForm.querySelectorAll(`input[name="${name}"]:checked`));
+        if (target) target.textContent = selected.map(input => input.closest('label').textContent.trim()).join(', ') || 'Sin seleccionar';
+      });
+      const maximum = previewForm.querySelector('[name="max_companies"]');
+      const target = previewForm.querySelector('[data-preview-max]');
+      if (target) target.textContent = maximum?.value || 'Sin definir';
+    };
+    previewForm.addEventListener('input', updatePreview);
+    updatePreview();
   }
 
   document.addEventListener('click', event => {
@@ -46,56 +28,86 @@
       event.preventDefault();
       return;
     }
+    // Toda la fila abre la ficha; el enlace del nombre sigue siendo el único destino para teclado y lectores.
+    const row = event.target?.closest?.('.result-row');
+    if (row && !event.target.closest('a, button, input, label, summary')
+        && !String(window.getSelection?.() || '')) {
+      const link = row.querySelector('.company-link');
+      if (link && (event.ctrlKey || event.metaKey)) window.open(link.href, '_blank', 'noopener');
+      else link?.click();
+      return;
+    }
     const copyBtn = event.target?.closest?.('[data-copy-channel]');
     if (copyBtn && navigator?.clipboard?.writeText) {
       const value = copyBtn.dataset.copyChannel || '';
-      const original = copyBtn.dataset.originalLabel || copyBtn.textContent;
-      copyBtn.dataset.originalLabel = original;
+      const label = copyBtn.querySelector('[data-copy-label]') || copyBtn;
       navigator.clipboard.writeText(value).then(() => {
+        window.clearTimeout(Number(copyBtn.dataset.copyTimer));
         copyBtn.dataset.copied = 'true';
-        copyBtn.textContent = '¡Copiado!';
-        window.setTimeout(() => {
+        label.textContent = 'Copiado';
+        announce('Canal copiado.');
+        copyBtn.dataset.copyTimer = String(window.setTimeout(() => {
           copyBtn.dataset.copied = 'false';
-          copyBtn.textContent = original;
-        }, 1800);
+          label.textContent = 'Copiar';
+        }, 1800));
       }).catch(() => {});
     }
   });
 
-  function setupFilterChoices(root = document) {
-    if (!root.querySelectorAll) return;
-    const choices = Array.from(root.querySelectorAll('.filter-choice'));
-    const detailsList = choices.map(choice => choice.querySelector('details')).filter(Boolean);
-
-    choices.forEach(choice => {
-      const summaryText = choice.querySelector('[data-filter-summary]');
-      const checkboxes = Array.from(choice.querySelectorAll('input[type="checkbox"]'));
-      function syncChoice() {
-        const selected = checkboxes.filter(input => input.checked);
-        choice.dataset.active = String(selected.length > 0);
-        if (!summaryText) return;
-        if (selected.length === 0) summaryText.textContent = 'Todos';
-        else if (selected.length === 1) {
-          const label = selected[0].closest('label');
-          summaryText.textContent = label ? label.textContent.trim() : '1 seleccionado';
-        } else {
-          summaryText.textContent = `${selected.length} seleccionados`;
-        }
-      }
-      checkboxes.forEach(input => input.addEventListener('change', syncChoice));
-    });
-
-    detailsList.forEach(filter => filter.addEventListener('toggle', () => {
-      if (filter.open) detailsList.forEach(other => { if (other !== filter) other.open = false; });
-    }));
-    document.addEventListener('click', event => detailsList.forEach(filter => {
-      if (filter.open && !filter.contains(event.target)) filter.open = false;
-    }));
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') detailsList.forEach(filter => { filter.open = false; });
-    });
+  // Un único anuncio cortés para confirmaciones que no cambian de página.
+  let announcer;
+  function announce(text) {
+    if (!announcer) {
+      announcer = document.createElement('p');
+      announcer.className = 'sr-only';
+      announcer.setAttribute('role', 'status');
+      body.append(announcer);
+    }
+    announcer.textContent = '';
+    window.setTimeout(() => { announcer.textContent = text; }, 60);
   }
-  setupFilterChoices();
+
+  // La confirmación de guardado se muestra una vez; recargar la página no la repite.
+  if (/[?&]saved=/.test(window.location?.search || '') && window.history?.replaceState) {
+    const search = window.location.search.replace(/([?&])saved=[^&#]*&?/, '$1').replace(/[?&]$/, '');
+    window.history.replaceState(null, '', `${window.location.pathname}${search}${window.location.hash}`);
+  }
+
+  // Filtros delegados: también funcionan con opciones que el sondeo agrega después de cargar.
+  function syncChoice(choice) {
+    const summaryText = choice.querySelector('[data-filter-summary]');
+    const selected = Array.from(choice.querySelectorAll('input[type="checkbox"]:checked'));
+    choice.dataset.active = String(selected.length > 0);
+    if (!summaryText) return;
+    if (selected.length === 0) summaryText.textContent = 'Todos';
+    else if (selected.length === 1) {
+      const label = selected[0].closest('label');
+      summaryText.textContent = label ? label.textContent.trim() : '1 seleccionado';
+    } else {
+      summaryText.textContent = `${selected.length} seleccionados`;
+    }
+  }
+  const openFilters = () => Array.from(document.querySelectorAll('.filter-choice details[open]'));
+  document.addEventListener('change', event => {
+    const choice = event.target?.closest?.('.filter-choice');
+    if (choice) syncChoice(choice);
+  });
+  // `toggle` no burbujea: se escucha en captura para cerrar los demás desplegables.
+  document.addEventListener('toggle', event => {
+    const filter = event.target;
+    if (filter?.open && filter.closest?.('.filter-choice')) {
+      openFilters().forEach(other => { if (other !== filter) other.open = false; });
+    }
+  }, true);
+  document.addEventListener('click', event => openFilters().forEach(filter => {
+    if (!filter.contains(event.target)) filter.open = false;
+  }));
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const open = openFilters();
+    open.forEach(filter => { filter.open = false; });
+    if (open.some(filter => filter.contains(document.activeElement))) open[0].querySelector('summary')?.focus();
+  });
 
   function setupOperationRows() {
     const rows = Array.from(document.querySelectorAll('[data-operation-row]'));
@@ -152,6 +164,15 @@
     const tablist = tabsRoot.querySelector('.tabs');
     const tabs = Array.from(tablist.querySelectorAll('.tab-link'));
     const panels = tabs.map(tab => document.querySelector(tab.getAttribute('href')));
+    // Dos indicadores medidos desde cada etiqueta: la pastilla acompaña al puntero y la línea, a la pestaña activa.
+    const hover = document.createElement('span');
+    const line = document.createElement('span');
+    hover.className = 'tabs-hover';
+    line.className = 'tabs-indicator';
+    [hover, line].forEach(node => node.setAttribute('aria-hidden', 'true'));
+    tablist.append(hover, line);
+    tablist.dataset.enhanced = 'true';
+    let current = -1;
     tablist.setAttribute('role', 'tablist');
     tabs.forEach((tab, index) => {
       tab.setAttribute('role', 'tab');
@@ -159,30 +180,75 @@
       tab.setAttribute('aria-controls', panels[index].id);
       panels[index].setAttribute('role', 'tabpanel');
       panels[index].setAttribute('aria-labelledby', tab.id);
+      panels[index].tabIndex = 0;
     });
-    function selectTab(index, focus = false) {
-      tabs.forEach((tab, current) => {
-        const selected = current === index;
+    function place(indicator, tab, instant = false) {
+      if (!tab) {
+        indicator.dataset.visible = 'false';
+        return;
+      }
+      // La pastilla aparece en su sitio la primera vez y después se desliza entre pestañas.
+      if (instant || indicator.dataset.visible !== 'true') indicator.style.transition = 'none';
+      if (indicator === hover) {
+        const right = tablist.clientWidth - tab.offsetLeft - tab.offsetWidth;
+        indicator.style.clipPath = `inset(0 ${right}px 0 ${tab.offsetLeft}px round 9px)`;
+      } else {
+        indicator.style.transform = `translateX(${tab.offsetLeft}px) scaleX(${tab.offsetWidth / 100})`;
+      }
+      if (indicator.style.transition === 'none') {
+        indicator.getBoundingClientRect();
+        indicator.style.removeProperty('transition');
+      }
+      indicator.dataset.visible = 'true';
+    }
+    function selectTab(index, focus = false, animate = false) {
+      const direction = Math.sign(index - current);
+      // Elegir una pestaña termina la entrada: el panel nuevo no repite la cascada inicial.
+      if (animate) tabsRoot.closest('[data-entering]')?.removeAttribute('data-entering');
+      tabs.forEach((tab, position) => {
+        const selected = position === index;
         tab.setAttribute('aria-selected', String(selected));
         tab.tabIndex = selected ? 0 : -1;
-        panels[current].hidden = !selected;
+        panels[position].hidden = !selected;
       });
+      place(line, tabs[index], !animate);
+      // El panel entra desde el lado hacia el que se movió la selección.
+      if (animate && index !== current) panels[index].animate?.(reducedMotion.matches
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [{ opacity: 0, transform: `translateX(${direction * 18}px)` }, { opacity: 1, transform: 'none' }],
+      { duration: reducedMotion.matches ? 160 : 340, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+      current = index;
       if (focus) tabs[index].focus();
     }
-    function revealHash() {
+    tablist.addEventListener('pointerover', event => {
+      const tab = event.target.closest?.('.tab-link');
+      if (tab) place(hover, tab);
+    });
+    tablist.addEventListener('pointerleave', () => { hover.dataset.visible = 'false'; });
+    window.addEventListener('resize', () => place(line, tabs[current], true));
+    document.fonts?.ready?.then(() => place(line, tabs[current], true));
+    function highlight(source) {
+      source.scrollIntoView({ block: 'center' });
+      // La fuente señalada por una píldora se ilumina un instante para unir referencia y origen.
+      source.animate?.([
+        { backgroundColor: 'rgb(128 223 243 / 10%)', boxShadow: '0 0 0 1px rgb(128 223 243 / 55%)' },
+        { backgroundColor: 'rgb(128 223 243 / 0%)', boxShadow: '0 0 0 1px rgb(128 223 243 / 0%)' },
+      ], { duration: 1800, delay: reducedMotion.matches ? 0 : 280, easing: 'ease-out', fill: 'backwards' });
+    }
+    function revealHash(animate = true) {
       const hash = window.location.hash;
       const matching = panels.findIndex(panel => `#${panel.id}` === hash);
-      if (matching >= 0) selectTab(matching);
+      if (matching >= 0) selectTab(matching, false, animate);
       else if (hash.startsWith('#source-')) {
         selectTab(panels.findIndex(panel => panel.id === 'evidence'));
         const source = document.getElementById(hash.slice(1));
-        if (source) requestAnimationFrame(() => source.scrollIntoView({ block: 'start' }));
+        if (source) requestAnimationFrame(() => highlight(source));
       }
     }
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', event => {
         event.preventDefault();
-        selectTab(index);
+        selectTab(index, false, true);
         window.history.replaceState(null, '', tab.getAttribute('href'));
       });
       tab.addEventListener('keydown', event => {
@@ -193,16 +259,16 @@
         if (event.key === 'End') next = tabs.length - 1;
         if (next !== undefined) {
           event.preventDefault();
-          selectTab(next, true);
+          selectTab(next, true, true);
           window.history.replaceState(null, '', tabs[next].getAttribute('href'));
         }
       });
     });
     selectTab(0);
-    revealHash();
+    revealHash(false);
     const invalidPanel = panels.findIndex(panel => panel.querySelector('.field-errors, .errorlist'));
     if (invalidPanel >= 0) selectTab(invalidPanel);
-    window.addEventListener('hashchange', revealHash);
+    window.addEventListener('hashchange', () => revealHash());
     tabsRoot.querySelectorAll('[data-evidence-link]').forEach(link => link.addEventListener('click', () => {
       selectTab(panels.findIndex(panel => panel.id === 'evidence'));
     }));
@@ -210,6 +276,8 @@
 
   const campaignPage = document.getElementById('campaign-page');
   if (!campaignPage) {
+    // El resumen se actualiza en su sitio desde dashboard.js; recargarlo reiniciaría su entrada.
+    if (document.querySelector('[data-live-dashboard]')) return;
     if (body.dataset.running === 'true' && body.dataset.statusUrl) {
       const check = async () => {
         try {
@@ -276,14 +344,17 @@
   function applyLiveSnapshot(html) {
     if (typeof DOMParser !== 'undefined' && live.querySelector) {
       const parsed = new DOMParser().parseFromString(html, 'text/html');
+      const morphing = window.ProspectingLive;
       const currentScroll = live.querySelector('.results-section .table-scroll');
       const scrollLeft = currentScroll ? currentScroll.scrollLeft : 0;
       const budgetDetailsOpen = Boolean(live.querySelector('.budget-details')?.open);
 
-      ['overview', 'results', 'budget'].forEach(sectionName => {
-        const currentSection = live.querySelector(`[data-live-section="${sectionName}"]`);
-        const nextSection = parsed.querySelector(`[data-live-section="${sectionName}"]`);
-        if (currentSection && nextSection) currentSection.replaceWith(nextSection);
+      // Cada sección se compara en su sitio: filas, foco, desplegables y animaciones en curso se conservan.
+      live.querySelectorAll('[data-live-section]').forEach(currentSection => {
+        const nextSection = parsed.querySelector(`[data-live-section="${currentSection.dataset.liveSection}"]`);
+        if (!nextSection) return;
+        if (morphing) morphing.update(currentSection, nextSection);
+        else currentSection.replaceWith(nextSection);
       });
 
       const currentFilters = live.querySelector('[data-live-filters]');
@@ -292,6 +363,7 @@
         currentFilters.hidden = nextFilters.hidden;
       }
 
+      if (morphing) return;
       const nextBudgetDetails = live.querySelector('.budget-details');
       if (nextBudgetDetails) nextBudgetDetails.open = budgetDetailsOpen;
       const nextScroll = live.querySelector('.results-section .table-scroll');
@@ -302,6 +374,35 @@
     const openDetails = Array.from(live.querySelectorAll('details')).map(detail => detail.open);
     live.innerHTML = html;
     live.querySelectorAll('details').forEach((detail, index) => { detail.open = openDetails[index] || false; });
+  }
+
+  // Al terminar, la página se lee de nuevo y se actualiza en su sitio para no repetir la entrada;
+  // sin comparación disponible o ante un fallo, se recarga.
+  async function finish() {
+    const morphing = window.ProspectingLive;
+    if (!morphing || typeof DOMParser === 'undefined') {
+      window.location.reload();
+      return;
+    }
+    try {
+      const response = await fetch(window.location.href, {
+        headers: { 'Accept': 'text/html' }, cache: 'no-store', credentials: 'same-origin',
+      });
+      if (!response.ok) throw new Error(`Estado ${response.status}`);
+      const next = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const main = document.getElementById('main');
+      const nextMain = next.getElementById('main');
+      if (!main || !nextMain?.querySelector('#campaign-page')) throw new Error('Campaña ausente');
+      inactiveControls.clear();
+      busy = false;
+      morphing.update(main, nextMain);
+      const nav = document.querySelector('[data-live-region="navigation"]');
+      const nextNav = next.querySelector('[data-live-region="navigation"]');
+      if (nav && nextNav) morphing.morph(nav, nextNav, []);
+      body.dataset.running = next.body?.dataset.running === 'true' ? 'true' : 'false';
+    } catch (_error) {
+      window.location.reload();
+    }
   }
 
   async function poll() {
@@ -322,7 +423,7 @@
         setBusy(true);
         pollTimer = window.setTimeout(poll, 2000);
       } else if (busy) {
-        window.location.reload();
+        await finish();
       }
     } catch (error) {
       showFeedback(error.message, 'warning');

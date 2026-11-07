@@ -80,7 +80,13 @@ def test_django_configuration_has_no_orm_or_authentication_and_is_local():
 
 @pytest.mark.parametrize("asset, marker", [
     ("css/app.css", b"--navy"),
+    ("css/workspace.css", b".home-panel"),
+    ("css/navigation.css", b".navigation-drawer"),
+    ("css/motion.css", b"data-motion-surface"),
     ("js/app.js", b"'use strict'"),
+    ("js/navigation.js", b"'use strict'"),
+    ("js/motion.js", b"'use strict'"),
+    ("js/dashboard.js", b"'use strict'"),
     ("img/veryfi-logo.svg", b"<svg"),
 ])
 def test_root_templates_and_static_assets_load_without_debug_or_database(tmp_path, asset, marker):

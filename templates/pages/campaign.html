@@ -1,20 +1,35 @@
 {% extends 'base.html' %}
 {% load prospecting_ui %}
 {% block title %}{{ campaign|campaign_short_title }} · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Campañas</a><span>/</span><span>{{ campaign|campaign_short_title }}</span>{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaign_history' %}">Historial</a><span aria-hidden="true">/</span><span>{{ campaign|campaign_short_title }}</span>{% endblock %}
 {% block content %}
-<div id="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}">
-  <header class="page-heading">
-    <div>
-      <h1>{{ campaign|campaign_title }}</h1>
-      <p class="quiet-note">{{ campaign.created_at|date:"d M Y · H:i" }} · Máx. {{ campaign.max_companies }} empresas</p>
+<div id="campaign-page" class="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}" data-entering>
+  <header class="campaign-head">
+    <div class="campaign-head-copy">
+      <h1>{% for country in campaign.countries %}{{ country|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</h1>
+      <ul class="campaign-tags" aria-label="Segmentos de la campaña">{% for segment in campaign.segments %}<li style="--i: {{ forloop.counter0 }}">{{ segment|label }}</li>{% endfor %}</ul>
+      <p class="campaign-meta">
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg><time datetime="{{ campaign.created_at|date:'c' }}">{{ campaign.created_at|date:"d M Y · H:i" }}</time></span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>Hasta {{ campaign.max_companies }} empresas</span>
+      </p>
     </div>
-    {% if not legacy_readonly and campaign.status != 'completed' %}
-    <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
-    {% endif %}
+    <div class="campaign-head-actions">
+      {% if not legacy_readonly and campaign.status != 'completed' %}
+      <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5v13l11-6.5z"/></svg>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
+      {% endif %}
+      {% if counts.total %}
+      <a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-ghost" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>Descargar listos <span class="button-count">{{ counts.ready }}</span></a>
+      <a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-ghost" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>Descargar todos <span class="button-count">{{ counts.total }}</span></a>
+      {% endif %}
+    </div>
   </header>
-  {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
-  {% elif apollo_blocked %}<div class="notice notice-warning">Apollo bloqueado: comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
+  <div class="campaign-alerts">
+    {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
+    {% elif apollo_blocked and campaign.status != 'completed' %}<div class="notice notice-warning"><strong>Apollo bloqueado.</strong> Comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
+    {% if view.exclusions_status != 'validated' %}
+    <div class="notice notice-warning"><strong>La lista de exclusiones necesita confirmación.</strong></div>
+    {% endif %}
+  </div>
   <div id="execution-feedback" role="status" aria-live="polite">
     {% if stop_reason %}
     <div class="notice notice-warning">
@@ -22,34 +37,19 @@
     </div>
     {% endif %}
   </div>
-  {% if view.exclusions_status != 'validated' %}
-  <div class="notice notice-warning">
-    <strong>La lista de exclusiones necesita confirmación.</strong>
-  </div>
-  {% endif %}
   {% if not legacy_readonly and campaign.status == 'created' and not counts.total %}
     {% include 'components/_authorization_section.html' with promoted=True %}
   {% endif %}
-  <div class="campaign-workspace">
-    <div id="campaign-live">{% include 'components/_campaign_results.html' %}</div>
-  </div>
+  <div id="campaign-live" class="campaign-live">{% include 'components/_campaign_results.html' %}</div>
   {% if not legacy_readonly and campaign.status != 'completed' %}
     {% if campaign.status != 'created' or counts.total %}
       {% include 'components/_authorization_section.html' with promoted=False %}
     {% endif %}
   {% endif %}
-  <section class="campaign-actions" aria-label="Exportación y cierre">
-    <div>
-      <h2>Exportar</h2>
-    </div>
-    <div class="export-actions">
-      <a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-navy" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar listos ({{ counts.ready }})</a>
-      <a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-secondary" data-idle-only {% if is_executing or not counts.total %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar todos ({{ counts.total }})</a>
-    </div>
-  </section>
   {% if campaign.status == 'running' or campaign.status == 'paused_budget' %}
   <form method="post" action="{% url 'webapp:close' campaign.id %}" class="close-campaign" data-idle-form>{% csrf_token %}
-    <button class="text-link" type="submit" data-idle-only {% if is_executing %}disabled{% endif %}>Cerrar campaña</button>
+    <button class="button button-quiet" type="submit" data-idle-only {% if is_executing %}disabled{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>Cerrar campaña</button>
+    <span>Conserva resultados y consumo.</span>
   </form>
   {% endif %}
 </div>

@@ -1,53 +1,257 @@
+---
+name: Veryfi Prospecting
+description: Interfaz local de campañas y revisión comercial.
+colors:
+  canvas: "#0D0F14"
+  surface: "#15171D"
+  sidebar: "#10151A"
+  accent: "#80DFF3"
+  accent-hover: "#A8ECF9"
+  accent-text: "#10252C"
+  text: "#F0F2F6"
+  text-muted: "#A4AAB8"
+  border: "#2B2E38"
+  border-strong: "#68727F"
+  soft: "#1C1F23"
+  info: "#A2C2FF"
+  info-background: "#1C2738"
+  warning: "#EBCE85"
+  warning-background: "#302B1E"
+  error: "#FFAAAA"
+  error-background: "#352123"
+  success: "#98DFB6"
+  success-background: "#1C3026"
+  violet: "#B7A5FA"
+  blue: "#97BDF1"
+typography:
+  heading:
+    fontFamily: "Inter, Arial, Helvetica, sans-serif"
+    fontSize: "2rem"
+    fontWeight: 600
+    lineHeight: 1.18
+    letterSpacing: "-0.03em"
+  body:
+    fontFamily: "Inter, Arial, Helvetica, sans-serif"
+    fontSize: "0.9375rem"
+    lineHeight: 1.55
+rounded:
+  xs: "6px"
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
+spacing:
+  "1": "6px"
+  "2": "12px"
+  "3": "16px"
+  "4": "24px"
+  "5": "32px"
+  "6": "44px"
+components:
+  button-primary:
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.accent-text}"
+    rounded: "{rounded.sm}"
+    padding: "10px 18px"
+  button-primary-hover:
+    backgroundColor: "{colors.accent-hover}"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.sm}"
+    padding: "10px 18px"
+  input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.xs}"
+    padding: "10px 12px"
+  navigation-link:
+    textColor: "{colors.text-muted}"
+    rounded: "{rounded.xs}"
+    padding: "10px 12px"
+  status-success:
+    backgroundColor: "{colors.success-background}"
+    textColor: "{colors.success}"
+    rounded: "{rounded.xs}"
+    padding: "4px 10px"
+  panel:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.md}"
+---
+
 # Diseño de Veryfi Prospecting
 
-## Dirección confirmada
+## Overview
 
-Herramienta de trabajo B2B para el equipo de ventas (Operate): campañas, resultados y fichas de empresa con jerarquía editorial clara, densidad de información controlada y flujo secuencial de revisión comercial.
-Tema aprobado: superficies de lectura luminosas (`#FFFFFF` y `#E9ECE4`) con barra lateral ejecutiva en azul marino (`#171C3A`) e identidad oficial de Veryfi.
-La primera pantalla muestra campañas reales guardadas o un estado vacío accionable que guía la creación de la primera campaña. Los datos de demostración se identifican explícitamente como sintéticos.
+Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
+investigación y revisar empresas, personas y evidencia. El inicio destaca la
+campaña activa o, si no existe, la última guardada. Sus indicadores resumen
+empresas, revisión y contacto listo; el presupuesto se consulta en cada campaña.
 
-## Identidad y tokens visuales
+La dirección oscura combina grafito, cian y violeta con el nombre Veryfi
+Prospecting. El marco compartido, el inicio, el historial, la campaña y la ficha
+aplican esta dirección. Las vistas de trabajo usan menos texto que el inicio:
+cifras, barras, iconos y estados con su etiqueta. Las propuestas estáticas de
+campaña y ficha en `static/prototypes/` quedan como referencia histórica, con
+datos exclusivamente sintéticos. La demostración identifica sus datos como sintéticos.
 
-- **Paleta principal**:
-  - Navy `#171C3A` (`--navy`) para navegación principal, encabezados y contraste tipográfico primario.
-  - Ivory `#E9ECE4` (`--bg`, `--bg-elevated`) para el lienzo general y superficies de contexto secundario.
-  - Blanco `#FFFFFF` (`--surface`) para áreas de lectura, tablas de resultados y paneles de ficha.
-  - Veryfi Green `#00FA6C` (`--green`) para la acción principal de cada pantalla con texto `#171C3A` y acabado de elevación sutil (`--green-hover: #00E060`).
-- **Estados semánticos accesibles**:
-  - Todas las etiquetas de estado (`.status`), prioridad (`.priority`) y decisión humana (`.review`) combinan color de alto contraste, texto explícito e indicador geométrico (`::before`: punto sólido, doble anillo, rombo o trazo) para no depender nunca solo del color.
-  - Los controles deshabilitados mantienen contraste mínimo ≥ 4,5:1 (`#DCE1DD` sobre `#4A5268`).
-- **Tipografía y escala**:
-  - Escala tipográfica íntegra en unidades `rem` (`>= 0.75rem`) para respetar las preferencias de tamaño de fuente del navegador.
-  - Números tabulares (`font-variant-numeric: tabular-nums`) en métricas, porcentajes de encaje/match, presupuestos y tablas contables.
-  - Formato monetario dual: resumen legible (`USD 5.00`) en tarjetas principales acompañado de la cifra contable exacta de 6 decimales (`USD 5.000000`) para conciliación y auditoría.
-- **Logotipo**:
-  - Logotipo oficial de Veryfi sin deformación, efectos ni alteraciones de color; ancho mínimo de `90 px`.
+<!-- Pendiente: nombre creativo de la dirección (Creative North Star). No está definido; requiere decisión del equipo. -->
 
-Referencia: https://www.veryfi.com/brand/ (consultada el 13 de octubre de 2026).
+## Colors
 
-## Composición, flujos y arquitectura de información
+Paleta oscura de grafito con acento cian. Verde, azul y violeta distinguen
+información complementaria; los estados también usan texto, no solo color.
 
-- **Estructura general**:
-  - Barra lateral oscura con acceso directo a creación, listado e historial reciente con nombres comerciales legibles (`CO, MX · FinTech y software`).
-  - Encabezado superior con migas de pan contextuales y una única acción primaria destacada por vista.
-- **Vista adaptativa de campaña (`campaign.html`)**:
-  - **Orden DOM = orden visual**: estructura lineal sin `display: contents` ni reordenamiento artificial con CSS `order`, garantizando lectura coherente con teclado y lector de pantalla.
-  - **Promoción contextual de autorización**: cuando una campaña recién creada (`created`) aún no tiene empresas descubiertas, el paso de autorización (`Paso 2 · Autorizar la investigación`) se promueve al inicio de la vista con asistente de un clic (`Usar topes disponibles`), agrupación semántica `<fieldset><legend>` por operación y referencia explícita a la variable de entorno requerida.
-  - **Filtros inteligentes**: ocultos cuando la campaña aún no tiene empresas ni filtros activos; resumen en vivo de opciones seleccionadas y contador de filtros aplicados.
-  - **Actualización en vivo no destructiva**: el sondeo periódico durante la ejecución actualiza únicamente las secciones de estado, tabla y presupuesto mediante `DOMParser`, preservando el foco, los desplegables `<details>` abiertos y la posición de desplazamiento horizontal de la tabla. En páginas distintas de la campaña se consulta `?compact=1` sin renderizar HTML innecesario.
-- **Ficha de empresa y bucle de revisión continua (`company.html`)**:
-  - **Navegación secuencial integrada**: barra superior (`.topbar`) con miga de pan de retorno a la campaña conservando los filtros activos (`?filter_query`) y selector segmentado `← Anterior · Empresa N de M · Siguiente →`.
-  - **Tres pestañas enfocadas sin títulos duplicados**: *Resumen* (con métricas y productos integrados, criterios con etiquetas semánticas `Señal fuerte` / `Señal parcial` / `Incompatible` / `Sin evidencia` y píldoras de referencia con origen o dominio), *Contactos* (ordenados por porcentaje de match, rol integrado en el subtítulo, metadatos de canal en línea, botón de copiado rápido y explicación explícita cuando una persona aún no es elegible para confirmación manual) y *Evidencia* (con resaltado visual `:target` al saltar desde una píldora de fuente).
-  - **Panel lateral de decisión humana**: flujo continuo con botones *Guardar revisión* y *Guardar y pasar a la siguiente →*, confirmando cada acción mediante avisos de estado accesibles.
+- **Lienzo** (`canvas`, #0D0F14): fondo de página. Variable `--ivory`.
+- **Paneles** (`surface`, #15171D): tarjetas, filtros y tablas. Variable `--surface`.
+- **Navegación** (`sidebar`, #10151A): fondo del cajón lateral.
+  La variable `--navy` conserva #111315 para otros controles.
+- **Acento** (`accent`, #80DFF3; `accent-hover`, #A8ECF9; `accent-text`, #10252C):
+  acción principal y elemento seleccionado. Variables `--cyan` y `--cyan-hover`.
+- **Texto** (`text`, #F0F2F6; `text-muted`, #A4AAB8): variables `--ink` y `--muted`.
+- **Bordes** (`border`, #2B2E38; `border-strong`, #68727F): divisiones y controles.
+  Variables `--line` y `--line-strong`.
+- **Superficie secundaria** (`soft`, #1C1F23): filas, badges y campos deshabilitados.
+- **Estados**: `info`, `warning`, `error` y `success`, cada uno con su fondo
+  (`*-background`). `violet` y `blue` completan la información complementaria.
+- **Prioridad**: escala de azules derivada de `blue` (#97BDF1 alta, #5D7CA6 media,
+  #3C4F69 baja) y grises para evidencia insuficiente y excluidas. Se acompaña de
+  barras de señal y del texto de la prioridad.
 
-## Movimiento, accesibilidad y diseño adaptable
+## Typography
 
-- **Microinteracciones funcionales**:
-  - Transiciones breves de `150–200 ms` (`cubic-bezier(0.22, 1, 0.36, 1)`) en cambios de pestañas, apertura de secciones, foco, selección de operaciones y confirmación de copiado.
-  - Respeto estricto de `prefers-reduced-motion: reduce`.
-- **Accesibilidad y seguridad de presentación**:
-  - Asociación automática de errores de formulario con `aria-invalid="true"` y `aria-describedby`.
-  - En móvil (`<= 760 px`), la apertura del menú lateral marca `#workspace-main` como `inert` para aislar el foco dentro del cajón de navegación.
-  - Autoescape estricto en todas las plantillas y filtros de presentación, sin `|safe` ni `mark_safe`.
-- **Responsive**:
-  - Diseño fluido verificado en anchos de `390 px`, `760 px`, `950 px`, `1280 px` y `1440 px` sin desbordamientos horizontales de página.
+Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes sans
+locales como alternativa. La fuente procede del
+[repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia SIL
+Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
+
+- **Encabezados** (`heading`): 2rem, peso 600, altura de línea 1.18, interletrado -0.03em.
+- **Texto** (`body`): 0.9375rem, altura de línea 1.55.
+- Los números de tablas, puntuaciones y presupuesto usan cifras tabulares.
+
+## Layout
+
+- La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
+  campaña. Su botón queda alineado con el logotipo en la barra superior, que
+  muestra la ruta y, en la ficha, Anterior y Siguiente. La barra superior no
+  resume el presupuesto: cada campaña muestra el suyo.
+- El inicio muestra el avance y tres indicadores de la campaña destacada; el
+  historial está en una vista independiente. Las cifras no suman campañas.
+- La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
+  campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
+- La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
+  investigadas, Sin revisar, Contacto listo y Aceptadas, y una barra apilada de
+  prioridades con su leyenda enlazada a filtros. Debajo, la tabla con búsqueda y
+  filtros en una sola barra, y el presupuesto. El progreso usa las empresas
+  encontradas como denominador; durante el descubrimiento, si todavía no hay
+  empresas, no inventa un porcentaje. Las descargas están en el encabezado.
+- La ficha presenta identidad y estados en el encabezado, conserva las pestañas
+  Resumen, Contactos y Evidencia, las fuentes enlazadas y, a la derecha, el mejor
+  match y la revisión de ventas. Anterior y Siguiente preservan los filtros.
+  Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
+
+## Elevation & Depth
+
+La jerarquía se construye con bordes sutiles y capas de tono (`surface` sobre
+`canvas`). Las sombras aparecen como respuesta a un estado: el desplegable de
+filtros, la confirmación flotante, la elevación de un panel del inicio al pasar
+el cursor con puntero fino y el halo del botón principal. Los paneles de trabajo
+(pulso de campaña, revisión) no se elevan: solo orientan su borde hacia el puntero.
+
+## Shapes
+
+Paneles con bordes sutiles y radios de 12–16 px (`md` y `lg`). Controles con 8 px
+(`sm`) y campos o etiquetas con 6 px (`xs`). Búsqueda, filtros, contadores y
+etiquetas de mercado o producto usan forma de píldora; las fuentes, 13 px para
+seguir legibles si su texto ocupa dos líneas.
+
+## Components
+
+### Navegación
+
+El menú se abre como cajón con el fondo oscurecido y desenfocado. Con JavaScript,
+contiene el foco y permite cerrar con Escape, el fondo o su botón, devolviendo el
+foco al control; sin JavaScript conserva la apertura y cierre nativos. El cajón se
+inspira en el [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
+y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
+El botón del menú, sin caja propia, comparte la línea del logotipo; al señalarlo,
+su carril se llena de cian y el chevrón empuja hacia el cajón, a partir del icono
+animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons)
+(MIT), recreado en CSS. Durante una investigación muestra un punto que late.
+
+### Campaña
+
+- **Pulso:** estado, cifra de investigadas con rodillo, un segmento por empresa y
+  tres cifras con su barra (Sin revisar en violeta, Contacto listo en verde,
+  Aceptadas en blanco). En curso, un haz recorre el borde.
+- **Prioridad:** barra apilada y leyenda con recuento; cada entrada filtra la tabla.
+- **Tabla:** avatar con la inicial tintado por prioridad, nombre con flecha al
+  señalar, encaje con barra y cobertura, prioridad con barras de señal (3, 2 o 1),
+  disponibilidad, revisión con icono (círculo, marca o cruz) y contactos con su
+  mejor match. Toda la fila abre la ficha; el nombre es el único enlace.
+- **Presupuesto:** libro de cuatro importes con el disponible destacado y las
+  cuentas en un desplegable.
+
+### Ficha
+
+- **Encabezado:** avatar, nombre, dominio, países y segmentos con iconos, y los
+  tres estados (prioridad, disponibilidad y revisión) separados.
+- **Pestañas:** una línea medida desde cada etiqueta marca la activa y una
+  pastilla sigue al puntero; el panel entra desde el lado de la pestaña elegida.
+  Siguen el patrón de teclado de pestañas (flechas, Inicio y Fin) y el panel
+  recibe el foco con Tab.
+- **Encaje:** cifra grande con barra graduada en cuartos, cobertura, explicación y
+  productos. Cada criterio muestra una bola de Harvey (llena, media, vacía o
+  punteada) junto a su etiqueta textual.
+- **Contactos:** persona con match en barra, etapa en cinco pasos más su etiqueta,
+  y canales como filas con icono, estado y copia; Directo y Utilizable se marcan
+  con iconos y conservan su texto para lectores de pantalla.
+- **Evidencia:** número de fuente como referencia citable; al llegar desde una
+  píldora, la fuente se ilumina un instante.
+- **Lateral:** mejor match y revisión fijos al desplazarse. La decisión es un
+  control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se desliza a la
+  opción elegida.
+
+### Controles, avisos y datos
+
+Los indicadores y las barras incluyen sus valores en texto. Las pestañas, los
+formularios y los avisos conservan etiquetas, foco y estados identificables. Los
+avisos de campaña y ficha llevan icono y título en una línea. Guardar una revisión,
+confirmar un canal o cerrar una campaña se confirma con un aviso flotante que se
+retira solo; con movimiento reducido queda como aviso en la página.
+
+### Marca
+
+El logotipo blanco de Veryfi permanece como recurso local y, en móvil, se muestra
+a 52 × 20 px junto al nombre Prospecting.
+
+### Movimiento
+
+- **Transiciones:** animaciones fluidas y perceptibles en navegación, pestañas, paneles y cambios de estado.
+- **Microinteracciones:** botones, tarjetas y controles responden con movimientos naturales y feedback visual.
+- **Contenido dinámico:** entradas escalonadas, contadores animados y transiciones suaves al actualizar resultados o progreso, sin reinicios innecesarios.
+- **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
+- **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
+
+Las transiciones respetan `prefers-reduced-motion`, y el movimiento posicional se
+desactiva en dispositivos táctiles. Las animaciones deben comprobarse en el
+navegador: el resultado debe transmitir una experiencia interactiva refinada sin
+distraer del trabajo comercial.
+
+En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
+cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
+durante el sondeo, solo se animan las diferencias. Una empresa nueva sube a su
+fila con un destello cian, una fila que cambia de puesto se desliza (FLIP) y una
+fila cuyo contenido cambia se ilumina; las cifras que crecen muestran `+n`. Al
+terminar la investigación, la página se actualiza en su sitio sin recargarse.
+Con movimiento reducido, todo llega en su estado final y los cambios solo se
+funden o cambian de color.
+
+## Do's and Don'ts
+
+- **Do** acompañar cada estado con texto además del color.
+- **Do** mantener el movimiento dentro de `prefers-reduced-motion` y, en táctil, sin desplazamiento posicional.
+- **Do** preferir en las vistas de trabajo una cifra, una barra o un icono con su etiqueta breve antes que una frase explicativa.
+- **Don't** usar `|safe` ni `mark_safe` en contenido externo; el autoescape de Django se conserva.
+- **Don't** usar el color como único indicador de estado.
+- **Don't** reiniciar animaciones de entrada durante el sondeo ni animar alturas o anchos.

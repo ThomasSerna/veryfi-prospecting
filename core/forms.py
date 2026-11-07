@@ -53,11 +53,12 @@ class CampaignForm(forms.Form):
 
 
 class FilterForm(forms.Form):
-    q = forms.CharField(label="Buscar empresa", required=False, max_length=200)
+    q = forms.CharField(label="Buscar empresa", required=False, max_length=200,
+                        widget=forms.TextInput(attrs={"type": "search", "placeholder": "Buscar empresa", "autocomplete": "off"}))
     countries = forms.MultipleChoiceField(label="País", required=False, widget=forms.CheckboxSelectMultiple)
     segments = forms.MultipleChoiceField(label="Tipo de empresa", required=False, widget=forms.CheckboxSelectMultiple)
     priorities = forms.MultipleChoiceField(label="Prioridad", required=False, widget=forms.CheckboxSelectMultiple)
-    availability = forms.MultipleChoiceField(label="Disponibilidad de contacto", required=False, widget=forms.CheckboxSelectMultiple)
+    availability = forms.MultipleChoiceField(label="Disponibilidad", required=False, widget=forms.CheckboxSelectMultiple)
 
     def __init__(self, *args, view, **kwargs):
         super().__init__(*args, **kwargs)
@@ -71,8 +72,14 @@ class FilterForm(forms.Form):
 
 
 class ReviewForm(forms.Form):
-    status = forms.ChoiceField(label="Decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
+    status = forms.ChoiceField(label="Decisión", widget=forms.RadioSelect,
+                               choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
     reason = forms.CharField(label="Notas", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        # Las etiquetas acompañan a la leyenda «Decisión», que no lleva dos puntos.
+        kwargs.setdefault("label_suffix", "")
+        super().__init__(*args, **kwargs)
 
 
 class ConfirmationForm(forms.Form):

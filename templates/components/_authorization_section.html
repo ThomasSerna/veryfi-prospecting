@@ -3,9 +3,10 @@
   <details {% if campaign.status == 'created' %}open{% endif %}>
     <summary>
       <span>
-        <strong id="authorization-title">{% if campaign.status == 'created' %}Autorizar ejecución{% else %}Reanudar ejecución{% endif %}</strong>
+        <strong id="authorization-title">{% if campaign.status == 'created' %}Autorizar investigación{% else %}Reanudar investigación{% endif %}</strong>
       </span>
     </summary>
+    <p class="quiet-note authorization-description">Revisa las operaciones y sus topes. Esta autorización corresponde únicamente a la ejecución que vas a iniciar.</p>
     {% if authorization_form %}
     <form method="post" action="{% url 'webapp:execute' campaign.id %}" id="execution-form" data-idle-form>{% csrf_token %}
       <div class="authorization-toolbar">

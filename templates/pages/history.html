@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load prospecting_ui %}
+{% block title %}Historial · Veryfi Prospecting{% endblock %}
+{% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Resumen</a><span>/</span><span>Historial</span>{% endblock %}
+{% block content %}
+<div class="history-page">
+  <header class="page-heading"><div><h1>Historial</h1><p>Tus campañas y los resultados que conservan.</p></div>
+    <a class="button button-primary" href="{% url 'webapp:new_campaign' %}" data-idle-only {% if execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>
+  </header>
+  {% if execution.is_executing %}<div class="notice notice-info" role="status">Hay una investigación en curso. La preparación de otra campaña se habilita cuando termine.</div>{% endif %}
+  {% if campaigns %}
+  <section class="surface history-surface" aria-labelledby="history-title" data-motion-surface>
+    <div class="section-heading section-heading-row"><h2 id="history-title">Campañas guardadas</h2><span class="result-count">{{ campaigns|length }} {% if campaigns|length == 1 %}campaña{% else %}campañas{% endif %}</span></div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Historial de campañas">
+      <table class="data-table">
+        <thead><tr><th>Campaña</th><th>Mercado</th><th>Estado</th><th>Fecha</th><th><span class="sr-only">Acción</span></th></tr></thead>
+        <tbody>{% for saved in campaigns %}
+          <tr>
+            <th scope="row"><a class="company-link" href="{% url 'webapp:campaign' saved.id %}">{{ saved|campaign_short_title }}</a><span class="cell-note">Máx. {{ saved.max_companies }} empresas</span></th>
+            <td>{% for code in saved.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %}<span class="cell-note">{% for segment in saved.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></td>
+            <td><span class="status status-{{ saved.status }}">{{ saved.status|label }}</span></td>
+            <td>{{ saved.created_at|date:"d M Y" }}<span class="cell-note">{{ saved.created_at|date:"H:i" }}</span></td>
+            <td class="numeric"><a class="table-action" href="{% url 'webapp:campaign' saved.id %}" aria-label="Abrir campaña {{ saved|campaign_short_title }}">Abrir <span class="motion-arrow" aria-hidden="true">→</span></a></td>
+          </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}<section class="home-empty surface"><h2>Sin campañas registradas</h2><p>Las campañas que prepares aparecerán aquí.</p><a class="text-link" href="{% url 'webapp:new_campaign' %}">Preparar la primera campaña</a></section>{% endif %}
+</div>
+{% endblock %}

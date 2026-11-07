@@ -1,73 +1,79 @@
 {% extends 'base.html' %}
 {% load prospecting_ui %}
-{% block title %}Campañas · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<span>Campañas</span>{% endblock %}
+{% block title %}Resumen · Veryfi Prospecting{% endblock %}
+{% block breadcrumb %}<span>Resumen</span>{% endblock %}
 {% block content %}
-<header class="page-heading">
-  <div>
-    <h1>Campañas</h1>
+<div class="home-panel" data-live-dashboard data-live-region="dashboard" data-entering>
+  <header class="home-heading">
+    <div>
+      <h1 class="home-title"><span class="reveal-line"><span>Una mirada.</span></span> <span class="reveal-line"><span>El siguiente paso.</span></span></h1>
+      <p class="home-intro">Tu investigación, donde la dejaste.</p>
+    </div>
+    <a class="text-link home-history-link" href="{% url 'webapp:campaign_history' %}">Ver historial <svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+  </header>
+  {% if execution.is_executing %}<div class="notice notice-info home-live-notice" role="status"><strong>Investigación en curso.</strong> Abre la campaña para seguir sus resultados.</div>{% endif %}
+  {% if highlighted_campaign %}
+  <div class="home-bento">
+    <section class="home-feature surface{% if execution.is_executing %} is-live{% endif %}" data-motion-surface data-motion-tilt aria-labelledby="featured-kind featured-title">
+      <span class="feature-beam" aria-hidden="true"></span>
+      <header class="home-feature-meta">
+        <span class="feature-status" role="status" data-live-swap><span class="status status-{{ highlighted_campaign.status }}">{{ highlighted_campaign.status|label }}</span></span>
+        <p class="feature-kind" data-live-swap><span id="featured-kind">{% if highlighted_is_active %}Campaña activa{% else %}Última campaña{% endif %}</span><span aria-hidden="true"> · </span><time datetime="{{ highlighted_campaign.created_at|date:'Y-m-d' }}">{{ highlighted_campaign.created_at|date:"d M Y" }}</time></p>
+      </header>
+      <div class="home-market">
+        <h2 id="featured-title">{% for code in highlighted_campaign.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</h2>
+        <ul class="home-tags" aria-label="Segmentos de la campaña">{% for segment in highlighted_campaign.segments %}<li style="--i: {{ forloop.counter0 }}">{{ segment|label }}</li>{% endfor %}</ul>
+      </div>
+      <div class="home-progress" style="--count: {{ campaign_insights.total|default:1 }}">
+        <p class="progress-figure">
+          <span class="progress-figure-value" data-value="{{ campaign_insights.completed }}" data-delta style="--roll-steps: {{ campaign_insights.completed }}">{% include 'components/_ticker.html' with value=campaign_insights.completed %}</span>
+          <span class="progress-figure-total">de {% include 'components/_ticker.html' with value=campaign_insights.total %}</span>
+          <span class="progress-figure-label">empresas con investigación terminada</span>
+        </p>
+        {% if campaign_insights.total %}<progress class="sr-only" value="{{ campaign_insights.completed }}" max="{{ campaign_insights.total }}" aria-label="Empresas con investigación terminada">{{ campaign_insights.completed }} de {{ campaign_insights.total }}</progress>{% endif %}
+        {# ponytail: un segmento por empresa; legible hasta unas 40 empresas, después conviene una barra continua. #}
+        <div class="progress-segments" aria-hidden="true">{% for item in highlighted_view.companies %}<span class="progress-segment{% if forloop.counter <= campaign_insights.completed %} is-done{% elif execution.is_executing and forloop.counter0 == campaign_insights.completed %} is-active{% endif %}" style="--i: {{ forloop.counter0 }}"></span>{% empty %}<span class="progress-segment is-placeholder{% if execution.is_executing %} is-searching{% endif %}" style="--i: 0"></span>{% endfor %}</div>
+        {% if not campaign_insights.total %}<p class="progress-hint">{% if execution.is_executing %}Buscando empresas. El avance se mostrará al encontrarlas.{% else %}Aún no hay empresas descubiertas.{% endif %}</p>{% endif %}
+      </div>
+      <footer class="home-feature-actions">
+        <a class="button button-primary home-cta" href="{% url 'webapp:campaign' highlighted_campaign.id %}"><span data-live-swap>{% if highlighted_is_active %}Continuar campaña{% else %}Abrir campaña{% endif %}</span><svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+      </footer>
+    </section>
+    <dl class="home-metrics" aria-label="Resumen de la campaña destacada">
+      <div class="home-metric surface home-metric-review" data-motion-surface>
+        <dt>Sin revisar</dt>
+        <dd>
+          <span class="home-metric-value" data-value="{{ campaign_insights.review_pending }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.review_pending %}</span>
+          {% if campaign_insights.total %}<span class="home-metric-share"><span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio campaign_insights.review_pending campaign_insights.total 100 %}"></span></span><span>de {{ campaign_insights.total }}</span></span>{% endif %}
+          <span class="home-metric-note" data-live-swap>{% if campaign_insights.next_review and not execution.is_executing %}<a class="text-link" href="{% url 'webapp:company' highlighted_campaign.id campaign_insights.next_review.company.id %}">Revisar siguiente <svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>{% elif execution.is_executing %}La revisión se habilita al terminar{% else %}Sin decisiones pendientes{% endif %}</span>
+        </dd>
+      </div>
+      <div class="home-metric surface home-metric-total" data-motion-surface>
+        <dt>Empresas</dt>
+        <dd>
+          <span class="home-metric-value" data-value="{{ campaign_insights.total }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.total %}</span>
+          <span class="home-metric-note">Descubiertas en esta campaña</span>
+        </dd>
+      </div>
+      <div class="home-metric surface home-metric-ready" data-motion-surface>
+        <dt>Con contacto listo</dt>
+        <dd>
+          <span class="home-metric-value" data-value="{{ campaign_insights.ready }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.ready %}</span>
+          {% if campaign_insights.total %}<span class="home-metric-share"><span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio campaign_insights.ready campaign_insights.total 100 %}"></span></span><span>de {{ campaign_insights.total }}</span></span>{% endif %}
+          <span class="home-metric-note">Empresas con un canal disponible</span>
+        </dd>
+      </div>
+    </dl>
   </div>
-  {% if campaigns %}
-  <a class="button button-navy" href="{% url 'webapp:new_campaign' %}" data-idle-only {% if execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>
+  <p class="home-footnote" data-live-swap>El resumen corresponde a {% if highlighted_is_active %}la campaña activa{% else %}la última campaña{% endif %}. La disponibilidad del contacto y la revisión son independientes.</p>
+  {% else %}
+  <section class="home-empty surface" data-motion-surface aria-labelledby="empty-title">
+    <span class="empty-radar" aria-hidden="true"><svg class="empty-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23" pathLength="1"/><circle cx="32" cy="32" r="12" pathLength="1"/><path d="M32 5v12m0 30v12M5 32h12m30 0h12" pathLength="1"/></svg></span>
+    <h2 id="empty-title">Tu próximo mercado empieza aquí.</h2>
+    <p>Sin campañas registradas. Elige un mercado para reunir empresas, contactos y evidencia.</p>
+    <a class="button button-primary home-cta" href="{% url 'webapp:new_campaign' %}">Preparar campaña <svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+    <span class="home-empty-note">Preparar guarda los criterios. No inicia llamadas.</span>
+  </section>
   {% endif %}
-</header>
-{% if execution.is_executing %}
-<div class="notice notice-info" role="status">
-  <strong>Investigación en curso.</strong>
 </div>
-{% endif %}
-{% if active_campaign %}
-<section class="active-campaign" aria-labelledby="active-title">
-  <div>
-    <span class="status status-{{ active_campaign.status }}">{{ active_campaign.status|label }}</span>
-    <h2 id="active-title">{{ active_campaign|campaign_short_title }}</h2>
-    <p>{% for code in active_campaign.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %} · Máx. {{ active_campaign.max_companies }} empresas</p>
-  </div>
-  <a href="{% url 'webapp:campaign' active_campaign.id %}" class="button button-primary">Abrir campaña</a>
-</section>
-{% endif %}
-{% if campaigns %}
-<section class="surface campaign-history" aria-labelledby="history-title">
-  <div class="section-heading section-heading-row">
-    <h2 id="history-title">Historial</h2>
-    <span class="result-count">{{ campaigns|length }} {% if campaigns|length == 1 %}campaña{% else %}campañas{% endif %}</span>
-  </div>
-  <div class="table-scroll" tabindex="0" role="region" aria-label="Historial de campañas">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Campaña</th>
-          <th>Países</th>
-          <th>Segmentos</th>
-          <th class="numeric">Máx. empresas</th>
-          <th>Estado</th>
-          <th><span class="sr-only">Acción</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for saved in campaigns %}
-        <tr>
-          <th scope="row">
-            <a class="company-link" href="{% url 'webapp:campaign' saved.id %}">{{ saved|campaign_short_title }}</a>
-            <span class="cell-note">{{ saved.created_at|date:"d M Y · H:i" }}</span>
-          </th>
-          <td>{% for code in saved.countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-          <td>{% for segment in saved.segments %}{{ segment|label }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
-          <td class="numeric">{{ saved.max_companies }}</td>
-          <td><span class="status status-{{ saved.status }}">{{ saved.status|label }}</span></td>
-          <td class="numeric"><a href="{% url 'webapp:campaign' saved.id %}" class="table-action" aria-label="Abrir campaña {{ saved|campaign_short_title }}">Abrir</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-{% else %}
-<section class="empty-onboarding" aria-labelledby="empty-title">
-  <div class="empty-intro">
-    <h2 id="empty-title">Sin campañas registradas</h2>
-    <a href="{% url 'webapp:new_campaign' %}" class="button button-primary">Nueva campaña</a>
-  </div>
-</section>
-{% endif %}
 {% endblock %}

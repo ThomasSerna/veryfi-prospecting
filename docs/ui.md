@@ -20,9 +20,44 @@ La migración de la interfaz a Django fue aprobada el 13 de octubre de 2026.
 Sustituye la interfaz Streamlit descrita en la arquitectura inicial de `IDEA.md`;
 el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
+## Inicio y navegación
+
+El inicio muestra la campaña activa o, si no la hay, la última guardada. El
+panel resume su avance y cuenta las empresas encontradas, sin revisar y con
+contacto listo; no suma resultados de campañas distintas. Desde «Sin revisar»
+se puede abrir la siguiente empresa pendiente cuando no hay una investigación
+en curso. Si no existen campañas, se ofrece preparar la primera.
+
+El avance dibuja un segmento por empresa encontrada y enciende los terminados;
+sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
+permanece en el documento para lectores de pantalla. Durante una investigación,
+el inicio vuelve a leer su propia página cada dos segundos y actualiza en su
+sitio avance, cifras, estado, navegación y presupuesto, sin recargar ni repetir
+la entrada; al terminar muestra el estado final y habilita la revisión. Con
+movimiento reducido, el contenido aparece en su estado final y los cambios solo
+se funden.
+
+El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
+navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
+comparte la línea del logotipo en la barra superior; al señalarlo, el icono
+anticipa la apertura del cajón y, durante una investigación, muestra un punto que
+late. Al abrirla, el contenido queda detrás de una capa oscurecida y desenfocada.
+Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
+sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
+muestra la ruta y, en la ficha, Anterior y Siguiente; no resume el presupuesto,
+que se consulta en la sección Presupuesto de cada campaña. Un importe desconocido
+o pendiente conserva esa condición.
+
+Las propuestas estáticas de [campaña](../static/prototypes/campaign.html) y
+[ficha](../static/prototypes/company.html) siguen disponibles en el servidor
+local bajo `/static/prototypes/` como referencia histórica. Contienen únicamente
+datos sintéticos y controles ilustrativos desactivados; no investigan ni guardan
+cambios. Las vistas operativas ya aplican la nueva dirección.
+
 ## Preparar y ejecutar
 
-1. Selecciona países, segmentos, palabras clave opcionales y un máximo de 1–20 empresas.
+1. En Mercado y Alcance, selecciona países, segmentos, palabras clave opcionales y
+   un máximo de 1–20 empresas. Revisa los criterios y topes en Resumen.
    Crear la campaña guarda los criterios y la instantánea de configuración sin tráfico.
 2. Consulta el presupuesto y las cuentas comprobadas. Ejecutar requiere claves en el
    entorno y un archivo válido `data/provider-access.json`.
@@ -36,7 +71,9 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 El historial recupera campañas y permite reanudar o cerrar una campaña de Apollo
 interrumpida conservando resultados y consumo. Las campañas anteriores a Apollo
 solo se consultan o exportan; si una sigue activa, debe cerrarse explícitamente para
-preparar otra. Los clics duplicados no repiten solicitudes
+preparar otra. Una campaña en estado `running` o `paused_budget` bloquea preparar
+otra, incluso si el hilo de investigación está detenido; la pantalla ofrece abrirla
+para retomarla o cerrarla cuando corresponda. Los clics duplicados no repiten solicitudes
 enviadas. Cerrar la pestaña no detiene la campaña; detener o reiniciar el servidor sí.
 No existe cola persistente ni reanudación automática: tras reiniciar, revisa el estado
 guardado y autoriza de nuevo. El último informe general está en memoria y se pierde al
@@ -148,12 +185,24 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 
 ## Resultados y revisión
 
-La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
-filtrar por país, segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
+La vista de campaña abre con un pulso de la investigación: un segmento por empresa
+encontrada, la cifra de investigadas y tres cifras con su barra (sin revisar,
+contacto listo y aceptadas), además de una barra apilada de prioridades cuya
+leyenda filtra la tabla. La tabla permite buscar y filtrar por país, segmento,
+prioridad y disponibilidad desde una sola barra; toda la fila abre la ficha y el
+nombre sigue siendo el único enlace para teclado y lectores de pantalla. Las dos
+descargas están en el encabezado. Durante una investigación, la vista consulta el
+estado cada dos segundos y compara cada sección en su sitio: las empresas nuevas
+entran en su fila, las que cambian de puesto se desplazan hasta él y las que
+cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
+lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
+empresa organiza Resumen,
 Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
 número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
 cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
-`Sin evidencia`), caso de uso, contactos y motivos de detención sin jerga técnica.
+`Sin evidencia`) junto a una bola de Harvey, caso de uso, contactos y motivos de
+detención sin jerga técnica. Al seguir una píldora, la fuente citada se ilumina
+un instante. A la derecha se mantienen el mejor match y la revisión de ventas.
 Datos desconocidos se muestran separados de cero.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
@@ -181,7 +230,9 @@ aparece sobre su tarjeta. Un correo de Apollo nunca se presenta como empleo conf
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
 son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
-no recalifica ni cambia la rúbrica. Las correcciones están disponibles cuando la
+no recalifica ni cambia la rúbrica. La decisión se elige en un control de tres
+opciones y la confirmación aparece como aviso flotante que se retira solo; con
+movimiento reducido queda en la página. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
 La confirmación manual solo permite canales `linkedin` u `other` existentes de una
@@ -224,6 +275,104 @@ y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde l
 y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
+
+## Verificación de campaña y ficha del 7 de noviembre de 2026
+
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
+  19 pruebas pasaron con DOM sintético. Las nuevas cubren el traslado de filas
+  sin recrearlas, los desplegables abiertos y la entrada terminada que el sondeo
+  no revierte, y el sondeo de campaña que compara secciones y termina sin
+  recargar. Se retiró la prueba del presupuesto de la barra superior, que ya no existe.
+- La suite completa pasó con **1258 pruebas**; `uv lock --check` y
+  `uv run --locked python manage.py check` también pasaron, con bases temporales
+  y datos sintéticos.
+- En Chrome 157 sin interfaz, sobre la demo sintética, se revisaron campaña y
+  ficha a 1440, 1280 y 390 px sin desbordamiento global. Se comprobaron las
+  flechas entre pestañas y Tab hacia el panel, Escape en los filtros, el retorno
+  del foco al botón del menú y el salto a una fuente desde su píldora. Con
+  movimiento reducido no quedó ninguna animación activa y la confirmación de
+  guardado apareció como aviso en la página.
+- Un arnés temporal fuera del repositorio simuló una investigación sintética de
+  siete empresas, sin proveedores. El pulso, la tabla y la barra de filtros
+  conservaron sus nodos, ninguna animación de entrada se reinició y, al terminar,
+  la página se actualizó sin recargar y habilitó las descargas.
+- El detector de Impeccable no dejó advertencias de geometría animada tras
+  sustituir anchos y alturas por transformaciones y recortes. Mantiene avisos
+  consultivos por medidas fuera de la paleta mínima de `DESIGN.md` y por Inter,
+  la fuente elegida. Quedan pendientes Firefox, Safari, un lector de pantalla
+  real, el zoom al 200 %, la revisión con ventas y una investigación con
+  proveedores reales.
+
+## Verificación del movimiento del resumen del 7 de noviembre de 2026
+
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
+  17 pruebas pasaron con DOM sintético. Cubren la actualización en su sitio del
+  sondeo, que conserva nodos y estilos del puntero, el brillo por proximidad y
+  la navegación.
+- `uv run --locked python manage.py check` pasó, igual que 195 pruebas
+  seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
+  identificadores persistidos, con bases temporales y datos sintéticos.
+- En Chrome 157 sin interfaz, sin claves y con bases temporales exclusivamente
+  sintéticas, se revisaron cuadros de la entrada a velocidad reducida, el brillo
+  por proximidad, la inclinación, el reflejo del botón, el foco por teclado, el
+  cajón con su indicador, el estado vacío, el historial y la campaña. En 1440 y
+  390 px no hubo desbordamiento global; con movimiento reducido, el inicio
+  apareció en su estado final sin animaciones activas.
+- Un arnés temporal fuera del repositorio simuló una campaña sintética en curso
+  durante 36 s, con sondeos cada dos segundos. El panel destacado, la tarjeta de
+  revisión, el primer segmento y el botón conservaron sus nodos; no se reinició
+  ninguna animación de entrada y solo corrieron las señales de cambio.
+- El detector de Impeccable no dejó advertencias tras retirar una transición de
+  altura; conserva avisos consultivos por medidas fuera de la paleta mínima de
+  `DESIGN.md`. Quedan pendientes Firefox, Safari, un lector de pantalla real, el
+  zoom al 200 %, la revisión con ventas y una investigación con proveedores reales.
+
+## Verificación del prototipo del 7 de noviembre de 2026
+
+- `uv run --locked python manage.py check` pasó. Pasaron 171 pruebas
+  seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
+  identificadores persistidos, con bases temporales y datos sintéticos.
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs`:
+  14 pruebas pasaron con DOM sintético. La reducción de movimiento y la
+  alternativa sin JavaScript se revisaron mediante código y pruebas, sin
+  emulación manual en el navegador.
+- En una demo temporal sin claves ni llamadas a proveedores, se revisó el inicio
+  a 1280, 1366, 1440 y 390 px sin desbordamiento global, y se comprobó la
+  separación del historial. Se comprobaron el cierre del menú con Escape, el
+  retorno y la contención del foco, y la visibilidad del presupuesto y el aviso
+  sintético. Las propuestas se revisaron a 1440 y 390 px; sus tablas desplazan
+  contenido sin desplazar la página.
+- La revisión independiente de código no encontró hallazgos materiales; incluyó
+  los flujos de autorización y sondeo.
+- La revisión visual independiente no observó otros defectos materiales en las
+  capturas iniciales. Tras corregir el logotipo, confirmó que Veryfi y Prospecting
+  se leen sin solapamientos en inicio e historial a 390 px. Sigue pendiente la
+  revisión del usuario antes de extender las distribuciones de campaña y ficha.
+- Se comprobaron ocho pares principales de la paleta, con un contraste mínimo de
+  7.70:1. Esta comprobación no es una auditoría completa de la interfaz.
+- El detector de diseño señaló Inter, el resplandor radial y la deriva de la
+  versión anterior de `DESIGN.md`; no interpretó las plantillas Django. Quedan
+  pendientes el zoom real al 200 %, un lector de pantalla real, la evaluación
+  con ventas y las llamadas a proveedores reales.
+
+## Verificación del rediseño anterior del 7 de noviembre de 2026
+
+- Tras integrar los cambios de `main`, la suite completa pasó con **1209 pruebas**;
+  `uv lock --check` y `uv run --locked python manage.py check` también pasaron.
+  Las pruebas usan datos sintéticos y bases temporales.
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs`: ocho
+  pruebas pasan con DOM y respuestas sintéticas. Cubren navegación, foco,
+  resumen de preparación, bloqueos de ejecución y sincronización del presupuesto
+  durante el sondeo; no sustituyen un navegador real.
+- Se revisaron las cuatro vistas con datos sintéticos a 1440 y 390 px, y se
+  midieron a 1366 y 1280 px sin desbordamiento global. En móvil se comprobó el
+  cierre del menú con Escape y el retorno del foco; en la ficha, la selección de
+  Contactos con flecha derecha y la presencia de la vigencia del empleo con sus
+  fuentes. La revisión independiente confirmó los ajustes de desbordamiento en
+  el inicio móvil y del contexto visible del presupuesto.
+- El zoom real al 200 % no se verificó: el navegador integrado no cambió la escala
+  al recibir los atajos. Tampoco se hizo un estudio con ventas ni llamadas reales
+  a proveedores para este rediseño.
 
 ## Verificación de la reorganización del 13 de octubre de 2026
 
