@@ -121,7 +121,8 @@
             <span class="status {% if person.eligible %}status-accepted{% else %}status-pending{% endif %}">{% if person.eligible %}Pertinente{% else %}Por confirmar{% endif %}</span>
           </div>
         </header>
-        {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>{% endif %}
+        {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>
+        {% elif person.employment.state != 'corporate_evidence' %}<div class="notice {% if person.employment.state == 'contradicted' %}notice-warning{% else %}notice-info{% endif %}"><strong>{{ person.employment|employment_label }}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</div>{% endif %}
         {% if person.match %}
         <details class="match-details">
           <summary>Desglose de match</summary>
@@ -174,7 +175,7 @@
           <summary>Datos de la persona</summary>
           <dl class="detail-grid">
             <div><dt>Identidad</dt><dd>{% if person.contact.identity_status == 'confirmed' %}Confirmada{% elif person.contact.identity_status == 'contradicted' %}Con contradicciones{% else %}Pendiente{% endif %}</dd></div>
-            <div><dt>Empleo actual</dt><dd>{{ person.contact.current_employment|yesno:'Sí,No,Pendiente' }}</dd></div>
+            <div><dt>Vigencia del empleo</dt><dd>{{ person.employment|employment_label }}{% if person.employment.reason %} · {{ person.employment|employment_reason }}{% endif %}{% for evidence_id in person.employment.evidence_ids %}{% if forloop.first %}<br>{% endif %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% endfor %}</dd></div>
             <div><dt>Función pertinente</dt><dd>{{ person.contact.relevant_function|yesno:'Sí,No,Pendiente' }}</dd></div>
             <div><dt>Alcance geográfico</dt><dd>{{ person.contact.geographic_scope|default_if_none:'Pendiente' }}</dd></div>
           </dl>

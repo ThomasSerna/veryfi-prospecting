@@ -17,8 +17,8 @@ from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
 from prospecting.contacts import (
-    ContactMatch, ContactMatchConfig, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness, employment_basis, load_contact_match,
-    match_sort_key, target_roles, validate_contact,
+    ContactMatch, ContactMatchConfig, EmploymentStatus, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
+    employment_status, load_contact_match, match_sort_key, target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
@@ -130,8 +130,8 @@ class ContactResult(Contract):
     contact: Contact
     eligible: StrictBool
     usable_channels: list[Channel]
-    # Solo para mostrar: "hunter_signal" es vigencia inferida, pendiente de confirmar antes de contactar (§10.2).
-    employment_basis: Literal["evidence", "hunter_signal"] | None = None
+    # Vigencia del empleo de cada persona, elegible o no, para explicar por qué no está lista (T18, §10.2).
+    employment: EmploymentStatus
     # Ordena para que ventas elija; no cambia eligible, canales utilizables ni disponibilidad.
     match: ContactMatch | None = None
 
@@ -239,11 +239,11 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                         contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
-                    basis = employment_basis(contact, company, evidence, campaign.limits, now) if eligible else None
+                    employment = employment_status(contact, company, evidence, campaign.limits, now)
                     ranking = None if weights is None or assessment is None else contact_match(
                         contact, company, assessment, evidence, campaign.limits, now, roles, weights, campaign=campaign)
                     results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable,
-                                                 employment_basis=basis, match=ranking))
+                                                 employment=employment, match=ranking))
                 results.sort(key=lambda item: match_sort_key(item.match, item.eligible, item.contact, roles or []))
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company, roles, campaign=campaign)

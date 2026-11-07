@@ -196,3 +196,17 @@ def test_invalid_weights_are_rejected_instead_of_defaulted(mutate):
 def test_missing_config_fails_instead_of_using_default_weights(tmp_path):
     with pytest.raises(OSError):
         load_contact_match(tmp_path / "contact_match.json")
+
+
+def test_v1_employment_levels_read_the_provider_neutral_state(ready, weights, make_hunter_contact):
+    """T18 no cambia los pesos: la evidencia vale 10, Hunter conserva su nivel histórico y Apollo suma 0."""
+    company, campaign, assessment, _, _ = ready
+    assert levels(match_of(ready, weights))["employment"] == ("evidence", 10, False)
+    hunter, hunter_facts = make_hunter_contact(company, NOW)
+    assert levels(match_of(ready, weights, hunter, hunter_facts))["employment"] == ("hunter_signal", 6, False)
+    assert not validate_contact(hunter, company, assessment, hunter_facts, campaign.limits, NOW)
+    enrichment = Evidence(company_id=company.id, contact_id=hunter.id, claim="Apollo informa enrichment: sintético.",
+                          provider="apollo", external_reference=f"apollo_v1:persona:{uuid4()}#enrichment",
+                          retrieved_at=NOW, kind="observed", source_type="provider")
+    claim = hunter.model_copy(update={"channels": []})
+    assert levels(match_of(ready, weights, claim, [enrichment]))["employment"] == ("unverified", 0, True)

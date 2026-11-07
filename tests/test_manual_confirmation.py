@@ -181,7 +181,8 @@ def test_channel_sources_with_future_date_or_contradiction_block_confirmation(ma
     channel = case.channel.model_copy(update={"evidence_ids": [source.id]})
     saved = case.db.save_contact(case.contact.model_copy(update={"channels": [channel, case.contact.channels[1]]}), evidence=[source])
     before = case.db.list_evidence(case.company.id)
-    with pytest.raises(ValueError, match="contradictoria"):
+    # Una fuente que contradice la del puesto deja el empleo contradicho (T18) y bloquea antes de revisar el canal.
+    with pytest.raises(ValueError, match="vigentes" if contradictory else "contradictoria"):
         confirm(case)
     assert case.db.get_contact(case.contact.id) == saved and case.db.list_evidence(case.company.id) == before
 

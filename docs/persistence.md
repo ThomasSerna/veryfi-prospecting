@@ -86,7 +86,10 @@ incompleto permanece pendiente; persistirlos no los vuelve utilizables.
 conserva su propia evidencia, estado original del proveedor, estado normalizado y
 fechas. La fecha de consulta de un proveedor no sustituye la fecha de verificación
 del correo ni demuestra empleo vigente. La evaluación de estas condiciones está
-descrita en [Personas y canales](contacts.md).
+descrita en [Personas y canales](contacts.md). El estado de vigencia del empleo
+(`employment_status`, T18) no se guarda: se recalcula al leer a partir de estas
+referencias, así que no cambia el esquema ni los identificadores persistidos, y los
+registros históricos de Hunter se leen sin volver a llamar al proveedor.
 
 Al fusionar la misma persona se conservan fuentes, canales y advertencias
 anteriores. Una verificación negativa no desaparece por una publicación o una

@@ -2,7 +2,7 @@
 
 Reglas vigentes de descubrimiento, identidad, evidencia, calificación, esfuerzo de búsqueda, personas y canales. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md). Las cifras son propuestas iniciales (`rubric_v1`, `contact_match_v1`) pendientes de validación con Veryfi. El flujo de etapas está en [Architecture.md](Architecture.md#flujo-de-investigación). Los topes de gasto están en [Budget-policy.md](Budget-policy.md).
 
-T14 propone `rubric_v2` para evaluación académica; su activación queda condicionada a la comparación indicada más abajo. `rubric_v1` sigue vigente para las campañas históricas y como valor predeterminado mientras no se cumpla esa condición. Los issues T16 (parada y número de personas por cuenta), T18 (vigencia del empleo) y T19 (`contact_match_v2`) proponen modificar otras reglas de este archivo.
+T14 propone `rubric_v2` para evaluación académica; su activación queda condicionada a la comparación indicada más abajo. `rubric_v1` sigue vigente para las campañas históricas y como valor predeterminado mientras no se cumpla esa condición. La vigencia del empleo neutral al proveedor de T18 ya rige (aprobada por el usuario el 7 de noviembre de 2026). Los issues T16 (parada y número de personas por cuenta) y T19 (`contact_match_v2`) proponen modificar otras reglas de este archivo.
 
 ## Descubrimiento
 
@@ -28,7 +28,7 @@ Guardar hechos atómicos, cada uno con texto breve, URL o referencia de proveedo
 
 No tratar el resumen del buscador como confirmación definitiva de cargo o canal: sirve para localizar la fuente. Un dato de proveedor puede usarse como tal, identificándolo, aunque no traiga URL pública; conservar referencia de registro y estado que devolvió.
 
-Reutilizar evidencia vigente entre ejecuciones. Valor inicial de caché: treinta días para páginas/búsquedas y treinta días para datos de contacto. Consultar una página hoy no convierte en actual una noticia antigua. Si hay contradicciones o indicios de cambio de cargo, suspender la condición de listo y revisar.
+Reutilizar evidencia vigente entre ejecuciones. Valor inicial de caché: treinta días para páginas/búsquedas y treinta días para datos de contacto. Consultar una página hoy no convierte en actual una noticia antigua. Si hay contradicciones o indicios de cambio de cargo, suspender la condición de listo, mostrar el motivo y revisar.
 
 ## Calificación explicable
 
@@ -124,7 +124,7 @@ Tope inicial global de ejecución: 45 minutos, además de los límites de llamad
 
 ### Requisitos de la persona
 
-Nombre completo identificado, empresa/entidad correcta, cargo respaldado, función relevante y evidencia de relación vigente sin contradicciones pendientes. Guardar función en la compra como `business_champion`, `technical_champion`, `economic_buyer` o `unknown`; un título por sí solo no confirma autoridad de compra.
+Nombre completo identificado, empresa/entidad correcta, cargo respaldado, función relevante y evidencia de relación vigente sin contradicciones pendientes (ver [Vigencia del empleo](#vigencia-del-empleo)). Guardar función en la compra como `business_champion`, `technical_champion`, `economic_buyer` o `unknown`; un título por sí solo no confirma autoridad de compra.
 
 La taxonomía versionada distingue familias, equivalencias de cargos y funciones, pero sus categorías de compra son objetivos de búsqueda, no una atribución individual. Priorizar promotores de negocio, técnicos y posibles compradores económicos, en ese orden; entre candidatos de calidad comparable favorecer familias distintas. Un título inequívocamente ajeno queda fuera; un título ambiguo permanece pendiente salvo que responsabilidades nominales citadas de una fuente corporativa vigente respalden una función del caso de uso. Aceptar un responsable regional que cubra el país de la cuenta aunque resida fuera de Colombia o México, si el alcance está respaldado.
 
@@ -146,7 +146,20 @@ Conservar estado original del proveedor y un estado normalizado: `verified`, `pu
 
 Frescura propuesta: verificación de email hasta 30 días; evidencia fechada del puesto preferiblemente dentro de 365 días, o directorio corporativo actual consultado. Si la fuente no permite estimar vigencia, marcar incertidumbre y requerir revisión antes de listo. Estos plazos son reglas del prototipo, no garantías del proveedor.
 
-La vigencia inferida que se aplicó a los datos históricos de Hunter se conserva en el [Historial](#historial).
+### Vigencia del empleo
+
+Distinguir lo que declara el proveedor de la evidencia del puesto. Python asigna a cada persona uno de cuatro estados, al consultar y sin llamadas adicionales:
+
+| Estado | Cuándo | ¿Permite listo? |
+|---|---|---|
+| `corporate_evidence` | Fuente corporativa o pública observada, vigente según la frescura anterior, que nombra a la persona con nombre completo y, si la persona viene de Apollo, con su cargo actual; sin contradicciones en ningún sentido | Sí, si se cumplen los demás requisitos |
+| `provider_claim` | Solo el proveedor declara el empleo: Apollo informa un empleo actual, o el historial de Hunter lo infiere | No |
+| `contradicted` | Salida nominal, empleo marcado como no vigente o en otra entidad, fuente corporativa con otro cargo o fuente del puesto contradicha | No |
+| `unknown` | Sin evidencia vigente ni afirmación reciente del proveedor | No |
+
+Ni un correo, ni su verificación, ni la fecha de actualización de un perfil, ni un dato del proveedor prueban el empleo. Una persona sin `corporate_evidence` nunca aparece como lista; la interfaz y el CSV muestran el estado y el motivo (por ejemplo, fuente vencida, fecha futura, fuente sin fecha, fuente que no nombra a la persona, cargo sin confirmar, nombre incompleto o solo afirmación del proveedor). Los casos ambiguos (otro cargo, fuente sin fecha o sin la persona, cargo sin confirmar e inferencia histórica de Hunter) quedan marcados para revisión humana. Las páginas corporativas y directorios localizados con Tavily son la vía de corroboración; justificar el empleo nunca exige enviar mensajes.
+
+La vigencia inferida que se aplicó a los datos históricos de Hunter se conserva en el [Historial](#historial) como afirmación del proveedor.
 
 ### Estados de negocio
 
@@ -160,10 +173,10 @@ La vigencia inferida que se aplicó a los datos históricos de Hunter se conserv
 
 Las interrupciones técnicas no son estados comerciales: registrar aparte la ejecución y `stop_reason`. Una empresa puede estar calificada y haber quedado sin contacto por falta de cuota.
 
-Porcentaje de match de contactos: Python ordena a todas las personas encontradas de cada empresa con un puntaje de 0 a 100 que suma cargo, canal, identidad y vigencia del empleo, según las reglas de §10.1 y §10.2, sin IA. Los pesos están versionados en `config/contact_match.json`; la propuesta inicial del equipo (`contact_match_v1`) prioriza la pertinencia del cargo. Se calcula al consultar, no altera estos estados ni la condición de listo, y un dato pendiente suma 0 sin contarse como incumplimiento. Una identidad contradicha, un empleo no vigente o un alcance geográfico incompatible llevan a la persona al final.
+Porcentaje de match de contactos: Python ordena a todas las personas encontradas de cada empresa con un puntaje de 0 a 100 que suma cargo, canal, identidad y vigencia del empleo, según las reglas de §10.1 y §10.2, sin IA. Los pesos están versionados en `config/contact_match.json`; la propuesta inicial del equipo (`contact_match_v1`) prioriza la pertinencia del cargo. Se calcula al consultar, no altera estos estados ni la condición de listo, y un dato pendiente suma 0 sin contarse como incumplimiento. Una identidad contradicha, un empleo no vigente o un alcance geográfico incompatible llevan a la persona al final. En `contact_match_v1`, la evidencia del puesto vale el nivel máximo, la inferencia histórica de Hunter conserva su nivel intermedio y una afirmación de Apollo queda sin comprobar.
 
 ## Historial
 
 ### Vigencia inferida de Hunter
 
-Vigencia inferida histórica de Hunter: sin evidencia fechada del puesto, una persona con identidad, nombre completo y cargo pertinente confirmados también se considera vigente si tiene un correo nominal del dominio confirmado verificado `valid` dentro de los 30 días y Hunter informó una fuente con `still_on_page` y `last_seen_on` dentro del plazo de vigencia del puesto. Un empleo marcado como no vigente, una salida nominal o evidencia contradictoria la anulan. La interfaz y el CSV la muestran como inferida: el buzón y la fuente no prueban el cargo actual, que ventas confirma antes de contactar. Esta regla conserva la lectura histórica y no se aplica a Apollo.
+Vigencia inferida histórica de Hunter: sin evidencia fechada del puesto, una persona con identidad, nombre completo y cargo pertinente confirmados también se considera vigente si tiene un correo nominal del dominio confirmado verificado `valid` dentro de los 30 días y Hunter informó una fuente con `still_on_page` y `last_seen_on` dentro del plazo de vigencia del puesto. Un empleo marcado como no vigente, una salida nominal o evidencia contradictoria la anulan. Desde T18 (7 de noviembre de 2026) esta inferencia es una afirmación del proveedor (`provider_claim` con origen Hunter): se sigue leyendo sin volver a llamar a Hunter y se muestra con su origen, pero ya no deja lista a la persona en ninguna campaña, porque el buzón y la fuente no prueban el cargo actual. No se aplica a Apollo.

@@ -156,14 +156,44 @@ caché web de 30 días. Una fuente sin vigencia estimable exige revisión. Estos
 valores iniciales del prototipo, reducidos según la configuración guardada de
 la campaña.
 
-Para los registros históricos, sin esa evidencia, `employment_basis` admite la
-vigencia inferida de Hunter (`hunter_signal`): correo nominal del dominio confirmado verificado `valid` dentro de
-`email_days` y una fuente de Hunter con `still_on_page=True` y `last_seen_on` dentro
-de `employment_days`. `current_employment=False`, una salida nominal o una fuente
-contradictoria la anulan. Se calcula al validar, sin cambiar `current_employment` ni
-hacer llamadas, así que también se aplica a contactos ya guardados. La ficha y el CSV
-la muestran como inferida y piden confirmar el cargo antes de contactar. Esta
-inferencia no se extiende a los candidatos de Apollo.
+### Vigencia del empleo (T18)
+
+`employment_status` separa lo que declara el proveedor de la evidencia pública del
+puesto. Se calcula al leer, sin red ni IA, para todas las personas (elegibles o no), y
+no se guarda: no cambia `current_employment`, el esquema ni los identificadores
+persistidos. Solo `corporate_evidence` habilita a la persona en `validate_contact`; los
+demás estados la dejan fuera de listo con un motivo visible en la ficha y el CSV.
+
+| Estado | Cuándo | Efecto |
+|---|---|---|
+| `corporate_evidence` | Un hecho del puesto observado de una fuente `primary` o `secondary` (nunca del proveedor ni del buscador), vigente según `employment_freshness`, que nombra a la persona con nombre completo, sin contradicciones en ningún sentido y con `current_employment=True`. Para personas de Apollo, además, una fuente pública vigente nombra a la persona con su cargo actual | Habilita a la persona |
+| `provider_claim` | Apollo declara el empleo actual (`#enrichment` dentro de `cache.contact_days`) o el historial de Hunter lo infiere (`origin="hunter"`) | No habilita; pide evidencia corporativa |
+| `contradicted` | Salida nominal o `current_employment=False`, una fuente corporativa con otro cargo o una fuente del puesto contradicha | No habilita; bloquea listo con su motivo |
+| `unknown` | Sin evidencia vigente ni afirmación reciente del proveedor | No habilita |
+
+`employment_freshness` clasifica cada fuente del puesto como `fresh`, `stale`, `future`
+o `undated`, con las ventanas de arriba. Los motivos (`reason`) son: `employment_ended`,
+`title_changed`, `contradicted_source`, `future_date`, `stale_source`,
+`undated_source`, `ambiguous_source` (la fuente no nombra a la persona),
+`title_unconfirmed` (ninguna fuente vigente confirma el cargo que declara Apollo),
+`incomplete_name` (apellido ofuscado o nombre parcial), `provider_claim_only`,
+`historical_inference` y `no_employment_evidence`. `review_required` marca los casos
+ambiguos que necesitan revisión humana: `title_changed`, `undated_source`,
+`ambiguous_source`, `title_unconfirmed` e `historical_inference`. `evidence_ids`
+apunta a las fuentes que justifican el estado o su motivo.
+
+Nunca cuentan como evidencia del puesto el correo ni su verificación, el
+`provider_status`, la fecha `last_refreshed_at` de Apollo ni un hecho del proveedor. Una
+contradicción se revisa en ambos sentidos: el hecho que contradice y el que es
+contradicho. Las páginas corporativas y directorios que localiza Tavily en la
+etapa de contactos son la vía de corroboración; T18 no añade llamadas ni proveedores.
+
+La vigencia inferida de Hunter se conserva solo para leer registros históricos:
+correo nominal del dominio confirmado verificado `valid` dentro de `email_days` y
+una fuente de Hunter con `still_on_page=True` y `last_seen_on` dentro de
+`employment_days`. Desde T18 es `provider_claim` con origen `hunter` y motivo
+`historical_inference`, y ya no deja lista a la persona en ninguna campaña. En una
+campaña Apollo, `contact_context` no muestra a esas personas.
 
 La extracción pública usa `contacts_extraction_v2` para campañas con taxonomía y
 `contacts_extraction_v1` para instantáneas históricas, con el mismo Haiku que la
@@ -226,6 +256,12 @@ la pertinencia del cargo:
 | Canal | 25 | Correo, teléfono o WhatsApp que supera `channel_is_usable`, 25; LinkedIn u otro canal confirmado, 18; correo, teléfono o WhatsApp sin comprobar, 10; LinkedIn u otro canal sin confirmar, 7; ninguno, 0 (pendiente) |
 | Identidad | 15 | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 (pendiente) |
 | Vigencia del empleo | 10 | Evidencia del puesto, 10; inferida de Hunter, 6; sin comprobar, 0 (pendiente) |
+
+Desde T18 el nivel de vigencia se lee del estado neutral, sin cambiar los pesos ni la
+huella de `contact_match_v1`: `corporate_evidence` es «evidencia del puesto»,
+`provider_claim` con origen Hunter conserva el nivel histórico `hunter_signal` y los
+demás estados, incluida una afirmación de Apollo, quedan «sin comprobar». `contact_match_v2`
+(T19) usará los nombres neutrales.
 
 Un dato pendiente suma 0, pero se muestra como pendiente y no como incumplimiento. Un
 canal `invalid` o marcado como no profesional no suma. Tres reglas descartan a la persona
