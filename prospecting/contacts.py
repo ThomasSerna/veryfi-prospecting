@@ -208,14 +208,28 @@ def current_directory(fact: Evidence) -> bool:
     return fact.url is not None and bool(re.search(r"/(?:team|equipo|leadership|directivos|directorio|people|contacto|contact|about|nosotros)(?:[/#?._-]|$)", str(fact.url).lower()))
 
 
-def employment_fresh(fact: Evidence, company: Company, limits: CampaignLimits, now: datetime) -> bool:
+EmploymentFreshness = Literal["fresh", "future", "stale", "undated"]
+
+
+def employment_freshness(fact: Evidence, company: Company, limits: CampaignLimits,
+                         now: datetime) -> EmploymentFreshness:
+    """Vigencia temporal de una fuente del puesto; solo «fresh» respalda el empleo.
+
+    Una fecha futura invalida la fuente; una fecha del puesto vale `employment_days`; sin ella, solo un
+    directorio corporativo consultado dentro de la caché web es vigente y otra página queda sin fecha.
+    """
     if any(value is not None and value > now for value in (fact.retrieved_at, fact.published_at, fact.updated_at)):
-        return False
+        return "future"
     date = fact.updated_at or fact.published_at
     if date is not None:
-        return _fresh(date, limits.freshness.employment_days, now)
-    return (fact.source_type == "primary" and _corporate(company, fact) and current_directory(fact)
-            and _fresh(fact.retrieved_at, limits.cache.web_days, now))
+        return "fresh" if _fresh(date, limits.freshness.employment_days, now) else "stale"
+    if fact.source_type == "primary" and _corporate(company, fact) and current_directory(fact):
+        return "fresh" if _fresh(fact.retrieved_at, limits.cache.web_days, now) else "stale"
+    return "undated"
+
+
+def employment_fresh(fact: Evidence, company: Company, limits: CampaignLimits, now: datetime) -> bool:
+    return employment_freshness(fact, company, limits, now) == "fresh"
 
 
 def employment_ended(text: str, name: str, title: str | None) -> bool:
