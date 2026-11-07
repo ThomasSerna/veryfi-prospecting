@@ -11,7 +11,7 @@ from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
 from prospecting.contacts import contact_context, target_roles
 from prospecting.db import Database
 from prospecting.models import Assessment, BusinessStatus, Channel, Contact, Evidence, IdentityStatus, RunItem, Usage, utc_now
-from prospecting.pipeline import find_contacts
+from prospecting.pipeline import find_contacts, read_campaign
 from prospecting.providers import ClaudeClient, HttpResponse, ProviderClient
 from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess, ApolloSearchResponse, parse_search, person_id
 from prospecting.providers.tavily import TAVILY_OPERATIONS, contact_search_request
@@ -43,7 +43,8 @@ def contact_case(database, config, make_campaign, make_company, make_assessment,
     access = ApolloAccess(account_ref=pools[0].account_ref, access_verified=True, work_email_verified=True,
         observed_at=utc_now(), source_reference="Acceso exclusivamente sintético")
     case = SimpleNamespace(db=database, campaign=campaign, company=company, assessment=assessment, budget=budget,
-        grants=grants, access=access, calls=[], replies={}, model_calls=[], people=[], publish_email=True)
+        grants=grants, access=access, calls=[], replies={}, model_calls=[], people=[], publish_email=True,
+        page_text=None, public_title="Product Manager")
 
     def response(operation, payload):
         if operation == "people_search":
@@ -60,6 +61,7 @@ def contact_case(database, config, make_campaign, make_company, make_assessment,
         text = f"Persona Sintética Uno es Product Manager de {company.name}."
         if case.publish_email:
             text += " Correo profesional persona@empresa-sintetica.example."
+        text = text if case.page_text is None else case.page_text
         return {"results": [{"url": url, "raw_content": text} for url in payload["urls"]], "usage": {"credits": 1}}
 
     def transport(prepared, timeout, max_bytes):
@@ -82,12 +84,13 @@ def contact_case(database, config, make_campaign, make_company, make_assessment,
         user = payload["messages"][0]["content"]
         context = json.loads(user.split("\n")[0])
         supplied = [json.loads(piece) for piece in user.split("<evidencia>\n")[1].split("\n</evidencia>")[0].splitlines()]
-        source = next(item for item in supplied if "Persona Sintética Uno" in item["excerpt"])
+        source = next((item for item in supplied if "Persona Sintética Uno" in item["excerpt"]), None)
         known = next((item["contact_id"] for item in context["contacts"] if item["name"] == "Persona Sintética Uno"), None)
-        facts = [("name", "Persona Sintética Uno"), ("title", "Product Manager"), ("employment", company.name)]
+        facts = [("name", "Persona Sintética Uno"), ("title", case.public_title), ("employment", company.name)]
         if case.publish_email:
             facts.append(("email", "persona@empresa-sintetica.example"))
-        text = json.dumps({"candidates": [{"contact_id": known, "name": "Persona Sintética Uno", "facts": [
+        # Sin una fuente que nombre a la persona, Haiku no propone candidatos.
+        text = json.dumps({"candidates": [] if source is None else [{"contact_id": known, "name": "Persona Sintética Uno", "facts": [
             {"field": field, "value": value, "evidence_id": source["evidence_id"], "quote": source["excerpt"]}
             for field, value in facts]}]})
         return SimpleNamespace(id="mensaje-sintetico", model=payload["model"], stop_reason="end_turn",
@@ -240,7 +243,15 @@ def test_candidate_survives_reopen_and_waits_for_enrichment_authorization(contac
     assert [item[0] for item in case.calls] == ["people_search", "people_search", "people_enrichment"]
 
 
-def test_enrichment_precedes_public_nominal_job_and_channel_evidence(contact_case):
+def employment_of(case, tmp_path):
+    """Lee la campaña como la interfaz: el estado de vigencia se calcula al leer y no se guarda."""
+    company = next(item for item in read_campaign(tmp_path / "synthetic.sqlite3", case.campaign.id).companies
+                   if item.company.id == case.company.id)
+    [person] = company.contacts
+    return person, company
+
+
+def test_enrichment_precedes_public_nominal_job_and_channel_evidence(contact_case, tmp_path):
     case = contact_case
     add_candidate(case)
     report = case.find(**case.public)
@@ -252,6 +263,50 @@ def test_enrichment_precedes_public_nominal_job_and_channel_evidence(contact_cas
     assert contact.current_employment is True and contact.channels[0].normalized_status == "unknown"
     assert contact.channels[0].published_evidence_ids and len(case.model_calls) == 1
     assert sum(key.startswith("contacts:person:") for key in case.db.get_run_item(case.campaign.id, case.company.id).attempts) == 1
+    # T18: la página corporativa extraída con Tavily, y no Apollo, justifica el empleo; no se envía nada.
+    person, _ = employment_of(case, tmp_path)
+    assert (person.employment.state, person.employment.origin, person.employment.reason) == (
+        "corporate_evidence", "apollo", None)
+    facts = {item.id: item for item in case.db.list_evidence(case.company.id)}
+    assert all(facts[id].source_type == "primary" and facts[id].url.path == "/equipo"
+               and facts[id].claim.startswith("Hecho nominal publicado: employment=") for id in person.employment.evidence_ids)
+
+
+def test_public_page_without_the_person_keeps_the_apollo_claim(contact_case, tmp_path):
+    case = contact_case
+    case.page_text = f"Equipo directivo sintético de {case.company.name}."
+    add_candidate(case)
+    report = case.find(**case.public)
+    assert report.business_status == "qualified_no_contact"
+    person, _ = employment_of(case, tmp_path)
+    assert (person.eligible, person.employment.state, person.employment.reason) == (
+        False, "provider_claim", "provider_claim_only")
+    [contact] = case.db.list_contacts(case.company.id)
+    assert contact.current_employment is None and contact.channels[0].provider_status == "verified"
+
+
+def test_public_departure_contradicts_the_apollo_claim(contact_case, tmp_path):
+    case = contact_case
+    case.publish_email = False
+    case.page_text = f"Persona Sintética Uno dejó de ser Product Manager de {case.company.name} en septiembre."
+    add_candidate(case)
+    assert case.find(**case.public).business_status == "qualified_no_contact"
+    person, _ = employment_of(case, tmp_path)
+    assert (person.employment.state, person.employment.reason) == ("contradicted", "employment_ended")
+    assert person.contact.current_employment is False and not person.eligible
+
+
+def test_public_page_with_another_title_contradicts_the_apollo_title(contact_case, tmp_path):
+    case = contact_case
+    case.publish_email = False
+    case.public_title = "CFO"
+    case.page_text = f"Persona Sintética Uno es CFO de {case.company.name}."
+    add_candidate(case)
+    assert case.find(**case.public).business_status == "qualified_no_contact"
+    person, _ = employment_of(case, tmp_path)
+    assert (person.employment.state, person.employment.reason, person.employment.review_required) == (
+        "contradicted", "title_changed", True)
+    assert person.contact.identity_status == "contradicted" and not person.eligible
 
 
 def test_verified_label_without_date_stays_pending_after_public_job_evidence(contact_case):
