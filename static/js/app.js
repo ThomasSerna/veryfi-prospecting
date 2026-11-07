@@ -3,6 +3,8 @@
 
   const body = document.body;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  // Con JavaScript, las filas de empresas se abren completas (ver el clic delegado).
+  body.dataset.rowLinks = 'true';
 
   const previewForm = document.querySelector('[data-campaign-preview]');
   if (previewForm) {
@@ -24,6 +26,15 @@
     const disabled = event.target?.closest?.('a[aria-disabled="true"]');
     if (disabled) {
       event.preventDefault();
+      return;
+    }
+    // Toda la fila abre la ficha; el enlace del nombre sigue siendo el único destino para teclado y lectores.
+    const row = event.target?.closest?.('.result-row');
+    if (row && !event.target.closest('a, button, input, label, summary')
+        && !String(window.getSelection?.() || '')) {
+      const link = row.querySelector('.company-link');
+      if (link && (event.ctrlKey || event.metaKey)) window.open(link.href, '_blank', 'noopener');
+      else link?.click();
       return;
     }
     const copyBtn = event.target?.closest?.('[data-copy-channel]');
@@ -263,14 +274,17 @@
   function applyLiveSnapshot(html) {
     if (typeof DOMParser !== 'undefined' && live.querySelector) {
       const parsed = new DOMParser().parseFromString(html, 'text/html');
+      const morphing = window.ProspectingLive;
       const currentScroll = live.querySelector('.results-section .table-scroll');
       const scrollLeft = currentScroll ? currentScroll.scrollLeft : 0;
       const budgetDetailsOpen = Boolean(live.querySelector('.budget-details')?.open);
 
-      ['overview', 'results', 'budget'].forEach(sectionName => {
-        const currentSection = live.querySelector(`[data-live-section="${sectionName}"]`);
-        const nextSection = parsed.querySelector(`[data-live-section="${sectionName}"]`);
-        if (currentSection && nextSection) currentSection.replaceWith(nextSection);
+      // Cada sección se compara en su sitio: filas, foco, desplegables y animaciones en curso se conservan.
+      live.querySelectorAll('[data-live-section]').forEach(currentSection => {
+        const nextSection = parsed.querySelector(`[data-live-section="${currentSection.dataset.liveSection}"]`);
+        if (!nextSection) return;
+        if (morphing) morphing.update(currentSection, nextSection);
+        else currentSection.replaceWith(nextSection);
       });
 
       const currentFilters = live.querySelector('[data-live-filters]');
@@ -279,6 +293,7 @@
         currentFilters.hidden = nextFilters.hidden;
       }
 
+      if (morphing) return;
       const nextBudgetDetails = live.querySelector('.budget-details');
       if (nextBudgetDetails) nextBudgetDetails.open = budgetDetailsOpen;
       const nextScroll = live.querySelector('.results-section .table-scroll');
@@ -289,6 +304,35 @@
     const openDetails = Array.from(live.querySelectorAll('details')).map(detail => detail.open);
     live.innerHTML = html;
     live.querySelectorAll('details').forEach((detail, index) => { detail.open = openDetails[index] || false; });
+  }
+
+  // Al terminar, la página se lee de nuevo y se actualiza en su sitio para no repetir la entrada;
+  // sin comparación disponible o ante un fallo, se recarga.
+  async function finish() {
+    const morphing = window.ProspectingLive;
+    if (!morphing || typeof DOMParser === 'undefined') {
+      window.location.reload();
+      return;
+    }
+    try {
+      const response = await fetch(window.location.href, {
+        headers: { 'Accept': 'text/html' }, cache: 'no-store', credentials: 'same-origin',
+      });
+      if (!response.ok) throw new Error(`Estado ${response.status}`);
+      const next = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const main = document.getElementById('main');
+      const nextMain = next.getElementById('main');
+      if (!main || !nextMain?.querySelector('#campaign-page')) throw new Error('Campaña ausente');
+      inactiveControls.clear();
+      busy = false;
+      morphing.update(main, nextMain);
+      const nav = document.querySelector('[data-live-region="navigation"]');
+      const nextNav = next.querySelector('[data-live-region="navigation"]');
+      if (nav && nextNav) morphing.morph(nav, nextNav, []);
+      body.dataset.running = next.body?.dataset.running === 'true' ? 'true' : 'false';
+    } catch (_error) {
+      window.location.reload();
+    }
   }
 
   async function poll() {
@@ -309,7 +353,7 @@
         setBusy(true);
         pollTimer = window.setTimeout(poll, 2000);
       } else if (busy) {
-        window.location.reload();
+        await finish();
       }
     } catch (error) {
       showFeedback(error.message, 'warning');

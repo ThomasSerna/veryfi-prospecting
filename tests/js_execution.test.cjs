@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function executionPage(status, isExecuting, { html = '', parsed = null } = {}) {
+function executionPage(status, isExecuting, { html = '', parsed = null, live = null, main = null, morphing = null } = {}) {
   let submit;
   let active = isExecuting;
   let reloads = 0;
@@ -26,8 +26,8 @@ function executionPage(status, isExecuting, { html = '', parsed = null } = {}) {
     addEventListener: (event, callback) => { if (event === 'submit') submit = callback; },
   };
   const elements = {
-    'campaign-page': page, 'execution-form': form,
-    'campaign-live': { querySelector: () => null, querySelectorAll: () => [] },
+    'campaign-page': page, 'execution-form': form, main,
+    'campaign-live': live || { querySelector: () => null, querySelectorAll: () => [] },
     'execution-feedback': { replaceChildren() {}, append() {} },
   };
   const context = {
@@ -42,11 +42,13 @@ function executionPage(status, isExecuting, { html = '', parsed = null } = {}) {
     window: {
       matchMedia: () => ({ matches: false }),
       setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {},
-      location: { search: '', reload: () => { reloads++; } },
+      location: { search: '', href: '/campaigns/sintetica/', reload: () => { reloads++; } },
+      ...(morphing && { ProspectingLive: morphing }),
     },
     FormData: class { get() { return 'csrf-exclusivamente-sintetico'; } },
     fetch: async url => {
       calls.push(url);
+      if (url === '/campaigns/sintetica/') return { ok: true, text: async () => '<main>Página sintética</main>' };
       return { ok: url === '/status/' || status < 400, json: async () => ({
         is_executing: url === '/status/' ? active : isExecuting,
         error_message: 'Respuesta exclusivamente sintética.',
@@ -89,5 +91,39 @@ test('Un rechazo 409 mantiene el bloqueo, consulta el estado y evita otro envío
   page.stop();
   await page.timers.shift()();
   assert.equal(page.reloads(), 1);
+  assert.equal(page.timers.length, 0);
+});
+
+test('El sondeo compara cada sección en su sitio y, al terminar, actualiza la página sin recargarla', async () => {
+  const updates = [];
+  const morphing = {
+    update: (current, next) => updates.push([current.name, next.name]),
+    morph: (current, next) => updates.push([current.name, next.name]),
+  };
+  const section = name => ({
+    name, dataset: { liveSection: name },
+    replaceWith() { assert.fail('El sondeo no debe reemplazar secciones que puede comparar.'); },
+  });
+  const sections = [section('overview'), section('results')];
+  const live = { querySelector: () => null, querySelectorAll: selector => selector === '[data-live-section]' ? sections : [] };
+  const nextMain = { name: 'main-nuevo', querySelector: selector => selector === '#campaign-page' ? {} : null };
+  const parsed = {
+    body: { dataset: { running: 'false' } },
+    querySelector: selector => {
+      const match = /data-live-section="([\w-]+)"/.exec(selector);
+      return match ? { name: `${match[1]}-nuevo` } : null;
+    },
+    getElementById: id => id === 'main' ? nextMain : null,
+  };
+  const page = executionPage(409, true, { html: '<section>Instantánea sintética</section>', parsed, live, main: { name: 'main' }, morphing });
+  await page.submit();
+  await new Promise(setImmediate);
+  assert.deepEqual(updates, [['overview', 'overview-nuevo'], ['results', 'results-nuevo']]);
+  page.stop();
+  await page.timers.shift()();
+  assert.equal(page.reloads(), 0);
+  assert.deepEqual(updates.at(-1), ['main', 'main-nuevo']);
+  assert.deepEqual(page.calls, ['/execute/', '/status/', '/status/', '/campaigns/sintetica/']);
+  assert.equal(page.document.body.dataset.running, 'false');
   assert.equal(page.timers.length, 0);
 });

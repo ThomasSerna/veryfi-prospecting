@@ -53,11 +53,12 @@ class CampaignForm(forms.Form):
 
 
 class FilterForm(forms.Form):
-    q = forms.CharField(label="Buscar empresa", required=False, max_length=200)
+    q = forms.CharField(label="Buscar empresa", required=False, max_length=200,
+                        widget=forms.TextInput(attrs={"type": "search", "placeholder": "Buscar empresa", "autocomplete": "off"}))
     countries = forms.MultipleChoiceField(label="País", required=False, widget=forms.CheckboxSelectMultiple)
     segments = forms.MultipleChoiceField(label="Tipo de empresa", required=False, widget=forms.CheckboxSelectMultiple)
     priorities = forms.MultipleChoiceField(label="Prioridad", required=False, widget=forms.CheckboxSelectMultiple)
-    availability = forms.MultipleChoiceField(label="Disponibilidad de contacto", required=False, widget=forms.CheckboxSelectMultiple)
+    availability = forms.MultipleChoiceField(label="Disponibilidad", required=False, widget=forms.CheckboxSelectMultiple)
 
     def __init__(self, *args, view, **kwargs):
         super().__init__(*args, **kwargs)
