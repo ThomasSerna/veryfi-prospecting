@@ -1,11 +1,22 @@
 # Plan propuesto de rediseño de la interfaz
 
-Estado: **propuesta para revisión**. Este documento inicia la planeación; no
-certifica una implementación ni sustituye los requisitos de producto, las reglas
-de negocio o las decisiones visuales vigentes en [DESIGN.md](../DESIGN.md).
+Estado: **implementación en curso**. Este documento conserva la propuesta que
+guio el rediseño; [DESIGN.md](../DESIGN.md) describe el sistema visual actual y
+[la guía de interfaz](ui.md) documenta su uso y verificaciones. El plan no
+sustituye los requisitos de producto ni las reglas de negocio.
+
 El 7 de noviembre de 2026 se revisaron en navegador la referencia y las cuatro
-pantallas actuales mediante la demo exclusivamente sintética. Esta etapa no
-incluye prototipos ni UI implementados, pruebas de suite o llamadas a proveedores.
+pantallas anteriores mediante la demo exclusivamente sintética. Durante la
+implementación se generaron referencias visuales sintéticas para inicio, campaña
+y ficha; son apoyo de diseño, no validación con usuarios.
+
+La regla existente de bloqueo se aplica a campañas en estado `running` o
+`paused_budget`, incluso si el hilo está detenido. La frase «campaña sin terminar»
+de la propuesta debe leerse con ese alcance: este rediseño no amplía los estados
+que impiden preparar otra campaña.
+
+Las secciones siguientes conservan la propuesta original y sus criterios de
+aceptación, no afirman por sí mismas que estos se hayan verificado.
 
 ## Objetivo y decisiones confirmadas
 

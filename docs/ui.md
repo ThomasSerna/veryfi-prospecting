@@ -20,9 +20,25 @@ La migración de la interfaz a Django fue aprobada el 13 de octubre de 2026.
 Sustituye la interfaz Streamlit descrita en la arquitectura inicial de `IDEA.md`;
 el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
+## Inicio y navegación
+
+El inicio muestra la campaña activa o, si no la hay, la última guardada. Sus
+indicadores corresponden a esa campaña: empresas encontradas, investigación
+terminada, contacto listo y revisión pendiente. «Para revisar» permite abrir una
+empresa con revisión pendiente o consultar las empresas con canal por confirmar;
+las acciones sujetas a bloqueo se habilitan cuando termina la ejecución.
+La distribución por prioridad y el historial completan el panorama; no suman
+empresas de campañas distintas.
+
+La navegación lateral reúne Resumen, Historial, Nueva campaña y las campañas
+recientes. El encabezado muestra el disponible de la campaña en contexto y
+enlaza al desglose; sin campaña seleccionada lo indica. Un importe desconocido
+o pendiente de conciliación conserva esa condición.
+
 ## Preparar y ejecutar
 
-1. Selecciona países, segmentos, palabras clave opcionales y un máximo de 1–20 empresas.
+1. En Mercado y Alcance, selecciona países, segmentos, palabras clave opcionales y
+   un máximo de 1–20 empresas. Revisa los criterios y topes en Resumen.
    Crear la campaña guarda los criterios y la instantánea de configuración sin tráfico.
 2. Consulta el presupuesto y las cuentas comprobadas. Ejecutar requiere claves en el
    entorno y un archivo válido `data/provider-access.json`.
@@ -36,7 +52,9 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 El historial recupera campañas y permite reanudar o cerrar una campaña de Apollo
 interrumpida conservando resultados y consumo. Las campañas anteriores a Apollo
 solo se consultan o exportan; si una sigue activa, debe cerrarse explícitamente para
-preparar otra. Los clics duplicados no repiten solicitudes
+preparar otra. Una campaña en estado `running` o `paused_budget` bloquea preparar
+otra, incluso si el hilo de investigación está detenido; la pantalla ofrece abrirla
+para retomarla o cerrarla cuando corresponda. Los clics duplicados no repiten solicitudes
 enviadas. Cerrar la pestaña no detiene la campaña; detener o reiniciar el servidor sí.
 No existe cola persistente ni reanudación automática: tras reiniciar, revisa el estado
 guardado y autoriza de nuevo. El último informe general está en memoria y se pierde al
@@ -148,8 +166,9 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 
 ## Resultados y revisión
 
-La navegación contiene las campañas y el acceso a una nueva campaña. La tabla permite
-filtrar por país, segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
+La vista de campaña muestra el avance sobre las empresas encontradas, los pendientes
+de revisión, los contactos listos y las prioridades. La tabla permite filtrar por país,
+segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
 Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
 número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
 cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
@@ -208,6 +227,17 @@ y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde l
 y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
+
+## Verificación del rediseño del 7 de noviembre de 2026
+
+- Las pruebas de `tests/test_ui.py`, `tests/test_web_execution.py` y
+  `tests/test_redesign.py` pasaron con datos sintéticos y bases temporales.
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs`: ocho
+  pruebas pasan con DOM y respuestas sintéticas. Cubren navegación, foco,
+  resumen de preparación, bloqueos de ejecución y sincronización del presupuesto
+  durante el sondeo; no sustituyen un navegador real.
+- Las referencias visuales generadas usan datos sintéticos. No constituyen una
+  evaluación de usabilidad con el equipo de ventas ni verifican proveedores reales.
 
 ## Verificación de la reorganización del 13 de octubre de 2026
 
