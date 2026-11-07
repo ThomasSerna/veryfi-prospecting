@@ -149,3 +149,15 @@ El contenido externo conserva el autoescape de Django. La actualización de
 resultados durante la ejecución mantiene las secciones y controles necesarios
 para preservar el estado de la interacción. La verificación de esta versión se
 registra en [la guía de la interfaz](docs/ui.md).
+
+## Motion Design y animaciones
+
+El movimiento es parte fundamental de la identidad visual. La interfaz debe sentirse dinámica, fluida y moderna, tomando como referencia la calidad y expresividad de los componentes animados de [21st.dev](https://21st.dev/). El minimalismo visual no implica animaciones mínimas o imperceptibles.
+
+- **Transiciones:** animaciones fluidas y perceptibles en navegación, pestañas, paneles y cambios de estado.
+- **Microinteracciones:** botones, tarjetas y controles responden con movimientos naturales y feedback visual.
+- **Contenido dinámico:** entradas escalonadas, contadores animados y transiciones suaves al actualizar resultados o progreso, sin reinicios innecesarios.
+- **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
+- **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
+
+Las animaciones deben comprobarse visualmente en el navegador. No basta con añadir transiciones CSS básicas: el resultado debe transmitir una experiencia interactiva refinada sin distraer del trabajo comercial.
