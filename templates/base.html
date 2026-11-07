@@ -45,7 +45,7 @@
       </header>
       <main id="main" class="main-content" tabindex="-1">
         {% if demo_mode %}<div class="notice notice-info demo-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><strong>Demostración con datos exclusivamente sintéticos.</strong></div>{% endif %}
-        {% if saved_notice %}<div class="notice notice-success" role="status"><strong>{{ saved_notice }}</strong></div>{% endif %}
+        {% if saved_notice %}<div class="notice notice-success toast" role="status"><strong>{{ saved_notice }}</strong></div>{% endif %}
         {% if messages %}{% for message in messages %}<div class="notice {% if message.tags == 'error' %}notice-error{% else %}notice-success{% endif %}" role="status">{{ message }}</div>{% endfor %}{% endif %}
         {% if access_error %}<div class="notice notice-error" role="alert"><strong>{{ access_error }}</strong></div>{% endif %}
         {% if error_message %}<div class="notice notice-error" role="alert"><strong>{{ error_message }}</strong></div>{% endif %}

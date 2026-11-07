@@ -72,8 +72,14 @@ class FilterForm(forms.Form):
 
 
 class ReviewForm(forms.Form):
-    status = forms.ChoiceField(label="Decisión", choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
+    status = forms.ChoiceField(label="Decisión", widget=forms.RadioSelect,
+                               choices=[(value, label(value)) for value in ("pending", "accepted", "rejected")])
     reason = forms.CharField(label="Notas", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        # Las etiquetas acompañan a la leyenda «Decisión», que no lleva dos puntos.
+        kwargs.setdefault("label_suffix", "")
+        super().__init__(*args, **kwargs)
 
 
 class ConfirmationForm(forms.Form):

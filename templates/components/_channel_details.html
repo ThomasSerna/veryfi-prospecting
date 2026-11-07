@@ -1,11 +1,11 @@
 {% load prospecting_ui %}
 <div class="channel-meta">
-  <div class="channel-flags">
-    <span>Directo: <strong>{{ channel.direct|yesno:'Sí,No,Pendiente' }}</strong></span>
-    <span>Utilizable: <strong>{% if channel in person.usable_channels %}Sí{% else %}No{% endif %}</strong></span>
-    {% if channel.phone_country %}<span>País: <strong>{{ channel.phone_country }}</strong></span>{% endif %}
-    {% if channel.extension %}<span>Ext.: <strong>{{ channel.extension }}</strong></span>{% endif %}
-  </div>
+  <ul class="channel-flags">
+    <li data-state="{% if channel.direct %}yes{% elif channel.direct == False %}no{% else %}pending{% endif %}"><span class="sr-only">Directo: {{ channel.direct|yesno:'Sí,No,Pendiente' }}</span><span aria-hidden="true">Directo</span></li>
+    <li data-state="{% if channel in person.usable_channels %}yes{% else %}no{% endif %}"><span class="sr-only">Utilizable: {% if channel in person.usable_channels %}Sí{% else %}No{% endif %}</span><span aria-hidden="true">Utilizable</span></li>
+    {% if channel.phone_country %}<li data-state="info">País: <strong>{{ channel.phone_country }}</strong></li>{% endif %}
+    {% if channel.extension %}<li data-state="info">Ext.: <strong>{{ channel.extension }}</strong></li>{% endif %}
+  </ul>
   {% if channel.manual_confirmation_reason %}<p class="quiet-note">Notas: {{ channel.manual_confirmation_reason }}</p>{% endif %}
   {% if channel.evidence_ids %}
   <div class="evidence-references">

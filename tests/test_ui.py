@@ -267,7 +267,8 @@ def test_human_review_saves_reason_and_survives_new_browser(ui_results, client):
     assert result.business_status == "needs_channel_confirmation"
     assert result.assessment == assessment
     reopened = Client(SERVER_NAME="localhost").get(url("company", case.campaign.id, case.companies[0].id))
-    assert 'value="accepted" selected' in text(reopened)
+    assert re.search(r'<input type="radio" name="status" value="accepted"[^>]*\bchecked\b', text(reopened))
+    assert not re.search(r'<input type="radio" name="status" value="pending"[^>]*\bchecked\b', text(reopened))
     assert "Aceptación exclusivamente sintética" in text(reopened)
 
 
