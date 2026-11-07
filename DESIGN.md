@@ -81,7 +81,7 @@ components:
 
 # Diseño de Veryfi Prospecting
 
-## Dirección visual
+## Overview
 
 Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
 investigación y revisar empresas, personas y evidencia. El inicio destaca la
@@ -95,64 +95,87 @@ las propuestas de campaña y ficha son estáticas, con datos exclusivamente
 sintéticos, y están pendientes de revisión antes de extender sus distribuciones
 a las vistas operativas. La demostración identifica sus datos como sintéticos.
 
-## Sistema visual
+<!-- Pendiente: nombre creativo de la dirección (Creative North Star). No está definido; requiere decisión del equipo. -->
 
-- Lienzo oscuro (`--ivory`), paneles grafito (`--surface`), navegación con
-  fondo `#10151A` y bordes discretos (`--line`). La variable `--navy`
-  conserva `#111315` para otros controles.
-- Texto principal (`--ink`), secundario (`--muted`) y acento cian (`--cyan`).
-  Verde, azul y violeta distinguen información complementaria; los estados
-  también usan texto, no solo color.
-- Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes
-  sans locales como alternativa. La fuente procede del
-  [repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia
-  SIL Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
-- Paneles con bordes sutiles y radios de `12–16 px`; controles y etiquetas de
-  menor radio. Los números de tablas, puntuaciones y presupuesto usan cifras
-  tabulares. El logotipo blanco de Veryfi permanece como recurso local y, en
-  móvil, se muestra a 52 × 20 px junto al nombre Prospecting.
-- El cajón se inspira en el
-  [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
-  y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
-  Se implementan con plantillas Django, CSS y JavaScript locales. El inicio
-  combina luz y bordes reactivos al cursor con una inclinación ligera del panel
-  destacado.
+## Colors
 
-## Composición y flujos
+Paleta oscura de grafito con acento cian. Verde, azul y violeta distinguen
+información complementaria; los estados también usan texto, no solo color.
+
+- **Lienzo** (`canvas`, #0D0F14): fondo de página. Variable `--ivory`.
+- **Paneles** (`surface`, #15171D): tarjetas, filtros y tablas. Variable `--surface`.
+- **Navegación** (`sidebar`, #10151A): fondo del cajón lateral.
+  La variable `--navy` conserva #111315 para otros controles.
+- **Acento** (`accent`, #80DFF3; `accent-hover`, #A8ECF9; `accent-text`, #10252C):
+  acción principal y elemento seleccionado. Variables `--cyan` y `--cyan-hover`.
+- **Texto** (`text`, #F0F2F6; `text-muted`, #A4AAB8): variables `--ink` y `--muted`.
+- **Bordes** (`border`, #2B2E38; `border-strong`, #68727F): divisiones y controles.
+  Variables `--line` y `--line-strong`.
+- **Superficie secundaria** (`soft`, #1C1F23): filas, badges y campos deshabilitados.
+- **Estados**: `info`, `warning`, `error` y `success`, cada uno con su fondo
+  (`*-background`). `violet` y `blue` completan la información complementaria.
+
+## Typography
+
+Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes sans
+locales como alternativa. La fuente procede del
+[repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia SIL
+Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
+
+- **Encabezados** (`heading`): 2rem, peso 600, altura de línea 1.18, interletrado -0.03em.
+- **Texto** (`body`): 0.9375rem, altura de línea 1.55.
+- Los números de tablas, puntuaciones y presupuesto usan cifras tabulares.
+
+## Layout
 
 - La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
-  campaña. La barra superior identifica la campaña y muestra su disponible,
-  con acceso al presupuesto detallado. Durante el sondeo de la campaña, el
-  resumen se actualiza junto con los resultados.
+  campaña. La barra superior identifica la campaña y muestra su disponible, con
+  acceso al presupuesto detallado. Durante el sondeo de la campaña, el resumen se
+  actualiza junto con los resultados.
 - El inicio muestra el avance y tres indicadores de la campaña destacada; el
   historial está en una vista independiente. Las cifras no suman campañas.
-- La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar
-  la campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
-- La campaña muestra avance, prioridades, filtros, tabla y presupuesto. El
-  progreso usa las empresas encontradas como denominador; durante el
-  descubrimiento, si todavía no hay empresas, no inventa un porcentaje.
+- La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
+  campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
+- La campaña muestra avance, prioridades, filtros, tabla y presupuesto. El progreso
+  usa las empresas encontradas como denominador; durante el descubrimiento, si
+  todavía no hay empresas, no inventa un porcentaje.
 - La ficha conserva las pestañas Resumen, Contactos y Evidencia, las fuentes
   enlazadas y el panel de revisión. Anterior y Siguiente preservan los filtros.
   Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
 
-## Interacción y accesibilidad
+## Elevation & Depth
+
+La jerarquía se construye con bordes sutiles y capas de tono (`surface` sobre
+`canvas`). Las sombras aparecen como respuesta a un estado: el desplegable de
+filtros, la elevación de un panel al pasar el cursor con puntero fino y el halo
+del botón principal.
+
+## Shapes
+
+Paneles con bordes sutiles y radios de 12–16 px (`md` y `lg`). Controles con 8 px
+(`sm`) y campos o etiquetas con 6 px (`xs`).
+
+## Components
+
+### Navegación
 
 El menú se abre como cajón con el fondo oscurecido y desenfocado. Con JavaScript,
 contiene el foco y permite cerrar con Escape, el fondo o su botón, devolviendo el
-foco al control; sin JavaScript conserva la apertura y cierre nativos. Los
-indicadores y las barras incluyen sus valores en texto. Las pestañas, los
+foco al control; sin JavaScript conserva la apertura y cierre nativos. El cajón se
+inspira en el [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
+y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
+
+### Controles, avisos y datos
+
+Los indicadores y las barras incluyen sus valores en texto. Las pestañas, los
 formularios y los avisos conservan etiquetas, foco y estados identificables.
-Las transiciones respetan `prefers-reduced-motion` y el movimiento posicional
-se desactiva en dispositivos táctiles.
 
-El contenido externo conserva el autoescape de Django. La actualización de
-resultados durante la ejecución mantiene las secciones y controles necesarios
-para preservar el estado de la interacción. La verificación de esta versión se
-registra en [la guía de la interfaz](docs/ui.md).
+### Marca
 
-## Motion Design y animaciones
+El logotipo blanco de Veryfi permanece como recurso local y, en móvil, se muestra
+a 52 × 20 px junto al nombre Prospecting.
 
-El movimiento es parte fundamental de la identidad visual. La interfaz debe sentirse dinámica, fluida y moderna, tomando como referencia la calidad y expresividad de los componentes animados de [21st.dev](https://21st.dev/). El minimalismo visual no implica animaciones mínimas o imperceptibles.
+### Movimiento
 
 - **Transiciones:** animaciones fluidas y perceptibles en navegación, pestañas, paneles y cambios de estado.
 - **Microinteracciones:** botones, tarjetas y controles responden con movimientos naturales y feedback visual.
@@ -160,4 +183,14 @@ El movimiento es parte fundamental de la identidad visual. La interfaz debe sent
 - **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
-Las animaciones deben comprobarse visualmente en el navegador. No basta con añadir transiciones CSS básicas: el resultado debe transmitir una experiencia interactiva refinada sin distraer del trabajo comercial.
+Las transiciones respetan `prefers-reduced-motion`, y el movimiento posicional se
+desactiva en dispositivos táctiles. Las animaciones deben comprobarse en el
+navegador: el resultado debe transmitir una experiencia interactiva refinada sin
+distraer del trabajo comercial.
+
+## Do's and Don'ts
+
+- **Do** acompañar cada estado con texto además del color.
+- **Do** mantener el movimiento dentro de `prefers-reduced-motion` y, en táctil, sin desplazamiento posicional.
+- **Don't** usar `|safe` ni `mark_safe` en contenido externo; el autoescape de Django se conserva.
+- **Don't** usar el color como único indicador de estado.
