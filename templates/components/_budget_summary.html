@@ -1,4 +1,0 @@
-{% load prospecting_ui %}
-{% if budget_view and budget_campaign %}
-<a href="{% url 'webapp:campaign' budget_campaign.id %}#budget-title" title="Consumo de {{ budget_campaign|campaign_short_title }}"><span class="budget-context">{% if campaign %}Esta campaña{% elif active_campaign and active_campaign.id == budget_campaign.id %}Campaña activa{% else %}Última campaña{% endif %} · {{ budget_campaign|campaign_short_title }}</span><span>Disponible <strong>{{ budget_view.campaign.available|money_summary }}</strong></span>{% if budget_view.campaign.unknown %}<span>Pendiente de conciliación</span>{% endif %}</a>
-{% else %}<span>Consumo</span><strong>Sin campaña seleccionada</strong>{% endif %}

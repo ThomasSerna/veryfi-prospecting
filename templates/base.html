@@ -33,10 +33,6 @@
         <a href="{% url 'webapp:campaign_history' %}" {% if nav_active == 'campaign_history' %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span>Historial</span><svg class="navigation-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
         <a href="{% url 'webapp:new_campaign' %}" class="navigation-create" data-idle-only {% if nav_active == 'new_campaign' %}aria-current="page"{% endif %} {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nueva campaña</span><svg class="navigation-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
       </nav>
-      <div class="sidebar-footer" data-live-region="navigation-footer">
-        <span class="local-indicator" data-live-swap>{% if is_executing or execution.is_executing %}Investigación activa{% else %}Servicio local{% endif %}</span>
-        <small>Ventas decide. La evidencia respalda.</small>
-      </div>
     </div>
     </details>
     <div class="workspace" id="workspace-main">
@@ -44,9 +40,6 @@
       <header class="topbar">
         <a class="workspace-brand" href="{% url 'webapp:campaigns' %}" aria-label="Veryfi Prospecting, inicio"><img src="{% static 'img/veryfi-logo.svg' %}" alt="" width="70" height="26"><span>Prospecting</span></a>
         <nav class="breadcrumb" aria-label="Ruta de navegación">{% block breadcrumb %}<span>Campañas</span>{% endblock %}</nav>
-        <div class="topbar-budget" data-budget-summary data-live-region="budget" data-live-swap>
-          {% include 'components/_budget_summary.html' %}
-        </div>
         {% block topbar_actions %}{% endblock %}
       </header>
       <main id="main" class="main-content" tabindex="-1">

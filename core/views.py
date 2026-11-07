@@ -172,7 +172,7 @@ def _campaign_context(request, campaign_id):
                    legacy_readonly=legacy_readonly, apollo_blocked=apollo_blocked,
                    authorization_form=form, operation_rows=[] if form is None else form.operation_rows,
                    counts=counts, execution=state, is_executing=state["is_executing"],
-                   campaign_insights=_campaign_insights(view), budget_view=view.budget, budget_campaign=view.campaign,
+                   campaign_insights=_campaign_insights(view),
                    stop_reason=state["stop_reason"], error_message=state["error_message"],
                    saved_notice=SAVED_MESSAGES.get(saved_key))
     return context
@@ -220,7 +220,6 @@ def _summary_context():
     context.update(nav_active="campaigns", highlighted_campaign=highlighted, highlighted_view=view,
                    highlighted_is_active=context["active_campaign"] is not None,
                    campaign_insights=_campaign_insights(view) if view else None,
-                   budget_view=view.budget if view else None, budget_campaign=highlighted,
                    execution=state, is_executing=state["is_executing"])
     return context
 
@@ -254,12 +253,11 @@ def new_campaign(request):
     # Solo hay una campaña activa por base (§13.3): otra sin terminar se anuncia en lugar de abrirse sin aviso.
     active = context["active_campaign"]
     blocking = active if active is not None and active.id != draft_id else None
-    budget_campaign = active or next(iter(context["campaigns"]), None)
-    view = _campaign_view(budget_campaign.id, context) if budget_campaign else None
+    latest = active or next(iter(context["campaigns"]), None)
+    view = _campaign_view(latest.id, context) if latest else None
     busy = execution.snapshot(None)["is_executing"] or bool(view and view.is_executing)
     context.update(form=form, config=config, nav_active="new_campaign", is_executing=busy,
-                   blocking_campaign=blocking, budget_view=view.budget if view else None,
-                   budget_campaign=budget_campaign)
+                   blocking_campaign=blocking)
     if request.method == "POST" and form.is_valid():
         with execution.idle_action():
             if _global_busy(context):

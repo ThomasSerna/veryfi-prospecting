@@ -266,17 +266,6 @@
       const currentScroll = live.querySelector('.results-section .table-scroll');
       const scrollLeft = currentScroll ? currentScroll.scrollLeft : 0;
       const budgetDetailsOpen = Boolean(live.querySelector('.budget-details')?.open);
-      const budgetSummary = document.querySelector('[data-budget-summary]');
-      const nextBudgetSummary = parsed.querySelector('[data-budget-live]');
-      if (budgetSummary && nextBudgetSummary && budgetSummary.textContent !== nextBudgetSummary.textContent) {
-        const currentLink = budgetSummary.querySelector('a');
-        const nextLink = nextBudgetSummary.querySelector('a');
-        if (currentLink && nextLink && currentLink.getAttribute('href') === nextLink.getAttribute('href')) {
-          currentLink.replaceChildren(...Array.from(nextLink.childNodes, node => node.cloneNode(true)));
-        } else {
-          budgetSummary.replaceChildren(...Array.from(nextBudgetSummary.childNodes, node => node.cloneNode(true)));
-        }
-      }
 
       ['overview', 'results', 'budget'].forEach(sectionName => {
         const currentSection = live.querySelector(`[data-live-section="${sectionName}"]`);

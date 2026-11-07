@@ -71,7 +71,8 @@ def test_dashboard_without_campaigns_does_not_read_or_create_database(redesign_p
     monkeypatch.setattr(views, "_campaign_view", forbidden)
     monkeypatch.setattr(views, "render", lambda request, template, context: context)
     context = views.campaigns(RequestFactory().get("/"))
-    assert context["highlighted_campaign"] is context["campaign_insights"] is context["budget_view"] is None
+    assert context["highlighted_campaign"] is context["campaign_insights"] is None
+    assert "budget_view" not in context
     assert not redesign_paths.db.exists()
 
 
@@ -92,9 +93,8 @@ def test_dashboard_reads_only_the_active_campaign(redesign_paths, make_campaign,
     monkeypatch.setattr(views, "render", lambda request, template, context: context)
     context = views.campaigns(RequestFactory().get("/"))
     assert calls == [active.id]
-    assert context["highlighted_campaign"].id == context["budget_campaign"].id == active.id
+    assert context["highlighted_campaign"].id == active.id
     assert context["highlighted_is_active"] is True
-    assert context["budget_view"] is context["highlighted_view"].budget
 
 
 def test_dashboard_labels_the_latest_without_an_active_campaign(redesign_paths, make_campaign, monkeypatch):
@@ -122,6 +122,8 @@ def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_path
     assert str(active.id) in content and str(latest.id) not in content
     assert content.count('class="home-metric ') == 3
     assert 'href="/campaigns/"' in content
+    # La barra superior ya no resume el presupuesto ni el menú anuncia el servicio local.
+    assert "data-budget-summary" not in content and "Servicio local" not in content
     history = client.get(reverse("webapp:campaign_history"))
     content = history.content.decode()
     assert history.status_code == 200

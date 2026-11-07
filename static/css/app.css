@@ -2222,11 +2222,6 @@ a.sequence-link:hover {
 svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .breadcrumb { flex: 1; min-width: 0; }
 .breadcrumb > a, .breadcrumb > span { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar-budget { flex-shrink: 0; font-size: .75rem; color: var(--muted); }
-.budget-context { flex-basis: 100%; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar-budget a { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; max-width: 240px; text-decoration: none; }
-.topbar-budget strong { color: var(--green); font-variant-numeric: tabular-nums; font-size: .8125rem; }
-.topbar-budget > strong { margin-left: 8px; color: var(--muted); }
 .demo-notice { display: flex; align-items: center; gap: 8px; padding: 8px 0; background: transparent; border: 0; font-size: .75rem; margin-bottom: 18px; }
 .demo-notice svg { width: 16px; height: 16px; }
 .demo-notice strong { font-weight: 400; }
@@ -2426,8 +2421,6 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
     padding: 20px;
   }
   .topbar .breadcrumb { flex-basis: calc(100% - 70px); }
-  .topbar-budget { width: 100%; padding-left: 0; }
-  .topbar-budget a { max-width: none; }
   .sequence-nav { width: 100%; justify-content: center; margin: 0; }
   .insight-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
  .priority-panel, .campaign-progress-panel, .priority-chart { padding: 20px; }

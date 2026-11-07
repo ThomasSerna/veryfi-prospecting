@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function executionPage(status, isExecuting, { html = '', budgetSummary = null, parsed = null } = {}) {
+function executionPage(status, isExecuting, { html = '', parsed = null } = {}) {
   let submit;
   let active = isExecuting;
   let reloads = 0;
@@ -33,7 +33,7 @@ function executionPage(status, isExecuting, { html = '', budgetSummary = null, p
   const context = {
     document: {
       body: { dataset: {} }, activeElement: null,
-      querySelector: selector => selector === '[data-budget-summary]' ? budgetSummary : null, addEventListener() {},
+      querySelector: () => null, addEventListener() {},
       getElementById: id => elements[id] ?? null, createElement: () => ({}),
       querySelectorAll: selector => selector === '[data-idle-only]' ? [button, link]
         : selector === '[data-idle-form] fieldset' ? [fieldset] : [],
@@ -90,42 +90,4 @@ test('Un rechazo 409 mantiene el bloqueo, consulta el estado y evita otro envío
   await page.timers.shift()();
   assert.equal(page.reloads(), 1);
   assert.equal(page.timers.length, 0);
-});
-
-test('El sondeo actualiza importes sin reemplazar el enlace de presupuesto enfocado', async () => {
-  const textNode = text => ({ textContent: text, cloneNode() { return textNode(this.textContent); } });
-  const anchor = {
-    childNodes: [textNode('USD 2.00')], getAttribute: () => '/campaign/#budget-title',
-    replaceChildren(...nodes) { this.childNodes = nodes; },
-  };
-  let currentLink = anchor;
-  let outerReplacements = 0;
-  const budgetSummary = {
-    get textContent() { return currentLink.childNodes.map(node => node.textContent).join(''); },
-    querySelector: () => currentLink,
-    replaceChildren(...nodes) {
-      outerReplacements++;
-      currentLink = nodes[0];
-      page.document.activeElement = null;
-    },
-  };
-  const nextLink = {
-    childNodes: [textNode('USD 1.90')], getAttribute: () => '/campaign/#budget-title',
-    cloneNode() { return { ...this, childNodes: this.childNodes.map(node => node.cloneNode(true)) }; },
-  };
-  const nextSummary = {
-    textContent: 'USD 1.90', childNodes: [nextLink], querySelector: () => nextLink,
-  };
-  const parsed = {
-    querySelector: selector => selector === '[data-budget-live]' ? nextSummary : null,
-  };
-  const page = executionPage(409, true, { html: '<div>Instantánea sintética</div>', budgetSummary, parsed });
-  page.document.activeElement = anchor;
-  await page.submit();
-  await new Promise(setImmediate);
-  assert.deepEqual(page.calls, ['/execute/', '/status/']);
-  assert.equal(budgetSummary.textContent, 'USD 1.90');
-  assert.equal(budgetSummary.querySelector('a'), anchor);
-  assert.equal(page.document.activeElement, anchor);
-  assert.equal(outerReplacements, 0);
 });
