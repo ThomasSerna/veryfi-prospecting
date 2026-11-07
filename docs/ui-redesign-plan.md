@@ -1,7 +1,7 @@
 # Plan propuesto de rediseño de la interfaz
 
-Estado: **propuesta original implementada; prototipo de la nueva iteración
-implementado y pendiente de revisión**.
+Estado: **propuesta original implementada; nueva iteración aplicada a inicio,
+historial, campaña y ficha**.
 Este documento conserva la propuesta que guio el rediseño anterior;
 [DESIGN.md](../DESIGN.md) describe el sistema visual actual y
 [la guía de interfaz](ui.md) documenta su uso y verificaciones. El plan no
@@ -28,14 +28,17 @@ original y sus criterios, sin afirmar por sí mismas que se hayan verificado.
 
 La interfaz conserva el nombre Veryfi Prospecting y una identidad propia, con
 predominio tipográfico de Prospecting, fondo grafito y acentos cian y violeta.
-Las distribuciones propuestas para campaña y ficha esperan la revisión del
-prototipo con el usuario antes de aplicarse a las vistas operativas.
+Tras revisar el inicio y el historial, el usuario pidió el 7 de noviembre de 2026
+extender la dirección a campaña y ficha con más movimiento y menos texto, retirar
+el pie del menú y el presupuesto de la barra superior, y rehacer el botón del
+menú. [La guía de interfaz](ui.md) describe el resultado.
 
 - El inicio (`/`) es un panel compacto de hasta aproximadamente 1040 px. La
   campaña activa o, en su ausencia, la última guardada ocupa el bloque principal,
   con estado, progreso conocido y acción disponible. Tres indicadores cuentan
   empresas encontradas, empresas sin revisar y empresas con contacto listo, siempre
-  de esa campaña. El presupuesto sigue contextualizado en la barra superior.
+  de esa campaña. El presupuesto se consulta en cada campaña; la barra superior
+  ya no lo resume.
 - El historial tiene una vista independiente en `/campaigns/`; el inicio ofrece
   acceso a ella sin mostrar listas de campañas. El menú incluye únicamente
   Resumen, Historial y Nueva campaña, sin campañas recientes.

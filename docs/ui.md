@@ -38,18 +38,21 @@ movimiento reducido, el contenido aparece en su estado final y los cambios solo
 se funden.
 
 El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
-navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Al
-abrirla, el contenido queda detrás de una capa oscurecida y desenfocada. Con
-JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
-sin JavaScript funciona el control nativo de apertura y cierre. El encabezado
-muestra el disponible de la campaña en contexto y enlaza al desglose; un
-importe desconocido o pendiente conserva esa condición.
+navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
+comparte la línea del logotipo en la barra superior; al señalarlo, el icono
+anticipa la apertura del cajón y, durante una investigación, muestra un punto que
+late. Al abrirla, el contenido queda detrás de una capa oscurecida y desenfocada.
+Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
+sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
+muestra la ruta y, en la ficha, Anterior y Siguiente; no resume el presupuesto,
+que se consulta en la sección Presupuesto de cada campaña. Un importe desconocido
+o pendiente conserva esa condición.
 
-Las propuestas de [campaña](../static/prototypes/campaign.html) y
-[ficha](../static/prototypes/company.html) están disponibles en el servidor
-local bajo `/static/prototypes/`. Contienen únicamente datos sintéticos y
-controles ilustrativos desactivados; no investigan ni guardan cambios. Sus
-distribuciones esperan revisión antes de aplicarse a las vistas operativas.
+Las propuestas estáticas de [campaña](../static/prototypes/campaign.html) y
+[ficha](../static/prototypes/company.html) siguen disponibles en el servidor
+local bajo `/static/prototypes/` como referencia histórica. Contienen únicamente
+datos sintéticos y controles ilustrativos desactivados; no investigan ni guardan
+cambios. Las vistas operativas ya aplican la nueva dirección.
 
 ## Preparar y ejecutar
 
@@ -182,13 +185,24 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 
 ## Resultados y revisión
 
-La vista de campaña muestra el avance sobre las empresas encontradas, los pendientes
-de revisión, los contactos listos y las prioridades. La tabla permite filtrar por país,
-segmento, prioridad y disponibilidad. La ficha de empresa organiza Resumen,
+La vista de campaña abre con un pulso de la investigación: un segmento por empresa
+encontrada, la cifra de investigadas y tres cifras con su barra (sin revisar,
+contacto listo y aceptadas), además de una barra apilada de prioridades cuya
+leyenda filtra la tabla. La tabla permite buscar y filtrar por país, segmento,
+prioridad y disponibilidad desde una sola barra; toda la fila abre la ficha y el
+nombre sigue siendo el único enlace para teclado y lectores de pantalla. Las dos
+descargas están en el encabezado. Durante una investigación, la vista consulta el
+estado cada dos segundos y compara cada sección en su sitio: las empresas nuevas
+entran en su fila, las que cambian de puesto se desplazan hasta él y las que
+cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
+lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
+empresa organiza Resumen,
 Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
 número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
 cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
-`Sin evidencia`), caso de uso, contactos y motivos de detención sin jerga técnica.
+`Sin evidencia`) junto a una bola de Harvey, caso de uso, contactos y motivos de
+detención sin jerga técnica. Al seguir una píldora, la fuente citada se ilumina
+un instante. A la derecha se mantienen el mejor match y la revisión de ventas.
 Datos desconocidos se muestran separados de cero.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
@@ -216,7 +230,9 @@ aparece sobre su tarjeta. Un correo de Apollo nunca se presenta como empleo conf
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
 son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
-no recalifica ni cambia la rúbrica. Las correcciones están disponibles cuando la
+no recalifica ni cambia la rúbrica. La decisión se elige en un control de tres
+opciones y la confirmación aparece como aviso flotante que se retira solo; con
+movimiento reducido queda en la página. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
 La confirmación manual solo permite canales `linkedin` u `other` existentes de una
@@ -259,6 +275,33 @@ y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde l
 y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
+
+## Verificación de campaña y ficha del 7 de noviembre de 2026
+
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
+  19 pruebas pasaron con DOM sintético. Las nuevas cubren el traslado de filas
+  sin recrearlas, los desplegables abiertos y la entrada terminada que el sondeo
+  no revierte, y el sondeo de campaña que compara secciones y termina sin
+  recargar. Se retiró la prueba del presupuesto de la barra superior, que ya no existe.
+- La suite completa pasó con **1258 pruebas**; `uv lock --check` y
+  `uv run --locked python manage.py check` también pasaron, con bases temporales
+  y datos sintéticos.
+- En Chrome 157 sin interfaz, sobre la demo sintética, se revisaron campaña y
+  ficha a 1440, 1280 y 390 px sin desbordamiento global. Se comprobaron las
+  flechas entre pestañas y Tab hacia el panel, Escape en los filtros, el retorno
+  del foco al botón del menú y el salto a una fuente desde su píldora. Con
+  movimiento reducido no quedó ninguna animación activa y la confirmación de
+  guardado apareció como aviso en la página.
+- Un arnés temporal fuera del repositorio simuló una investigación sintética de
+  siete empresas, sin proveedores. El pulso, la tabla y la barra de filtros
+  conservaron sus nodos, ninguna animación de entrada se reinició y, al terminar,
+  la página se actualizó sin recargar y habilitó las descargas.
+- El detector de Impeccable no dejó advertencias de geometría animada tras
+  sustituir anchos y alturas por transformaciones y recortes. Mantiene avisos
+  consultivos por medidas fuera de la paleta mínima de `DESIGN.md` y por Inter,
+  la fuente elegida. Quedan pendientes Firefox, Safari, un lector de pantalla
+  real, el zoom al 200 %, la revisión con ventas y una investigación con
+  proveedores reales.
 
 ## Verificación del movimiento del resumen del 7 de noviembre de 2026
 

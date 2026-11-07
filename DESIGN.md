@@ -86,14 +86,14 @@ components:
 Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
 investigación y revisar empresas, personas y evidencia. El inicio destaca la
 campaña activa o, si no existe, la última guardada. Sus indicadores resumen
-empresas, revisión y contacto listo; el presupuesto conserva el contexto de la
-campaña consultada.
+empresas, revisión y contacto listo; el presupuesto se consulta en cada campaña.
 
 La dirección oscura combina grafito, cian y violeta con el nombre Veryfi
-Prospecting. El marco compartido, el inicio y el historial aplican esta dirección;
-las propuestas de campaña y ficha son estáticas, con datos exclusivamente
-sintéticos, y están pendientes de revisión antes de extender sus distribuciones
-a las vistas operativas. La demostración identifica sus datos como sintéticos.
+Prospecting. El marco compartido, el inicio, el historial, la campaña y la ficha
+aplican esta dirección. Las vistas de trabajo usan menos texto que el inicio:
+cifras, barras, iconos y estados con su etiqueta. Las propuestas estáticas de
+campaña y ficha en `static/prototypes/` quedan como referencia histórica, con
+datos exclusivamente sintéticos. La demostración identifica sus datos como sintéticos.
 
 <!-- Pendiente: nombre creativo de la dirección (Creative North Star). No está definido; requiere decisión del equipo. -->
 
@@ -114,6 +114,9 @@ información complementaria; los estados también usan texto, no solo color.
 - **Superficie secundaria** (`soft`, #1C1F23): filas, badges y campos deshabilitados.
 - **Estados**: `info`, `warning`, `error` y `success`, cada uno con su fondo
   (`*-background`). `violet` y `blue` completan la información complementaria.
+- **Prioridad**: escala de azules derivada de `blue` (#97BDF1 alta, #5D7CA6 media,
+  #3C4F69 baja) y grises para evidencia insuficiente y excluidas. Se acompaña de
+  barras de señal y del texto de la prioridad.
 
 ## Typography
 
@@ -129,31 +132,38 @@ Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
 ## Layout
 
 - La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
-  campaña. La barra superior identifica la campaña y muestra su disponible, con
-  acceso al presupuesto detallado. Durante el sondeo de la campaña, el resumen se
-  actualiza junto con los resultados.
+  campaña. Su botón queda alineado con el logotipo en la barra superior, que
+  muestra la ruta y, en la ficha, Anterior y Siguiente. La barra superior no
+  resume el presupuesto: cada campaña muestra el suyo.
 - El inicio muestra el avance y tres indicadores de la campaña destacada; el
   historial está en una vista independiente. Las cifras no suman campañas.
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
   campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
-- La campaña muestra avance, prioridades, filtros, tabla y presupuesto. El progreso
-  usa las empresas encontradas como denominador; durante el descubrimiento, si
-  todavía no hay empresas, no inventa un porcentaje.
-- La ficha conserva las pestañas Resumen, Contactos y Evidencia, las fuentes
-  enlazadas y el panel de revisión. Anterior y Siguiente preservan los filtros.
+- La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
+  investigadas, Sin revisar, Contacto listo y Aceptadas, y una barra apilada de
+  prioridades con su leyenda enlazada a filtros. Debajo, la tabla con búsqueda y
+  filtros en una sola barra, y el presupuesto. El progreso usa las empresas
+  encontradas como denominador; durante el descubrimiento, si todavía no hay
+  empresas, no inventa un porcentaje. Las descargas están en el encabezado.
+- La ficha presenta identidad y estados en el encabezado, conserva las pestañas
+  Resumen, Contactos y Evidencia, las fuentes enlazadas y, a la derecha, el mejor
+  match y la revisión de ventas. Anterior y Siguiente preservan los filtros.
   Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
 
 ## Elevation & Depth
 
 La jerarquía se construye con bordes sutiles y capas de tono (`surface` sobre
 `canvas`). Las sombras aparecen como respuesta a un estado: el desplegable de
-filtros, la elevación de un panel al pasar el cursor con puntero fino y el halo
-del botón principal.
+filtros, la confirmación flotante, la elevación de un panel del inicio al pasar
+el cursor con puntero fino y el halo del botón principal. Los paneles de trabajo
+(pulso de campaña, revisión) no se elevan: solo orientan su borde hacia el puntero.
 
 ## Shapes
 
 Paneles con bordes sutiles y radios de 12–16 px (`md` y `lg`). Controles con 8 px
-(`sm`) y campos o etiquetas con 6 px (`xs`).
+(`sm`) y campos o etiquetas con 6 px (`xs`). Búsqueda, filtros, contadores y
+etiquetas de mercado o producto usan forma de píldora; las fuentes, 13 px para
+seguir legibles si su texto ocupa dos líneas.
 
 ## Components
 
@@ -164,11 +174,51 @@ contiene el foco y permite cerrar con Escape, el fondo o su botón, devolviendo 
 foco al control; sin JavaScript conserva la apertura y cierre nativos. El cajón se
 inspira en el [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
 y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
+El botón del menú, sin caja propia, comparte la línea del logotipo; al señalarlo,
+su carril se llena de cian y el chevrón empuja hacia el cajón, a partir del icono
+animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons)
+(MIT), recreado en CSS. Durante una investigación muestra un punto que late.
+
+### Campaña
+
+- **Pulso:** estado, cifra de investigadas con rodillo, un segmento por empresa y
+  tres cifras con su barra (Sin revisar en violeta, Contacto listo en verde,
+  Aceptadas en blanco). En curso, un haz recorre el borde.
+- **Prioridad:** barra apilada y leyenda con recuento; cada entrada filtra la tabla.
+- **Tabla:** avatar con la inicial tintado por prioridad, nombre con flecha al
+  señalar, encaje con barra y cobertura, prioridad con barras de señal (3, 2 o 1),
+  disponibilidad, revisión con icono (círculo, marca o cruz) y contactos con su
+  mejor match. Toda la fila abre la ficha; el nombre es el único enlace.
+- **Presupuesto:** libro de cuatro importes con el disponible destacado y las
+  cuentas en un desplegable.
+
+### Ficha
+
+- **Encabezado:** avatar, nombre, dominio, países y segmentos con iconos, y los
+  tres estados (prioridad, disponibilidad y revisión) separados.
+- **Pestañas:** una línea medida desde cada etiqueta marca la activa y una
+  pastilla sigue al puntero; el panel entra desde el lado de la pestaña elegida.
+  Siguen el patrón de teclado de pestañas (flechas, Inicio y Fin) y el panel
+  recibe el foco con Tab.
+- **Encaje:** cifra grande con barra graduada en cuartos, cobertura, explicación y
+  productos. Cada criterio muestra una bola de Harvey (llena, media, vacía o
+  punteada) junto a su etiqueta textual.
+- **Contactos:** persona con match en barra, etapa en cinco pasos más su etiqueta,
+  y canales como filas con icono, estado y copia; Directo y Utilizable se marcan
+  con iconos y conservan su texto para lectores de pantalla.
+- **Evidencia:** número de fuente como referencia citable; al llegar desde una
+  píldora, la fuente se ilumina un instante.
+- **Lateral:** mejor match y revisión fijos al desplazarse. La decisión es un
+  control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se desliza a la
+  opción elegida.
 
 ### Controles, avisos y datos
 
 Los indicadores y las barras incluyen sus valores en texto. Las pestañas, los
-formularios y los avisos conservan etiquetas, foco y estados identificables.
+formularios y los avisos conservan etiquetas, foco y estados identificables. Los
+avisos de campaña y ficha llevan icono y título en una línea. Guardar una revisión,
+confirmar un canal o cerrar una campaña se confirma con un aviso flotante que se
+retira solo; con movimiento reducido queda como aviso en la página.
 
 ### Marca
 
@@ -188,9 +238,20 @@ desactiva en dispositivos táctiles. Las animaciones deben comprobarse en el
 navegador: el resultado debe transmitir una experiencia interactiva refinada sin
 distraer del trabajo comercial.
 
+En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
+cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
+durante el sondeo, solo se animan las diferencias. Una empresa nueva sube a su
+fila con un destello cian, una fila que cambia de puesto se desliza (FLIP) y una
+fila cuyo contenido cambia se ilumina; las cifras que crecen muestran `+n`. Al
+terminar la investigación, la página se actualiza en su sitio sin recargarse.
+Con movimiento reducido, todo llega en su estado final y los cambios solo se
+funden o cambian de color.
+
 ## Do's and Don'ts
 
 - **Do** acompañar cada estado con texto además del color.
 - **Do** mantener el movimiento dentro de `prefers-reduced-motion` y, en táctil, sin desplazamiento posicional.
+- **Do** preferir en las vistas de trabajo una cifra, una barra o un icono con su etiqueta breve antes que una frase explicativa.
 - **Don't** usar `|safe` ni `mark_safe` en contenido externo; el autoescape de Django se conserva.
 - **Don't** usar el color como único indicador de estado.
+- **Don't** reiniciar animaciones de entrada durante el sondeo ni animar alturas o anchos.
