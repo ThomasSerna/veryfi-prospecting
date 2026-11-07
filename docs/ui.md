@@ -168,13 +168,21 @@ ordena la revisión; «listo» sigue dependiendo de las reglas de persona y cana
 un `config/contact_match.json` válido, la ficha lo avisa y muestra a las personas sin
 porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
 
+Cada persona muestra la vigencia de su empleo ([Vigencia del empleo](contacts.md#vigencia-del-empleo-t18)):
+el estado (vigente según fuente corporativa o pública, declarado por Apollo, inferido del
+historial de Hunter, contradicho o sin comprobar), el motivo en lenguaje comercial, las
+fuentes que lo sustentan y la marca «Requiere revisión humana» en los casos ambiguos.
+Si la persona no está descartada por regla y su empleo no está comprobado, el aviso
+aparece sobre su tarjeta. Un correo de Apollo nunca se presenta como empleo confirmado.
+
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
 son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
 no recalifica ni cambia la rúbrica. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
 La confirmación manual solo permite canales `linkedin` u `other` existentes de una
-persona con identidad, cargo y empleo pertinentes vigentes. Declara canal directo
+persona con identidad, cargo y empleo pertinentes vigentes; si falta la evidencia del
+puesto, el formulario queda deshabilitado y explica el motivo. Declara canal directo
 comprobado y añade notas de verificación. El pipeline guarda evidencia
 manual, fecha y disponibilidad recalculada en una sola transacción. Una URL de perfil
 por sí sola no basta; la confirmación tampoco elimina una verificación negativa.
@@ -194,8 +202,10 @@ El CSV tiene una fila por persona; cuando se exporta todo, una empresa sin perso
 conserva una fila con esos campos vacíos. Incluye IDs, estados técnicos y comerciales,
 score y cobertura, criterios, canales, fuentes con fechas, revisión, advertencias y
 motivos. También incluye el porcentaje de match de cada persona, su versión, el motivo
-de descarte y el desglose; las filas de cada empresa siguen ese orden. Un valor
-desconocido queda vacío, nunca se convierte en cero.
+de descarte y el desglose; las filas de cada empresa siguen ese orden. Las columnas
+`employment_status` y `employment_reason` llevan el estado y el motivo de la vigencia
+del empleo, recalculados al descargar. Un valor desconocido queda vacío, nunca se
+convierte en cero.
 
 La descarga usa UTF-8 con BOM, `csv` estándar y todos los campos entrecomillados.
 Los textos con prefijos peligrosos para hojas de cálculo se neutralizan anteponiendo
