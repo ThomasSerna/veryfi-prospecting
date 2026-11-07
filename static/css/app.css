@@ -339,7 +339,7 @@ button:disabled {
   justify-content: space-between;
   gap: 20px;
   min-height: 64px;
-  padding: 10px 28px;
+  padding: 12px 28px;
   background: var(--ivory);
   border-bottom: 1px solid var(--line);
 }
@@ -347,8 +347,8 @@ button:disabled {
 .breadcrumb {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
+  min-height: 40px;
   color: var(--muted);
   font-size: 0.8125rem;
 }
@@ -2221,7 +2221,8 @@ a.sequence-link:hover {
 /* Espacio de trabajo oscuro y lectura visual de las campañas. */
 svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .breadcrumb { flex: 1; min-width: 0; }
-.breadcrumb > a, .breadcrumb > span { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.breadcrumb > a, .breadcrumb > span { flex-shrink: 1; min-width: 0; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.breadcrumb > [aria-hidden='true'] { flex-shrink: 0; overflow: visible; }
 .demo-notice { display: flex; align-items: center; gap: 8px; padding: 8px 0; background: transparent; border: 0; font-size: .75rem; margin-bottom: 18px; }
 .demo-notice svg { width: 16px; height: 16px; }
 .demo-notice strong { font-weight: 400; }

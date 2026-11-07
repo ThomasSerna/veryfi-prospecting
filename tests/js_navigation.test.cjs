@@ -123,12 +123,14 @@ for (const isMobile of [false, true]) {
       assert.equal(page.sidebar.getAttribute('aria-modal'), 'true');
       assert.equal(page.sidebar.inert, false);
       assert.equal(page.workspace.inert, true);
+      assert.equal(page.menu.inert, true);
       assert.equal(page.document.activeElement, page.close);
       close();
       assert.equal(page.body.dataset.navOpen, 'false');
       assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
       assert.equal(page.sidebar.inert, true);
       assert.equal(page.workspace.inert, false);
+      assert.equal(page.menu.inert, false);
       assert.equal(page.document.activeElement, page.menu);
       assert.equal(page.sidebar.getAttribute('aria-modal'), null);
       assert.equal([...page.timers.values()][0].delay, 200);

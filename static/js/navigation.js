@@ -71,6 +71,8 @@
     menu.setAttribute('aria-label', open ? 'Cerrar navegación' : 'Abrir navegación');
     sidebar.inert = !open;
     workspace.inert = open;
+    // El botón queda bajo el fondo del cajón; fuera del orden de foco mientras el panel está abierto.
+    menu.inert = open;
     if (!open) {
       if (!focus || reducedMotion.matches) drawer.open = false;
       else closingTimer = window.setTimeout(() => { drawer.open = false; }, 200);

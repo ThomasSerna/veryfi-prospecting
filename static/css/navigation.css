@@ -9,50 +9,112 @@
   z-index: 60;
 }
 
-.menu-toggle,
-.sidebar-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 160ms, background-color 160ms, border-color 160ms;
-}
-
+/* Botón del menú: alineado en la barra superior; al señalarlo, el panel del icono se llena y anticipa el cajón. */
 .menu-toggle {
   position: fixed;
-  top: 18px;
-  left: 28px;
-  z-index: 63;
+  top: 12px;
+  left: 20px;
+  /* Bajo el fondo del cajón: al abrirlo se oscurece y desenfoca con la página. */
+  z-index: 60;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  color: var(--muted);
   list-style: none;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, box-shadow 220ms ease, transform 160ms var(--ease-out-quint, ease-out);
 }
 
 .menu-toggle::-webkit-details-marker { display: none; }
 .menu-toggle::marker { content: ''; }
 .menu-toggle::after { display: none; }
-.menu-toggle svg,
+.menu-toggle svg { width: 22px; height: 22px; overflow: visible; }
+.menu-toggle-rail {
+  fill: var(--cyan);
+  fill-opacity: .55;
+  stroke: none;
+  transform: scaleX(0);
+  transform-box: fill-box;
+  transform-origin: left center;
+  transition: transform 420ms var(--ease-out-expo, ease-out), fill-opacity 220ms ease;
+}
+.menu-toggle-chevron {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 420ms var(--ease-out-expo, ease-out), stroke 180ms ease;
+}
+
+/* Investigación activa: un punto late sobre el icono mientras el servidor investiga. */
+.menu-toggle-pulse {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--info);
+  box-shadow: 0 0 0 2px var(--ivory);
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity 240ms ease, transform 420ms var(--ease-out-expo, ease-out);
+}
+body[data-running='true'] .menu-toggle-pulse { opacity: 1; transform: none; animation: toggle-pulse 1.8s ease-out infinite; }
+@keyframes toggle-pulse {
+  0% { box-shadow: 0 0 0 2px var(--ivory), 0 0 0 2px rgb(162 194 255 / 55%); }
+  75%, 100% { box-shadow: 0 0 0 2px var(--ivory), 0 0 0 8px rgb(162 194 255 / 0%); }
+}
+
+.menu-toggle:focus-visible { color: var(--ink); }
+.menu-toggle:focus-visible .menu-toggle-rail { transform: none; }
+.menu-toggle:active { transform: scale(.92); }
+.navigation-drawer[open] > .menu-toggle .menu-toggle-rail { transform: none; fill-opacity: .75; }
+.navigation-drawer[open] > .menu-toggle .menu-toggle-chevron { transform: scaleX(-1); }
+
+@media (hover: hover) and (pointer: fine) {
+  .menu-toggle:hover { color: var(--ink); background: rgb(255 255 255 / 5%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%); }
+  .menu-toggle:hover .menu-toggle-rail { transform: none; }
+  .menu-toggle:hover .menu-toggle-chevron { stroke: var(--cyan); transform: translateX(2px); animation: toggle-nudge 560ms var(--ease-out-expo, ease-out); }
+}
+
+/* El chevrón empuja hacia el cajón y se asienta, como un resorte corto. */
+@keyframes toggle-nudge {
+  0% { transform: none; }
+  45% { transform: translateX(3.5px); }
+  100% { transform: translateX(2px); }
+}
+
+.sidebar-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 160ms, background-color 160ms, border-color 160ms;
+}
+
 .sidebar-close svg { width: 20px; height: 20px; }
-.menu-toggle:hover,
 .sidebar-close:hover { color: var(--ink); border-color: var(--line-strong); background: var(--soft); }
 
+/* Sin JavaScript, el mismo control cierra el cajón desde dentro del panel. */
 body:not([data-nav-open]) .navigation-drawer[open] > .menu-toggle {
   left: 228px;
   top: 24px;
+  z-index: 63;
 }
 
-body[data-nav-open='true'] .navigation-drawer > .menu-toggle { visibility: hidden; }
-.sidebar-close { display: none; }
 body[data-nav-open] .sidebar-close { display: inline-flex; }
-.topbar { padding-left: 88px; }
-.workspace-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; color: var(--ink); text-decoration: none; }
+.topbar { padding-left: 72px; }
+.workspace-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 40px; color: var(--ink); text-decoration: none; }
 .workspace-brand img { width: 70px; height: 26px; object-fit: contain; }
 .workspace-brand span { font-size: .8125rem; font-weight: 500; letter-spacing: -.01em; }
+.topbar .breadcrumb::before { width: 1px; height: 18px; margin-right: 6px; background: var(--line); content: ''; }
 
 .sidebar {
   position: fixed;
@@ -190,13 +252,13 @@ body[data-nav-open='true'] .navigation-backdrop { transition-duration: 300ms; }
 body:has(.navigation-drawer[open]) { overflow: hidden; }
 
 @media (max-width: 760px) {
-  .menu-toggle { left: 20px; top: 14px; }
-  .topbar { padding-left: 76px; min-height: 68px; }
+  .menu-toggle { left: 12px; top: 12px; }
+  .topbar { padding-left: 60px; min-height: 64px; align-content: flex-start; }
   .workspace-brand img { width: 52px; height: 20px; }
   .topbar .breadcrumb { flex-basis: 0; }
   body:not([data-nav-open]) .navigation-drawer[open] > .menu-toggle { left: min(228px, calc(88vw - 58px)); top: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar, .main-nav a, .main-nav .navigation-arrow, .navigation-backdrop, .navigation-indicator, .brand { animation: none !important; transition: none !important; }
+  .sidebar, .main-nav a, .main-nav .navigation-arrow, .navigation-backdrop, .navigation-indicator, .brand, .menu-toggle, .menu-toggle * { animation: none !important; transition: none !important; }
 }
