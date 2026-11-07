@@ -115,8 +115,9 @@ demostración identifica sus datos como exclusivamente sintéticos.
 ## Composición y flujos
 
 - La navegación lateral reúne la creación, Resumen, Historial y las campañas
-  recientes. La barra superior muestra la ruta y el disponible de la campaña
-  en contexto, con acceso al presupuesto detallado.
+  recientes. La barra superior identifica la campaña y muestra su disponible,
+  con acceso al presupuesto detallado. Durante el sondeo de la campaña, el
+  resumen se actualiza junto con los resultados.
 - El inicio muestra el avance, las empresas por revisar, la disponibilidad de
   contacto, la distribución de prioridades y el historial. Los indicadores
   corresponden a la campaña destacada, no a la suma de todo el historial.

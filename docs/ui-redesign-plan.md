@@ -1,9 +1,13 @@
 # Plan propuesto de rediseño de la interfaz
 
-Estado: **implementación en curso**. Este documento conserva la propuesta que
+Estado: **implementado**. Este documento conserva la propuesta que
 guio el rediseño; [DESIGN.md](../DESIGN.md) describe el sistema visual actual y
 [la guía de interfaz](ui.md) documenta su uso y verificaciones. El plan no
 sustituye los requisitos de producto ni las reglas de negocio.
+
+Las comprobaciones finales usaron datos sintéticos. Quedan sin verificar el zoom
+real al 200 %, la usabilidad con el equipo de ventas y llamadas a proveedores
+reales desde este rediseño.
 
 El 7 de noviembre de 2026 se revisaron en navegador la referencia y las cuatro
 pantallas anteriores mediante la demo exclusivamente sintética. Durante la

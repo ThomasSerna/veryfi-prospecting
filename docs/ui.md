@@ -240,14 +240,22 @@ canales solo se han verificado con datos sintéticos.
 
 ## Verificación del rediseño del 7 de noviembre de 2026
 
-- Las pruebas de `tests/test_ui.py`, `tests/test_web_execution.py` y
-  `tests/test_redesign.py` pasaron con datos sintéticos y bases temporales.
+- Tras integrar los cambios de `main`, la suite completa pasó con **1209 pruebas**;
+  `uv lock --check` y `uv run --locked python manage.py check` también pasaron.
+  Las pruebas usan datos sintéticos y bases temporales.
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs`: ocho
   pruebas pasan con DOM y respuestas sintéticas. Cubren navegación, foco,
   resumen de preparación, bloqueos de ejecución y sincronización del presupuesto
   durante el sondeo; no sustituyen un navegador real.
-- Las referencias visuales generadas usan datos sintéticos. No constituyen una
-  evaluación de usabilidad con el equipo de ventas ni verifican proveedores reales.
+- Se revisaron las cuatro vistas con datos sintéticos a 1440 y 390 px, y se
+  midieron a 1366 y 1280 px sin desbordamiento global. En móvil se comprobó el
+  cierre del menú con Escape y el retorno del foco; en la ficha, la selección de
+  Contactos con flecha derecha y la presencia de la vigencia del empleo con sus
+  fuentes. La revisión independiente confirmó los ajustes de desbordamiento en
+  el inicio móvil y del contexto visible del presupuesto.
+- El zoom real al 200 % no se verificó: el navegador integrado no cambió la escala
+  al recibir los atajos. Tampoco se hizo un estudio con ventas ni llamadas reales
+  a proveedores para este rediseño.
 
 ## Verificación de la reorganización del 13 de octubre de 2026
 
