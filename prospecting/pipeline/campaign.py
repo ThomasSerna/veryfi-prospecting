@@ -18,7 +18,8 @@ from pydantic import Field, StrictBool, ValidationError, model_validator
 from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
 from prospecting.contacts import (
     ContactMatch, ContactMatchConfig, EmploymentStatus, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
-    employment_status, load_contact_match, match_sort_key, target_roles, validate_contact,
+    PeopleProgress, PersonStage, employment_status, load_contact_match, match_sort_key, people_progress, person_stage,
+    target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
@@ -31,7 +32,7 @@ from prospecting.models import (
     Evidence, Money, Priority, RunItem, RunStage, Text, utc_now,
 )
 from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
-from prospecting.pipeline.contacts import find_contacts
+from prospecting.pipeline.contacts import REJECTED_KEY, find_contacts
 from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
@@ -129,6 +130,10 @@ class AuthorizationInput(Contract):
 class ContactResult(Contract):
     contact: Contact
     eligible: StrictBool
+    # Etapa acumulada (T16): candidata, identidad verificada, pertinente, con canal o lista; None sin evaluación.
+    stage: PersonStage | None = None
+    # Código con el que Apollo no confirmó a la persona al enriquecerla (T16); None si no hubo rechazo.
+    enrichment_rejected: Text | None = None
     usable_channels: list[Channel]
     # Vigencia del empleo de cada persona, elegible o no, para explicar por qué no está lista (T18, §10.2).
     employment: EmploymentStatus
@@ -143,6 +148,8 @@ class CompanyResult(Contract):
     evidence: list[Evidence]
     contacts: list[ContactResult]
     business_status: BusinessStatus | None
+    # Personas por etapa y objetivo de la política (T16); None sin evaluación.
+    people: PeopleProgress | None = None
 
 
 class CampaignView(Contract):
@@ -233,17 +240,27 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 if assessment is not None:
                     contacts = [apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
                                 for contact in contacts]
-                results = []
+                results, stages = [], []
+                rejected = {key.rsplit(":", 1)[1]: key[len(REJECTED_KEY):].rsplit(":", 1)[0]
+                            for key in item.attempts if key.startswith(REJECTED_KEY)}
                 for contact in contacts:
                     eligible = not excluded and match is None and assessment is not None and validate_contact(
                         contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
+                    stage = None if assessment is None else person_stage(
+                        contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
+                    # Una exclusión de la empresa impide que la persona figure como lista.
+                    stage = "channel_usable" if stage == "ready" and not eligible else stage
+                    stages.append(stage)
                     usable = [channel for channel in contact.channels if eligible and channel_is_usable(
                         channel, contact, evidence, campaign.limits, now, company)]
                     employment = employment_status(contact, company, evidence, campaign.limits, now)
                     ranking = None if weights is None or assessment is None else contact_match(
                         contact, company, assessment, evidence, campaign.limits, now, roles, weights, campaign=campaign)
-                    results.append(ContactResult(contact=contact, eligible=eligible, usable_channels=usable,
-                                                 employment=employment, match=ranking))
+                    results.append(ContactResult(contact=contact, eligible=eligible, stage=stage, usable_channels=usable,
+                                                 employment=employment, match=ranking,
+                                                 enrichment_rejected=rejected.get(str(contact.id))))
+                people = None if assessment is None else people_progress(
+                    contacts, company, assessment, evidence, now, roles, campaign=campaign, stages=stages)
                 results.sort(key=lambda item: match_sort_key(item.match, item.eligible, item.contact, roles or []))
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company, roles, campaign=campaign)
@@ -252,7 +269,8 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 elif match is not None:
                     status = BusinessStatus.INSUFFICIENT_EVIDENCE
                 companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
-                                               evidence=evidence, contacts=results, business_status=status))
+                                               evidence=evidence, contacts=results, business_status=status,
+                                               people=people))
         if campaign.rubric_version == "rubric_v2":
             companies.sort(key=lambda result: enterprise_sort_key(result.company, result.assessment))
         return CampaignView(campaign=campaign, companies=companies, budget=budget,

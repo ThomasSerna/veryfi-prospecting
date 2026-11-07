@@ -5,9 +5,9 @@ from django import template
 from prospecting.sources import validate_public_url
 from core.presentation import (
     campaign_short_title, campaign_title, criterion_label, criterion_tone, employment_label, employment_reason,
-    ineligible_reason, label as present_label,
+    enrichment_rejection, ineligible_reason, label as present_label,
     match_label, money as present_money, money_summary as present_money_summary,
-    stop_message, stop_tone,
+    people_summary, person_stage_label, stop_message, stop_tone,
 )
 
 register = template.Library()
@@ -21,6 +21,9 @@ register.filter("criterion_label", criterion_label)
 register.filter("criterion_tone", criterion_tone)
 register.filter("employment_label", employment_label)
 register.filter("employment_reason", employment_reason)
+register.filter("person_stage_label", person_stage_label)
+register.filter("enrichment_rejection", enrichment_rejection)
+register.filter("people_summary", people_summary)
 
 
 @register.filter

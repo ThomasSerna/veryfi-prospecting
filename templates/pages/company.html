@@ -93,6 +93,7 @@
     </section>
     <section id="contacts" class="tab-panel surface company-panel" aria-labelledby="contacts-title">
       <h2 id="contacts-title" class="sr-only">Contactos</h2>
+      {% if result.people %}<p class="people-summary">{{ result.people|people_summary }}</p>{% endif %}
       {% if not view.contact_match_version and result.contacts %}
       <div class="notice notice-warning"><strong>El porcentaje de match no está disponible.</strong></div>
       {% endif %}
@@ -105,9 +106,10 @@
           </div>
           <div class="contact-badges">
             {% if person.match %}<span class="match-score{% if person.match.blocked_reason %} match-blocked{% endif %}"><strong>{{ person.match.score }} %</strong> de match</span>{% endif %}
-            <span class="status {% if person.eligible %}status-accepted{% else %}status-pending{% endif %}">{% if person.eligible %}Pertinente{% else %}Por confirmar{% endif %}</span>
+            <span class="status {% if person.stage == 'ready' %}status-accepted{% else %}status-pending{% endif %}">{{ person.stage|person_stage_label }}</span>
           </div>
         </header>
+        {% if person.enrichment_rejected %}<div class="notice notice-info">{{ person.enrichment_rejected|enrichment_rejection }} Queda como candidata.</div>{% endif %}
         {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>
         {% elif person.employment.state != 'corporate_evidence' %}<div class="notice {% if person.employment.state == 'contradicted' %}notice-warning{% else %}notice-info{% endif %}"><strong>{{ person.employment|employment_label }}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</div>{% endif %}
         {% if person.match %}

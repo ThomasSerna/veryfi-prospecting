@@ -656,9 +656,12 @@ def person_function(contact: Contact, company: Company, assessment: Assessment, 
 
 
 def people_progress(contacts: list[Contact], company: Company, assessment: Assessment, evidence: list[Evidence],
-                    now: datetime, roles: list[str] | None = None, *, campaign: Campaign) -> PeopleProgress:
-    stages = [person_stage(item, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
-              for item in contacts]
+                    now: datetime, roles: list[str] | None = None, *, campaign: Campaign,
+                    stages: list[PersonStage] | None = None) -> PeopleProgress:
+    """`stages` permite reutilizar etapas ya calculadas para las mismas personas, en el mismo orden."""
+    if stages is None:
+        stages = [person_stage(item, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)
+                  for item in contacts]
     level = {stage: index for index, stage in enumerate(PERSON_STAGES)}
     reached = lambda stage: sum(level[item] >= level[stage] for item in stages)
     functions = [person_function(item, company, assessment, campaign, evidence, now)

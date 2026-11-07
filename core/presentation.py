@@ -94,6 +94,19 @@ EMPLOYMENT_REASONS = {
     "no_employment_evidence": "Sin evidencia del puesto.",
 }
 READY = {"ready_preferred", "ready_alternative"}
+# Etapas acumuladas de persona (T16): «Pertinente» no exige canal ni evidencia del puesto; «Lista» sí.
+PERSON_STAGE_LABELS = {
+    "candidate": "Candidata",
+    "identity_verified": "Identidad verificada",
+    "relevant": "Pertinente",
+    "channel_usable": "Pertinente con canal",
+    "ready": "Lista",
+}
+ENRICHMENT_REJECTIONS = {
+    "identity_unconfirmed": "Apollo no confirmó una coincidencia de identidad alta.",
+    "identity_mismatch": "Apollo devolvió datos de otra persona; no se asignaron.",
+    "entity_mismatch": "Apollo no confirmó que trabaje actualmente en esta entidad.",
+}
 STOP_MESSAGES = {
     "budget_exceeded": "Presupuesto disponible agotado.",
     "company_budget_exceeded": "Se alcanzó el tope de esta empresa.",
@@ -119,6 +132,7 @@ STOP_MESSAGES = {
     "qualification_unavailable": "Calificación no disponible.",
     "insufficient_evidence": "La evidencia no permite decidir.",
     "contact_plan_exhausted": "Búsqueda de contactos agotada.",
+    "enrichment_limit": "Se agotó el tope de enriquecimientos antes de completar el objetivo de personas.",
     "exclusion_review": "Exclusión pendiente de revisión.",
     "duplicate_review": "Posible duplicado pendiente de revisión.",
     "assessment_pending": "La calificación quedó pendiente.",
@@ -132,6 +146,7 @@ STOP_MESSAGES = {
 # Paradas previstas: la empresa terminó su plan con un resultado, no quedó pendiente ni falló.
 STOP_OUTCOMES = {
     "preferred_channel_found": "Se encontró un canal preferido.",
+    "people_target_reached": "Se alcanzó el objetivo de personas pertinentes.",
     "people_limit": "Se alcanzó el máximo de personas evaluadas.",
     "already_checked": "Contactos reutilizados de una consulta previa.",
     "excluded_account": "Incluida en la lista de exclusiones.",
@@ -271,6 +286,24 @@ def ineligible_reason(person):
     return "Comprobaciones pendientes."
 
 
+def person_stage_label(stage):
+    return PERSON_STAGE_LABELS.get(stage, "Etapa pendiente")
+
+
+def enrichment_rejection(code):
+    return ENRICHMENT_REJECTIONS.get(code, "Apollo no confirmó a esta persona.") if code else ""
+
+
+def people_summary(people):
+    """Resumen de personas de una empresa; sin política no hay objetivo, nunca un objetivo de cero."""
+    if people is None:
+        return ""
+    parts = [f"{people.candidates} candidatas", f"{people.relevant} pertinentes", f"{people.ready} listas"]
+    if people.target is not None:
+        parts.insert(0, f"Objetivo {people.target}")
+    return " · ".join(parts)
+
+
 def _stop_key(reason, messages):
     return next((key for key in messages if reason == key or reason.startswith(key + "_") or reason.startswith(key + ":")), None)
 
@@ -308,7 +341,9 @@ CSV_FIELDS = (
     "campaign_id", "company_id", "contact_id", "company_name", "domain", "entity_name",
     "countries", "segments", "stage", "business_status", "stored_business_status", "stop_reason", "error_message",
     "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
-    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready", "employment_status", "employment_reason",
+    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready", "person_stage",
+    "people_candidates", "people_relevant", "people_ready", "people_target", "people_policy_version",
+    "employment_status", "employment_reason",
     "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
     "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
@@ -347,6 +382,13 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "buying_role": None if contact is None else contact.buying_role,
                 "contact_eligible": None if person is None else person.eligible,
                 "contact_ready": None if person is None else person.eligible and bool(person.usable_channels),
+                "person_stage": None if person is None else person.stage,
+                # Conteos de la empresa; sin evaluación o sin política quedan vacíos, nunca 0 inventado.
+                "people_candidates": None if result.people is None else result.people.candidates,
+                "people_relevant": None if result.people is None else result.people.relevant,
+                "people_ready": None if result.people is None else result.people.ready,
+                "people_target": None if result.people is None else result.people.target,
+                "people_policy_version": None if result.people is None else result.people.policy_version,
                 "employment_status": None if person is None else person.employment.state,
                 "employment_reason": None if person is None else person.employment.reason,
                 # Sin match la celda queda vacía, nunca 0.

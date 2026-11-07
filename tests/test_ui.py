@@ -308,7 +308,8 @@ def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client
     with Database(case.paths.db) as db:
         db.save_contact(contact, evidence=evidence)
     shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
-    assert "Pertinente" in shown and "Por confirmar" in shown
+    # T16: la persona de Hunter tiene canal utilizable, pero sin evidencia del puesto no figura como lista.
+    assert "Pertinente con canal" in shown and ">Lista<" not in shown
     assert "Inferida del historial de Hunter; no prueba el puesto" in shown
     assert "Inferido del historial de Hunter; sin evidencia del puesto" in shown
     assert "Requiere revisión humana" in shown
@@ -496,6 +497,8 @@ def test_results_prioritize_fit_and_stop_reasons_explain_the_next_action(ui_resu
 @pytest.mark.parametrize("reason, tone, expected", [
     ("preferred_channel_found", "info", "canal preferido"),
     ("people_limit", "info", "máximo de personas"),
+    ("people_target_reached", "info", "objetivo de personas pertinentes"),
+    ("enrichment_limit", "warning", "tope de enriquecimientos"),
     ("excluded_account", "info", "lista de exclusiones"),
     (f"duplicate_of:{uuid4()}", "info", "duplicado confirmado"),
     ("low_fit", "info", "encaje es bajo"),

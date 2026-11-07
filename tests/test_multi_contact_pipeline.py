@@ -206,3 +206,38 @@ def test_resume_after_an_uncertain_enrichment_does_not_repeat_calls(contact_case
     case.replies["people_enrichment"] = reply
     again = case.find()
     assert again.status == "pending" and len(case.calls) == calls
+
+
+def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_case, role_config, tmp_path):
+    """La ficha, la tabla y el CSV separan candidatas, pertinentes y listas, con objetivo y rechazo por persona."""
+    import csv
+    from io import StringIO
+    from types import SimpleNamespace
+
+    from core.presentation import export_csv
+    from prospecting.pipeline import read_campaign
+    from test_contact_match_view import page
+
+    case = multi(contact_case, role_config, ["Head of Product", "Engineering Manager", "Product Manager", "Solutions Architect"],
+                 enriched={0: {"confidence": "low"}})
+    case.find()
+    path = tmp_path / "synthetic.sqlite3"
+    view = read_campaign(path, case.campaign.id)
+    [result] = [item for item in view.companies if item.company.id == case.company.id]
+    people = result.people
+    assert (people.candidates, people.relevant, people.ready, people.target, people.policy_version) == (
+        4, 3, 0, 3, "people_policy_v1")
+    assert sorted(person.stage for person in result.contacts) == ["candidate", "relevant", "relevant", "relevant"]
+    assert [person.enrichment_rejected for person in result.contacts if person.enrichment_rejected] == ["identity_unconfirmed"]
+    rows = list(csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig"))))
+    assert sorted(row["person_stage"] for row in rows) == ["candidate", "relevant", "relevant", "relevant"]
+    assert {(row["people_candidates"], row["people_relevant"], row["people_ready"], row["people_target"],
+             row["people_policy_version"]) for row in rows} == {("4", "3", "0", "3", "people_policy_v1")}
+    assert list(csv.DictReader(StringIO(export_csv(view).decode("utf-8-sig")))) == []
+    shown = SimpleNamespace(path=path, tmp_path=tmp_path, campaign=case.campaign)
+    html = page(shown, "webapp:company", company_id=case.company.id)
+    assert "Objetivo 3 · 4 candidatas · 3 pertinentes · 0 listas" in html
+    assert ">Candidata<" in html and ">Pertinente<" in html and ">Lista<" not in html
+    assert "Apollo no confirmó una coincidencia de identidad alta." in html
+    assert "Se alcanzó el objetivo de personas pertinentes." in html
+    assert "3 pertinentes · 0 listas" in page(shown, "webapp:campaign")

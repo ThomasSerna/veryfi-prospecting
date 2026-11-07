@@ -95,6 +95,8 @@ def test_primary_has_only_current_eligible_people_and_preserves_sources_and_iden
     assert row["fit_score"] == "88.9" and row["coverage"] == "0.9"
     assert row["contact_ready"] == "True" and row["business_status"] == "ready_preferred"
     assert row["employment_status"] == "corporate_evidence" and row["employment_reason"] == ""
+    # Sin `people_policy` (instantánea histórica) no hay objetivo: la celda queda vacía, nunca 0.
+    assert row["person_stage"] == "ready" and row["people_target"] == row["people_policy_version"] == ""
     assert row["phone"] == "'\t+571234567890"
     channels = json.loads(row["channels"])
     assert channels[0]["normalized_status"] == "published_professional" and channels[0]["verified_at"] is None
