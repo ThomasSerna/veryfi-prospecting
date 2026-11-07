@@ -21,7 +21,7 @@ from prospecting.pipeline import (
 )
 from core import execution
 from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
-from core.presentation import READY, download_csv, evidence_pill
+from core.presentation import READY, download_csv, evidence_pill, label
 
 SAVED_MESSAGES = {
     "closed": "Campaña cerrada.",
@@ -114,6 +114,29 @@ def _company_sort_key(item):
             -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name)
 
 
+def _campaign_insights(view):
+    """Resume la campaña leída sin confundir avance, revisión y contacto."""
+    total = len(view.companies)
+    completed = sum(item.run_item.stage == "completed" for item in view.companies)
+    priorities = dict.fromkeys((*PRIORITY_ORDER, "pending"), 0)
+    for item in view.companies:
+        priority = ("excluded" if item.business_status == "excluded" else
+                    item.assessment.priority if item.assessment is not None else "pending")
+        priorities[priority] += 1
+    distribution = [{"value": value, "label": "Sin calificar" if value == "pending" else label(value), "count": count,
+                     "percent": round(count * 100 / total) if total else 0, "tone": value,
+                     "query": ("availability=excluded" if value == "excluded" else
+                               "" if value == "pending" else urlencode({"priorities": value}))}
+                    for value, count in priorities.items()]
+    return {"total": total, "completed": completed,
+            "review_pending": sum(item.run_item.review_status == "pending" for item in view.companies),
+            "ready": sum(item.business_status in READY for item in view.companies),
+            "needs_confirmation": sum(item.business_status == "needs_channel_confirmation" for item in view.companies),
+            "progress": round(completed * 100 / total) if total else None,
+            "next_review": next((item for item in view.companies if item.run_item.review_status == "pending"), None),
+            "priority_distribution": distribution}
+
+
 def _campaign_context(request, campaign_id):
     context = _base()
     view = _campaign_view(campaign_id, context)
@@ -149,6 +172,7 @@ def _campaign_context(request, campaign_id):
                    legacy_readonly=legacy_readonly, apollo_blocked=apollo_blocked,
                    authorization_form=form, operation_rows=[] if form is None else form.operation_rows,
                    counts=counts, execution=state, is_executing=state["is_executing"],
+                   campaign_insights=_campaign_insights(view), budget_view=view.budget, budget_campaign=view.campaign,
                    stop_reason=state["stop_reason"], error_message=state["error_message"],
                    saved_notice=SAVED_MESSAGES.get(saved_key))
     return context
@@ -191,8 +215,15 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
 @_handled
 def campaigns(request):
     context = _base()
-    context["execution"] = execution.snapshot(context["active_campaign"].id if context["active_campaign"] else None)
-    context["execution"]["is_executing"] = _global_busy(context)
+    highlighted = context["active_campaign"] or next(iter(context["campaigns"]), None)
+    view = _campaign_view(highlighted.id, context) if highlighted else None
+    state = execution.snapshot(highlighted.id if highlighted else None)
+    state["is_executing"] = state["is_executing"] or bool(view and view.is_executing)
+    context.update(highlighted_campaign=highlighted, highlighted_view=view,
+                   highlighted_is_active=context["active_campaign"] is not None,
+                   campaign_insights=_campaign_insights(view) if view else None,
+                   budget_view=view.budget if view else None, budget_campaign=highlighted,
+                   execution=state, is_executing=state["is_executing"])
     return render(request, "pages/campaigns.html", context)
 
 
@@ -211,8 +242,12 @@ def new_campaign(request):
     # Solo hay una campaña activa por base (§13.3): otra sin terminar se anuncia en lugar de abrirse sin aviso.
     active = context["active_campaign"]
     blocking = active if active is not None and active.id != draft_id else None
-    context.update(form=form, config=config, nav_active="new_campaign", is_executing=_global_busy(context),
-                   blocking_campaign=blocking)
+    budget_campaign = active or next(iter(context["campaigns"]), None)
+    view = _campaign_view(budget_campaign.id, context) if budget_campaign else None
+    busy = execution.snapshot(None)["is_executing"] or bool(view and view.is_executing)
+    context.update(form=form, config=config, nav_active="new_campaign", is_executing=busy,
+                   blocking_campaign=blocking, budget_view=view.budget if view else None,
+                   budget_campaign=budget_campaign)
     if request.method == "POST" and form.is_valid():
         with execution.idle_action():
             if _global_busy(context):

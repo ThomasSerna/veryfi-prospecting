@@ -1,27 +1,44 @@
 {% load prospecting_ui %}
 <section class="campaign-overview" data-live-section="overview" aria-label="Estado y avance de campaña">
-  <div class="overview-status">
-    <span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span>
-  </div>
-  <div class="campaign-counts">
-    <div><strong>{{ counts.total }}</strong><span>Empresas</span></div>
-    <div><strong>{{ counts.ready }}</strong><span>Con contacto listo</span></div>
-    <div><strong>{{ counts.pending }}</strong><span>Sin contacto listo</span></div>
-    <div><strong>{{ counts.accepted }}</strong><span>Aceptadas</span></div>
-  </div>
-  {% if is_executing %}
-  <div class="execution-progress" role="status">
-    <div class="progress-copy">
-      <strong>Investigación en curso</strong>
-      <span>{% if counts.total %}{{ counts.completed }} de {{ counts.total }} empresas{% else %}Buscando empresas…{% endif %}</span>
+  <div class="campaign-summary-grid">
+    <div class="campaign-progress-panel surface">
+      <div class="campaign-progress-header">
+        <h2>Avance de investigación</h2>
+        <span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span>
+      </div>
+      <div class="execution-progress" {% if is_executing %}role="status"{% endif %}>
+        <div class="progress-copy">
+          <strong>{% if counts.total %}{{ counts.completed }} de {{ counts.total }} procesadas{% elif is_executing %}Buscando empresas…{% else %}Sin empresas investigadas{% endif %}</strong>
+          <span>{% if is_executing %}Investigación en curso{% elif counts.total %}Resultados guardados{% else %}Configura la autorización para comenzar{% endif %}</span>
+        </div>
+        {% if counts.total %}
+        <progress value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas terminadas">{{ counts.completed }} de {{ counts.total }}</progress>
+        {% elif is_executing %}
+        <progress aria-label="Descubrimiento en curso"></progress>
+        {% endif %}
+      </div>
+      <div class="insight-metrics">
+        <div class="insight-metric"><strong>{{ counts.total }}</strong><span>Empresas</span></div>
+        <div class="insight-metric tone-violet"><strong>{{ campaign_insights.review_pending }}</strong><span>Pendientes de revisión</span></div>
+        <div class="insight-metric tone-mint"><strong>{{ counts.ready }}</strong><span>Con contacto listo</span></div>
+        <div class="insight-metric"><strong>{{ counts.accepted }}</strong><span>Aceptadas</span></div>
+      </div>
     </div>
-    {% if counts.total %}
-    <progress value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas terminadas">{{ counts.completed }} de {{ counts.total }}</progress>
-    {% else %}
-    <progress aria-label="Descubrimiento en curso"></progress>
-    {% endif %}
+    <aside class="priority-chart surface" aria-labelledby="priority-chart-title">
+      <h2 id="priority-chart-title">Prioridad de empresas</h2>
+      {% if counts.total %}
+      {% for item in campaign_insights.priority_distribution %}{% if item.count %}
+      <div class="priority-chart-row tone-{{ item.tone }}">
+        <div>{% if item.query %}<a href="{% url 'webapp:campaign' campaign.id %}?{{ item.query }}">{{ item.label }}</a>{% else %}<span>{{ item.label }}</span>{% endif %}<strong>{{ item.count }}</strong></div>
+        <span class="chart-bar" aria-hidden="true"><span style="width: {{ item.percent }}%"></span></span>
+      </div>
+      {% endif %}{% endfor %}
+      <p class="quiet-note">Sin contacto listo: {{ counts.pending }}. La disponibilidad se revisa por separado.</p>
+      {% else %}
+      <p class="quiet-note">Las prioridades aparecerán al calificar las primeras empresas.</p>
+      {% endif %}
+    </aside>
   </div>
-  {% endif %}
 </section>
 <section class="result-filters" data-live-filters aria-label="Filtrar empresas" {% if not counts.total and not has_active_filters %}hidden{% endif %}>
   <form method="get" class="filter-form">
@@ -49,14 +66,11 @@
       <thead>
         <tr>
           <th>Empresa</th>
+          <th class="numeric">Encaje y cobertura</th>
           <th>Prioridad</th>
           <th>Disponibilidad</th>
           <th>Revisión</th>
-          <th class="numeric">Encaje</th>
-          <th class="numeric">Cobertura</th>
           <th class="numeric">Contactos</th>
-          <th>Mercado</th>
-          <th>Etapa</th>
         </tr>
       </thead>
       <tbody>
@@ -65,18 +79,14 @@
           <th scope="row">
             <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}</a>
             <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
+            <span class="cell-note">{% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
+            <span class="cell-note">Etapa: {{ result.run_item.stage|label }}</span>
           </th>
+          <td class="numeric"><span class="score-meter"><strong>{{ result.assessment.fit_score|score }}</strong>{% if result.assessment.fit_score != None %}<span class="metric-track" aria-hidden="true"><span style="width: {{ result.assessment.fit_score|floatformat:'0' }}%"></span></span>{% endif %}<span class="cell-note">Cobertura {{ result.assessment.coverage|percentage }}</span>{% if result.assessment.coverage != None %}<span class="metric-track" aria-hidden="true"><span style="width: {% widthratio result.assessment.coverage 1 100 %}%"></span></span>{% endif %}</span></td>
           <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
           <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
           <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
-          <td class="numeric">{{ result.assessment.fit_score|score }}</td>
-          <td class="numeric">{{ result.assessment.coverage|percentage }}</td>
           <td class="numeric">{{ result.contacts|length }}{% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}</td>
-          <td>
-            {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendiente{% endfor %}
-            <span class="cell-note">{% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
-          </td>
-          <td>{{ result.run_item.stage|label }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -94,6 +104,7 @@
   {% endif %}
 </section>
 <section class="surface budget-section" data-live-section="budget" aria-labelledby="budget-title">
+  <div data-budget-live hidden>{% include 'components/_budget_summary.html' %}</div>
   <div class="section-heading">
     <h2 id="budget-title">Presupuesto</h2>
   </div>

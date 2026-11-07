@@ -6,15 +6,21 @@
 <div id="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}">
   <header class="page-heading">
     <div>
-      <h1>{{ campaign|campaign_title }}</h1>
-      <p class="quiet-note">{{ campaign.created_at|date:"d M Y · H:i" }} · Máx. {{ campaign.max_companies }} empresas</p>
+      <h1>{% for country in campaign.countries %}{{ country|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</h1>
+      <p class="page-description">{% for segment in campaign.segments %}{{ segment|label }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+      <p class="quiet-note">{{ campaign.created_at|date:"d M Y · H:i" }} · Hasta {{ campaign.max_companies }} empresas</p>
     </div>
     {% if not legacy_readonly and campaign.status != 'completed' %}
     <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
     {% endif %}
   </header>
-  {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
-  {% elif apollo_blocked %}<div class="notice notice-warning">Apollo bloqueado: comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
+  <div class="campaign-notices">
+    {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
+    {% elif apollo_blocked %}<div class="notice notice-warning">Apollo bloqueado: comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
+    {% if view.exclusions_status != 'validated' %}
+    <div class="notice notice-warning"><strong>La lista de exclusiones necesita confirmación.</strong></div>
+    {% endif %}
+  </div>
   <div id="execution-feedback" role="status" aria-live="polite">
     {% if stop_reason %}
     <div class="notice notice-warning">
@@ -22,11 +28,6 @@
     </div>
     {% endif %}
   </div>
-  {% if view.exclusions_status != 'validated' %}
-  <div class="notice notice-warning">
-    <strong>La lista de exclusiones necesita confirmación.</strong>
-  </div>
-  {% endif %}
   {% if not legacy_readonly and campaign.status == 'created' and not counts.total %}
     {% include 'components/_authorization_section.html' with promoted=True %}
   {% endif %}

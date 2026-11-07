@@ -6,38 +6,60 @@
   const sidebar = document.getElementById('navigation');
   const workspace = document.getElementById('workspace-main');
   const mobile = window.matchMedia('(max-width: 760px)');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const backdrop = document.querySelector('.navigation-backdrop');
+  const sidebarClose = document.querySelector('.sidebar-close');
 
-  function closeNavigation() {
-    body.dataset.navOpen = 'false';
+  function setNavigation(open, focus = false) {
+    body.dataset.navOpen = String(open);
     if (menu) {
-      menu.setAttribute('aria-expanded', 'false');
-      menu.setAttribute('aria-label', 'Abrir navegación');
+      menu.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-label', open ? 'Contraer navegación' : 'Abrir navegación');
     }
-    if (sidebar) sidebar.inert = mobile.matches;
-    if (workspace) workspace.inert = false;
+    if (sidebar) sidebar.inert = !open;
+    if (workspace) workspace.inert = mobile.matches && open;
+    if (backdrop) backdrop.hidden = !mobile.matches || !open;
+    if (focus && open && mobile.matches) sidebarClose?.focus();
+    if (focus && !open) menu?.focus();
   }
 
   if (menu && sidebar) {
-    closeNavigation();
-    menu.addEventListener('click', () => {
-      const open = body.dataset.navOpen !== 'true';
-      body.dataset.navOpen = String(open);
-      menu.setAttribute('aria-expanded', String(open));
-      menu.setAttribute('aria-label', open ? 'Cerrar navegación' : 'Abrir navegación');
-      sidebar.inert = mobile.matches && !open;
-      if (workspace) workspace.inert = mobile.matches && open;
-      if (open) sidebar.querySelector('a')?.focus();
-    });
+    setNavigation(!mobile.matches);
+    menu.addEventListener('click', () => setNavigation(body.dataset.navOpen !== 'true', true));
+    sidebarClose?.addEventListener('click', () => setNavigation(false, true));
+    backdrop?.addEventListener('click', () => setNavigation(false, true));
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && body.dataset.navOpen === 'true') {
-        closeNavigation();
-        menu.focus();
+        setNavigation(false, true);
+      }
+      if (event.key === 'Tab' && mobile.matches && body.dataset.navOpen === 'true') {
+        const items = Array.from(sidebar.querySelectorAll('a[href]:not([aria-disabled="true"]), button:not([disabled])'));
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
     });
     document.addEventListener('click', event => {
-      if (body.dataset.navOpen === 'true' && !sidebar.contains(event.target) && !menu.contains(event.target)) closeNavigation();
+      if (mobile.matches && body.dataset.navOpen === 'true' && sidebar.contains(event.target) && event.target.closest?.('a[href]:not([aria-disabled="true"])')) setNavigation(false, true);
     });
-    mobile.addEventListener('change', closeNavigation);
+    mobile.addEventListener('change', () => setNavigation(!mobile.matches));
+  }
+
+  const previewForm = document.querySelector('[data-campaign-preview]');
+  if (previewForm) {
+    const updatePreview = () => {
+      ['countries', 'segments'].forEach(name => {
+        const target = previewForm.querySelector(`[data-preview-${name}]`);
+        const selected = Array.from(previewForm.querySelectorAll(`input[name="${name}"]:checked`));
+        if (target) target.textContent = selected.map(input => input.closest('label').textContent.trim()).join(', ') || 'Sin seleccionar';
+      });
+      const maximum = previewForm.querySelector('[name="max_companies"]');
+      const target = previewForm.querySelector('[data-preview-max]');
+      if (target) target.textContent = maximum?.value || 'Sin definir';
+    };
+    previewForm.addEventListener('input', updatePreview);
+    updatePreview();
   }
 
   document.addEventListener('click', event => {
@@ -54,6 +76,7 @@
       navigator.clipboard.writeText(value).then(() => {
         copyBtn.dataset.copied = 'true';
         copyBtn.textContent = '¡Copiado!';
+        if (!reducedMotion.matches) copyBtn.animate?.([{ transform: 'scale(.97)' }, { transform: 'scale(1)' }], { duration: 160, easing: 'ease-out' });
         window.setTimeout(() => {
           copyBtn.dataset.copied = 'false';
           copyBtn.textContent = original;
@@ -160,13 +183,17 @@
       panels[index].setAttribute('role', 'tabpanel');
       panels[index].setAttribute('aria-labelledby', tab.id);
     });
-    function selectTab(index, focus = false) {
+    function selectTab(index, focus = false, animate = false) {
       tabs.forEach((tab, current) => {
         const selected = current === index;
         tab.setAttribute('aria-selected', String(selected));
         tab.tabIndex = selected ? 0 : -1;
         panels[current].hidden = !selected;
       });
+      if (animate && !reducedMotion.matches) panels[index].animate?.([
+        { opacity: .7, transform: 'translateY(3px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ], { duration: 180, easing: 'cubic-bezier(.16,1,.3,1)' });
       if (focus) tabs[index].focus();
     }
     function revealHash() {
@@ -182,7 +209,7 @@
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', event => {
         event.preventDefault();
-        selectTab(index);
+        selectTab(index, false, true);
         window.history.replaceState(null, '', tab.getAttribute('href'));
       });
       tab.addEventListener('keydown', event => {
@@ -193,7 +220,7 @@
         if (event.key === 'End') next = tabs.length - 1;
         if (next !== undefined) {
           event.preventDefault();
-          selectTab(next, true);
+          selectTab(next, true, true);
           window.history.replaceState(null, '', tabs[next].getAttribute('href'));
         }
       });
@@ -279,6 +306,17 @@
       const currentScroll = live.querySelector('.results-section .table-scroll');
       const scrollLeft = currentScroll ? currentScroll.scrollLeft : 0;
       const budgetDetailsOpen = Boolean(live.querySelector('.budget-details')?.open);
+      const budgetSummary = document.querySelector('[data-budget-summary]');
+      const nextBudgetSummary = parsed.querySelector('[data-budget-live]');
+      if (budgetSummary && nextBudgetSummary && budgetSummary.textContent !== nextBudgetSummary.textContent) {
+        const currentLink = budgetSummary.querySelector('a');
+        const nextLink = nextBudgetSummary.querySelector('a');
+        if (currentLink && nextLink && currentLink.getAttribute('href') === nextLink.getAttribute('href')) {
+          currentLink.replaceChildren(...Array.from(nextLink.childNodes, node => node.cloneNode(true)));
+        } else {
+          budgetSummary.replaceChildren(...Array.from(nextBudgetSummary.childNodes, node => node.cloneNode(true)));
+        }
+      }
 
       ['overview', 'results', 'budget'].forEach(sectionName => {
         const currentSection = live.querySelector(`[data-live-section="${sectionName}"]`);

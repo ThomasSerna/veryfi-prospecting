@@ -21,9 +21,12 @@
 {% endblock %}
 {% block content %}
 <header class="page-heading company-heading">
-  <div>
-    <h1>{{ result.company.name }}</h1>
-    <p>{{ result.company.domain|default_if_none:'Dominio pendiente' }} · {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</p>
+  <div class="company-identity">
+    <span class="company-monogram" aria-hidden="true">{{ result.company.name|slice:':1'|upper }}</span>
+    <div class="company-title-copy">
+      <h1>{{ result.company.name }}</h1>
+      <p>{{ result.company.domain|default_if_none:'Dominio pendiente' }} · {% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</p>
+    </div>
   </div>
   <div class="company-heading-status">
     <span class="priority priority-{{ result.assessment.priority|default:'pending' }}">Prioridad {{ result.assessment.priority|label|lower }}</span>
@@ -45,10 +48,16 @@
       <h2 id="summary-title" class="sr-only">Resumen</h2>
       {% if result.assessment %}
       <p class="assessment-explanation">{{ result.assessment.explanation }}</p>
-      <dl class="assessment-metrics">
-        <div><dt>Encaje</dt><dd>{{ result.assessment.fit_score|score }}<small>/ 100</small></dd></div>
-        <div><dt>Cobertura</dt><dd>{{ result.assessment.coverage|percentage }}</dd></div>
-        <div class="assessment-products"><dt>Productos</dt><dd>{% for product in result.assessment.products %}{{ product|label }}{% if not forloop.last %}, {% endif %}{% empty %}Pendientes{% endfor %}</dd></div>
+      <dl class="assessment-metrics assessment-score-band">
+        <div>
+          <dt>Encaje</dt><dd>{{ result.assessment.fit_score|score }}<small>/ 100</small></dd>
+          {% if result.assessment.fit_score != None %}<span class="metric-track" aria-hidden="true"><span style="width: {{ result.assessment.fit_score|floatformat:'0' }}%"></span></span>{% endif %}
+        </div>
+        <div>
+          <dt>Cobertura de evidencia</dt><dd>{{ result.assessment.coverage|percentage }}</dd>
+          {% if result.assessment.coverage != None %}<span class="metric-track" aria-hidden="true"><span style="width: {% widthratio result.assessment.coverage 1 100 %}%"></span></span>{% endif %}
+        </div>
+        <div class="assessment-products"><dt>Productos compatibles</dt><dd>{% for product in result.assessment.products %}<span class="product-tag">{{ product|label }}</span>{% empty %}Pendientes{% endfor %}</dd></div>
       </dl>
       <div class="criteria-list">
         {% for name, criterion in result.assessment.criteria.items %}
@@ -57,6 +66,7 @@
             <h3>{{ name|label }}</h3>
             <span class="status criterion-badge criterion-{{ criterion.value|criterion_tone }}">{{ criterion.value|criterion_label }}</span>
           </div>
+          <span class="criterion-signal criterion-{{ criterion.value|criterion_tone }}" aria-hidden="true"><span style="width: {% if criterion.value != None %}{% widthratio criterion.value 1 100 %}{% else %}0{% endif %}%"></span></span>
           <p>{{ criterion.justification }}</p>
           {% if criterion.evidence_ids %}
           <div class="evidence-references">
@@ -99,9 +109,12 @@
       {% for person in result.contacts %}
       <article class="contact-detail">
         <header>
-          <div>
-            <h3>{{ person.contact.name|default_if_none:'Nombre pendiente' }}</h3>
-            <p>{{ person.contact.title|default_if_none:'Cargo pendiente' }} · <span>{{ person.contact.buying_role|label }}</span></p>
+          <div class="contact-identity">
+            <span class="contact-initial" aria-hidden="true">{{ person.contact.name|default_if_none:'?'|slice:':1'|upper }}</span>
+            <div>
+              <h3>{{ person.contact.name|default_if_none:'Nombre pendiente' }}</h3>
+              <p>{{ person.contact.title|default_if_none:'Cargo pendiente' }} · <span>{{ person.contact.buying_role|label }}</span></p>
+            </div>
           </div>
           <div class="contact-badges">
             {% if person.match %}<span class="match-score{% if person.match.blocked_reason %} match-blocked{% endif %}"><strong>{{ person.match.score }} %</strong> de match</span>{% endif %}
@@ -204,7 +217,7 @@
   </div>
   {% if not legacy_readonly %}
   <aside class="review-panel surface" aria-labelledby="review-title">
-    <h2 id="review-title">Revisión</h2>
+    <div class="review-panel-heading"><h2 id="review-title">Revisión de ventas</h2><p class="quiet-note">Registra tu decisión y continúa con la siguiente empresa.</p></div>
     <form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
       <fieldset {% if is_executing %}disabled{% endif %}>
         {% if review_form.non_field_errors %}<div class="notice notice-error">{{ review_form.non_field_errors }}</div>{% endif %}
