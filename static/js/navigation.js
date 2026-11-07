@@ -13,12 +13,51 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let closingTimer;
 
+  // Una sola pastilla se desliza al enlace señalado o enfocado y vuelve a la sección actual.
+  const nav = sidebar.querySelector?.('.main-nav');
+  const indicator = nav ? document.createElement('span') : null;
+  if (indicator) {
+    indicator.className = 'navigation-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.setAttribute('data-morph-skip', '');
+    nav.append(indicator);
+    nav.dataset.indicator = 'true';
+  }
+  const currentLink = () => nav?.querySelector('a[aria-current="page"]') || null;
+
+  function placeIndicator(link, instant = false) {
+    if (!indicator) return;
+    if (!link?.offsetHeight) {
+      nav.dataset.indicatorVisible = 'false';
+      return;
+    }
+    if (instant) indicator.style.transition = 'none';
+    indicator.style.transform = `translateY(${link.offsetTop}px)`;
+    indicator.style.height = `${link.offsetHeight}px`;
+    nav.dataset.indicatorVisible = 'true';
+    if (instant) {
+      indicator.getBoundingClientRect();
+      indicator.style.removeProperty('transition');
+    }
+  }
+
+  nav?.addEventListener('pointerover', event => {
+    const link = event.target.closest?.('a[href]');
+    placeIndicator(link && link.getAttribute('aria-disabled') !== 'true' ? link : currentLink());
+  });
+  nav?.addEventListener('pointerleave', () => placeIndicator(currentLink()));
+  nav?.addEventListener('focusin', event => placeIndicator(event.target.closest?.('a[href]') || currentLink()));
+  nav?.addEventListener('focusout', event => {
+    if (!nav.contains(event.relatedTarget)) placeIndicator(currentLink());
+  });
+
   function setNavigation(open, focus = true) {
     window.clearTimeout(closingTimer);
     if (open) {
       drawer.open = true;
       // Materializa el estado de partida antes de deslizar el panel.
       sidebar.getBoundingClientRect();
+      placeIndicator(currentLink(), true);
       sidebar.setAttribute('role', 'dialog');
       sidebar.setAttribute('aria-modal', 'true');
       sidebar.setAttribute('aria-label', 'Navegación principal');
