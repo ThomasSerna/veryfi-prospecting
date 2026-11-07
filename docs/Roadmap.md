@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-07 (America/Bogota). Instantánea de los 22 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15 cerrado el 2026-11-07 y T16 a T22 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
+- **Fecha de corte:** 2026-11-07 (America/Bogota). Instantánea de los 24 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15 cerrado el 2026-11-07 y T16 a T24 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -32,8 +32,10 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T20 | [#21](https://github.com/ThomasSerna/veryfi-prospecting/issues/21) | Evaluar tres alternativas de interfaz para cuentas enterprise y contactos Apollo | Abierto | P1 (paralelizable) | Evaluación UX/UI | T12 para definir estados de Apollo, T13 para escenarios enterprise |
 | T21 | [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22) | Validar el pipeline enterprise con Apollo frente a la línea base Hunter | Abierto | P0 para cierre, ejecutar al final | QA/evaluación | T12, T13, T14, T15, T16, T17, T18 (T19 si aplica) |
 | T22 | [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23) | [SPIKE no funcional] Evaluar Snov.io vs Apollo en rama experimental aislada | Abierto | P2 (posterior a migración y baseline) | Spike técnico/no funcional | T12, T17, T16, T18 y T21 |
+| T23 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Abierto | P1 | Revisión humana/backend e interfaz | T18 |
+| T24 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Abierto | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
 
-Las prioridades y los tipos solo existen en los issues T12 a T22. Los criterios de aceptación de cada tarea están en su issue.
+Las prioridades y los tipos solo existen en los issues T12 a T24. Los criterios de aceptación de cada tarea están en su issue.
 
 ## Siguiente a construir
 
@@ -41,11 +43,11 @@ Derivado de las dependencias y prioridades del tracker. Con T12 a T15 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Listas para empezar | T18 (P0) y T17 (P0) | Sus dependencias están cerradas. T18 separa el empleo declarado por Apollo de la evidencia corporativa vigente; T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
+| Listas para empezar | T18 (P0) y T17 (P0) | Sus dependencias están cerradas. T18 ya está implementada en `main` (2026-11-07) y falta cerrarla en el tracker; T17 valida el acceso real a Apollo y retira los rastros operativos de Hunter |
 | Paralelizable | T20 (P1) | Es solo UX/UI y no toca el pipeline; T12 y T13 están cerradas |
-| Bloqueadas | T16 y T19 (esperan T18), T21 (espera T16, T17 y T18) y T22 (espera T17, T16, T18 y T21) | Dependencias abiertas |
+| Bloqueadas | T16, T19 y T23 (esperan T18), T24 (espera T18 y T16), T21 (espera T16, T17 y T18) y T22 (espera T17, T16, T18 y T21) | Dependencias abiertas |
 
-Orden sugerido por olas: T17 y T20 (primera ola) junto con T18; después T16 y T19; después T21; al final T22.
+Orden sugerido por olas: T17 y T20 (primera ola) junto con T18; después T16, T19 y T23; después T24 y T21; al final T22.
 
 ## Dependencias entre tareas
 
@@ -62,6 +64,8 @@ flowchart LR
     T20["T20 Alternativas de interfaz"]:::ready
     T21["T21 Validación enterprise"]
     T22["T22 Spike Snov.io"]
+    T23["T23 Confirmación manual del empleo"]
+    T24["T24 Corroboración con Tavily"]
     T12 --> T13
     T12 --> T17
     T13 --> T14
@@ -81,6 +85,9 @@ flowchart LR
     T17 --> T22
     T13 -.-> T20
     T19 -.-> T21
+    T18 --> T23
+    T18 --> T24
+    T16 --> T24
     classDef closed fill:#d4edda,stroke:#2e7d32
     classDef ready fill:#fff3cd,stroke:#b8860b
 ```
@@ -350,6 +357,73 @@ Como equipo de producto, quiero comparar el nuevo sistema Apollo + puntuación e
 - Se reportan errores, duplicados, puestos obsoletos y empresas grandes sin encaje.
 - El pipeline principal no introduce Snov ni otros proveedores de contactos.
 
+### Seguimiento de T18 (T23 y T24, abiertas)
+
+#### T23 · Permitir que ventas confirme manualmente el empleo vigente de una persona
+
+- **Issue:** [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24)
+- **Estado:** Abierto
+- **Prioridad:** P1
+- **Dependencias:** T18
+- **Tipo:** Revisión humana/backend e interfaz
+
+**Historia de usuario**
+
+Como representante comercial, quiero registrar que comprobé el empleo vigente de una persona marcada para revisión, para resolver un caso ambiguo sin esperar a que aparezca una nueva fuente corporativa.
+
+**Alcance**
+
+- Añadir en la ficha una acción de confirmación del empleo, análoga a `confirm_alternative_channel` (`prospecting/pipeline/contacts.py`), solo para personas cuyo `employment_status` sea `provider_claim` o tenga `review_required` (`title_changed`, `undated_source`, `ambiguous_source`, `title_unconfirmed`, `historical_inference`).
+- Guardar una evidencia `manual` observada con motivo, fecha y la fuente consultada por el vendedor; conservar las fuentes originales, las contradicciones y los datos del proveedor sin reescribirlos.
+- En `title_changed`, la confirmación indica cuál de los cargos ya citados es el vigente; no se acepta un cargo nuevo sin fuente.
+- La confirmación vence según `cache.contact_days` y una contradicción posterior (salida nominal, otra entidad) la anula.
+- Decidir con aprobación si la confirmación manual cuenta como `corporate_evidence` o como un estado propio, y si habilita 'listo'. Actualizar «Vigencia del empleo» en `docs/Business-rules.md`.
+- Guardar contacto, evidencia y disponibilidad recalculada en una sola transacción; bloquear durante una ejecución y en campañas históricas.
+- No enviar mensajes, hacer llamadas ni mandar invitaciones para comprobar el empleo.
+- La ficha y el CSV muestran el origen manual, el motivo y la fecha.
+
+**Criterios de aceptación**
+
+- Una persona con `contradicted`/`employment_ended` no se puede confirmar.
+- Se rechaza una confirmación sin motivo o sin aceptación explícita.
+- La confirmación caduca y la persona vuelve a su estado anterior; una contradicción posterior la anula.
+- Pruebas de rollback, caducidad, contradicción posterior, cambio de cargo y campaña histórica.
+- Los identificadores persistidos nuevos (referencia de la evidencia manual) se documentan en `docs/persistence.md` y se fijan en `tests/test_persisted_identifiers.py`.
+
+#### T24 · Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa
+
+- **Issue:** [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25)
+- **Estado:** Abierto
+- **Prioridad:** P1
+- **Dependencias:** T18, T16 (política de esfuerzo)
+- **Tipo:** Pipeline/backend
+
+**Historia de usuario**
+
+Como responsable comercial, quiero que el pipeline busque una fuente pública dirigida para cada persona de Apollo cuyo empleo solo declara el proveedor, para convertir más afirmaciones en empleo verificado sin añadir otro proveedor de personas.
+
+**Contexto**
+
+Hoy `_search_public` (`prospecting/pipeline/contacts.py`) no se ejecuta si ya hay un directorio corporativo vigente guardado (`/equipo`, `/team`, `/directorio`, `/leadership`) o si Haiku ya se ejecutó. Una persona de Apollo que ese directorio no nombra puede quedarse en `provider_claim` aunque una búsqueda dirigida la encontraría.
+
+**Alcance**
+
+- Después del enriquecimiento, buscar por persona (`"nombre" "empresa" cargo`) a quienes queden en `provider_claim` (`provider_claim_only`, `title_unconfirmed`, `undated_source`, `stale_source`), aunque exista un directorio vigente que no las nombre.
+- Priorizar por pertinencia y diversidad de funciones, en coherencia con T16; nunca buscar con un apellido ofuscado.
+- Mantener el gasto dentro de los límites por nivel de esfuerzo; versionar el cambio en `limits.effort` y obtener aprobación del gasto adicional (`docs/Budget-policy.md`).
+- Usar claves de intento por persona para no repetir búsquedas al reanudar.
+- Extraer con Haiku solo los fragmentos nuevos, con las mismas reglas de citas literales y asociación nominal.
+- Medir cuántas afirmaciones pasan a `corporate_evidence` y el coste por empleo verificado.
+- Alternativa: incorporar este alcance a T16 si se implementan juntos.
+
+**Criterios de aceptación**
+
+- Un directorio vigente que no nombra a la persona ya no impide su búsqueda dirigida.
+- Cada persona recibe como máximo el número de búsquedas configurado; con el cupo agotado queda pendiente con motivo.
+- No se repiten búsquedas tras reanudar; las claves de intento nuevas quedan documentadas en `docs/persistence.md`.
+- Pruebas sin red: sin resultados, homónimo, página con salida, página con otro cargo y cupo agotado.
+- Sin proveedores nuevos ni envío de mensajes.
+
 ### Exploración (T22, abierta)
 
 #### T22 · [SPIKE no funcional] Evaluar Snov.io vs Apollo en rama experimental aislada
@@ -464,11 +538,13 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
 - **T15:** la taxonomía de cargos versionada vive en `config/veryfi.json` y las reglas de selección en [Business-rules.md](Business-rules.md#persona-y-canal-útiles). La búsqueda de Apollo se arma en `people_search_request` con títulos y, cuando corresponda, seniority. Sin datos personales en el repositorio, fixtures ni logs. El estado del issue sigue siendo el del tracker.
 - **T16:** cambia reglas vigentes de [Business-rules.md](Business-rules.md#esfuerzo-de-búsqueda-y-parada): hoy la empresa se detiene al lograr un contacto pertinente con correo o teléfono utilizable y la prioridad alta admite hasta 3 personas. Los topes de gasto siguen en [Budget-policy.md](Budget-policy.md). Requiere aprobación antes de modificar la regla.
 - **T17:** afecta a [Library-docs.md](Library-docs.md), [provider-check.md](provider-check.md), [budget-providers.md](budget-providers.md) y `README.md`. Las llamadas reales solo se hacen con autorización explícita del responsable del cupo (proveedor, operación y tope).
-- **T18:** `hunter_signal` aparece en `prospecting/contacts.py` y `prospecting/pipeline/campaign.py` como base de vigencia para mostrar. Antes de renombrarlo hay que comprobar si algún valor se guarda ([persistence.md](persistence.md)). Reglas afectadas: [Business-rules.md](Business-rules.md#reglas-por-canal) y el Historial de Hunter.
+- **T18:** implementada en `main` el 2026-11-07: `employment_status` en `prospecting/contacts.py` sustituye a `hunter_signal` en las reglas activas y el estado se calcula al leer, sin persistirse ([contacts.md](contacts.md#vigencia-del-empleo-t18)). Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo). Falta cerrar el issue en el tracker.
 - **T19:** los pesos viven en `config/contact_match.json` y cambiar un número exige cambiar `version`; el cálculo está en [contacts.md](contacts.md#porcentaje-de-match). `contact_match_v1` debe seguir reproduciéndose para las campañas históricas.
 - **T20:** solo UX/UI; no cambia backend, puntuación ni proveedores. Contexto visual en `DESIGN.md` y [ui.md](ui.md).
 - **T21:** el protocolo y los formatos de evaluación están en [t10-evaluation.md](t10-evaluation.md); la línea base, en [evaluation.md](evaluation.md) y [delivery.md](delivery.md) (0 personas listas). Las llamadas nuevas requieren cupos verificados y autorización explícita.
 - **T22:** el issue planea la rama `experiment/snov-benchmark`, pero `AGENTS.md` indica trabajar en `main`: pedir autorización al responsable antes de crearla. No se agrega `SNOV_API_KEY` ni dependencias a `main`.
+- **T23:** seguir el patrón de `confirm_alternative_channel` en `prospecting/pipeline/contacts.py`. Que la confirmación manual habilite listo cambia «Vigencia del empleo» en [Business-rules.md](Business-rules.md#vigencia-del-empleo) y requiere aprobación.
+- **T24:** cambia el esfuerzo y el gasto de la etapa de contactos (`_search_public`): requiere aprobación de presupuesto ([Budget-policy.md](Budget-policy.md)) y coordinarse con T16. Las llamadas reales requieren autorización explícita.
 
 ## Responsables por módulo
 
