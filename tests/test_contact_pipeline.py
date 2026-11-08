@@ -471,3 +471,36 @@ def test_direct_public_only_stage_checks_apollo_before_spend(contact_case, monke
                            apollo_access=case.access, authorizations=case.grants, **case.public)
     assert report.stop_reason == "apollo_access_unverified"
     assert case.calls == [] and case.model_calls == [] and case.db.list_usage() == []
+
+
+def test_checkpoint_keeps_an_attempt_written_by_another_connection(database, make_campaign, make_company,
+                                                                   monkeypatch, tmp_path):
+    """T17, concurrencia local: el checkpoint lee el RunItem dentro de su transacción y no pierde claves ajenas."""
+    from contextlib import contextmanager
+    import time
+
+    from prospecting.pipeline.contacts import _ContactStage
+
+    campaign = database.save_campaign(make_campaign())
+    company, facts = make_company()
+    database.save_company(company, evidence=facts)
+    database.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id))
+    stage = _ContactStage.__new__(_ContactStage)
+    stage.db, stage.campaign, stage.company = database, campaign, company
+    stage.tick, stage.evidence_ids = time.monotonic(), []
+    original = database.transaction
+
+    @contextmanager
+    def racing():
+        # Otra conexión guarda una clave justo antes de que el checkpoint abra su transacción.
+        with Database(tmp_path / "synthetic.sqlite3") as other:
+            with other.transaction():
+                item = other.get_run_item(campaign.id, company.id)
+                other.save_run_item(item.model_copy(update={"attempts": item.attempts | {"contacts:apollo_enrichments": 1}}))
+        with original():
+            yield
+
+    monkeypatch.setattr(database, "transaction", racing)
+    stage.checkpoint(attempts={"contacts:apollo_search": 1})
+    saved = database.get_run_item(campaign.id, company.id).attempts
+    assert saved["contacts:apollo_enrichments"] == 1 and saved["contacts:apollo_search"] == 1

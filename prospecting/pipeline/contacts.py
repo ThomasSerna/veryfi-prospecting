@@ -175,16 +175,17 @@ class _ContactStage:
     def checkpoint(self, *, attempts=None, consumed=None, updates=None, aggregates=(), facts=()):
         now_tick = time.monotonic()
         elapsed = max(0.0, now_tick - self.tick)
-        current = self.db.get_run_item(self.campaign.id, self.company.id)
-        counters = current.consumed_limits.model_dump()
-        for name, amount in (consumed or {}).items():
-            counters[name] += amount
-        counters["active_seconds"] += elapsed
-        counters["contacts_active_seconds"] += elapsed
-        changes = {"attempts": current.attempts | (attempts or {}),
-                   "consumed_limits": type(current.consumed_limits).model_validate(counters),
-                   "updated_at": utc_now()} | (updates or {})
         with self.db.transaction():
+            # Leer dentro de la transacción (T17): otra conexión no puede perder una clave de intento escrita antes.
+            current = self.db.get_run_item(self.campaign.id, self.company.id)
+            counters = current.consumed_limits.model_dump()
+            for name, amount in (consumed or {}).items():
+                counters[name] += amount
+            counters["active_seconds"] += elapsed
+            counters["contacts_active_seconds"] += elapsed
+            changes = {"attempts": current.attempts | (attempts or {}),
+                       "consumed_limits": type(current.consumed_limits).model_validate(counters),
+                       "updated_at": utc_now()} | (updates or {})
             for contact, source in aggregates:
                 self.db.save_contact(contact, evidence=source)
                 self.evidence_ids.extend(item.id for item in source)
