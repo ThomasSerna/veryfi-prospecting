@@ -208,6 +208,32 @@ def test_resume_after_an_uncertain_enrichment_does_not_repeat_calls(contact_case
     assert again.status == "pending" and len(case.calls) == calls
 
 
+def test_entity_rejection_keeps_the_failed_condition_without_response_data(contact_case, role_config, tmp_path):
+    """T17: el rechazo guarda qué condición de entidad falló, sin copiar datos de la respuesta de Apollo."""
+    from core.presentation import enrichment_rejection
+    from prospecting.pipeline import read_campaign
+
+    case = multi(contact_case, role_config, ["Head of Product", "Engineering Manager"])
+    reply = case.replies["people_enrichment"]
+
+    def other_domain(payload):
+        body = reply(payload)
+        body["person"]["organization"] = body["person"]["organization"] | {"primary_domain": "otra-marca.example"}
+        return body
+
+    case.replies["people_enrichment"] = other_domain
+    case.find()
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    keys = [key for key in run.attempts if key.startswith("contacts:apollo_rejected:")]
+    assert keys and all(key.startswith("contacts:apollo_rejected:entity_mismatch_domain:") for key in keys)
+    assert "otra-marca" not in " ".join(run.attempts)
+    assert not any("otra-marca" in (item.excerpt or "") for item in case.db.list_evidence(case.company.id))
+    view = read_campaign(tmp_path / "synthetic.sqlite3", case.campaign.id)
+    rejected = [item.enrichment_rejected for result in view.companies for item in result.contacts if item.enrichment_rejected]
+    assert rejected and set(rejected) == {"entity_mismatch_domain"}
+    assert "otro dominio principal" in enrichment_rejection(rejected[0])
+
+
 def test_enrichment_reconciled_without_consumption_is_retried_exactly_once(contact_case, role_config):
     """T17: tras conciliar en cero un timeout, reanudar repite esa llamada una sola vez y no ocupa otro cupo."""
     from prospecting.budget import Confirmation

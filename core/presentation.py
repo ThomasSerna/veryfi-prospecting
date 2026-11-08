@@ -106,6 +106,12 @@ ENRICHMENT_REJECTIONS = {
     "identity_unconfirmed": "Apollo no confirmó una coincidencia de identidad alta.",
     "identity_mismatch": "Apollo devolvió datos de otra persona; no se asignaron.",
     "entity_mismatch": "Apollo no confirmó que trabaje actualmente en esta entidad.",
+    # Condición concreta que falló (T17); los rechazos anteriores conservan `entity_mismatch`.
+    "entity_mismatch_no_organization": "Apollo no informó la organización actual de la persona.",
+    "entity_mismatch_domain": "Apollo asocia a la persona con otro dominio principal, no el de esta empresa.",
+    "entity_mismatch_organization_id": "Apollo informó datos de organización contradictorios para la persona.",
+    "entity_mismatch_name": "El nombre de la organización en Apollo no coincide con esta empresa.",
+    "entity_mismatch_not_current": "Apollo no informa un empleo actual de la persona en esta organización.",
 }
 STOP_MESSAGES = {
     "budget_exceeded": "Presupuesto disponible agotado.",

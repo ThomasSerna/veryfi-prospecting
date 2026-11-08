@@ -254,3 +254,14 @@ def test_reconciliation_receipt_and_rate_limit_identifiers_are_fixed():
 
     assert get_args(ReconciliationReceipt.model_fields["version"].annotation) == ("apollo_reconciliation_v1",)
     assert "rate_limits" in ApolloAccess.model_fields and not ApolloAccess.model_fields["rate_limits"].is_required()
+
+
+def test_entity_mismatch_codes_are_fixed():
+    """T17: los códigos de la condición de entidad se guardan en `contacts:apollo_rejected:`; no se renombran."""
+    from prospecting.providers.apollo import ENTITY_MISMATCH_CODES
+
+    assert ENTITY_MISMATCH_CODES == (
+        "entity_mismatch_no_organization", "entity_mismatch_domain", "entity_mismatch_organization_id",
+        "entity_mismatch_name", "entity_mismatch_not_current",
+    )
+    assert all(":" not in code for code in ENTITY_MISMATCH_CODES)

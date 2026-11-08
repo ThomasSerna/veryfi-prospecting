@@ -740,3 +740,14 @@ def test_company_criteria_and_sources_use_semantic_labels_and_contextual_pills(u
     assert "Fuente original · synthetic-co.example #" in page
     assert 'class="company-nav-bar"' not in page
     assert 'aria-label="Navegación secuencial de empresas"' in page
+
+
+def test_each_entity_mismatch_condition_has_its_own_explanation():
+    """T17: la ficha y el CSV explican qué condición de entidad falló; el código antiguo conserva su texto."""
+    from core.presentation import enrichment_rejection
+    from prospecting.providers.apollo import ENTITY_MISMATCH_CODES
+
+    generic = enrichment_rejection("codigo_desconocido")
+    labels = [enrichment_rejection(code) for code in ENTITY_MISMATCH_CODES]
+    assert generic not in labels and len(set(labels)) == len(labels)
+    assert enrichment_rejection("entity_mismatch") == "Apollo no confirmó que trabaje actualmente en esta entidad."

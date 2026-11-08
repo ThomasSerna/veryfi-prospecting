@@ -236,6 +236,36 @@ def parse_search(company: Company, data: ApolloSearchResponse, request_id: UUID,
     return results
 
 
+# Condición de entidad que People Enrichment no confirmó (T17). Solo el código se guarda, en la clave
+# `contacts:apollo_rejected:<código>:<contact_id>`, sin datos de la persona ni de la respuesta.
+ENTITY_MISMATCH_CODES = (
+    "entity_mismatch_no_organization", "entity_mismatch_domain", "entity_mismatch_organization_id",
+    "entity_mismatch_name", "entity_mismatch_not_current",
+)
+
+
+def _entity_mismatch(company: Company, person: ApolloPerson) -> str | None:
+    """Primera condición de entidad que falla, en el orden en que se comprueban; None si todas se cumplen.
+
+    `entity_mismatch` a secas queda para una empresa sin identidad confirmada, que nunca llega a Apollo.
+    """
+    organization = person.organization
+    if company.identity_status != IdentityStatus.CONFIRMED or company.domain is None:
+        return "entity_mismatch"
+    if organization is None or organization.id is None:
+        return "entity_mismatch_no_organization"
+    if organization.primary_domain != company.domain:
+        return "entity_mismatch_domain"
+    if person.organization_id != organization.id:
+        return "entity_mismatch_organization_id"
+    if not organization_matches(company, organization.name):
+        return "entity_mismatch_name"
+    if not any(item.current is True and not item.end_date and item.organization_id == organization.id
+               for item in person.employment_history):
+        return "entity_mismatch_not_current"
+    return None
+
+
 def parse_enrichment(contact: Contact, company: Company, data: ApolloEnrichmentResponse,
                      request_id: UUID, retrieved_at: datetime) -> tuple[Contact, list[Evidence]]:
     data = ApolloEnrichmentResponse.model_validate(data)
@@ -247,12 +277,9 @@ def parse_enrichment(contact: Contact, company: Company, data: ApolloEnrichmentR
     if person.match_confidence != "high":
         raise ContactError("identity_unconfirmed", "Apollo no confirmó una coincidencia de identidad alta.")
     organization = person.organization
-    if (company.identity_status != IdentityStatus.CONFIRMED or company.domain is None
-            or organization is None or organization.primary_domain != company.domain or organization.id is None
-            or person.organization_id != organization.id or not organization_matches(company, organization.name)
-            or not any(item.current is True and not item.end_date and item.organization_id == organization.id
-                       for item in person.employment_history)):
-        raise ContactError("entity_mismatch", "Apollo no confirmó la entidad actual; no se asignaron sus datos.")
+    mismatch = _entity_mismatch(company, person)
+    if mismatch is not None:
+        raise ContactError(mismatch, "Apollo no confirmó la entidad actual; no se asignaron sus datos.")
     name, complete = full_name(person.first_name, person.last_name)
     if name is None and person.name and person.name.strip():
         name = person.name.strip()

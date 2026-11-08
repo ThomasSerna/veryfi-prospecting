@@ -172,10 +172,19 @@ def test_enrichment_resolves_identity_without_fabricating_verification_or_employ
     ({"id": "otra-persona"}, "identity_mismatch"),
     ({"match_confidence": "medium"}, "identity_unconfirmed"),
     ({"match_confidence": "none"}, "identity_unconfirmed"),
-    ({"organization_id": "otra-empresa"}, "entity_mismatch"),
-    ({"organization": {"id": "empresa-sintetica", "name": "Empresa sintética", "primary_domain": "another.example"}}, "entity_mismatch"),
-    ({"employment_history": [{"current": False, "organization_id": "empresa-sintetica"}]}, "entity_mismatch"),
-    ({"employment_history": []}, "entity_mismatch"),
+    # T17: cada condición de entidad tiene su código; ninguno contiene datos de la persona.
+    ({"organization_id": "otra-empresa"}, "entity_mismatch_organization_id"),
+    ({"organization": {"id": "empresa-sintetica", "name": "Empresa sintética", "primary_domain": "another.example"}},
+     "entity_mismatch_domain"),
+    ({"organization": None}, "entity_mismatch_no_organization"),
+    ({"organization": {"id": None, "name": "Empresa sintética", "primary_domain": "example.com"}},
+     "entity_mismatch_no_organization"),
+    ({"organization": {"id": "empresa-sintetica", "name": "Compañía completamente distinta", "primary_domain": "example.com"}},
+     "entity_mismatch_name"),
+    ({"employment_history": [{"current": False, "organization_id": "empresa-sintetica"}]}, "entity_mismatch_not_current"),
+    ({"employment_history": []}, "entity_mismatch_not_current"),
+    ({"employment_history": [{"current": True, "organization_id": "empresa-sintetica", "end_date": "2025-01-01"}]},
+     "entity_mismatch_not_current"),
     ({"name": "Otra Persona"}, "identity_mismatch"),
 ])
 def test_enrichment_rejects_mismatched_identity_or_previous_employer(apollo_company, changes, code):
