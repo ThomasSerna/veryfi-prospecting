@@ -3,6 +3,8 @@
 
   // Actualización viva: la entrada se reproduce una vez y el sondeo actualiza en su sitio, sin reiniciarla.
   const EASE = 'cubic-bezier(.16, 1, .3, 1)';
+  // Los destellos usan el acento de la paleta (`--accent` en app.css) con la opacidad indicada.
+  const accent = alpha => `color-mix(in srgb, var(--accent) ${alpha}%, transparent)`;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const motionless = () => reduced.matches;
 
@@ -51,9 +53,9 @@
     // Una empresa nueva sube a su fila y conserva un instante la luz del descubrimiento.
     if (node.nodeName === 'TR') {
       node.animate([
-        { opacity: 0, transform: 'translateY(12px)', backgroundColor: 'rgb(128 223 243 / 16%)' },
-        { opacity: 1, transform: 'none', backgroundColor: 'rgb(128 223 243 / 10%)', offset: 0.35 },
-        { opacity: 1, transform: 'none', backgroundColor: 'rgb(128 223 243 / 0%)' },
+        { opacity: 0, transform: 'translateY(12px)', backgroundColor: accent(16) },
+        { opacity: 1, transform: 'none', backgroundColor: accent(10), offset: 0.35 },
+        { opacity: 1, transform: 'none', backgroundColor: 'transparent' },
       ], { duration: 1600, delay, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'backwards' });
       return;
     }
@@ -192,17 +194,17 @@
 
   function flash(segment, order) {
     segment.animate?.([
-      { filter: 'brightness(1)', boxShadow: '0 0 0 0 rgb(128 223 243 / 0)' },
-      { filter: 'brightness(1.7)', boxShadow: '0 0 22px 3px rgb(128 223 243 / .6)', offset: 0.3 },
-      { filter: 'brightness(1)', boxShadow: '0 0 0 0 rgb(128 223 243 / 0)' },
+      { filter: 'brightness(1)', boxShadow: '0 0 0 0 transparent' },
+      { filter: 'brightness(1.7)', boxShadow: `0 0 22px 3px ${accent(60)}`, offset: 0.3 },
+      { filter: 'brightness(1)', boxShadow: '0 0 0 0 transparent' },
     ], { duration: 1200, delay: order * 110, easing: 'ease-out' });
   }
 
   // Una fila cuyo contenido cambió se ilumina y se apaga: el color explica el cambio también sin movimiento.
   function glow(row) {
     row.animate?.([
-      { backgroundColor: 'rgb(128 223 243 / 14%)' },
-      { backgroundColor: 'rgb(128 223 243 / 0%)' },
+      { backgroundColor: accent(14) },
+      { backgroundColor: 'transparent' },
     ], { duration: motionless() ? 900 : 1600, easing: 'ease-out' });
   }
 

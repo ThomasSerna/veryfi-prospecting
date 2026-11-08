@@ -34,7 +34,7 @@
 .menu-toggle::after { display: none; }
 .menu-toggle svg { width: 22px; height: 22px; overflow: visible; }
 .menu-toggle-rail {
-  fill: var(--cyan);
+  fill: var(--accent);
   fill-opacity: .55;
   stroke: none;
   transform: scaleX(0);
@@ -57,15 +57,15 @@
   height: 7px;
   border-radius: 50%;
   background: var(--info);
-  box-shadow: 0 0 0 2px var(--ivory);
+  box-shadow: 0 0 0 2px var(--canvas);
   opacity: 0;
   transform: scale(.4);
   transition: opacity 240ms ease, transform 420ms var(--ease-out-expo, ease-out);
 }
 body[data-running='true'] .menu-toggle-pulse { opacity: 1; transform: none; animation: toggle-pulse 1.8s ease-out infinite; }
 @keyframes toggle-pulse {
-  0% { box-shadow: 0 0 0 2px var(--ivory), 0 0 0 2px rgb(162 194 255 / 55%); }
-  75%, 100% { box-shadow: 0 0 0 2px var(--ivory), 0 0 0 8px rgb(162 194 255 / 0%); }
+  0% { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 2px color-mix(in srgb, var(--info) 55%, transparent); }
+  75%, 100% { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 8px color-mix(in srgb, var(--info) 0%, transparent); }
 }
 
 .menu-toggle:focus-visible { color: var(--ink); }
@@ -77,7 +77,7 @@ body[data-running='true'] .menu-toggle-pulse { opacity: 1; transform: none; anim
 @media (hover: hover) and (pointer: fine) {
   .menu-toggle:hover { color: var(--ink); background: rgb(255 255 255 / 5%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%); }
   .menu-toggle:hover .menu-toggle-rail { transform: none; }
-  .menu-toggle:hover .menu-toggle-chevron { stroke: var(--cyan); transform: translateX(2px); animation: toggle-nudge 560ms var(--ease-out-expo, ease-out); }
+  .menu-toggle:hover .menu-toggle-chevron { stroke: var(--accent); transform: translateX(2px); animation: toggle-nudge 560ms var(--ease-out-expo, ease-out); }
 }
 
 /* El chevrón empuja hacia el cajón y se asienta, como un resorte corto. */
@@ -126,7 +126,7 @@ body[data-nav-open] .sidebar-close { display: inline-flex; }
   height: 100dvh;
   padding: 30px 22px 24px;
   border-right: 1px solid var(--line);
-  background: #10151a;
+  background: var(--surface);
   color: var(--ink);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -190,11 +190,11 @@ body[data-nav-open='true'] .sidebar {
 .main-nav a .navigation-arrow { width: 15px; height: 15px; opacity: 0; transform: translateX(-4px); transition: opacity 160ms, transform 160ms; }
 .main-nav a:hover:not([aria-disabled='true']),
 .main-nav a:focus-visible,
-.main-nav a[aria-current='page'] { color: var(--ink); background: #202b33; }
-.main-nav a[aria-current='page'] > svg:first-child { color: var(--cyan, #8cdef0); }
+.main-nav a[aria-current='page'] { color: var(--ink); background: var(--soft); }
+.main-nav a[aria-current='page'] > svg:first-child { color: var(--accent); }
 .main-nav a:hover .navigation-arrow,
 .main-nav a:focus-visible .navigation-arrow { opacity: 1; transform: none; }
-.main-nav .navigation-create { margin-top: 14px; background: rgb(128 223 243 / 7%); color: var(--cyan, #8cdef0); }
+.main-nav .navigation-create { margin-top: 14px; background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--accent); }
 .main-nav a[aria-disabled='true'] { color: var(--disabled-ink); opacity: .55; cursor: not-allowed; }
 
 /* Con JavaScript, una pastilla compartida se desliza entre enlaces en lugar de encender cada fondo. */
@@ -205,8 +205,8 @@ body[data-nav-open='true'] .sidebar {
   right: 0;
   height: 50px;
   border-radius: 10px;
-  background: #202b33;
-  box-shadow: inset 0 0 0 1px rgb(128 223 243 / 8%);
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
   opacity: 0;
   pointer-events: none;
   transition: transform 420ms var(--ease-out-expo, cubic-bezier(.16, 1, .3, 1)), opacity 220ms ease;
@@ -216,7 +216,7 @@ body[data-nav-open='true'] .sidebar {
 .main-nav[data-indicator] a:hover:not([aria-disabled='true']),
 .main-nav[data-indicator] a:focus-visible,
 .main-nav[data-indicator] a[aria-current='page'] { background: transparent; }
-.main-nav[data-indicator] .navigation-create:hover:not([aria-disabled='true']) { background: rgb(128 223 243 / 7%); }
+.main-nav[data-indicator] .navigation-create:hover:not([aria-disabled='true']) { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 body[data-nav-open='true'] .main-nav a {
   animation: navigation-item-in 520ms var(--ease-out-expo, cubic-bezier(.16, 1, .3, 1)) 70ms backwards;
@@ -240,7 +240,8 @@ body[data-nav-open='true'] .brand { animation: navigation-brand-in 560ms var(--e
   height: 100%;
   padding: 0;
   border: 0;
-  background: rgb(0 0 0 / .58);
+  /* Velo navy, no negro: la página sigue en la paleta de Veryfi bajo el cajón. */
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   opacity: 1;

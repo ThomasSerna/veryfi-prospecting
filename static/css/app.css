@@ -8,37 +8,58 @@
 
 :root {
   color-scheme: dark;
-  --navy: #111315;
-  --navy-hover: #272b30;
-  --navy-surface: #21252a;
-  --navy-muted: #a0a6b1;
-  --ivory: #0d0f14;
-  --ivory-deep: #2a2e34;
-  --surface: #15171d;
-  --cyan: #80dff3;
-  --cyan-hover: #a8ecf9;
-  --green: #84d6ac;
-  --green-hover: #a0e9c3;
-  --green-focus: #84d6ac;
-  --white: #f1f3f4;
-  --ink: #f0f2f6;
-  --muted: #a4aab8;
-  --line: #2b2e38;
-  --line-strong: #68727f;
-  --soft: #1c1f23;
-  --surface-hover: #202429;
-  --disabled-bg: #272b30;
-  --disabled-ink: #a8afba;
-  --info: #a2c2ff;
-  --info-bg: #1c2738;
-  --warning: #ebce85;
-  --warning-bg: #302b1e;
-  --error: #ffaaaa;
-  --error-bg: #352123;
-  --success: #98dfb6;
-  --success-bg: #1c3026;
-  --violet: #b7a5fa;
-  --blue: #97bdf1;
+  /* Paleta de Veryfi para superficies oscuras (https://www.veryfi.com/brand/). El turquesa
+     #2db5d2 completa el degradado del botón principal de veryfi.com. Veryfi no usa negro. */
+  --veryfi-navy: #171c3a;
+  --veryfi-navy-medium: #45495f;
+  --veryfi-navy-light: #70748f;
+  --veryfi-ivory: #e9ece4;
+  --veryfi-ivory-medium: #b9bdb1;
+  --veryfi-ivory-dark: #9b9c98;
+  --veryfi-green: #00fa6c;
+  --veryfi-teal: #2db5d2;
+  --veryfi-forest-light: #00d181;
+  --veryfi-sky: #7081f0;
+  --veryfi-sky-light: #9ba6e8;
+  --veryfi-sky-dark: #4553ba;
+  --veryfi-gold: #ffc56d;
+  --veryfi-magenta-light: #ff7585;
+
+  /* Roles de color: los componentes solo usan estos nombres; probar otra paleta es reasignarlos.
+     Los navy derivados conservan en OKLCH el matiz de Navy (274°). */
+  --canvas: oklch(0.184 0.045 275);
+  --surface: var(--veryfi-navy);
+  /* Los paneles protagonistas (resumen y pulso) se aclaran arriba hacia el turquesa de marca. */
+  --surface-top: color-mix(in oklab, var(--surface), var(--accent-alt) 7%);
+  --surface-hover: oklch(0.259 0.057 274);
+  --soft: oklch(0.272 0.06 274);
+  --line: oklch(0.331 0.055 275);
+  --line-strong: var(--veryfi-navy-light);
+  --track: var(--line);
+  --navy: var(--canvas);
+  --navy-hover: var(--soft);
+  --navy-surface: var(--soft);
+  --white: #fff;
+  --ink: var(--veryfi-ivory);
+  --muted: var(--veryfi-ivory-medium);
+  --disabled-bg: oklch(0.3 0.044 274);
+  --disabled-ink: var(--veryfi-ivory-dark);
+  --accent: var(--veryfi-green);
+  --accent-alt: var(--veryfi-teal);
+  --accent-ink: var(--veryfi-navy);
+  --accent-gradient: linear-gradient(298.79deg, var(--accent-alt) -23.47%, var(--accent) 92.01%, var(--accent-alt) 214.83%);
+  --accent-gradient-hover: linear-gradient(307.48deg, var(--accent-alt) -211.07%, var(--accent) -6.04%, var(--accent-alt) 212.05%);
+  --info: var(--veryfi-sky-light);
+  --info-bg: oklch(0.311 0.075 275);
+  --warning: var(--veryfi-gold);
+  --warning-bg: oklch(0.299 0.045 74);
+  --error: var(--veryfi-magenta-light);
+  --error-bg: oklch(0.291 0.065 10);
+  --success: var(--veryfi-forest-light);
+  --success-bg: oklch(0.301 0.06 160);
+  --unreviewed: var(--veryfi-gold);
+  --blue: var(--veryfi-sky-light);
+  --blue-pale: color-mix(in oklab, var(--blue) 40%, var(--ink));
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius: 12px;
@@ -71,19 +92,19 @@ html {
 
 body {
   margin: 0;
-  background: var(--ivory);
+  background: var(--canvas);
   color: var(--ink);
   font: 0.9375rem/1.55 var(--font);
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--cyan);
-  color: #10252c;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -237,8 +258,8 @@ code {
   left: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-xs);
-  background: var(--green);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
   text-decoration: none;
   transform: translateY(-200%);
@@ -275,13 +296,14 @@ code {
   transform: translateY(1px);
 }
 
+/* Principal: el degradado verde-turquesa del botón de veryfi.com, con texto navy. */
 .button-primary {
-  background: var(--cyan);
-  color: #10252c;
+  background: var(--accent-gradient);
+  color: var(--accent-ink);
 }
 
 .button-primary:hover:not(:disabled):not([aria-disabled='true']) {
-  background: var(--cyan-hover);
+  background: var(--accent-gradient-hover);
 }
 
 .button-navy {
@@ -382,7 +404,7 @@ button:disabled {
   gap: 20px;
   min-height: 64px;
   padding: 12px 28px;
-  background: var(--ivory);
+  background: var(--canvas);
   border-bottom: 1px solid var(--line);
 }
 
@@ -657,7 +679,7 @@ button:disabled {
 .priority-medium {
   --bar-1: var(--bar-on);
   --bar-2: var(--bar-on);
-  color: #d3dae6;
+  color: var(--blue-pale);
 }
 
 .priority-low {
@@ -767,7 +789,7 @@ button:disabled {
 }
 
 .company-link:hover {
-  color: var(--green-focus);
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -901,7 +923,7 @@ select:hover:not(:disabled) {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--green-focus);
+  border-color: var(--accent);
 }
 
 input:disabled,
@@ -931,7 +953,7 @@ input[type='checkbox'] {
   width: 18px;
   height: 18px;
   margin: 0 10px 0 0;
-  accent-color: var(--green-focus);
+  accent-color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -1067,20 +1089,20 @@ progress {
   border: 0;
   border-radius: var(--radius-xs);
   overflow: hidden;
-  background: var(--ivory-deep);
-  accent-color: var(--green-focus);
+  background: var(--track);
+  accent-color: var(--accent);
 }
 
 progress::-webkit-progress-bar {
-  background: var(--ivory-deep);
+  background: var(--track);
 }
 
 progress::-webkit-progress-value {
-  background: var(--green-focus);
+  background: var(--accent);
 }
 
 progress::-moz-progress-bar {
-  background: var(--green-focus);
+  background: var(--accent);
 }
 
 /* Barra de filtros */
@@ -1543,7 +1565,7 @@ a.sequence-link:hover {
 
 .tab-link[aria-selected='true'] span {
   background: var(--navy-surface);
-  color: var(--green);
+  color: var(--accent);
 }
 
 .company-panel {
@@ -1677,7 +1699,7 @@ a.sequence-link:hover {
 .source-pill:hover,
 .evidence-references a:hover,
 .provenance-list a:hover {
-  background: var(--ivory);
+  background: var(--canvas);
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -1899,7 +1921,7 @@ a.sequence-link:hover {
 }
 
 .copy-channel-btn:hover {
-  background: var(--ivory);
+  background: var(--canvas);
   border-color: var(--ink);
 }
 
@@ -1982,7 +2004,7 @@ a.sequence-link:hover {
 .evidence-detail:target {
   background: var(--soft);
   border-color: var(--ink);
-  outline: 2px solid var(--green-focus);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -2038,7 +2060,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .demo-notice svg { width: 16px; height: 16px; }
 .demo-notice strong { font-weight: 400; }
 .page-description { color: var(--muted); margin: 7px 0 0; font-size: .875rem; }
-.product-tag { display: inline-flex; padding: 4px 9px; border: 1px solid var(--line); border-radius: 5px; font-size: .75rem; color: var(--muted); background: var(--soft); } .metric-track { display: block; height: 6px; border-radius: 3px; background: var(--ivory-deep); overflow: hidden; } .metric-track > span { display: block; height: 100%; background: var(--green); border-radius: inherit; }
+.product-tag { display: inline-flex; padding: 4px 9px; border: 1px solid var(--line); border-radius: 5px; font-size: .75rem; color: var(--muted); background: var(--soft); } .metric-track { display: block; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; } .metric-track > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
 .preparation-layout { grid-template-columns: minmax(0,1fr); }
 .preparation-form { padding: 24px; }
 .preparation-section + .preparation-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
@@ -2055,17 +2077,17 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .preparation-preview dd { font-size: .8125rem; }
 .company-identity, .contact-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .company-title-copy { min-width: 0; }
-.company-monogram, .contact-initial { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); font-size: 1.125rem; color: var(--green); }
+.company-monogram, .contact-initial { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); font-size: 1.125rem; color: var(--accent); }
 .assessment-score-band { gap: 20px; }
 .assessment-score-band > div { padding: 12px 0; background: transparent; border: 0; border-radius: 0; }
 .assessment-score-band .metric-track { margin-top: 12px; }
 .company-panel > p.assessment-explanation { padding: 0; background: transparent; border: 0; font-size: 1rem; line-height: 1.6; }
-.criterion-signal { width: 44px; height: 5px; display: inline-block; background: var(--ivory-deep); border-radius: 2px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+.criterion-signal { width: 44px; height: 5px; display: inline-block; background: var(--track); border-radius: 2px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
 .criterion-signal > span { display: block; height: 100%; background: currentColor; }
 .tabs { position: relative; padding: 0; gap: 20px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .tab-link { padding: 12px 0; border-radius: 0; border-bottom: 2px solid transparent; }
-.tab-link[aria-selected='true'] { background: transparent; color: var(--ink); border-bottom-color: var(--green); }
-.tab-link[aria-selected='true'] span { background: var(--soft); color: var(--green); }
+.tab-link[aria-selected='true'] { background: transparent; color: var(--ink); border-bottom-color: var(--accent); }
+.tab-link[aria-selected='true'] span { background: var(--soft); color: var(--accent); }
 .tab-link:hover { background: transparent; color: var(--ink); }
 .review-panel { top: 84px; }
 .review-panel-heading h2 { margin-bottom: 8px; }

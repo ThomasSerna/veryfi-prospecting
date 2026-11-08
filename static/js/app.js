@@ -231,8 +231,8 @@
       source.scrollIntoView({ block: 'center' });
       // La fuente señalada por una píldora se ilumina un instante para unir referencia y origen.
       source.animate?.([
-        { backgroundColor: 'rgb(128 223 243 / 10%)', boxShadow: '0 0 0 1px rgb(128 223 243 / 55%)' },
-        { backgroundColor: 'rgb(128 223 243 / 0%)', boxShadow: '0 0 0 1px rgb(128 223 243 / 0%)' },
+        { backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent)' },
+        { backgroundColor: 'transparent', boxShadow: '0 0 0 1px transparent' },
       ], { duration: 1800, delay: reducedMotion.matches ? 0 : 280, easing: 'ease-out', fill: 'backwards' });
     }
     function revealHash(animate = true) {
