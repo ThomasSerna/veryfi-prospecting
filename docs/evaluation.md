@@ -146,8 +146,8 @@ campaña. La interfaz muestra el cupo, el margen y lo pendiente de conciliar.
 
 ## Limitaciones y siguiente mejora
 
-- **Siguiente mejora prioritaria: la etapa de personas.** Con los cargos de la evaluación, Hunter
-  Domain Search encontró personas en 1 de 8 empresas, y ninguna fuente pública aportó empleo vigente
+- **Siguiente mejora prioritaria (14 de octubre; histórico): la etapa de personas.** Con los cargos de
+  la evaluación, Hunter Domain Search encontró personas en 1 de 8 empresas, y ninguna fuente pública aportó empleo vigente
   fechado. Medir frente a esta línea base una fuente adicional de personas (Apollo o X-Ray) y el uso
   de las páginas de equipo corporativas.
 - **CPG**: los sitios promocionales casi nunca confirman nombre ni país, así que el segmento quedó con
@@ -316,8 +316,8 @@ Solo usa datos sintéticos: no hubo llamadas reales ni se repitió ningún lote.
   observación de esa muestra, no una validación general de precisión comercial.
 - **Priorización de cargos.** Cada perfil de `config/veryfi.json` lista sus cargos con variantes
   en español e inglés, y los cargos de la evaluación se limitan a los perfiles de la empresa.
-  Hunter Domain Search busca primero por esos cargos y, en el segundo intento de prioridad alta,
-  por departamentos. La búsqueda pública usa los cuatro primeros cargos. Las personas se
+  En esa evaluación, Hunter Domain Search buscaba primero por esos cargos y, en el segundo intento
+  de prioridad alta, por departamentos; desde T12 la búsqueda de personas usa Apollo. La búsqueda pública usa los cuatro primeros cargos. Las personas se
   investigan por nombre completo, cargo pertinente y posición de su cargo en la lista.
 - **Cupo de personas.** La selección de la T06 seguía sin corregir: un candidato poco pertinente
   hallado primero ocupaba el cupo, y los idóneos que aparecían después se descartaban sin

@@ -117,7 +117,8 @@ USD 0,0283956 de Haiku en este ledger, más unos USD 0,0019 de otra instancia.
 
 ## Estimaciones
 
-Valores para planear; no son mediciones ni compromisos:
+Valores para planear del 14 de octubre de 2026; no son mediciones ni compromisos. Desde T12 la
+etapa de personas usa Apollo y la estimación de Hunter queda solo como antecedente:
 
 - Un lote de 8 empresas como los observados consumiría del orden de 20 a 25 créditos de Tavily,
   USD 0,01 de Haiku y 0 a 2 créditos de Hunter Domain Search. Depende de las empresas, de los
@@ -149,7 +150,8 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
 - **Reglas comerciales**: catálogo, rúbrica, umbrales y cargos son propuestas; la lista de
   exclusiones de Veryfi no existe aún. Los plazos de vigencia (30 días para correos, 365
   para cargos) son reglas del prototipo, no garantías de los proveedores. La vigencia
-  inferida de Hunter (correo verificado y fuente vista recientemente) no prueba el cargo.
+  inferida de Hunter (correo verificado y fuente vista recientemente) no prueba el cargo; desde
+  T18 solo se aplica al historial de Hunter.
 - **Vigencia**: no hay revalidación periódica de cargos ni canales; la disponibilidad se
   recalcula al consultar con la fecha actual, sin nuevas llamadas.
 - **Tamaño de las solicitudes a Haiku**: el límite de entrada se controla con una estimación de
@@ -191,7 +193,8 @@ discutir con Veryfi, no resultados obtenidos.
 
 ## Trabajo posterior
 
-En orden de prioridad según la evidencia disponible:
+Prioridades al 14 de octubre de 2026, con Hunter como ruta de personas; el backlog vigente está
+en [Roadmap.md](Roadmap.md):
 
 1. **Etapa de personas**: es el cuello de botella medido. En el lote de la entrega Hunter halló
    tres personas pertinentes con correo verificado, pero ninguna con evidencia de empleo vigente.

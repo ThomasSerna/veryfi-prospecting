@@ -153,7 +153,10 @@ mostró exactamente 16.143 tokens de entrada y 2.354 de salida.
   clasificación cerca de los umbrales, pero no miden calidad ni calibración (T10). La
   revisión humana de §6 sigue siendo necesaria.
 
-## Hunter
+## Hunter (histórico)
+
+Registro de la ruta anterior a T12. Hunter ya no se llama ni se puede autorizar; desde T17 la
+configuración rechaza su cupo. Las cifras se conservan como línea base.
 
 | Campo | Valor observado |
 |---|---|
