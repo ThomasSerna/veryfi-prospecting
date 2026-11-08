@@ -7,12 +7,16 @@ La capa de datos puede utilizarse desde Python, sin Django ni claves:
 ```python
 from pathlib import Path
 
+from prospecting.contacts import load_contact_match
 from prospecting.db import Database
 from prospecting.models import Campaign, VeryfiConfig
 
 config = VeryfiConfig.model_validate_json(
     Path("config/veryfi.json").read_text(encoding="utf-8")
 )
+config = config.model_copy(update={
+    "contact_match": load_contact_match(Path("config/contact_match_v2.json")),
+})
 campaign = Campaign(
     countries=["CO"],
     segments=["fintech_software"],
@@ -39,6 +43,13 @@ evaluaciones nuevas, `profile_matches` guarda el `profile_id` y sus citas litera
 con `evidence_id`; las referencias se verifican para la empresa y campaña. Si después
 aparece una contradicción, la evaluación histórica se conserva y la pertinencia se
 recalcula con la evidencia disponible para la campaña.
+
+La preparación de campañas nuevas incorpora la configuración validada de
+`contact_match_v2` en `config_snapshot.contact_match`. El ejemplo de bajo nivel la
+incorpora explícitamente antes de guardar; `Database.save_campaign` no la añade.
+La instantánea conserva pesos y versión, aunque después cambie el archivo de
+configuración. El campo es opcional para leer campañas anteriores sin reescribirlas ni
+modificar el esquema SQLite; ausente o `null` identifica la ruta histórica v1.
 
 La instantánea identifica la generación de contactos mediante `people_provider`:
 las campañas anteriores, sin ese campo, son históricas; las nuevas utilizan `apollo`.
@@ -174,6 +185,9 @@ identificadores sin reescribir el ledger anterior:
 
 - `people_provider="apollo"` en la instantánea de las campañas nuevas; el campo
   ausente identifica campañas históricas.
+- `contact_match_v2` en `config_snapshot.contact_match` identifica los pesos y el
+  algoritmo de match de las campañas nuevas; un campo ausente o `null` selecciona la
+  lectura histórica `contact_match_v1`.
 - Claves `contacts:apollo_search` y `contacts:apollo_enrichments` para los intentos
   de búsqueda y enriquecimiento; las claves compartidas mantienen su significado.
 - Clave `contacts:apollo_rejected:<código>:<contact_id>` (T16) para una persona que
@@ -202,9 +216,13 @@ Fuera de SQLite, `data/provider-access.json` admite `ApolloAccess.rate_limits` (
 sin él rigen los límites del plan Free) y los comprobantes de `data/conciliaciones/` usan el
 formato `apollo_reconciliation_v1` ([budget-providers.md](budget-providers.md#conciliación-con-el-panel)).
 
-El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
-recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera
-datos guardados ([Personas y canales](contacts.md#porcentaje-de-match)). Del mismo modo,
+El porcentaje de match de contactos no se guarda en SQLite: se recalcula al leer con
+la versión y los pesos de la instantánea, o con `config/contact_match.json` para las
+campañas anteriores sin instantánea de match ([Personas y canales](contacts.md#porcentaje-de-match)).
+Las mismas entradas y fecha reproducen el resultado de cada versión; la evidencia y su
+vigencia se vuelven a comprobar en la fecha de consulta. Los resultados y configuraciones
+externas que no se guardaron en campañas anteriores no se pueden reconstruir con certeza.
+Del mismo modo,
 la calibración del ICP enterprise (`config/icp_enterprise.json`, `icp_enterprise_v1`) vive
 versionada fuera de SQLite, y los campos adicionales de escala en `CompanySize`
 (`public_revenue`, `geographic_coverage`, `scope`, `icp_tier`) tienen valores

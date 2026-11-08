@@ -23,8 +23,9 @@ de la campaña.
 
 El orden de trabajo es:
 
-1. Reutilizar personas, canales y evidencia de la generación Apollo. Si ya existe un canal
-   preferido utilizable, terminar sin nuevas llamadas.
+1. Reutilizar personas, canales y evidencia de la generación Apollo. Las campañas sin
+   política de varias personas terminan si ya existe un canal preferido utilizable;
+   las que tienen política comprueban además el objetivo de personas y funciones.
 2. Consultar People API Search sobre el dominio confirmado y con cargos específicos
    de los casos de uso respaldados. Se agrupan cargos con seniority inequívoco y
    especialistas o jerarquías ambiguas sin ese filtro, hasta dos consultas. Cada
@@ -52,11 +53,13 @@ un cargo claramente fuera del perfil resulta `relevant_function=False` y uno
 ambiguo sin respaldo de función queda `None`. Ninguno es elegible. El cupo de personas
 (`contacts:person:`) solo lo ocupa quien supera `validate_contact` al investigarla,
 así un candidato poco pertinente hallado primero no desplaza a uno idóneo hallado
-después. Entre candidatos de calidad comparable se favorecen familias distintas y se
-priorizan promotores de negocio, técnicos y posibles compradores económicos. Las
-búsquedas nominales en la web omiten a quien ya se sabe fuera del perfil. Esta
-selección no amplía topes: consultas, páginas y enriquecimientos siguen contándose
-igual y las llamadas hechas no se recuperan.
+después. En campañas con `contact_match_v2`, la pertinencia y el match ordenan los
+candidatos; solo a igualdad de ambas se alternan funciones. Se excluyen del
+enriquecimiento las personas descartadas por identidad, empleo o alcance, pero las
+que tienen datos pendientes siguen siendo investigables. Las búsquedas nominales en
+la web omiten a quien ya se sabe fuera del perfil. Esta selección no amplía topes:
+consultas, páginas y enriquecimientos siguen contándose igual y las llamadas hechas
+no se recuperan.
 
 La prioridad media permite hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos
 Apollo, 2 consultas web, 2 páginas y 90 segundos adicionales. La prioridad alta permite
@@ -86,9 +89,10 @@ Con política, la etapa de contactos:
 
 - ocupa el cupo `contacts:person:` como antes, pero un canal preferido ya no la termina;
 - omite People Search si el objetivo ya se cumple con datos vigentes;
-- enriquece en el orden de pertinencia y diversidad y comprueba el objetivo antes de cada
-  enriquecimiento. Si hay personas suficientes de una sola función y queda un candidato de
-  otra por intentar, solo enriquece candidatos de otras funciones;
+- comprueba el objetivo antes de cada enriquecimiento. Con v2 ordena por pertinencia y
+  match y, a igualdad de ambos, favorece funciones distintas; las campañas anteriores
+  conservan su orden. Si hay personas suficientes de una sola función y queda un
+  candidato viable de otra por intentar, solo enriquece candidatos de otras funciones;
 - registra un rechazo de identidad o entidad de People Enrichment (`identity_unconfirmed`,
   `identity_mismatch`, `entity_mismatch`) como resultado procesado con la clave
   `contacts:apollo_rejected:<código>:<contact_id>`. Desde T17 el rechazo de entidad guarda
@@ -301,57 +305,65 @@ utilizable, `qualified_no_contact`. Los fallos técnicos se registran aparte.
 ## Porcentaje de match
 
 `read_campaign` devuelve a todas las personas guardadas de cada empresa, también a las
-que no superan `validate_contact`, ordenadas por un porcentaje de match determinístico
-de 0 a 100 para que ventas elija a quién contactar. `contact_match` lo calcula al leer,
-sin red, IA ni persistencia, con las reglas de esta página. No cambia `eligible`, los
-canales utilizables, `derive_readiness` ni el estado comercial: ordena la revisión y no
-es una probabilidad de respuesta ni de compra.
+que no superan `validate_contact`, con un match determinístico de 0 a 100. El cálculo
+no usa red ni IA y no convierte a una persona en elegible o lista. Ordena la revisión y
+ayuda a priorizar el enriquecimiento, pero no es una probabilidad de respuesta ni de compra.
 
-Cada persona suma cuatro componentes. El código fija los niveles; `config/contact_match.json`,
-sus puntos. La versión `contact_match_v1` (propuesta del equipo, 15 de octubre) prioriza
-la pertinencia del cargo:
+Cada persona suma cuatro componentes. Las campañas nuevas guardan la propuesta
+`contact_match_v2`, pendiente de validación comercial con Veryfi. Las campañas anteriores
+sin instantánea de match usan `contact_match_v1`, propuesta del equipo del 15 de octubre:
 
-| Componente | Peso | Niveles y puntos |
-|---|---:|---|
-| Cargo | 50 | Elegido en la calificación, 50; otro cargo de los perfiles respaldados, 35; fuera de los perfiles, 0; sin cargo con fuente, 0 (pendiente) |
-| Canal | 25 | Correo, teléfono o WhatsApp que supera `channel_is_usable`, 25; LinkedIn u otro canal confirmado, 18; correo, teléfono o WhatsApp sin comprobar, 10; LinkedIn u otro canal sin confirmar, 7; ninguno, 0 (pendiente) |
-| Identidad | 15 | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 (pendiente) |
-| Vigencia del empleo | 10 | Evidencia del puesto, 10; inferida de Hunter, 6; sin comprobar, 0 (pendiente) |
+| Componente | `contact_match_v1` | `contact_match_v2` |
+|---|---|---|
+| Cargo | Elegido en la calificación, 50; otro de los perfiles respaldados, 35; fuera de perfil o desconocido, 0 | Elegido, 40; otro respaldado, 28; fuera de perfil o desconocido, 0 |
+| Canal | Preferido utilizable, 25; alternativo confirmado, 18; preferido sin comprobar, 10; alternativo sin confirmar, 7; ninguno, 0 | Preferido utilizable, 20; alternativo confirmado, 14; preferido sin comprobar, 8; alternativo sin confirmar, 6; ninguno, 0 |
+| Identidad | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 | Los mismos niveles y puntos que v1 |
+| Vigencia del empleo | Evidencia del puesto, 10; inferencia histórica de Hunter, 6; sin comprobar, 0 | `corporate_evidence`, 25; `provider_claim`, `contradicted` o `unknown`, 0 |
 
-Desde T18 el nivel de vigencia se lee del estado neutral, sin cambiar los pesos ni la
-huella de `contact_match_v1`: `corporate_evidence` es «evidencia del puesto»,
-`provider_claim` con origen Hunter conserva el nivel histórico `hunter_signal` y los
-demás estados, incluida una afirmación de Apollo, quedan «sin comprobar». `contact_match_v2`
-(T19) usará los nombres neutrales.
+El canal preferido es correo, teléfono o WhatsApp; el alternativo es LinkedIn u otro
+canal directo. Un canal `invalid` o marcado como no profesional no suma. En v2,
+`provider_claim` y `unknown` se muestran pendientes: la afirmación de un proveedor
+no prueba empleo vigente. `contradicted` descarta a la persona. En v1 se conserva la
+interpretación histórica: `corporate_evidence` corresponde a evidencia del puesto y
+`provider_claim` de Hunter a `hunter_signal`; las afirmaciones de Apollo quedan sin
+comprobar. El proveedor no añade puntos en v2.
 
-Un dato pendiente suma 0, pero se muestra como pendiente y no como incumplimiento. Un
-canal `invalid` o marcado como no profesional no suma. Tres reglas descartan a la persona
-(`blocked_reason`) y la llevan al final sin ocultar su desglose: identidad `contradicted`,
-empleo no vigente o salida nominal (`employment_ended`) y un alcance geográfico respaldado
-que no cubre los países de la empresa (`scope_mismatch`). El orden es: con match, no
-descartadas, mayor puntaje, elegibles, posición del cargo en `target_roles`, nombre e id;
-no depende del orden de guardado.
+Ambas versiones llevan al final a las personas con identidad contradictoria, salida o
+empleo no vigente, o alcance respaldado incompatible con la empresa; v2 también descarta
+las demás contradicciones del empleo. El desglose no se oculta. V1 ordena por descarte,
+puntaje descendente, elegibilidad, posición del cargo, nombre e id. V2 ordena primero por
+descarte y pertinencia del cargo, después por puntaje descendente; a igualdad de pertinencia
+y puntaje alterna funciones y desempata por elegibilidad, cargo, nombre e id. El orden no
+depende del orden de guardado.
 
 La ficha muestra el porcentaje, su desglose y la versión; la tabla de la campaña, el
 número de personas y el mejor match no descartado. El CSV añade `contact_match`,
-`contact_match_version`, `contact_match_blocked` y `contact_match_detail`.
+`contact_match_version`, `contact_match_blocked` y `contact_match_detail`. La ficha y
+el CSV también muestran la función que la taxonomía asocia al cargo con fuente y las
+funciones representadas entre las personas pertinentes; esto no acredita empleo ni
+autoridad de compra.
 
 ### Configurar los pesos
 
-1. Edita `config/contact_match.json`. Los `weight` de los cuatro componentes suman 100;
-   en cada componente, el nivel más alto vale su peso y ninguno lo supera; los niveles
-   pendientes (`unknown`, `none`, `incomplete`, `unverified`) valen 0. Los nombres de
-   componentes y niveles los fija el código.
-2. Cambia `version` (por ejemplo, `contact_match_v2`) y registra su huella en
-   `CONFIG_FINGERPRINTS` de `tests/test_contact_match.py`. La prueba falla si cambian los
-   puntos y se conserva la versión.
-3. Recarga la ficha. El match se recalcula al consultar, también en campañas ya
-   guardadas, sin llamadas ni gasto; la ficha y el CSV indican la versión usada.
-4. Para probar otra combinación sin tocar el archivo versionado, apunta la variable
-   `PROSPECTING_CONTACT_MATCH_PATH` a otro JSON antes de iniciar el servidor.
+`config/contact_match_v2.json` contiene la propuesta para campañas nuevas;
+`config/contact_match.json` conserva v1 para las anteriores. La preparación valida el
+archivo v2 y guarda su configuración en la instantánea de la campaña. Para usar otro
+archivo v2, indica su ruta en `PROSPECTING_CONTACT_MATCH_PATH` antes de preparar la
+campaña. Esa variable no modifica las campañas ya guardadas ni sus exportaciones.
+Si el archivo v2 falta, es inválido o contiene otra versión, no se guarda la campaña
+nueva y se informa el error.
 
-Si el archivo falta o no es válido, la aplicación no usa pesos por defecto: muestra a las
-personas sin porcentaje, avisa en la ficha y deja vacías las columnas del CSV.
+Cada versión fija sus componentes, niveles y puntos mediante una huella validada: no
+se pueden cambiar los pesos conservando el mismo nombre de versión. Los cuatro pesos
+suman 100, el máximo de cada componente coincide con su peso y los niveles marcados
+como pendientes suman 0. Un cambio de puntos o niveles necesita una versión nueva y
+su implementación explícita; no basta con editar el JSON.
+
+El match se recalcula sin llamadas ni gasto con la evidencia y fecha de consulta actuales.
+Las mismas entradas y fecha producen el mismo resultado, pero una fuente que caduca o
+una contradicción nueva puede cambiarlo. Para campañas anteriores, si el archivo v1 falta,
+no es válido o declara otra versión, se muestran las personas sin porcentaje, la ficha
+avisa y las columnas de match del CSV quedan vacías; no se inventan pesos.
 
 Las pruebas sin red usan credenciales y datos declarados sintéticos; no demuestran
 cobertura, acceso ni consumo de Apollo. Las llamadas históricas a Hunter de T07, T09

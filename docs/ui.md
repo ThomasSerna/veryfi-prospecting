@@ -58,7 +58,10 @@ cambios. Las vistas operativas ya aplican la nueva dirección.
 
 1. En Mercado y Alcance, selecciona países, segmentos, palabras clave opcionales y
    un máximo de 1–20 empresas. Revisa los criterios y topes en Resumen.
-   Crear la campaña guarda los criterios y la instantánea de configuración sin tráfico.
+   Crear la campaña guarda los criterios y la instantánea de configuración, incluida
+   la propuesta `contact_match_v2`, sin tráfico. La versión y sus pesos no cambian al
+   editar después el archivo local. Si la configuración v2 falta o no es válida, se
+   informa el error y no se guarda la campaña nueva.
 2. Consulta el presupuesto y las cuentas comprobadas. Ejecutar requiere claves en el
    entorno y un archivo válido `data/provider-access.json`.
 3. El responsable autoriza explícitamente cada operación habilitada, con cuenta, tope
@@ -221,16 +224,21 @@ prioridad, necesidad documental `1` y score descendente, con desempate estable.
 La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
-La pestaña Contactos lista a todas las personas encontradas, ordenadas por porcentaje de
-match, con su desglose, sus datos pendientes y la marca de las descartadas por regla. Cada
-persona muestra su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
-o Lista) y, si Apollo no la confirmó al enriquecerla, el motivo. Encima, un resumen indica el
-objetivo del nivel y cuántas personas son candidatas, pertinentes y listas; sin
-`people_policy` se omite el objetivo. La tabla de la campaña muestra cuántas personas tiene
-cada empresa, cuántas son pertinentes y listas, y su mejor match. El match
-ordena la revisión; «listo» sigue dependiendo de las reglas de persona y canal. Si falta
-un `config/contact_match.json` válido, la ficha lo avisa y muestra a las personas sin
-porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
+La pestaña Contactos lista a todas las personas encontradas, con su porcentaje de match,
+su desglose, sus datos pendientes y la marca de las descartadas por regla. En v2, las
+personas no descartadas y la pertinencia preceden al porcentaje en el orden. La ficha
+indica que v2 es una propuesta pendiente de validación comercial. Cada persona muestra
+su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
+o Lista), la función de su cargo y, si Apollo no la confirmó al enriquecerla, el motivo.
+Encima, un resumen indica el objetivo del nivel, cuántas personas son candidatas,
+pertinentes y listas y qué funciones representan las pertinentes; sin `people_policy`
+se omite el objetivo. La tabla de la campaña muestra cuántas personas tiene
+cada empresa, cuántas son pertinentes y listas, y su mejor match. Las campañas nuevas
+usan el match v2 de su instantánea; las anteriores sin ella usan v1. El match ordena la
+revisión y la prioridad de enriquecimiento, mientras «listo» sigue dependiendo de las
+reglas de persona y canal. Si falta una configuración v1 válida para una campaña
+histórica, o el archivo declara otra versión, la ficha lo avisa y muestra a las personas
+sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
 
 Cada persona muestra la vigencia de su empleo ([Vigencia del empleo](contacts.md#vigencia-del-empleo-t18)):
 el estado (vigente según fuente corporativa o pública, declarado por Apollo, inferido del
@@ -270,7 +278,9 @@ score y cobertura, criterios, canales, fuentes con fechas, revisión, advertenci
 motivos. También incluye el porcentaje de match de cada persona, su versión, el motivo
 de descarte y el desglose; las filas de cada empresa siguen ese orden. Las columnas
 `employment_status` y `employment_reason` llevan el estado y el motivo de la vigencia
-del empleo, recalculados al descargar. `person_stage` lleva la etapa de la persona;
+del empleo, recalculados al descargar. `function_id` lleva la función del cargo y
+`people_functions` la lista JSON de funciones representadas por personas pertinentes.
+`person_stage` lleva la etapa de la persona;
 `people_candidates`, `people_relevant`, `people_ready`, `people_target` y
 `people_policy_version` repiten en cada fila los conteos y el objetivo de su empresa. Un valor desconocido queda vacío, nunca se
 convierte en cero.
