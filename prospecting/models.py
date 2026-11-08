@@ -3,6 +3,8 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+import hashlib
+import json
 import re
 from typing import Annotated, Literal, Self
 from uuid import UUID, uuid4
@@ -443,6 +445,57 @@ class Defaults(CampaignLimits):
     employee_ranges: dict[Literal["small", "medium", "large"], EmployeeRange]
 
 
+MatchComponentName = Literal["role", "channel", "identity", "employment"]
+MATCH_LEVELS = {
+    "role": ("selected_role", "profile_role", "outside_profile", "unknown"),
+    "channel": ("preferred_usable", "alternative_usable", "preferred_unconfirmed", "alternative_unconfirmed", "none"),
+    "identity": ("confirmed_complete", "complete_pending", "incomplete"),
+    "employment": ("evidence", "hunter_signal", "unverified"),
+}
+MATCH_LEVELS_V2 = MATCH_LEVELS | {"employment": ("corporate_evidence", "provider_claim", "contradicted", "unknown")}
+PENDING_LEVELS = frozenset({"unknown", "none", "incomplete", "unverified", "provider_claim"})
+Points = Annotated[StrictInt, Field(ge=0, le=100)]
+CONTACT_MATCH_FINGERPRINTS = {
+    "contact_match_v1": "dd990a111908273b12a82a916a8174962377367aa41c9dc7aa6f0f31407b6d7e",
+    "contact_match_v2": "c68ed6877f566d289330f0397e4cd05044200b2bce547f59181e40a1c94463ee",
+}
+
+
+class MatchComponentConfig(Contract):
+    weight: Annotated[StrictInt, Field(gt=0, le=100)]
+    levels: dict[Text, Points]
+
+
+class ContactMatchConfig(Contract):
+    """La versión fija niveles, puntos y algoritmo; nunca se reinterpretan pesos históricos."""
+
+    version: Literal["contact_match_v1", "contact_match_v2"]
+    validation_status: Literal["proposed", "validated"]
+    source_reference: Text
+    components: dict[MatchComponentName, MatchComponentConfig]
+
+    @model_validator(mode="after")
+    def validate_points(self) -> Self:
+        if self.version == "contact_match_v2" and self.validation_status != "proposed":
+            raise ValueError("contact_match_v2 sigue siendo una propuesta sin validación comercial.")
+        levels = MATCH_LEVELS if self.version == "contact_match_v1" else MATCH_LEVELS_V2
+        if set(self.components) != set(levels):
+            raise ValueError("El match necesita los componentes role, channel, identity y employment.")
+        if sum(item.weight for item in self.components.values()) != 100:
+            raise ValueError("Los pesos del match deben sumar 100.")
+        for name, item in self.components.items():
+            if set(item.levels) != set(levels[name]):
+                raise ValueError(f"El componente {name} necesita exactamente los niveles {', '.join(levels[name])}.")
+            if max(item.levels.values()) != item.weight:
+                raise ValueError(f"El nivel más alto de {name} debe valer su peso, sin superarlo.")
+            if any(points for level, points in item.levels.items() if level in PENDING_LEVELS):
+                raise ValueError("Un dato pendiente no suma puntos.")
+        digest = hashlib.sha256(json.dumps(self.model_dump(mode="json")["components"], sort_keys=True).encode()).hexdigest()
+        if digest != CONTACT_MATCH_FINGERPRINTS[self.version]:
+            raise ValueError("Cambiar pesos o niveles requiere una nueva versión de match implementada.")
+        return self
+
+
 class VeryfiConfig(Contract):
     people_provider: Literal["apollo"] | None = None
     schema_version: Annotated[StrictInt, Field(ge=1, le=1)]
@@ -452,6 +505,7 @@ class VeryfiConfig(Contract):
     defaults: Defaults
     role_taxonomy: RoleTaxonomy | None = None
     people_policy: PeoplePolicy | None = None
+    contact_match: ContactMatchConfig | None = None
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:

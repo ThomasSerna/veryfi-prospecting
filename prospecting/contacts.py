@@ -8,15 +8,16 @@ Toda fuente de personas entrega `Contact`, `Channel` y `Evidence` y pasa por est
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import re
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal
 import unicodedata
 from uuid import UUID
 
-from pydantic import Field, StrictBool, StrictInt, model_validator
+from pydantic import Field, StrictBool, StrictInt
 
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignLimits, Channel, ChannelStatus, ChannelType,
-    Company, Contact, Contract, Evidence, IdentityStatus, Priority, Text,
+    Company, Contact, ContactMatchConfig, Contract, Evidence, IdentityStatus, MATCH_LEVELS, MatchComponentConfig,
+    MatchComponentName, PENDING_LEVELS, Points, Priority, Text,
 )
 from prospecting.sources import is_search_evidence, url_host, within_domain
 
@@ -406,7 +407,7 @@ _REVIEW_REASONS = frozenset({"title_changed", "undated_source", "ambiguous_sourc
 
 
 class EmploymentStatus(Contract):
-    """Vigencia del empleo calculada al leer, sin guardarse ni decidir gasto (T18).
+    """Vigencia del empleo calculada al leer, sin guardarse ni autorizar llamadas (T18).
 
     Solo `corporate_evidence` habilita a la persona: una afirmación de proveedor (Apollo o el historial
     de Hunter) nunca prueba el puesto. `reason` explica por qué no hay evidencia vigente.
@@ -676,47 +677,8 @@ def people_progress(contacts: list[Contact], company: Company, assessment: Asses
 
 # Porcentaje de match: ordena a las personas para que ventas elija; no decide elegibilidad,
 # listo ni gasto. El código fija componentes y niveles; config/contact_match.json, sus puntos.
-MatchComponentName = Literal["role", "channel", "identity", "employment"]
-MATCH_LEVELS = {
-    "role": ("selected_role", "profile_role", "outside_profile", "unknown"),
-    "channel": ("preferred_usable", "alternative_usable", "preferred_unconfirmed", "alternative_unconfirmed", "none"),
-    "identity": ("confirmed_complete", "complete_pending", "incomplete"),
-    "employment": ("evidence", "hunter_signal", "unverified"),
-}
-# Dato desconocido: suma 0 y se muestra pendiente, nunca como «no cumple».
-PENDING_LEVELS = frozenset({"unknown", "none", "incomplete", "unverified"})
-BlockedReason = Literal["identity_contradicted", "employment_ended", "scope_mismatch"]
+BlockedReason = Literal["identity_contradicted", "employment_ended", "employment_contradicted", "scope_mismatch"]
 _PREFERRED = (ChannelType.EMAIL, ChannelType.PHONE, ChannelType.WHATSAPP)
-Points = Annotated[StrictInt, Field(ge=0, le=100)]
-
-
-class MatchComponentConfig(Contract):
-    weight: Annotated[StrictInt, Field(gt=0, le=100)]
-    levels: dict[Text, Points]
-
-
-class ContactMatchConfig(Contract):
-    """Pesos versionados: cambiar un número exige cambiar `version` (docs/contacts.md)."""
-
-    version: Text
-    validation_status: Literal["proposed", "validated"]
-    source_reference: Text
-    components: dict[MatchComponentName, MatchComponentConfig]
-
-    @model_validator(mode="after")
-    def validate_points(self) -> Self:
-        if set(self.components) != set(MATCH_LEVELS):
-            raise ValueError("El match necesita los componentes role, channel, identity y employment.")
-        if sum(item.weight for item in self.components.values()) != 100:
-            raise ValueError("Los pesos del match deben sumar 100.")
-        for name, item in self.components.items():
-            if set(item.levels) != set(MATCH_LEVELS[name]):
-                raise ValueError(f"El componente {name} necesita exactamente los niveles {', '.join(MATCH_LEVELS[name])}.")
-            if max(item.levels.values()) != item.weight:
-                raise ValueError(f"El nivel más alto de {name} debe valer su peso, sin superarlo.")
-            if any(points for level, points in item.levels.items() if level in PENDING_LEVELS):
-                raise ValueError("Un dato pendiente no suma puntos.")
-        return self
 
 
 class MatchComponent(Contract):
@@ -781,7 +743,8 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
         channel = "none"
     identity = ("confirmed_complete" if contact.identity_status == IdentityStatus.CONFIRMED and contact.name_complete is True
                 else "complete_pending" if contact.name_complete is True else "incomplete")
-    employment = _v1_employment_level(employment_status(contact, company, evidence, limits, now))
+    status = employment_status(contact, company, evidence, limits, now)
+    employment = _v1_employment_level(status) if config.version == "contact_match_v1" else status.state
     components = [MatchComponent(name=name, level=level, points=config.components[name].levels[level],
                                  weight=config.components[name].weight, pending=level in PENDING_LEVELS)
                   for name, level in (("role", role), ("channel", channel), ("identity", identity),
@@ -789,7 +752,9 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
     # Solo un alcance respaldado que excluye los países de la empresa bloquea; uno sin fuente queda pendiente.
     scoped = bool(contact.geographic_scope and _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence))
     blocked = ("identity_contradicted" if contact.identity_status == IdentityStatus.CONTRADICTED
-               else "employment_ended" if _employment_contradicted(contact, evidence)
+               else "employment_ended" if (_employment_contradicted(contact, evidence) or
+                                            config.version == "contact_match_v2" and status.reason == "employment_ended")
+               else "employment_contradicted" if config.version == "contact_match_v2" and status.state == "contradicted"
                else "scope_mismatch" if scoped and not _scope_covers(contact.geographic_scope, company) else None)
     return ContactMatch(version=config.version, score=sum(item.points for item in components),
                         components=components, blocked_reason=blocked)
@@ -797,8 +762,34 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
 
 def match_sort_key(match: ContactMatch | None, eligible: bool, contact: Contact, roles: list[str]):
     """Mayor match primero y bloqueadas al final; empates por elegibilidad, cargo, nombre e id."""
-    return (match is None, match is not None and match.blocked_reason is not None, -(match.score if match else 0),
+    base = (match is None, match is not None and match.blocked_reason is not None, -(match.score if match else 0),
             not eligible, role_position(contact.title, roles), fold_words(contact.name or ""), str(contact.id))
+    if match is None or match.version == "contact_match_v1":
+        return base
+    role = next(item.level for item in match.components if item.name == "role")
+    relevance = 0 if role in ("selected_role", "profile_role") else 1 if role == "unknown" else 2
+    return base[:2] + (relevance,) + base[2:]
+
+
+def rank_contact_matches(entries: list[tuple[Contact, ContactMatch | None, bool]], roles: list[str], *,
+                         function_ids: dict[UUID, str] | None = None,
+                         function_order: list[str] | None = None) -> list[UUID]:
+    """Comparte el orden de revisión e investigación; v2 alterna funciones solo con igual score y pertinencia."""
+    ordered = sorted(entries, key=lambda item: match_sort_key(item[1], item[2], item[0], roles))
+    positions = {name: index for index, name in enumerate(function_order or [])}
+    occurrences, ranked = {}, []
+    for contact, match, eligible in ordered:
+        base = match_sort_key(match, eligible, contact, roles)
+        if match is None or match.version == "contact_match_v1":
+            ranked.append((base, contact.id))
+            continue
+        quality = base[:4]
+        function = (function_ids or {}).get(contact.id)
+        key = quality, function
+        occurrence = occurrences.get(key, 0)
+        occurrences[key] = occurrence + 1
+        ranked.append((quality + (occurrence, positions.get(function, len(positions))) + base[4:], contact.id))
+    return [id for _, id in sorted(ranked, key=lambda item: item[0])]
 
 
 def merge_contact(old: Contact, new: Contact, evidence: list[Evidence]) -> Contact:

@@ -11,9 +11,9 @@ from pydantic import Field, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization, unconsumed_failure
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, derive_readiness,
+    ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
     matched_role_family, merge_contact, people_progress, people_target, person_function, role_families, role_position,
-    target_roles, validate_contact,
+    rank_contact_matches, target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.models import (
@@ -203,6 +203,20 @@ class _ContactStage:
         return ids - {item.id for item in self.db.list_contacts(self.company.id) if item.relevant_function is False}
 
     def ranked_people(self):
+        config = self.campaign.config_snapshot.contact_match
+        if config is not None and config.version == "contact_match_v2":
+            people, facts, now = self.people(), self.facts(), utc_now()
+            matches = [(person, contact_match(person, self.company, self.assessment, facts, self.campaign.limits,
+                                              now, self.roles, config, campaign=self.campaign),
+                        validate_contact(person, self.company, self.assessment, facts, self.campaign.limits,
+                                         now, self.roles, campaign=self.campaign)) for person in people]
+            families = role_families(self.company, self.assessment, self.campaign, evidence=facts)
+            functions = {person.id: person_function(person, self.company, self.assessment, self.campaign,
+                                                    facts, now) for person in people}
+            ordered = rank_contact_matches(matches, self.roles, function_ids=functions,
+                                           function_order=list(dict.fromkeys(family.function_id for family in families)))
+            by_id = {person.id: person for person in people}
+            return [by_id[id] for id in ordered]
         selected = self.selected()
         people = sorted(self.people(), key=lambda item: _rank(item, self.roles, selected))
         if self.campaign.config_snapshot.role_taxonomy is None:
@@ -374,8 +388,17 @@ class _ContactStage:
                 or any(item.contact_id == contact.id and (item.external_reference or "").endswith("#enrichment")
                        for item in facts)):
             return False
+        if self.match_blocked(contact, facts):
+            return False
         fingerprint = self.client.fingerprint(enrichment_request(identifier, self.apollo_access.account_ref))
         return not self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0)
+
+    def match_blocked(self, contact, facts) -> bool:
+        """V2 no gasta en identidad, empleo o alcance contradichos; los pendientes siguen investigables."""
+        config = self.campaign.config_snapshot.contact_match
+        return config is not None and config.version == "contact_match_v2" and contact_match(
+            contact, self.company, self.assessment, facts, self.campaign.limits, utc_now(), self.roles,
+            config, campaign=self.campaign).blocked_reason is not None
 
     def exhausted_reason(self) -> str:
         """Motivo de cierre al agotar el plan: objetivo cumplido, tope de enriquecimientos o plan agotado."""
@@ -612,9 +635,11 @@ class _ContactStage:
 
     def _enrich(self, contact):
         company, access = self.company, self.apollo_access
-        identifier = person_id(contact, self.facts())
+        facts = self.facts()
+        identifier = person_id(contact, facts)
         if (identifier is None or contact.relevant_function is not True or
-                contact.identity_status == IdentityStatus.CONTRADICTED or contact.current_employment is False):
+                contact.identity_status == IdentityStatus.CONTRADICTED or contact.current_employment is False
+                or self.match_blocked(contact, facts)):
             return None
         request = enrichment_request(identifier, access.account_ref)
 

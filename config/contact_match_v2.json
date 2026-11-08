@@ -1,0 +1,11 @@
+{
+  "version": "contact_match_v2",
+  "validation_status": "proposed",
+  "source_reference": "Propuesta interna T19 aprobada el 8 de noviembre de 2026; pendiente de validación comercial con Veryfi",
+  "components": {
+    "role": {"weight": 40, "levels": {"selected_role": 40, "profile_role": 28, "outside_profile": 0, "unknown": 0}},
+    "channel": {"weight": 20, "levels": {"preferred_usable": 20, "alternative_usable": 14, "preferred_unconfirmed": 8, "alternative_unconfirmed": 6, "none": 0}},
+    "identity": {"weight": 15, "levels": {"confirmed_complete": 15, "complete_pending": 8, "incomplete": 0}},
+    "employment": {"weight": 25, "levels": {"corporate_evidence": 25, "provider_claim": 0, "contradicted": 0, "unknown": 0}}
+  }
+}
