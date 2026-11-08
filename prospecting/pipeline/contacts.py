@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import Field, TypeAdapter
 
-from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
+from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization, unconsumed_failure
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
     ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, derive_readiness,
@@ -261,6 +261,8 @@ class _ContactStage:
                 continue
             previous = self.db.get_run_item(row.campaign_id, self.company.id)
             done = previous.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0)
+            if row.campaign_id == self.campaign.id and not done and unconsumed_failure(row):
+                continue  # Fallo conciliado sin consumo (T17): `perform` decide si admite su único reintento.
             if row.status in (UsageStatus.IN_FLIGHT, UsageStatus.UNCERTAIN):
                 raise BudgetError("request_uncertain", "Hay una llamada enviada pendiente de resultado o conciliación.", row.request_id)
             if row.status not in (UsageStatus.RESERVED, UsageStatus.RECONCILED) and not done:
@@ -278,6 +280,21 @@ class _ContactStage:
                 return True
         return False
 
+    def retry_target(self, request, fingerprint) -> UUID | None:
+        """Solicitud enviada de esta campaña que se puede repetir: un único fallo conciliado sin consumo (T17).
+
+        Sin envíos previos devuelve None; con más de uno, el reintento ya se gastó y la etapa queda pendiente.
+        """
+        sent = [row for row in self.db.list_usage(company_id=self.company.id, provider=request.provider)
+                if row.campaign_id == self.campaign.id and row.status != UsageStatus.RESERVED
+                and (row.operation, row.account_ref, row.request_fingerprint) == (
+                    request.operation, request.account_ref, fingerprint)]
+        if not sent:
+            return None
+        if len(sent) == 1 and unconsumed_failure(sent[0]):
+            return sent[0].request_id
+        raise BudgetError("duplicate_request", "La solicitud ya se repitió una vez; no se vuelve a enviar.", sent[-1].request_id)
+
     def perform(self, request, response_model, *, credits, count_key, cap, consumed,
                 parse, funding="free_credit", pages=0):
         """Reserva, llama, valida y guarda el resultado en un checkpoint; respeta caché y cupos."""
@@ -286,17 +303,19 @@ class _ContactStage:
         days = limits.cache.web_days if request.provider == "tavily" else limits.cache.contact_days
         if self.cached(fingerprint, request.provider, request.operation, request.account_ref, days):
             return
-        if self.run.attempts.get(count_key, 0) >= cap:
+        retry_of = self.retry_target(request, fingerprint)
+        # El reintento sustituye al intento fallido: no ocupa otro cupo del nivel de esfuerzo (T17).
+        if retry_of is None and self.run.attempts.get(count_key, 0) >= cap:
             return
         if seconds_left(self.deadline) <= 0:
             raise BudgetError("time_limit", "Se agotó el tiempo de contactos antes de llamar.")
         grant = grant_for(self.grants, request.provider, request.operation, request.account_ref)
         usage = reserve_credits(self.budget, request, fingerprint, Decimal(credits), funding_source=funding,
-                                authorization=grant, **self.base)
+                                authorization=grant, retry_of=retry_of, **self.base)
         self.requests.append(usage.request_id)
         self.checkpoint(attempts={f"{REQUEST_KEY}{usage.request_id}": 1})
-        attempts = {count_key: self.run.attempts.get(count_key, 0) + 1}
-        if pages:
+        attempts = {} if retry_of is not None else {count_key: self.run.attempts.get(count_key, 0) + 1}
+        if pages and retry_of is None:
             attempts[PAGES_KEY] = self.run.attempts.get(PAGES_KEY, 0) + pages
         try:
             result = self.client.request_json(usage.request_id, request, response_model, authorization=grant,
@@ -431,7 +450,8 @@ class _ContactStage:
             if not key.startswith(REQUEST_KEY):
                 continue
             prior = self.db.get_usage(UUID(key.split(":")[-1]))
-            if prior is not None and prior.status != UsageStatus.RESERVED and not run.attempts.get(f"{PROCESSED_KEY}{prior.request_fingerprint}", 0):
+            if prior is not None and prior.status != UsageStatus.RESERVED and not unconsumed_failure(prior) and not run.attempts.get(
+                    f"{PROCESSED_KEY}{prior.request_fingerprint}", 0):
                 self.requests.append(prior.request_id)
                 return self.finish(_blocked_reason(prior), status="pending",
                                    message=run.error_message or "Hay una llamada enviada sin resultado validado persistido.")

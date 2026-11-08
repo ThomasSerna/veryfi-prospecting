@@ -208,6 +208,40 @@ def test_resume_after_an_uncertain_enrichment_does_not_repeat_calls(contact_case
     assert again.status == "pending" and len(case.calls) == calls
 
 
+def test_enrichment_reconciled_without_consumption_is_retried_exactly_once(contact_case, role_config):
+    """T17: tras conciliar en cero un timeout, reanudar repite esa llamada una sola vez y no ocupa otro cupo."""
+    from prospecting.budget import Confirmation
+    from prospecting.models import utc_now
+
+    case = multi(contact_case, role_config, ["Head of Product", "Engineering Manager", "Product Manager"])
+    reply = case.replies["people_enrichment"]
+    case.replies["people_enrichment"] = lambda payload: TimeoutError("sin respuesta sintética") if (
+        payload["id"] == "persona-sintetica-1") else reply(payload)
+    assert case.find().stop_reason == "apollo_timeout"
+    case.replies["people_enrichment"] = reply
+    blocked = case.find()
+    assert blocked.status == "pending" and blocked.stop_reason == "request_uncertain"
+    uncertain = [row for row in case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")
+                 if row.status == "uncertain"]
+    assert len(uncertain) == 1
+    enrichments = case.db.get_run_item(case.campaign.id, case.company.id).attempts["contacts:apollo_enrichments"]
+    case.budget.reconcile(uncertain[0].request_id, Confirmation(
+        outcome="failed", final_cost_usd="0", credits="0", outlay_usd="0",
+        source_reference="Panel sintético: sin consumo", observed_at=utc_now()))
+    calls = len(case.calls)
+    case.find()
+    retried = [row for row in case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")
+               if row.request_fingerprint == uncertain[0].request_fingerprint]
+    assert len(retried) == 2 and len(case.calls) > calls
+    assert sum(1 for operation, payload, _ in case.calls[calls:]
+               if operation == "people_enrichment" and payload["id"] == "persona-sintetica-1") == 1
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert run.attempts["contacts:apollo_enrichments"] >= enrichments
+    again = len(case.calls)
+    case.find()
+    assert len(case.calls) == again
+
+
 def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_case, role_config, tmp_path):
     """La ficha, la tabla y el CSV separan candidatas, pertinentes y listas, con objetivo y rechazo por persona."""
     import csv
