@@ -39,6 +39,41 @@ o niveles amplía los resultados y el total de títulos incluidos y excluidos de
 menor que 100. La referencia de ese endpoint no documenta un filtro de departamento.
 Esta consulta documental no verifica el acceso de la cuenta ni sus resultados reales.
 
+## Apollo: preparación de T17
+
+El 2026-11-07 (America/Bogota) se revisaron de nuevo solo metadatos locales. Se retiró de
+`data/provider-access.json` el cupo de Hunter, tras copiar el archivo en
+`data/backups/provider-access-2026-11-07-antes-t17.json`; el ledger de SQLite no se tocó.
+El archivo sigue sin `apollo_access` ni cupo de Apollo, así que la ejecución real continúa
+bloqueada. Hasta esta fecha no se ha hecho ninguna llamada real a Apollo. El lote real de T17
+depende de que el responsable compruebe el panel y autorice proveedor, operación y tope; su
+resultado, o el bloqueo literal si el acceso falla, se registrará en este archivo.
+
+Documentación oficial consultada el 2026-11-07 ([Library-docs.md](Library-docs.md#apollo-personas-y-correos-profesionales)):
+People API Search cuesta 0 créditos y oculta el apellido, el correo y el teléfono.
+People Enrichment cuesta de 0 a 1 crédito sin teléfono ni waterfall y su respuesta no
+informa el consumo. Organization Search y Organization Enrichment cuestan 1 crédito (por
+página y por organización). Los límites Free son 50, 200 y 600 solicitudes por minuto,
+hora y día. Un 403 `API_INACCESSIBLE` indica un plan o una clave sin acceso, y la respuesta
+a créditos agotados no está documentada.
+
+### Limitaciones de la cuenta
+
+- Search y Enrichment exigen una cuenta registrada con correo laboral; el plan Free puede
+  tener requisitos adicionales de elegibilidad que solo se ven en la cuenta.
+- El saldo de créditos solo se ve en el panel (Settings > Billing and credits): ninguna
+  respuesta de la API lo informa y `api_usage_stats` solo muestra el uso de los límites de
+  tasa. Por eso cada enriquecimiento queda pendiente con 1 crédito hasta conciliarlo con
+  `manage.py reconcile_usage`.
+- Search devuelve candidatos con apellido ofuscado, sin correo ni teléfono; un dominio
+  coincidente puede corresponder a un empleo anterior. No hay filtro de departamento.
+- El esquema no informa la fecha de verificación del correo; `last_refreshed_at` no prueba
+  el cargo ni el empleo vigente.
+- Los límites se aplican por equipo: otro uso de la misma cuenta fuera de esta base consume
+  el mismo cupo de solicitudes, y el ledger local no lo ve.
+- Planes heredados o de pago pueden tener otros precios y límites; el adaptador solo admite
+  el plan Free y sus límites, o unos más estrictos.
+
 ## Tavily
 
 | Campo | Valor observado |
