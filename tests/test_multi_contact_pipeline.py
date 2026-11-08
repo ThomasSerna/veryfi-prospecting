@@ -201,7 +201,7 @@ def test_resume_after_an_uncertain_enrichment_does_not_repeat_calls(contact_case
     case.replies["people_enrichment"] = lambda payload: TimeoutError("sin respuesta sintética") if (
         payload["id"] == "persona-sintetica-1") else reply(payload)
     report = case.find()
-    assert report.status == "pending" and report.stop_reason == "timeout"
+    assert report.status == "pending" and report.stop_reason == "apollo_timeout"
     calls = len(case.calls)
     case.replies["people_enrichment"] = reply
     again = case.find()

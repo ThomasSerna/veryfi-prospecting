@@ -136,11 +136,26 @@ def enrichment_request(person_id: str, account_ref: str) -> ProviderRequest:
                                     "run_waterfall_phone": False})
 
 
+# Motivos propios de Apollo (T17): cualquiera de ellos detiene la pasada de contactos, porque el mismo fallo
+# se repetiría en todas las empresas. Apollo no documenta la respuesta de créditos agotados: un 400/422 o un
+# error no documentado también detiene la pasada (fail closed). `permission_denied` y `rate_limited` se conservan.
+APOLLO_STOP_REASONS = frozenset({
+    "apollo_access_unverified", "apollo_api_inaccessible", "permission_denied", "rate_limited",
+    "apollo_invalid_input", "apollo_not_found", "apollo_provider_error", "apollo_timeout",
+    "apollo_transport_error", "apollo_invalid_response",
+})
+
+
 def classify_apollo_error(error: ProviderError) -> str:
+    """Motivo estable de un fallo de Apollo; el mensaje literal (código y Retry-After) queda en el error."""
     if error.kind == "http":
-        return {400: "invalid_input", 401: "permission_denied", 403: "permission_denied",
-                404: "not_found", 422: "invalid_input", 429: "rate_limited"}.get(error.http_status, "provider_error")
-    return {"timeout": "timeout", "transport": "transport_error", "local": "local_error"}.get(error.kind, "invalid_response")
+        if error.http_status == 403 and getattr(error, "provider_code", None) == "API_INACCESSIBLE":
+            return "apollo_api_inaccessible"
+        return {400: "apollo_invalid_input", 401: "permission_denied", 403: "permission_denied",
+                404: "apollo_not_found", 422: "apollo_invalid_input", 429: "rate_limited"}.get(
+                    error.http_status, "apollo_provider_error")
+    return {"timeout": "apollo_timeout", "transport": "apollo_transport_error", "local": "local_error",
+            "redirect": "apollo_provider_error"}.get(error.kind, "apollo_invalid_response")
 
 
 def _fact(company: Company, contact_id: UUID, identifier: str, request_id: UUID,

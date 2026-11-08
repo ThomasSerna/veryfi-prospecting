@@ -14,7 +14,7 @@ from prospecting.contacts import ContactError
 from prospecting.models import Usage, utc_now
 from prospecting.providers import HttpResponse, ProviderClient, ProviderError
 from prospecting.providers.apollo import (
-    APOLLO_OPERATIONS, ApolloAccess, ApolloEnrichmentResponse, ApolloSearchResponse,
+    APOLLO_OPERATIONS, APOLLO_STOP_REASONS, ApolloAccess, ApolloEnrichmentResponse, ApolloSearchResponse,
     classify_apollo_error, enrichment_request, parse_enrichment, parse_search,
     people_search_request, person_id,
 )
@@ -212,6 +212,60 @@ def test_structured_api_errors_preserve_literal_reason_without_secrets(apollo_ca
     assert "persona@example.com" not in str(error)
     assert error.retry_after_seconds == 60
     assert len(case.calls) == 1
+
+
+@pytest.mark.parametrize("status, body, headers, classification, literal", [
+    # Cuerpos con la forma documentada en docs.apollo.io (status-codes, rate-limits), con texto sintético.
+    (403, {"error_code": "API_INACCESSIBLE", "error": "Clave sintética sin acceso a este endpoint"}, {},
+     "apollo_api_inaccessible", "Clave sintética sin acceso"),
+    (429, {"error_details": {"code": "USAGE.RATE_LIMIT.API_RATE_LIMIT_EXCEEDED", "message": "Límite sintético",
+                             "context": {"window": {"value": "minute"}}}}, {"Retry-After": "42"},
+     "rate_limited", "Reintenta después de 42 s."),
+    (429, {"error_details": {"code": "USAGE.RATE_LIMIT.PLATFORM_RATE_LIMIT", "message": "Carga sintética"}}, {},
+     "rate_limited", "USAGE.RATE_LIMIT.PLATFORM_RATE_LIMIT"),
+    (401, None, {}, "permission_denied", "HTTP 401."),
+    (422, {"error": "Parámetro sintético inválido"}, {}, "apollo_invalid_input", "Parámetro sintético inválido"),
+    (400, {"error": "Solicitud sintética rechazada"}, {}, "apollo_invalid_input", "HTTP 400."),
+    (404, {"error": "No existe"}, {}, "apollo_not_found", "HTTP 404."),
+    (500, {"error": "Caída sintética"}, {}, "apollo_provider_error", "HTTP 500."),
+])
+def test_documented_apollo_failures_get_their_own_reason_and_keep_the_literal_text(
+        apollo_case, status, body, headers, classification, literal):
+    case = apollo_case
+    raw = b"Invalid API key. Texto plano sintetico" if body is None else json.dumps(body).encode()
+    case.response = HttpResponse(status=status, headers={"Content-Type": "application/json", **headers}, body=raw)
+    usage, grant = case.reserve()
+    with pytest.raises(ProviderError) as caught:
+        case.client.request_json(usage.request_id, case.request, ApolloSearchResponse, authorization=grant)
+    assert classify_apollo_error(caught.value) == classification
+    assert classification in APOLLO_STOP_REASONS
+    assert literal in case.db.get_usage(usage.request_id).error_message
+    assert "clave-apollo-exclusivamente-sintetica" not in str(caught.value)
+    assert len(case.calls) == 1
+
+
+@pytest.mark.parametrize("failure, classification", [
+    (TimeoutError("sintético"), "apollo_timeout"),
+    (OSError("Conexión sintética caída"), "apollo_transport_error"),
+])
+def test_apollo_outages_get_their_own_reason_and_stay_uncertain(apollo_case, failure, classification):
+    case = apollo_case
+    usage, grant = case.reserve()
+    client = ProviderClient(case.budget, APOLLO_OPERATIONS,
+                            transport=lambda *args: (_ for _ in ()).throw(failure))
+    with pytest.raises(ProviderError) as caught:
+        client.request_json(usage.request_id, case.request, ApolloSearchResponse, authorization=grant)
+    assert classify_apollo_error(caught.value) == classification
+    assert case.db.get_usage(usage.request_id).status == "uncertain"
+
+
+def test_invalid_apollo_schema_is_an_apollo_reason(apollo_case):
+    case = apollo_case
+    case.response = HttpResponse(status=200, headers={"Content-Type": "application/json"}, body=b'{"people": "x"}')
+    usage, grant = case.reserve()
+    with pytest.raises(ProviderError) as caught:
+        case.client.request_json(usage.request_id, case.request, ApolloSearchResponse, authorization=grant)
+    assert classify_apollo_error(caught.value) == "apollo_invalid_response"
 
 
 def test_enrichment_reserves_one_credit_without_claiming_observed_consumption(apollo_case):
