@@ -82,6 +82,48 @@ por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reut
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
+### Configurar Apollo
+
+Apollo es el único proveedor de personas. Para habilitarlo:
+
+1. Usa una cuenta de Apollo registrada con correo laboral: People API Search y People
+   Enrichment lo exigen. Comprueba en el panel el plan, los créditos usados y el límite,
+   y que la clave de API tenga acceso a ambos endpoints.
+2. Pon la clave en `APOLLO_API_KEY`, en el entorno o en el `.env` local, y arranca el
+   servidor con `--env-file .env`. Ninguna clave va en `data/provider-access.json`.
+3. En `data/provider-access.json`, añade el cupo de créditos de la cuenta
+   (`account_allowances`, proveedor `apollo`) y `apollo_access` con la referencia de la
+   cuenta, `work_email_verified` y `access_verified` según lo comprobado, la fecha y la
+   referencia de la comprobación. El [ejemplo sintético](docs/ui.md#acceso-local-a-proveedores)
+   muestra la forma; no copies sus marcas como comprobaciones reales. El archivo solo admite
+   cupos de Tavily, Anthropic y Apollo.
+4. Al ejecutar, autoriza en la interfaz Search y Enrichment de la cuenta. Sus topes se suman
+   y no pueden superar los créditos disponibles.
+
+La ejecución queda bloqueada si falta la clave, la comprobación de acceso o el cupo, o si
+queda menos de un crédito disponible. Search no consume créditos y Enrichment reserva uno
+por persona. Antes de reservar se aplican los límites del plan Free: 50 solicitudes por
+minuto, 200 por hora y 600 por día por endpoint. Cada fallo de Apollo detiene la pasada de
+contactos con un motivo visible en la ficha. Las limitaciones de la cuenta están en el
+[registro de proveedores](docs/provider-check.md).
+
+Apollo no informa en su respuesta los créditos consumidos. Tras un lote real, lee el panel,
+guarda un comprobante en `data/conciliaciones/` ([formato](docs/budget-providers.md#conciliación-con-el-panel))
+y concílialo. Primero comprueba sin escribir:
+
+```console
+uv run --locked python manage.py reconcile_usage data/conciliaciones/apollo-AAAA-MM-DD.json --dry-run
+```
+
+Después aplícalo:
+
+```console
+uv run --locked python manage.py reconcile_usage data/conciliaciones/apollo-AAAA-MM-DD.json
+```
+
+Una llamada sin resultado conciliada como fallida y sin consumo se repite una sola vez al
+reanudar.
+
 ## Demostración sin consumo
 
 Para recorrer la interfaz sin claves, sin red y sin tocar `data/`:
