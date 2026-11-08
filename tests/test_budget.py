@@ -907,6 +907,9 @@ def test_reconcile_many_is_all_or_nothing_and_idempotent(prepared):
     assert error.value.code == "outcome_conflict"
     assert [budget.db.get_usage(item.request_id).status for item in (first, second)] == [UsageStatus.FAILED] * 2
     items = [(first.request_id, zero()), (second.request_id, zero())]
+    ledger = budget.db.list_usage()
+    preview = budget.reconcile_many(items, **account, apply=False)
+    assert [item.status for item in preview] == [UsageStatus.RECONCILED] * 2 and budget.db.list_usage() == ledger
     saved = budget.reconcile_many(items, **account)
     assert [item.status for item in saved] == [UsageStatus.RECONCILED] * 2
     ledger = budget.db.list_usage()

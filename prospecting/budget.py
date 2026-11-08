@@ -109,6 +109,14 @@ class BudgetError(Exception):
         self.request_id = request_id
 
 
+class _Preview(Exception):
+    """Revierte una conciliación de prueba conservando el resultado calculado."""
+
+    def __init__(self, results):
+        super().__init__("Conciliación de prueba revertida.")
+        self.results = results
+
+
 class BudgetAmount(Contract):
     confirmed: Money
     estimated: Money
@@ -600,27 +608,34 @@ class Budget:
             return self._reconcile(request_id, confirmation)
 
     def reconcile_many(self, items: list[tuple[UUID, Confirmation]], *, provider: str, account_ref: str,
-                       since: datetime, until: datetime) -> list[Usage]:
+                       since: datetime, until: datetime, apply: bool = True) -> list[Usage]:
         """Concilia un comprobante de panel en una sola transacción: todas las filas o ninguna (T17).
 
         Las filas de la cuenta creadas dentro de la ventana del panel deben ser exactamente las del comprobante;
-        repetir el mismo comprobante no cambia nada y uno que contradiga lo ya conciliado se rechaza.
+        repetir el mismo comprobante no cambia nada y uno que contradiga lo ya conciliado se rechaza. Con
+        `apply=False` hace las mismas comprobaciones, devuelve el resultado y revierte la transacción.
         """
         items = [(request_id, Confirmation.model_validate_json(item.model_dump_json())) for request_id, item in items]
         requested = [request_id for request_id, _ in items]
         if len(requested) != len(set(requested)):
             raise BudgetError("receipt_duplicate", "El comprobante repite una solicitud.")
-        with self.db.transaction():
-            window = {row.request_id for row in self.db.list_usage()
-                      if (row.provider, row.account_ref) == (provider, account_ref) and since <= row.created_at <= until}
-            for request_id in requested:
-                usage = self._get(request_id)
-                if (usage.provider, usage.account_ref) != (provider, account_ref):
-                    raise BudgetError("receipt_mismatch", "El comprobante incluye una solicitud de otra cuenta.", request_id)
-            if window != set(requested):
-                raise BudgetError("receipt_incomplete",
-                                  "El comprobante no cubre exactamente las solicitudes de la cuenta en la ventana del panel.")
-            return [self._reconcile(request_id, confirmation) for request_id, confirmation in items]
+        try:
+            with self.db.transaction():
+                window = {row.request_id for row in self.db.list_usage()
+                          if (row.provider, row.account_ref) == (provider, account_ref) and since <= row.created_at <= until}
+                for request_id in requested:
+                    usage = self._get(request_id)
+                    if (usage.provider, usage.account_ref) != (provider, account_ref):
+                        raise BudgetError("receipt_mismatch", "El comprobante incluye una solicitud de otra cuenta.", request_id)
+                if window != set(requested):
+                    raise BudgetError("receipt_incomplete",
+                                      "El comprobante no cubre exactamente las solicitudes de la cuenta en la ventana del panel.")
+                results = [self._reconcile(request_id, confirmation) for request_id, confirmation in items]
+                if not apply:
+                    raise _Preview(results)
+                return results
+        except _Preview as preview:
+            return preview.results
 
     def _reconcile(self, request_id: UUID, confirmation: Confirmation) -> Usage:
         """Conciliación de una fila dentro de una transacción abierta por el llamador."""

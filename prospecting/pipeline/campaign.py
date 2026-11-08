@@ -11,12 +11,14 @@ from decimal import Decimal
 from pathlib import Path
 import threading
 import time
-from typing import Callable, Literal
+from typing import Annotated, Callable, Literal
 from uuid import UUID
 
 from pydantic import Field, StrictBool, ValidationError, model_validator
 
-from prospecting.budget import AccountAllowance, Budget, BudgetSnapshot, FundingSource, SpendingAuthorization
+from prospecting.budget import (
+    AccountAllowance, Budget, BudgetError, BudgetSnapshot, Confirmation, FundingSource, SpendingAuthorization,
+)
 from prospecting.contacts import (
     ContactMatch, ContactMatchConfig, EmploymentStatus, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
     PeopleProgress, PersonStage, employment_status, load_contact_match, match_sort_key, people_progress, person_stage,
@@ -30,7 +32,7 @@ from prospecting.identity import (
 )
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract,
-    Evidence, Money, Priority, RunItem, RunStage, Text, utc_now,
+    Evidence, Money, Priority, RunItem, RunStage, Text, UsageStatus, UtcDatetime, utc_now,
 )
 from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
 from prospecting.pipeline.contacts import REJECTED_KEY, find_contacts
@@ -185,6 +187,135 @@ def load_provider_access(path: Path) -> ProviderAccess:
         return ProviderAccess.model_validate_json(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValidationError):
         raise ValueError("No se pudo leer la configuración válida de cupos y acceso a proveedores.") from None
+
+
+class PanelReading(Contract):
+    """Créditos usados que el responsable leyó en el panel del proveedor; no es un cargo ni habilita gasto."""
+
+    credits_used: Money
+    observed_at: UtcDatetime
+    source_reference: Text
+
+
+class ReceiptRequest(Contract):
+    """Consumo confirmado de una solicitud del ledger; una solicitud no enviada se cancela sin consumo."""
+
+    request_id: UUID
+    operation: Literal["people_search", "people_enrichment"]
+    outcome: Literal["succeeded", "failed"]
+    credits: Money
+    no_send: StrictBool = False
+
+    @model_validator(mode="after")
+    def validate_unsent(self):
+        if self.no_send and (self.outcome != "failed" or self.credits != 0):
+            raise ValueError("Una solicitud no enviada solo se concilia como fallida y sin créditos.")
+        return self
+
+
+class ReconciliationReceipt(Contract):
+    """Comprobante `apollo_reconciliation_v1` (T17), guardado por el responsable en `data/conciliaciones/`.
+
+    Los créditos de las solicitudes más los ajenos al ledger deben sumar exactamente el salto del panel.
+    Si el proveedor no informa el consumo por solicitud, la atribución es una inferencia y necesita nota.
+    """
+
+    version: Literal["apollo_reconciliation_v1"]
+    provider: Literal["apollo"]
+    account_ref: Text
+    responsible: Text
+    panel_before: PanelReading
+    panel_after: PanelReading
+    attribution: Literal["per_request", "inferred_from_total"]
+    attribution_note: Text | None = None
+    external_credits: Money = Decimal(0)
+    external_note: Text | None = None
+    requests: Annotated[list[ReceiptRequest], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_totals(self):
+        if not self.panel_before.observed_at < self.panel_after.observed_at <= utc_now():
+            raise ValueError("Las lecturas del panel deben estar ordenadas y no pueden tener fecha futura.")
+        delta = self.panel_after.credits_used - self.panel_before.credits_used
+        if delta < 0:
+            raise ValueError("Los créditos usados del panel no pueden disminuir entre lecturas.")
+        if len({item.request_id for item in self.requests}) != len(self.requests):
+            raise ValueError("El comprobante repite una solicitud.")
+        if self.attribution == "inferred_from_total" and self.attribution_note is None:
+            raise ValueError("Una atribución inferida del total necesita una nota que la explique.")
+        if self.external_credits > 0 and self.external_note is None:
+            raise ValueError("Los créditos ajenos al ledger necesitan una nota.")
+        if sum((item.credits for item in self.requests), Decimal(0)) + self.external_credits != delta:
+            raise ValueError("Los créditos del comprobante no suman exactamente el salto del panel.")
+        return self
+
+
+class ReconciliationSummary(Contract):
+    """Resultado de conciliar, sin datos personales: solo cuenta, conteos y créditos."""
+
+    account_ref: Text
+    applied: StrictBool
+    panel_delta: Money
+    external_credits: Money
+    reconciled_now: Annotated[int, Field(ge=0)]
+    already_reconciled: Annotated[int, Field(ge=0)]
+    credits_by_operation: dict[Text, Money]
+    available_credits: Money | None
+    pending_credits: Money
+    reservation_overrun: StrictBool
+
+
+def reconcile_usage(db_path: Path, receipt_path: Path, *, access: ProviderAccess, apply: bool = True
+                    ) -> ReconciliationSummary:
+    """Concilia el consumo de Apollo con un comprobante del panel; nunca crea la base ni llama a proveedores.
+
+    Se niega mientras haya una ejecución en este proceso o una campaña `running` (también de otro proceso):
+    tras un cierre inesperado, primero se cierra esa campaña. Con `apply=False` solo comprueba y no escribe.
+    """
+    try:
+        receipt = ReconciliationReceipt.model_validate_json(Path(receipt_path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValidationError):
+        raise ValueError("No se pudo leer un comprobante de conciliación válido.") from None
+    access = ProviderAccess.model_validate(access)
+    if access.apollo_access is None or access.apollo_access.account_ref != receipt.account_ref:
+        raise ValueError("El comprobante no corresponde a la cuenta de Apollo configurada.")
+    if not _EXECUTION.acquire(blocking=False):
+        raise ValueError("Hay una investigación ejecutándose; concilia cuando termine.")
+    try:
+        with _saved_database(db_path) as db:
+            if any(item.status == CampaignStatus.RUNNING for item in db.list_campaigns()):
+                raise ValueError("Hay una campaña en ejecución; ciérrala o espera a que termine antes de conciliar.")
+            rows = {row.request_id: row for row in db.list_usage(provider=APOLLO)}
+            if any(item.request_id not in rows or rows[item.request_id].account_ref != receipt.account_ref
+                   or rows[item.request_id].operation != item.operation
+                   or rows[item.request_id].funding_source != "free_credit" for item in receipt.requests):
+                raise ValueError("El comprobante incluye una solicitud que no es de esta cuenta de Apollo.")
+            already = sum(1 for item in receipt.requests if rows[item.request_id].status == UsageStatus.RECONCILED)
+            campaign_id = rows[receipt.requests[0].request_id].campaign_id
+            budget = Budget(db, db.get_campaign(campaign_id).config_snapshot.defaults.budget, access.account_allowances)
+            confirmations = [(item.request_id, Confirmation(
+                outcome=item.outcome, final_cost_usd=Decimal(0), credits=item.credits, outlay_usd=Decimal(0),
+                source_reference=receipt.panel_after.source_reference, observed_at=receipt.panel_after.observed_at,
+                no_send=item.no_send)) for item in receipt.requests]
+            try:
+                budget.reconcile_many(confirmations, provider=APOLLO, account_ref=receipt.account_ref,
+                                      since=receipt.panel_before.observed_at, until=receipt.panel_after.observed_at,
+                                      apply=apply)
+            except BudgetError as error:
+                raise ValueError(f"{error.code}: {error}") from None
+            snapshot = budget.snapshot(campaign_id)
+            account = next(item for item in snapshot.accounts if (item.provider, item.account_ref) == (APOLLO, receipt.account_ref))
+            totals: dict[str, Decimal] = {}
+            for item in receipt.requests:
+                totals[item.operation] = totals.get(item.operation, Decimal(0)) + item.credits
+            return ReconciliationSummary(
+                account_ref=receipt.account_ref, applied=apply,
+                panel_delta=receipt.panel_after.credits_used - receipt.panel_before.credits_used,
+                external_credits=receipt.external_credits, reconciled_now=len(receipt.requests) - already if apply else 0,
+                already_reconciled=already, credits_by_operation=totals, available_credits=account.credits.available,
+                pending_credits=account.credits.pending, reservation_overrun=snapshot.reservation_overrun)
+    finally:
+        _EXECUTION.release()
 
 
 def _saved_database(db_path: Path) -> Database:
