@@ -177,7 +177,11 @@ identificadores sin reescribir el ledger anterior:
 - Claves `contacts:apollo_search` y `contacts:apollo_enrichments` para los intentos
   de búsqueda y enriquecimiento; las claves compartidas mantienen su significado.
 - Clave `contacts:apollo_rejected:<código>:<contact_id>` (T16) para una persona que
-  People Enrichment no confirmó; su llamada queda procesada y no se repite. Las
+  People Enrichment no confirmó; su llamada queda procesada y no se repite. Desde T17 el
+  código de entidad indica la condición que falló (`ENTITY_MISMATCH_CODES`:
+  `entity_mismatch_no_organization`, `entity_mismatch_domain`, `entity_mismatch_organization_id`,
+  `entity_mismatch_name`, `entity_mismatch_not_current`); `entity_mismatch` sigue identificando
+  los rechazos anteriores. Las
   etapas de persona y los conteos por empresa no se guardan: se recalculan al leer.
 - `uuid5(company_id, "apollo:<id>")` para candidatos Apollo y
   `uuid5(company_id, "public_apollo_v1:<valor_del_canal>")` para contactos públicos nuevos

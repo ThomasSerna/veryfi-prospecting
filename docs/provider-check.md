@@ -129,10 +129,12 @@ dato. Resultado: 0 identidades verificadas, 0 canales y 0 personas listas
 - Apollo cobró los 3 enriquecimientos aunque el sistema rechazó a las tres personas: el costo por
   contacto útil de este lote no está definido (0 listos). Con prioridad media solo se permiten
   3 enriquecimientos, así que el rechazo de los primeros agotó el tope de la empresa.
-- El sistema no guarda qué condición de `entity_mismatch` falló (dominio principal, organización
-  u historial de empleo actual), y la respuesta de Apollo no se conserva. No se puede saber sin
-  otra llamada si la regla es demasiado estricta para grupos con filiales o marcas, como una
-  embotelladora frente a la marca global.
+- En estos lotes el sistema no guardaba qué condición de `entity_mismatch` falló (dominio
+  principal, organización u historial de empleo actual), y la respuesta de Apollo no se
+  conserva. No se puede saber sin otra llamada si la regla es demasiado estricta para grupos
+  con filiales o marcas, como una embotelladora frente a la marca global. Desde el 2026-11-08
+  cada rechazo guarda el código de la condición (`entity_mismatch_domain`, etc.; ver
+  [contacts.md](contacts.md)), así que el próximo lote o T21 lo mostrarán sin datos personales.
 - El descubrimiento con dos segmentos y sin palabras clave devolvió sitios sin encaje en 5 de
   7 empresas: el sistema los detuvo antes de gastar en Haiku y Apollo, pero llegar a Apollo
   exigió un segundo lote.

@@ -91,7 +91,13 @@ Con política, la etapa de contactos:
   otra por intentar, solo enriquece candidatos de otras funciones;
 - registra un rechazo de identidad o entidad de People Enrichment (`identity_unconfirmed`,
   `identity_mismatch`, `entity_mismatch`) como resultado procesado con la clave
-  `contacts:apollo_rejected:<código>:<contact_id>`. La persona queda candidata con su
+  `contacts:apollo_rejected:<código>:<contact_id>`. Desde T17 el rechazo de entidad guarda
+  la primera condición que falla, en este orden: `entity_mismatch_no_organization` (sin
+  organización actual), `entity_mismatch_domain` (otro dominio principal),
+  `entity_mismatch_organization_id` (organización contradictoria), `entity_mismatch_name`
+  (nombre distinto) o `entity_mismatch_not_current` (sin empleo actual en esa organización).
+  Solo se guarda el código, sin datos de la respuesta; los rechazos anteriores conservan
+  `entity_mismatch`. La persona queda candidata con su
   motivo, la etapa continúa y la llamada no se repite al reanudar. Sin política, ese
   rechazo sigue dejando la empresa pendiente;
 - ejecuta después la búsqueda y extracción públicas dentro de sus cupos;
