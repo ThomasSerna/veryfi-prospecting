@@ -3,6 +3,7 @@
 from datetime import timedelta
 import csv
 from io import StringIO
+import json
 import sqlite3
 from uuid import uuid4
 
@@ -140,6 +141,20 @@ def test_operations_share_one_apollo_account(access):
     ]
     with pytest.raises(ValidationError):
         ProviderAccess.model_validate(access.model_dump() | {"hunter_access": {}})
+
+
+def test_retired_provider_allowance_blocks_the_access_file(tmp_path, access):
+    """T17: un cupo de Hunter ya no se carga ni se muestra; el error no revela el contenido del JSON."""
+    retired = access.account_allowances[0].model_copy(update={"provider": "hunter", "account_ref": "hunter-sintetica-secreta"})
+    data = access.model_dump(mode="json")
+    data["account_allowances"].append(retired.model_dump(mode="json"))
+    with pytest.raises(ValidationError, match="Tavily, Anthropic y Apollo"):
+        ProviderAccess.model_validate(data)
+    path = tmp_path / "access.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError) as error:
+        load_provider_access(path)
+    assert "hunter" not in str(error.value) and "secreta" not in str(error.value)
 
 
 def test_execute_builds_fresh_grants_after_budget_and_preserves_campaign(tmp_path, make_campaign, access, monkeypatch):

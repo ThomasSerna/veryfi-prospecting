@@ -99,6 +99,9 @@ class ProviderAccess(Contract):
         accounts = {(item.provider, item.account_ref): item for item in self.account_allowances}
         if len(accounts) != len(self.account_allowances):
             raise ValueError("Las cuentas de consumo deben tener referencias únicas.")
+        # Solo proveedores activos (T17): un cupo de un proveedor retirado, como Hunter, bloquea la configuración.
+        if any(item.provider not in (TAVILY, CLAUDE_PROVIDER, APOLLO) for item in self.account_allowances):
+            raise ValueError("La configuración solo admite cupos de Tavily, Anthropic y Apollo.")
         expected = [(TAVILY, self.tavily_account_ref, "free_credit"),
                     (CLAUDE_PROVIDER, self.claude_account_ref, self.claude_funding_source)]
         apollo = self.apollo_access
