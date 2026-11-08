@@ -493,6 +493,39 @@ def test_retry_after_numeric_is_metadata_and_never_causes_retry(provider_case, r
     assert len(case.calls) == 1
 
 
+def test_retry_after_is_kept_in_the_persisted_message(provider_case):
+    """§13.3 (T17): el plazo informado queda en el error guardado, sin reintentar."""
+    case = provider_case
+    usage = case.reserve()
+    case.response = HttpResponse(
+        status=429, headers={"Retry-After": "3", "Content-Type": "application/json"},
+        body=b'{"message": "Limite sintetico"}',
+    )
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    assert "Reintenta después de 3 s." in error.value.message
+    assert "Reintenta después de 3 s." in case.db.get_usage(usage.request_id).error_message
+    assert len(case.calls) == 1
+
+
+@pytest.mark.parametrize("body, expected", [
+    (b'{"error_details": {"code": "USAGE.RATE_LIMIT.API_RATE_LIMIT_EXCEEDED", "message": "Limite"}}',
+     "USAGE.RATE_LIMIT.API_RATE_LIMIT_EXCEEDED"),
+    (b'{"error_code": "API_INACCESSIBLE", "error": "Clave sin acceso sintetica"}', "API_INACCESSIBLE"),
+    (b'{"errors": [{"code": "INVALID_FILTER", "details": "Filtro sintetico"}]}', "INVALID_FILTER"),
+    (b'{"error_code": "codigo en minusculas"}', None),
+    (b'{"error_code": "' + b"A" * 81 + b'"}', None),
+    (b"Invalid API key. Texto plano sintetico", None),
+])
+def test_provider_error_code_is_read_only_from_documented_fields(provider_case, body, expected):
+    case = provider_case
+    usage = case.reserve()
+    case.response = HttpResponse(status=403, headers={"Content-Type": "application/json"}, body=body)
+    with pytest.raises(ProviderError) as error:
+        call(case, usage)
+    assert error.value.provider_code == expected
+
+
 def test_retry_after_http_date_is_parsed_without_sleeping(provider_case):
     case = provider_case
     usage = case.reserve()

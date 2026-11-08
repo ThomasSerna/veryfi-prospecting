@@ -136,7 +136,7 @@ class ProviderError(Exception):
     """Error seguro para persistencia, sin cuerpos ni solicitudes originales."""
 
     def __init__(self, kind, message, *, request_id=None, provider=None, operation=None,
-                 http_status=None, retry_after_seconds=None):
+                 http_status=None, retry_after_seconds=None, provider_code=None):
         super().__init__(message)
         self.kind = kind
         self.message = message
@@ -145,6 +145,8 @@ class ProviderError(Exception):
         self.operation = operation
         self.http_status = http_status
         self.retry_after_seconds = retry_after_seconds
+        # Código estable del cuerpo de error (p. ej. Apollo `API_INACCESSIBLE`); None si no hay uno válido.
+        self.provider_code = provider_code
         self.retryable = False
         self.no_send = False
 
@@ -167,6 +169,17 @@ def _retry_after(value):
     except (ValueError, TypeError, OverflowError):
         return None
     return seconds if math.isfinite(seconds) else None
+
+
+def _provider_code(raw) -> str | None:
+    """Código de error documentado: `error_details.code`, `error_code` o `errors[0].code`, solo si es un identificador."""
+    candidates = []
+    if isinstance(raw.get("error_details"), dict):
+        candidates.append(raw["error_details"].get("code"))
+    candidates.append(raw.get("error_code"))
+    if isinstance(raw.get("errors"), list) and raw["errors"] and isinstance(raw["errors"][0], dict):
+        candidates.append(raw["errors"][0].get("code"))
+    return next((item for item in candidates if isinstance(item, str) and re.fullmatch(r"[A-Z0-9_.]{1,80}", item)), None)
 
 
 def _reject_json_constant(value):
@@ -336,9 +349,11 @@ class ProviderClient:
             self._fail(ProviderError("response_limit", "La respuesta supera el límite de tamaño.", **context), "failed")
         if response.status >= 300 or response.status < 200:
             message = f"HTTP {response.status}."
+            code = None
             try:
                 raw = json.loads(response.body)
                 if isinstance(raw, dict):
+                    code = _provider_code(raw)
                     if isinstance(raw.get("errors"), list):
                         detail = "; ".join(
                             " ".join(str(item[field]) for field in ("id", "code", "details")
@@ -359,9 +374,13 @@ class ProviderClient:
                         message += " " + _safe_message(detail, key, request)
             except (ValueError, UnicodeError, RecursionError):
                 pass
+            retry_after = _retry_after(_header(response.headers, "Retry-After"))
+            if retry_after is not None:
+                # §13.3: el plazo queda en el mensaje persistido para informarlo; nunca provoca un reintento.
+                message += f" Reintenta después de {math.ceil(retry_after)} s."
             error = ProviderError("redirect" if 300 <= response.status < 400 else "http", message,
-                                  http_status=response.status,
-                                  retry_after_seconds=_retry_after(_header(response.headers, "Retry-After")), **context)
+                                  http_status=response.status, retry_after_seconds=retry_after,
+                                  provider_code=code, **context)
             self._fail(error, "failed")
         content_type = (_header(response.headers, "Content-Type") or "").split(";", 1)[0].strip().lower()
         if content_type != "application/json" and not (content_type.startswith("application/") and content_type.endswith("+json")):
