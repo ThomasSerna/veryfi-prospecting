@@ -8,14 +8,14 @@
   <meta name="color-scheme" content="dark">
   <title>{% block title %}Veryfi Prospecting{% endblock %}</title>
   <link rel="preload" href="{% static 'fonts/InterVariable.woff2' %}" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=motion-2">
-  <link rel="stylesheet" href="{% static 'css/workspace.css' %}?v=motion-2">
-  <link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=motion-2">
-  <link rel="stylesheet" href="{% static 'css/motion.css' %}?v=motion-2">
-  <script src="{% static 'js/app.js' %}?v=motion-2" defer></script>
-  <script src="{% static 'js/navigation.js' %}?v=motion-2" defer></script>
-  <script src="{% static 'js/motion.js' %}?v=motion-2" defer></script>
-  <script src="{% static 'js/dashboard.js' %}?v=motion-2" defer></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=colors-1">
+  <link rel="stylesheet" href="{% static 'css/workspace.css' %}?v=colors-1">
+  <link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=colors-1">
+  <link rel="stylesheet" href="{% static 'css/motion.css' %}?v=colors-1">
+  <script src="{% static 'js/app.js' %}?v=colors-1" defer></script>
+  <script src="{% static 'js/navigation.js' %}?v=colors-1" defer></script>
+  <script src="{% static 'js/motion.js' %}?v=colors-1" defer></script>
+  <script src="{% static 'js/dashboard.js' %}?v=colors-1" defer></script>
   {% block scripts %}{% endblock %}
 </head>
 <body data-running="{% if is_executing or execution.is_executing %}true{% else %}false{% endif %}" {% if campaign %}data-status-url="{% url 'webapp:status' campaign.id %}"{% elif active_campaign %}data-status-url="{% url 'webapp:status' active_campaign.id %}"{% elif execution.campaign_id and execution.campaign_id != 'None' %}data-status-url="{% url 'webapp:status' execution.campaign_id %}"{% endif %}>

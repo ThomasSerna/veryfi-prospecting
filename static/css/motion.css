@@ -42,7 +42,7 @@
   inset: 0;
   z-index: -1;
   opacity: 0;
-  background: radial-gradient(340px circle at var(--motion-x, 50%) var(--motion-y, 50%), rgb(128 223 243 / 9%), transparent 70%);
+  background: radial-gradient(340px circle at var(--motion-x, 50%) var(--motion-y, 50%), color-mix(in srgb, var(--accent-alt) 10%, transparent), transparent 70%);
   transition: opacity 320ms ease;
 }
 
@@ -56,7 +56,7 @@
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
   [data-motion-surface]::after {
-    background: conic-gradient(from calc(var(--motion-angle) - 75deg), transparent 0deg, rgb(128 223 243 / 95%) 55deg, rgb(183 165 250 / 90%) 95deg, transparent 150deg);
+    background: conic-gradient(from calc(var(--motion-angle) - 75deg), transparent 0deg, color-mix(in srgb, var(--accent) 95%, transparent) 55deg, color-mix(in srgb, var(--accent-alt) 90%, transparent) 95deg, transparent 150deg);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -65,12 +65,12 @@
 
   [data-motion-surface]:focus-within::after {
     opacity: 1;
-    background: linear-gradient(135deg, var(--cyan, #80dff3), var(--violet, #b7a5fa) 55%, rgb(128 223 243 / 35%));
+    background: linear-gradient(135deg, var(--accent), var(--accent-alt) 55%, color-mix(in srgb, var(--accent) 35%, transparent));
   }
 }
 
 [data-motion-surface]:focus-within {
-  border-color: rgb(128 223 243 / 55%);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .workspace .button,
@@ -103,7 +103,7 @@
   }
 
   [data-motion-surface]:hover {
-    border-color: #3a3f4b;
+    border-color: color-mix(in oklab, var(--line), var(--line-strong) 30%);
   }
 }
 
@@ -118,7 +118,7 @@
   }
 
   .workspace .button-primary:hover:not(:disabled):not([aria-disabled='true']) {
-    box-shadow: 0 10px 26px -12px rgb(128 223 243 / 70%);
+    box-shadow: 0 10px 26px -12px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
   a:hover > .motion-arrow,
