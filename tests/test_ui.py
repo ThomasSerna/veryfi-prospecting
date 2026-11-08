@@ -529,6 +529,21 @@ def test_claude_http_errors_and_pending_assessments_explain_their_cause(reason, 
     assert message.startswith("La calificación quedó pendiente.") is reason.startswith("assessment_pending:")
 
 
+def test_apollo_limit_and_reconciliation_reasons_never_fall_back_to_the_generic_message():
+    """T17: cada motivo de Apollo, del límite local y de la conciliación tiene su explicación."""
+    from prospecting.providers.apollo import APOLLO_STOP_REASONS
+
+    reasons = APOLLO_STOP_REASONS | {
+        "local_rate_limit", "request_uncertain", "result_unavailable", "request_not_reserved", "invalid_input",
+        "not_found", "transport_error", "local_error", "provider_error", "invalid_contact_data"}
+    assert [reason for reason in sorted(reasons) if "quedó pendiente" in stop_message(reason)] == []
+    assert "concíliala" in stop_message("request_uncertain")
+    assert "límite de solicitudes" in stop_message("local_rate_limit")
+    # Los motivos de Tavily y Claude conservan su texto.
+    assert stop_message("timeout") == "Tiempo de espera agotado en el proveedor."
+    assert stop_message("rate_limited") == "El proveedor limitó las solicitudes."
+
+
 def test_csrf_is_required_and_read_only_routes_do_not_accept_writes(ui_paths):
     client = Client(SERVER_NAME="localhost", enforce_csrf_checks=True)
     response = client.get(url("new_campaign"))
