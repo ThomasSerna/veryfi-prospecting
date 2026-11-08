@@ -685,17 +685,67 @@ def test_retry_is_one_new_request_after_confirmed_transient_failure(prepared):
     assert len(budget.db.list_usage()) == 2
 
 
-def test_restart_does_not_infer_retryability_from_error_text(prepared):
+def failed_after_restart(prepared, **reconciled):
+    """Un fallo enviado; con `reconciled`, una persona lo concilia antes de abrir otra sesión con permiso nuevo."""
     budget, proposal, grant = prepared
     claim(prepared)
     budget.record_result(proposal.request_id, Observation(
         outcome="failed", retryable=True, error_message="Error sintético transitorio HTTP 503",
     ))
-    budget.reconcile(proposal.request_id, confirmation(outcome="failed", final_cost_usd="0", credits="0"))
+    if reconciled:
+        budget.reconcile(proposal.request_id, confirmation(**{"outcome": "failed"} | reconciled))
     restored = Budget(budget.db, budget.global_limits, budget.account_allowances)
-    grant = fresh_grant(restored, grant)
-    with pytest.raises(BudgetError):
+    return restored, proposal, fresh_grant(restored, grant)
+
+
+def test_restart_does_not_infer_retryability_from_error_text(prepared):
+    """Sin conciliar, el texto del error no prueba que repetir sea seguro."""
+    restored, proposal, grant = failed_after_restart(prepared)
+    with pytest.raises(BudgetError) as error:
         restored.reserve(proposal.model_copy(update={"request_id": uuid4()}), grant, retry_of=proposal.request_id)
+    assert error.value.code == "duplicate_request"
+
+
+def test_failure_reconciled_without_consumption_allows_one_retry_in_a_new_session(prepared):
+    """T17: conciliar un fallo en cero, con un permiso nuevo, admite un único reintento (Architecture §13.3)."""
+    restored, proposal, grant = failed_after_restart(prepared, final_cost_usd="0", credits="0")
+    retry = proposal.model_copy(update={"request_id": uuid4()})
+    assert restored.reserve(retry, grant, retry_of=proposal.request_id).status == UsageStatus.RESERVED
+    # Tras un cierre antes de enviar, la reserva del reintento se reutiliza en lugar de duplicarse.
+    again = Budget(restored.db, restored.global_limits, restored.account_allowances)
+    regrant = fresh_grant(again, grant)
+    reused = again.reserve(proposal.model_copy(update={"request_id": uuid4()}), regrant, retry_of=proposal.request_id)
+    assert reused.request_id == retry.request_id
+    assert again.claim(retry.request_id, retry.request_fingerprint, regrant).status == UsageStatus.IN_FLIGHT
+    again.record_result(retry.request_id, Observation(outcome="failed", error_message="Fallo sintético"))
+    again.reconcile(retry.request_id, confirmation(outcome="failed", final_cost_usd="0", credits="0"))
+    with pytest.raises(BudgetError) as error:
+        again.reserve(proposal.model_copy(update={"request_id": uuid4()}), regrant, retry_of=retry.request_id)
+    assert error.value.code == "duplicate_request"
+    assert len(again.db.list_usage()) == 2
+
+
+@pytest.mark.parametrize("reconciled", [{"final_cost_usd": "0", "credits": "1"},
+                                        {"final_cost_usd": "0.05", "credits": "0"}])
+def test_failure_reconciled_with_consumption_is_never_retried(prepared, reconciled):
+    restored, proposal, grant = failed_after_restart(prepared, **reconciled)
+    with pytest.raises(BudgetError) as error:
+        restored.reserve(proposal.model_copy(update={"request_id": uuid4()}), grant, retry_of=proposal.request_id)
+    assert error.value.code == "duplicate_request"
+
+
+def test_two_sessions_claim_one_retry_only_once(prepared):
+    """Concurrencia local: dos sesiones que reintentan el mismo fallo conciliado envían una sola vez."""
+    restored, proposal, grant = failed_after_restart(prepared, final_cost_usd="0", credits="0")
+    retry = restored.reserve(proposal.model_copy(update={"request_id": uuid4()}), grant, retry_of=proposal.request_id)
+    other = Budget(restored.db, restored.global_limits, restored.account_allowances)
+    other_grant = fresh_grant(other, grant)
+    assert other.reserve(proposal.model_copy(update={"request_id": uuid4()}), other_grant,
+                         retry_of=proposal.request_id).request_id == retry.request_id
+    restored.claim(retry.request_id, retry.request_fingerprint, grant)
+    with pytest.raises(BudgetError) as error:
+        other.claim(retry.request_id, retry.request_fingerprint, other_grant)
+    assert error.value.code == "request_not_reserved"
 
 
 @pytest.mark.parametrize("bound", ["credits", "cost", "shared_credit"])

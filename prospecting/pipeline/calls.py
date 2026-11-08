@@ -78,8 +78,11 @@ def observed_credits(data) -> Decimal | None:
 
 def reserve_credits(budget: Budget, request: ProviderRequest, fingerprint: str, credits: Decimal, *,
                     funding_source: str, campaign_id: UUID, company_id: UUID | None,
-                    authorization: SpendingAuthorization | None) -> Usage:
-    """Reserva la cota de créditos; fuera del crédito gratuito, su costo exige una valoración comprobada (§14.3)."""
+                    authorization: SpendingAuthorization | None, retry_of: UUID | None = None) -> Usage:
+    """Reserva la cota de créditos; fuera del crédito gratuito, su costo exige una valoración comprobada (§14.3).
+
+    `retry_of` identifica el fallo conciliado sin consumo que esta reserva repite una sola vez (T17).
+    """
     cost = Decimal(0)
     if funding_source != "free_credit":
         account = next((item for item in budget.account_allowances if
@@ -93,7 +96,7 @@ def reserve_credits(budget: Budget, request: ProviderRequest, fingerprint: str, 
         operation=request.operation, account_ref=request.account_ref, request_fingerprint=fingerprint,
         reserved_credits=credits, reserved_cost_usd=cost,
         funding_source=funding_source, status=UsageStatus.RESERVED,
-    ), authorization)
+    ), authorization, retry_of=retry_of)
 
 
 def reserve_claude(budget: Budget, fingerprint: str, payload: dict, *, account_ref: str, funding_source: str,

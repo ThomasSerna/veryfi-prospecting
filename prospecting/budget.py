@@ -214,6 +214,16 @@ def _amount(rows: list[Usage], limit: Decimal | None, *, credits=False,
     )
 
 
+def unconsumed_failure(usage: Usage) -> bool:
+    """Fallo conciliado sin consumo: una persona confirmó créditos, costo y desembolso en cero (T17).
+
+    Es la única prueba persistida que admite un reintento en otra sesión; un mensaje de error no lo es.
+    """
+    return (usage.status == UsageStatus.RECONCILED and usage.outcome == "failed"
+            and usage.credits == 0 and usage.final_cost_usd == 0 and usage.outlay_usd == 0
+            and (usage.tokens is None or not any(usage.tokens.model_dump().values())))
+
+
 def _context(usage: Usage):
     return (
         usage.campaign_id, usage.company_id, usage.provider, usage.account_ref,
@@ -328,6 +338,11 @@ class Budget:
         if registered != authorization:
             raise BudgetError("authorization_conflict", "El mismo permiso no puede cambiar sus topes.", request_id)
         return authorization, key
+
+    def _may_retry(self, usage: Usage) -> bool:
+        """Fallo conciliado que se puede repetir una vez: transitorio en esta sesión o conciliado sin consumo."""
+        return (usage.status == UsageStatus.RECONCILED and usage.outcome == "failed"
+                and (usage.request_id in self._retryable or unconsumed_failure(usage)))
 
     def _bind(self, request_id, key):
         self._request_grants[request_id] = key
@@ -469,15 +484,27 @@ class Budget:
                         raise BudgetError("request_conflict", "La solicitud duplicada tiene otra cota de consumo.", result.request_id)
                     key = self._check(result, authorization, rows)
                 else:
+                    pending_retry = None
                     if group:
-                        if (retry_of is None or len(group) != 1 or group[0].request_id != retry_of
-                                or group[0].status != UsageStatus.RECONCILED
-                                or group[0].outcome != "failed" or retry_of not in self._retryable):
+                        prior = next((row for row in group if row.request_id == retry_of), None)
+                        rest = [row for row in group if row.request_id != retry_of]
+                        # Un único reintento: el fallo previo admite repetirse y, a lo sumo, ya hay su reserva sin enviar.
+                        if (retry_of is None or prior is None or not self._may_retry(prior) or len(rest) > 1
+                                or any(row.status != UsageStatus.RESERVED for row in rest)):
                             raise BudgetError("duplicate_request", "La huella ya tiene una solicitud; recupera o concilia antes de repetir.", group[-1].request_id)
+                        pending_retry = rest[0] if rest else None
                     elif retry_of is not None:
                         raise BudgetError("invalid_retry", "El reintento no corresponde a una solicitud previa del grupo.", proposal.request_id)
-                    key = self._check(proposal, authorization, rows + [proposal])
-                    result = self.db.save_usage(proposal)
+                    if pending_retry is not None:
+                        # La reserva del reintento quedó sin enviar (p. ej. tras un cierre): se reutiliza.
+                        if any(getattr(pending_retry, name) != getattr(proposal, name) for name in
+                               ("reserved_cost_usd", "reserved_credits", "reserved_tokens", "funding_source")):
+                            raise BudgetError("request_conflict", "La solicitud duplicada tiene otra cota de consumo.", pending_retry.request_id)
+                        result = pending_retry
+                        key = self._check(result, authorization, rows)
+                    else:
+                        key = self._check(proposal, authorization, rows + [proposal])
+                        result = self.db.save_usage(proposal)
         self._bind(result.request_id, key)
         return result
 
@@ -496,8 +523,8 @@ class Budget:
             others = [row for row in rows if row.request_id != request_id and _context(row) == _context(usage)]
             if any(row.status != UsageStatus.RECONCILED or row.outcome != "failed" for row in others):
                 raise BudgetError("duplicate_request", "Otra solicitud del grupo impide un envío duplicado.", request_id)
-            if len(others) > 1 or any(row.request_id not in self._retryable for row in others):
-                raise BudgetError("invalid_retry", "El segundo intento necesita un fallo transitorio comprobado en esta ejecución.", request_id)
+            if len(others) > 1 or any(not self._may_retry(row) for row in others):
+                raise BudgetError("invalid_retry", "El segundo intento necesita un fallo transitorio de esta ejecución o conciliado sin consumo.", request_id)
             key = self._check(usage, authorization, rows)
             result = self.db.save_usage(usage.model_copy(update={"status": UsageStatus.IN_FLIGHT}))
         self._bind(request_id, key)
