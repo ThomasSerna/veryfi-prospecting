@@ -82,6 +82,12 @@ por Git. Contiene cupos y referencias comprobadas, nunca claves ni permisos reut
 Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva el cupo.
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
+Al preparar una campaña nueva, la aplicación guarda una instantánea de la propuesta
+`contact_match_v2` de `config/contact_match_v2.json`. La variable
+`PROSPECTING_CONTACT_MATCH_PATH` permite indicar otro JSON v2 antes de crearla; no
+modifica campañas ya guardadas ni sus exportaciones. Las campañas anteriores sin
+instantánea de match usan la configuración histórica `contact_match_v1`.
+
 ### Configurar Apollo
 
 Apollo es el único proveedor de personas. Para habilitarlo:
@@ -254,7 +260,8 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `prospecting/contact_extraction.py`: extracción de contactos públicos con Haiku y validación de sus citas.
 - `prospecting/pipeline/`: etapas que reservan gasto, llaman a proveedores y guardan resultados, un módulo por etapa (descubrimiento e identidad, extracción y ampliación de evidencia, calificación y contactos), las llamadas con reserva compartidas en `calls.py` y la orquestación de campañas en `campaign.py`.
 - `config/veryfi.json`: catálogo provisional, perfiles y rúbrica versionada.
-- `config/contact_match.json`: pesos versionados del porcentaje de match que ordena a las personas de cada empresa; `PROSPECTING_CONTACT_MATCH_PATH` permite usar otro archivo ([cómo configurarlos](docs/contacts.md#configurar-los-pesos)).
+- `config/contact_match.json`: pesos históricos de `contact_match_v1`.
+- `config/contact_match_v2.json`: propuesta de pesos para campañas nuevas ([cómo configurarlos](docs/contacts.md#configurar-los-pesos)).
 - `tests/`: pruebas de inicialización, contratos, persistencia, presupuesto, clientes, descubrimiento, calificación, contactos y orquestación con datos sintéticos.
 - `docs/provider-check.md`: registro de comprobaciones reales de acceso a proveedores.
 - `docs/persistence.md`: contratos de datos y persistencia local en SQLite.
