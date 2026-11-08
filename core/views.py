@@ -76,7 +76,7 @@ def _campaign_view(campaign_id, base):
     if not any(item.id == campaign_id for item in base["campaigns"]):
         raise Http404("La campaña no existe.")
     return read_campaign(db_path, campaign_id, account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                         exclusions_path=exclusions_path, contact_match_path=Path(settings.PROSPECTING_CONTACT_MATCH_PATH))
+                         exclusions_path=exclusions_path)
 
 
 def _global_busy(base):
@@ -265,7 +265,8 @@ def new_campaign(request):
             if blocking is not None:
                 raise execution.ExecutionBusy("Hay una campaña sin terminar. Retómala o ciérrala conservando sus "
                                               "resultados antes de preparar otra.")
-            saved = prepare_campaign(_paths()[0], form.campaign)
+            saved = prepare_campaign(_paths()[0], form.campaign,
+                                     contact_match_path=Path(settings.PROSPECTING_CONTACT_MATCH_PATH))
         return redirect("webapp:campaign", campaign_id=saved.id)
     return render(request, "pages/new_campaign.html", context, status=400 if request.method == "POST" else 200)
 
@@ -402,8 +403,7 @@ def export(request, campaign_id):
         _require_idle(view)
         content = download_csv(_paths()[0], campaign_id, include_all=mode == "all",
                                account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                               exclusions_path=_paths()[2],
-                               contact_match_path=Path(settings.PROSPECTING_CONTACT_MATCH_PATH))
+                               exclusions_path=_paths()[2])
     response = HttpResponse(content, content_type="text/csv; charset=utf-8")
     prefix = "demo-sintetica-" if settings.PROSPECTING_DEMO else ""
     name = "resultados" if mode == "all" else "prospectos-listos"

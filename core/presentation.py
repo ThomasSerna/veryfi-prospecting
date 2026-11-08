@@ -30,6 +30,10 @@ LABELS = {
     "whatsapp": "WhatsApp", "linkedin": "LinkedIn", "other": "Otro canal",
     "business_champion": "Impulsor de negocio", "technical_champion": "Impulsor técnico",
     "economic_buyer": "Responsable económico",
+    "product": "Producto", "engineering": "Ingeniería", "financial_process": "Procesos financieros",
+    "fintech_economic": "Dirección económica FinTech", "marketing": "Marketing", "insights": "Conocimiento del consumidor",
+    "martech": "Tecnología de marketing", "cpg_economic": "Dirección económica de consumo masivo",
+    "loyalty_accounts": "Cuentas de fidelización",
     "document_need": "Necesidad documental", "offer_match": "Encaje con Veryfi",
     "scale_potential": "Potencial de escala", "adoption_capacity": "Capacidad de adopción",
     "opportunity_timing": "Momento de la oportunidad",
@@ -67,8 +71,13 @@ MATCH_LABELS = {
     "employment:evidence": "Vigente según evidencia del puesto",
     "employment:hunter_signal": "Inferida del historial de Hunter; no prueba el puesto",
     "employment:unverified": "Sin comprobar",
+    "employment:corporate_evidence": "Vigente según evidencia del puesto",
+    "employment:provider_claim": "Declarado por el proveedor; sin comprobar",
+    "employment:contradicted": "Empleo contradicho por una fuente",
+    "employment:unknown": "Sin comprobar",
     "identity_contradicted": "su identidad tiene contradicciones",
     "employment_ended": "una fuente indica que ya no ocupa el puesto",
+    "employment_contradicted": "las fuentes del puesto tienen contradicciones pendientes",
     "scope_mismatch": "su alcance geográfico no cubre los países de la empresa",
 }
 # Vigencia del empleo (T18): estado, origen y motivo calculados al leer; solo la evidencia del puesto habilita.
@@ -337,6 +346,8 @@ def people_summary(people):
     parts = [_count(people.candidates, "candidata", "candidatas"), people_counts(people)]
     if people.target is not None:
         parts.insert(0, f"Objetivo {people.target}")
+    if people.function_ids:
+        parts.append("Funciones: " + ", ".join(label(value) for value in people.function_ids))
     return " · ".join(parts)
 
 
@@ -377,8 +388,8 @@ CSV_FIELDS = (
     "campaign_id", "company_id", "contact_id", "company_name", "domain", "entity_name",
     "countries", "segments", "stage", "business_status", "stored_business_status", "stop_reason", "error_message",
     "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
-    "contact_name", "title", "buying_role", "contact_eligible", "contact_ready", "person_stage",
-    "people_candidates", "people_relevant", "people_ready", "people_target", "people_policy_version",
+    "contact_name", "title", "buying_role", "function_id", "contact_eligible", "contact_ready", "person_stage",
+    "people_candidates", "people_relevant", "people_ready", "people_target", "people_policy_version", "people_functions",
     "employment_status", "employment_reason",
     "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
@@ -416,6 +427,7 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "criteria": json.dumps({} if assessment is None else assessment.model_dump(mode="json")["criteria"], ensure_ascii=False),
                 "contact_name": None if contact is None else contact.name, "title": None if contact is None else contact.title,
                 "buying_role": None if contact is None else contact.buying_role,
+                "function_id": None if person is None else person.function_id,
                 "contact_eligible": None if person is None else person.eligible,
                 "contact_ready": None if person is None else person.eligible and bool(person.usable_channels),
                 "person_stage": None if person is None else person.stage,
@@ -425,6 +437,7 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "people_ready": None if result.people is None else result.people.ready,
                 "people_target": None if result.people is None else result.people.target,
                 "people_policy_version": None if result.people is None else result.people.policy_version,
+                "people_functions": None if result.people is None else json.dumps(result.people.function_ids),
                 "employment_status": None if person is None else person.employment.state,
                 "employment_reason": None if person is None else person.employment.reason,
                 # Sin match la celda queda vacía, nunca 0.
@@ -450,11 +463,9 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
     return output.getvalue().encode("utf-8-sig")
 
 
-def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None,
-                 contact_match_path=None):
+def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None):
     """Consulta al descargar con una conexión nueva, sin reutilizar una pantalla anterior."""
-    current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path,
-                            contact_match_path=contact_match_path)
+    current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path)
     if current.is_executing:
         raise ValueError("La campaña está ejecutándose; espera antes de exportar.")
     return export_csv(current, include_all=include_all)

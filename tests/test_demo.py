@@ -37,6 +37,8 @@ def current(case):
 
 def test_demo_reaches_every_business_status_through_the_real_rules(seeded):
     view = current(seeded)
+    assert view.contact_match_version == "contact_match_v2"
+    assert view.campaign.config_snapshot.contact_match.validation_status == "proposed"
     assert sorted(item.business_status for item in view.companies) == sorted(BusinessStatus)
     assert all(item.business_status == item.run_item.business_status for item in view.companies)
     rubric = rubric_for(view.campaign)

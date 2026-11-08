@@ -14,7 +14,7 @@ import sys
 import tempfile
 from uuid import uuid4
 
-from prospecting.contacts import derive_readiness
+from prospecting.contacts import derive_readiness, load_contact_match
 from prospecting.db import Database
 from prospecting.identity import ExclusionEntry, ExclusionList, exclusion_evidence, match_exclusion
 from prospecting.models import (
@@ -154,6 +154,7 @@ def build_demo(directory: Path, now: datetime) -> Campaign:
     if db_path.exists() or exclusions_path.exists():
         raise FileExistsError("La demostración solo crea archivos nuevos; elige un directorio vacío.")
     config = VeryfiConfig.model_validate_json((PROJECT_ROOT / "config" / "veryfi.json").read_text(encoding="utf-8"))
+    config = config.model_copy(update={"contact_match": load_contact_match(PROJECT_ROOT / "config" / "contact_match_v2.json")})
     campaign = Campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"], max_companies=len(COMPANIES),
                         config_snapshot=config, status=CampaignStatus.COMPLETED, created_at=now, updated_at=now)
     excluded = next(spec for spec in COMPANIES if spec.get("excluded"))

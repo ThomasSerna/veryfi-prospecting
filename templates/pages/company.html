@@ -119,6 +119,7 @@
     <section id="contacts" class="tab-panel surface company-panel" aria-labelledby="contacts-title">
       <h2 id="contacts-title" class="sr-only">Contactos</h2>
       {% if result.people %}<p class="people-summary">{{ result.people|people_summary }}</p>{% endif %}
+      {% if view.contact_match_version %}<p class="cell-note">{{ view.contact_match_version }}{% if campaign.config_snapshot.contact_match.validation_status == 'proposed' %} · Propuesta pendiente de validación comercial{% endif %}</p>{% endif %}
       {% if not view.contact_match_version and result.contacts %}
       <div class="notice notice-warning"><strong>El porcentaje de match no está disponible.</strong></div>
       {% endif %}
@@ -195,6 +196,7 @@
             <div><dt>Identidad</dt><dd>{% if person.contact.identity_status == 'confirmed' %}Confirmada{% elif person.contact.identity_status == 'contradicted' %}Con contradicciones{% else %}Pendiente{% endif %}</dd></div>
             <div><dt>Vigencia del empleo</dt><dd>{{ person.employment|employment_label }}{% if person.employment.reason %} · {{ person.employment|employment_reason }}{% endif %}{% for evidence_id in person.employment.evidence_ids %}{% if forloop.first %}<br>{% endif %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% endfor %}</dd></div>
             <div><dt>Función pertinente</dt><dd>{{ person.contact.relevant_function|yesno:'Sí,No,Pendiente' }}</dd></div>
+            <div><dt>Función del cargo</dt><dd>{{ person.function_id|label }}</dd></div>
             <div><dt>Alcance geográfico</dt><dd>{{ person.contact.geographic_scope|default_if_none:'Pendiente' }}</dd></div>
           </dl>
           {% if person.contact.provenance %}

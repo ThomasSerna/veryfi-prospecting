@@ -21,8 +21,8 @@ from prospecting.budget import (
 )
 from prospecting.contacts import (
     ContactMatch, ContactMatchConfig, EmploymentStatus, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
-    PeopleProgress, PersonStage, employment_status, load_contact_match, match_sort_key, people_progress, person_stage,
-    target_roles, validate_contact,
+    PeopleProgress, PersonStage, employment_status, load_contact_match, people_progress, person_stage,
+    person_function, rank_contact_matches, role_families, target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.discovery import initial_urls
@@ -70,6 +70,7 @@ _HUMAN_REVIEW = ("exclusion_review", "duplicate_review")
 # Una ejecución a la vez por proceso (§13.3): el servidor Django local investiga en un hilo de ese proceso.
 _EXECUTION = threading.Lock()
 _FINAL = {Priority.EXCLUDED: BusinessStatus.EXCLUDED, Priority.LOW: BusinessStatus.LOW_FIT}
+_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 
 
 class CompanyProgress(Contract):
@@ -147,6 +148,7 @@ class ContactResult(Contract):
     employment: EmploymentStatus
     # Ordena para que ventas elija; no cambia eligible, canales utilizables ni disponibilidad.
     match: ContactMatch | None = None
+    function_id: Text | None = None
 
 
 class CompanyResult(Contract):
@@ -166,7 +168,7 @@ class CampaignView(Contract):
     budget: BudgetSnapshot
     is_executing: StrictBool
     exclusions_status: ExclusionStatus
-    # None: falta un config/contact_match.json válido y las personas se muestran sin porcentaje.
+    # None: falta la configuración histórica válida y las personas se muestran sin porcentaje.
     contact_match_version: Text | None = None
 
 
@@ -332,38 +334,43 @@ def list_saved_campaigns(db_path: Path) -> list[Campaign]:
         return db.list_campaigns()
 
 
-def prepare_campaign(db_path: Path, campaign: Campaign) -> Campaign:
+def prepare_campaign(db_path: Path, campaign: Campaign, *, contact_match_path: Path | None = None) -> Campaign:
     """Única acción de la interfaz que puede crear la base; guarda un borrador sin tráfico."""
     campaign = Campaign.model_validate(campaign)
     with Database(Path(db_path)) as db, db.transaction():
         existing = db.get_active_campaign() or db.get_campaign(campaign.id)
         if existing is not None:
             return existing
-        return db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.CREATED}))
+        weights = load_contact_match(contact_match_path if contact_match_path is not None else _CONFIG_DIR / "contact_match_v2.json")
+        if weights.version != "contact_match_v2":
+            raise ValueError("Las campañas nuevas requieren contact_match_v2.")
+        snapshot = campaign.config_snapshot.model_copy(update={"contact_match": weights})
+        return db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.CREATED, "config_snapshot": snapshot}))
 
 
-def _contact_match_config(path: Path | None) -> ContactMatchConfig | None:
-    """Sin un archivo válido no hay match: la interfaz lo avisa y nunca se inventan pesos."""
-    if path is None:
-        return None
+def _contact_match_config(campaign: Campaign) -> ContactMatchConfig | None:
+    """La instantánea manda; solo las campañas históricas consultan el JSON v1 canónico."""
+    if campaign.config_snapshot.contact_match is not None:
+        return campaign.config_snapshot.contact_match
     try:
-        return load_contact_match(path)
+        weights = load_contact_match(_CONFIG_DIR / "contact_match.json")
+        return weights if weights.version == "contact_match_v1" else None
     except (OSError, UnicodeError, ValueError):
         return None
 
 
 def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[AccountAllowance] | None = None,
-                  exclusions_path: Path | None = None, contact_match_path: Path | None = None) -> CampaignView:
+                  exclusions_path: Path | None = None) -> CampaignView:
     """Lectura para la UI/CSV; recalcula persona, canales, disponibilidad y match con la fecha actual.
 
     Devuelve todas las personas guardadas de cada empresa, ordenadas por match.
     """
     exclusions = None if exclusions_path is None else load_exclusions(exclusions_path)
-    weights = _contact_match_config(contact_match_path)
     with _saved_database(db_path) as db:
         campaign = db.get_campaign(campaign_id)
         if campaign is None:
             raise ValueError("La campaña no existe.")
+        weights = _contact_match_config(campaign)
         budget = Budget(db, campaign.config_snapshot.defaults.budget, account_allowances or []).snapshot(campaign_id)
         companies, now = [], utc_now()
         with db.transaction():
@@ -393,12 +400,19 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     employment = employment_status(contact, company, evidence, campaign.limits, now)
                     ranking = None if weights is None or assessment is None else contact_match(
                         contact, company, assessment, evidence, campaign.limits, now, roles, weights, campaign=campaign)
+                    function = None if assessment is None else person_function(contact, company, assessment, campaign, evidence, now)
                     results.append(ContactResult(contact=contact, eligible=eligible, stage=stage, usable_channels=usable,
                                                  employment=employment, match=ranking,
+                                                 function_id=function,
                                                  enrichment_rejected=rejected.get(str(contact.id))))
                 people = None if assessment is None else people_progress(
                     contacts, company, assessment, evidence, now, roles, campaign=campaign, stages=stages)
-                results.sort(key=lambda item: match_sort_key(item.match, item.eligible, item.contact, roles or []))
+                families = [] if assessment is None else role_families(company, assessment, campaign, evidence=evidence)
+                order = rank_contact_matches([(item.contact, item.match, item.eligible) for item in results], roles or [],
+                                             function_ids={item.contact.id: item.function_id for item in results if item.function_id},
+                                             function_order=list(dict.fromkeys(family.function_id for family in families)))
+                by_id = {item.contact.id: item for item in results}
+                results = [by_id[identifier] for identifier in order]
                 status = None if assessment is None else derive_readiness(
                     assessment, contacts, evidence, campaign.limits, now, company, roles, campaign=campaign)
                 if excluded:

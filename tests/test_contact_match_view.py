@@ -17,9 +17,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from core.presentation import export_csv
+from prospecting.contacts import load_contact_match
 from prospecting.db import Database
-from prospecting.models import Channel, Contact, Evidence, RunItem, utc_now
+from prospecting.models import Channel, Contact, Evidence, IdentityStatus, RunItem, utc_now
 from prospecting.pipeline import read_campaign
+from prospecting.pipeline import campaign as bridge
 
 
 MATCH_PATH = Path(__file__).resolve().parents[1] / "config" / "contact_match.json"
@@ -27,10 +29,11 @@ READY, SALES, CONTRADICTED = "Persona Sintética Lista", "Persona Sintética Ven
 
 
 @pytest.fixture
-def people(tmp_path, make_campaign, make_company, make_assessment, config):
+def people(tmp_path, make_campaign, make_company, make_assessment, config, request):
     """Tres personas guardadas en un orden distinto al del match: ventas, contradicha y lista."""
     path, now = tmp_path / "synthetic-match.sqlite3", utc_now()
-    campaign = make_campaign(status="completed", config_snapshot=config.model_copy(update={"people_provider": None}))
+    weights = load_contact_match(MATCH_PATH.with_name("contact_match_v2.json")) if getattr(request, "param", None) == "v2" else None
+    campaign = make_campaign(status="completed", config_snapshot=config.model_copy(update={"people_provider": None, "contact_match": weights}))
     company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
                                              segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
@@ -64,7 +67,7 @@ def people(tmp_path, make_campaign, make_company, make_assessment, config):
 
 
 def test_every_saved_person_is_returned_ordered_by_match_with_blocked_last(people):
-    view = read_campaign(people.path, people.campaign.id, contact_match_path=MATCH_PATH)
+    view = read_campaign(people.path, people.campaign.id)
     [result] = view.companies
     assert view.contact_match_version == "contact_match_v1"
     # La contradicha suma más que la de ventas, pero una regla la descarta y queda al final.
@@ -74,18 +77,20 @@ def test_every_saved_person_is_returned_ordered_by_match_with_blocked_last(peopl
     assert result.business_status == "ready_preferred"
 
 
-@pytest.mark.parametrize("content", [None, '{"version": "contact_match_v9"}', "no es JSON"])
-def test_missing_or_invalid_weights_show_people_without_inventing_a_match(people, content):
-    path = None
+@pytest.mark.parametrize("content", [None, '{"version": "contact_match_v9"}', "no es JSON", "valid_v2"])
+def test_missing_or_invalid_weights_show_people_without_inventing_a_match(people, content, monkeypatch):
+    status = read_campaign(people.path, people.campaign.id).companies[0].business_status
+    monkeypatch.setattr(bridge, "_CONFIG_DIR", people.tmp_path)
     if content is not None:
         path = people.tmp_path / "contact_match.json"
+        if content == "valid_v2":
+            content = MATCH_PATH.with_name("contact_match_v2.json").read_text(encoding="utf-8")
         path.write_text(content, encoding="utf-8")
-    view = read_campaign(people.path, people.campaign.id, contact_match_path=path)
+    view = read_campaign(people.path, people.campaign.id)
     [result] = view.companies
     assert view.contact_match_version is None and len(result.contacts) == 3
     assert all(person.match is None for person in result.contacts)
-    assert result.business_status == read_campaign(people.path, people.campaign.id,
-                                                    contact_match_path=MATCH_PATH).companies[0].business_status
+    assert result.business_status == status
 
 
 def page(people, name, match_path=MATCH_PATH, **kwargs):
@@ -106,9 +111,10 @@ def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(pe
     assert "El porcentaje de match no está disponible" not in html
 
 
-def test_company_page_warns_when_weights_are_invalid(people):
+def test_company_page_warns_when_weights_are_invalid(people, monkeypatch):
     broken = people.tmp_path / "contact_match.json"
     broken.write_text('{"version": "contact_match_v9"}', encoding="utf-8")
+    monkeypatch.setattr(bridge, "_CONFIG_DIR", people.tmp_path)
     html = page(people, "webapp:company", broken, company_id=people.company.id)
     assert "El porcentaje de match no está disponible" in html and "de match</span>" not in html
     assert all(name in html for name in (READY, SALES, CONTRADICTED))
@@ -124,7 +130,7 @@ def csv_rows(content):
 
 
 def test_csv_rows_follow_match_order_and_leave_missing_match_empty(people):
-    view = read_campaign(people.path, people.campaign.id, contact_match_path=MATCH_PATH)
+    view = read_campaign(people.path, people.campaign.id)
     rows = csv_rows(export_csv(view, include_all=True))
     assert [(row["contact_name"], row["contact_match"], row["contact_match_blocked"]) for row in rows] == [
         (READY, "100", ""), (SALES, "25", ""), (CONTRADICTED, "68", "identity_contradicted")]
@@ -133,7 +139,9 @@ def test_csv_rows_follow_match_order_and_leave_missing_match_empty(people):
         "name": "role", "level": "outside_profile", "points": 0, "weight": 50, "pending": False}
     # La exportación principal sigue limitada a personas listas.
     assert [row["contact_name"] for row in csv_rows(export_csv(view))] == [READY]
-    plain = csv_rows(export_csv(read_campaign(people.path, people.campaign.id), include_all=True))
+    for person in view.companies[0].contacts:
+        person.match = None
+    plain = csv_rows(export_csv(view, include_all=True))
     assert len(plain) == 3 and all(row["contact_match"] == row["contact_match_detail"] == "" for row in plain)
 
 
@@ -145,3 +153,29 @@ def test_csv_download_uses_the_configured_weights(people):
             reverse("webapp:export", kwargs={"campaign_id": people.campaign.id}), {"mode": "all"})
     assert response.status_code == 200
     assert [row["contact_match"] for row in csv_rows(response.content)] == ["100", "25", "68"]
+
+
+@pytest.mark.parametrize("people", ["v2"], indirect=True)
+def test_v2_snapshot_drives_view_html_and_csv_despite_a_broken_external_path(people):
+    view = read_campaign(people.path, people.campaign.id)
+    assert view.contact_match_version == "contact_match_v2"
+    assert [(person.contact.name, person.match.score) for person in view.companies[0].contacts] == [
+        (READY, 100), (SALES, 40), (CONTRADICTED, 73)]
+    assert [row["contact_match"] for row in csv_rows(export_csv(view, include_all=True))] == ["100", "40", "73"]
+    html = page(people, "webapp:company", people.tmp_path / "inexistente.json", company_id=people.company.id)
+    assert "contact_match_v2" in html and "Propuesta pendiente de validación comercial" in html
+    assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
+    assert 'id="lead-title">Mejor match' in html
+    assert "El porcentaje de match no está disponible" not in html
+
+
+@pytest.mark.parametrize("people", ["v2"], indirect=True)
+def test_only_blocked_people_have_no_best_match_summary(people):
+    with Database(people.path) as db:
+        for contact in db.list_contacts(people.company.id):
+            db.save_contact(contact.model_copy(update={"identity_status": IdentityStatus.CONTRADICTED}),
+                            evidence=[fact for fact in db.list_evidence(people.company.id) if fact.contact_id == contact.id])
+    html = page(people, "webapp:company", company_id=people.company.id)
+    assert 'id="lead-title"' not in html and html.count("Descartada por regla") == 3
+    assert "Mejor match" not in page(people, "webapp:campaign")
+    assert csv_rows(export_csv(read_campaign(people.path, people.campaign.id))) == []
