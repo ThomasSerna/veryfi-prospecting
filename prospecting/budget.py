@@ -1,6 +1,6 @@
 """Reserva local conservadora; ninguna función realiza llamadas de red."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, localcontext
 import math
 import time
@@ -597,35 +597,62 @@ class Budget:
     def reconcile(self, request_id: UUID, confirmation: Confirmation) -> Usage:
         confirmation = Confirmation.model_validate_json(confirmation.model_dump_json())
         with self.db.transaction():
-            usage = self._get(request_id)
-            if confirmation.observed_at < usage.created_at:
-                raise BudgetError("confirmation_date", "La confirmación es anterior a la solicitud.", request_id)
-            if confirmation.no_send:
-                unsent = usage.status in (UsageStatus.RESERVED, UsageStatus.RECONCILED) or (
-                    usage.status == UsageStatus.FAILED and request_id in self._proved_unsent
-                )
-                if (not unsent
-                        or confirmation.outcome != "failed"
-                        or any((confirmation.final_cost_usd, confirmation.credits, confirmation.outlay_usd))
-                        or confirmation.tokens is not None and any(confirmation.tokens.model_dump().values())):
-                    raise BudgetError("invalid_no_send", "Solo una reserva no enviada se cancela sin consumo.", request_id)
-            elif usage.status == UsageStatus.RESERVED:
-                raise BudgetError("invalid_state", "Una reserva no enviada necesita confirmación explícita de no envío.", request_id)
-            if usage.outcome not in (None, "unknown", confirmation.outcome):
-                raise BudgetError("outcome_conflict", "La conciliación contradice el resultado conocido.", request_id)
-            tokens = _tokens(usage.tokens, confirmation.tokens)
-            values = {"final_cost_usd": confirmation.final_cost_usd,
-                      "credits": confirmation.credits, "outlay_usd": confirmation.outlay_usd}
-            for name, value in values.items():
-                if getattr(usage, name) is not None and getattr(usage, name) != value:
-                    raise BudgetError("reconciliation_conflict", "La confirmación contradice un consumo ya registrado.", request_id)
-            if usage.status == UsageStatus.RECONCILED:
-                if usage.outcome != confirmation.outcome or usage.tokens != tokens:
-                    raise BudgetError("reconciliation_conflict", "La conciliación confirmada es inmutable.", request_id)
-                return usage
-            return self.db.save_usage(usage.model_copy(update=values | {
-                "tokens": tokens, "outcome": confirmation.outcome,
-                "status": UsageStatus.RECONCILED,
-                "finished_at": usage.finished_at or confirmation.observed_at,
-                "reconciled_at": confirmation.observed_at,
-            }))
+            return self._reconcile(request_id, confirmation)
+
+    def reconcile_many(self, items: list[tuple[UUID, Confirmation]], *, provider: str, account_ref: str,
+                       since: datetime, until: datetime) -> list[Usage]:
+        """Concilia un comprobante de panel en una sola transacción: todas las filas o ninguna (T17).
+
+        Las filas de la cuenta creadas dentro de la ventana del panel deben ser exactamente las del comprobante;
+        repetir el mismo comprobante no cambia nada y uno que contradiga lo ya conciliado se rechaza.
+        """
+        items = [(request_id, Confirmation.model_validate_json(item.model_dump_json())) for request_id, item in items]
+        requested = [request_id for request_id, _ in items]
+        if len(requested) != len(set(requested)):
+            raise BudgetError("receipt_duplicate", "El comprobante repite una solicitud.")
+        with self.db.transaction():
+            window = {row.request_id for row in self.db.list_usage()
+                      if (row.provider, row.account_ref) == (provider, account_ref) and since <= row.created_at <= until}
+            for request_id in requested:
+                usage = self._get(request_id)
+                if (usage.provider, usage.account_ref) != (provider, account_ref):
+                    raise BudgetError("receipt_mismatch", "El comprobante incluye una solicitud de otra cuenta.", request_id)
+            if window != set(requested):
+                raise BudgetError("receipt_incomplete",
+                                  "El comprobante no cubre exactamente las solicitudes de la cuenta en la ventana del panel.")
+            return [self._reconcile(request_id, confirmation) for request_id, confirmation in items]
+
+    def _reconcile(self, request_id: UUID, confirmation: Confirmation) -> Usage:
+        """Conciliación de una fila dentro de una transacción abierta por el llamador."""
+        usage = self._get(request_id)
+        if confirmation.observed_at < usage.created_at:
+            raise BudgetError("confirmation_date", "La confirmación es anterior a la solicitud.", request_id)
+        if confirmation.no_send:
+            unsent = usage.status in (UsageStatus.RESERVED, UsageStatus.RECONCILED) or (
+                usage.status == UsageStatus.FAILED and request_id in self._proved_unsent
+            )
+            if (not unsent
+                    or confirmation.outcome != "failed"
+                    or any((confirmation.final_cost_usd, confirmation.credits, confirmation.outlay_usd))
+                    or confirmation.tokens is not None and any(confirmation.tokens.model_dump().values())):
+                raise BudgetError("invalid_no_send", "Solo una reserva no enviada se cancela sin consumo.", request_id)
+        elif usage.status == UsageStatus.RESERVED:
+            raise BudgetError("invalid_state", "Una reserva no enviada necesita confirmación explícita de no envío.", request_id)
+        if usage.outcome not in (None, "unknown", confirmation.outcome):
+            raise BudgetError("outcome_conflict", "La conciliación contradice el resultado conocido.", request_id)
+        tokens = _tokens(usage.tokens, confirmation.tokens)
+        values = {"final_cost_usd": confirmation.final_cost_usd,
+                  "credits": confirmation.credits, "outlay_usd": confirmation.outlay_usd}
+        for name, value in values.items():
+            if getattr(usage, name) is not None and getattr(usage, name) != value:
+                raise BudgetError("reconciliation_conflict", "La confirmación contradice un consumo ya registrado.", request_id)
+        if usage.status == UsageStatus.RECONCILED:
+            if usage.outcome != confirmation.outcome or usage.tokens != tokens:
+                raise BudgetError("reconciliation_conflict", "La conciliación confirmada es inmutable.", request_id)
+            return usage
+        return self.db.save_usage(usage.model_copy(update=values | {
+            "tokens": tokens, "outcome": confirmation.outcome,
+            "status": UsageStatus.RECONCILED,
+            "finished_at": usage.finished_at or confirmation.observed_at,
+            "reconciled_at": confirmation.observed_at,
+        }))

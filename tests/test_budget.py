@@ -880,3 +880,54 @@ def test_two_connections_cannot_exceed_a_request_limit_together(prepared, tmp_pa
         results = [future.result(timeout=15) for future in
                    [executor.submit(reserve_one, fingerprint) for fingerprint in ("b" * 64, "c" * 64)]]
     assert sorted(results) == ["local_rate_limit", UsageStatus.RESERVED]
+
+
+def sent_failure(budget, proposal, grant, fingerprint):
+    """Una solicitud enviada que falló, pendiente de conciliar."""
+    usage = proposal.model_copy(update={"request_id": uuid4(), "request_fingerprint": fingerprint,
+                                        "reserved_cost_usd": Decimal(0), "created_at": utc_now()})
+    budget.reserve(usage, grant)
+    budget.claim(usage.request_id, usage.request_fingerprint, grant)
+    budget.record_result(usage.request_id, Observation(outcome="failed", error_message="Fallo sintético"))
+    return usage
+
+
+def zero(**overrides):
+    return confirmation(**{"outcome": "failed", "final_cost_usd": "0", "credits": "0", "observed_at": utc_now()} | overrides)
+
+
+def test_reconcile_many_is_all_or_nothing_and_idempotent(prepared):
+    """T17: un comprobante concilia todas sus filas en una transacción; repetirlo no cambia nada."""
+    budget, proposal, grant = prepared
+    since = utc_now()
+    first, second = (sent_failure(budget, proposal, grant, fingerprint) for fingerprint in ("b" * 64, "c" * 64))
+    account = {"provider": proposal.provider, "account_ref": proposal.account_ref, "since": since, "until": utc_now()}
+    with pytest.raises(BudgetError) as error:
+        budget.reconcile_many([(first.request_id, zero()), (second.request_id, zero(outcome="succeeded"))], **account)
+    assert error.value.code == "outcome_conflict"
+    assert [budget.db.get_usage(item.request_id).status for item in (first, second)] == [UsageStatus.FAILED] * 2
+    items = [(first.request_id, zero()), (second.request_id, zero())]
+    saved = budget.reconcile_many(items, **account)
+    assert [item.status for item in saved] == [UsageStatus.RECONCILED] * 2
+    ledger = budget.db.list_usage()
+    assert budget.reconcile_many(items, **account) == saved and budget.db.list_usage() == ledger
+    with pytest.raises(BudgetError) as error:
+        budget.reconcile_many([(first.request_id, zero(credits="1")), (second.request_id, zero())], **account)
+    assert error.value.code == "reconciliation_conflict"
+
+
+def test_reconcile_many_requires_exactly_the_rows_of_the_panel_window(prepared):
+    budget, proposal, grant = prepared
+    since = utc_now()
+    first, second = (sent_failure(budget, proposal, grant, fingerprint) for fingerprint in ("b" * 64, "c" * 64))
+    account = {"provider": proposal.provider, "account_ref": proposal.account_ref, "since": since, "until": utc_now()}
+    for items, code in (([(first.request_id, zero())], "receipt_incomplete"),
+                        ([(first.request_id, zero()), (first.request_id, zero())], "receipt_duplicate")):
+        with pytest.raises(BudgetError) as error:
+            budget.reconcile_many(items, **account)
+        assert error.value.code == code
+    with pytest.raises(BudgetError) as error:
+        budget.reconcile_many([(first.request_id, zero()), (second.request_id, zero())],
+                              **account | {"account_ref": "otra-cuenta"})
+    assert error.value.code == "receipt_mismatch"
+    assert all(row.status == UsageStatus.FAILED for row in budget.db.list_usage())
