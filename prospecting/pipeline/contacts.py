@@ -103,6 +103,11 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 
+def _blocked_reason(usage) -> str:
+    """Una llamada en curso o con resultado incierto espera conciliación; las demás, su resultado persistido."""
+    return "request_uncertain" if usage.status in (UsageStatus.IN_FLIGHT, UsageStatus.UNCERTAIN) else "result_unavailable"
+
+
 def _contact_error_reason(error) -> str:
     if isinstance(error, (BudgetError, ContactError)):
         return error.code
@@ -415,7 +420,11 @@ class _ContactStage:
             return self.finish("invalid_contact_data", status="pending", message="No se pudieron validar los hechos de contacto.")
 
     def _recover_pending(self):
-        """Una llamada enviada sin resultado validado deja la etapa pendiente, sin repetirla."""
+        """Una llamada enviada sin resultado validado deja la etapa pendiente, sin repetirla.
+
+        El motivo describe el bloqueo actual (`request_uncertain` o `result_unavailable`), no el fallo original,
+        que sigue en el mensaje: así un fallo antiguo de Apollo no detiene la pasada de las demás empresas (T17).
+        """
         run = self.run
         for key in run.attempts:
             if not key.startswith(REQUEST_KEY):
@@ -423,13 +432,13 @@ class _ContactStage:
             prior = self.db.get_usage(UUID(key.split(":")[-1]))
             if prior is not None and prior.status != UsageStatus.RESERVED and not run.attempts.get(f"{PROCESSED_KEY}{prior.request_fingerprint}", 0):
                 self.requests.append(prior.request_id)
-                return self.finish(run.stop_reason or "result_unavailable", status="pending",
+                return self.finish(_blocked_reason(prior), status="pending",
                                    message=run.error_message or "Hay una llamada enviada sin resultado validado persistido.")
         for key in run.attempts:
             if key.startswith(HAIKU_REQUEST_KEY):
                 prior = self.db.get_usage(UUID(key.split(":")[-1]))
                 if prior is not None and not run.attempts.get(f"{PROCESSED_KEY}{prior.request_fingerprint}", 0):
-                    return self.finish(run.stop_reason or "result_unavailable", status="pending",
+                    return self.finish(_blocked_reason(prior), status="pending",
                                        message=run.error_message or "La extracción enviada no tiene un resultado validado persistido.")
         return None
 
@@ -644,8 +653,8 @@ def find_contacts(db: Database, budget: Budget, client: ProviderClient, campaign
     try:
         require_apollo_access(campaign, apollo_access, budget)
     except ValueError as error:
-        return ContactReport(**base, status="pending", business_status=run.business_status,
-                             stop_reason="apollo_access_unverified", error_message=str(error))
+        # Se guarda el motivo (T17): la ficha explica el bloqueo y la campaña detiene la pasada de contactos.
+        return stage.finish("apollo_access_unverified", status="pending", message=str(error))
     if not stage.roles:
         return ContactReport(**base, status="skipped", stop_reason="no_target_roles")
     return stage.execute()

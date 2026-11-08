@@ -19,7 +19,7 @@ from prospecting.pipeline.campaign import BUDGET_STOPS, PROVIDER_STOPS
 from prospecting.pipeline.contacts import ContactReport
 from prospecting.qualification import PROMPT_VERSION
 from prospecting.providers import ClaudeClient, HttpResponse, ProviderClient
-from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess
+from prospecting.providers.apollo import APOLLO_OPERATIONS, APOLLO_STOP_REASONS, ApolloAccess
 from prospecting.providers.tavily import TAVILY_OPERATIONS
 
 
@@ -683,6 +683,63 @@ def test_unavailable_provider_stops_the_pass_and_keeps_the_literal_reason(world)
     assert all(item.stage == RunStage.DISCOVERED for item in case.by_domain().values())
 
 
+@pytest.mark.parametrize("failure, reason, blocked", [
+    (422, "apollo_invalid_input", "result_unavailable"),
+    (500, "apollo_provider_error", "result_unavailable"),
+    ("timeout", "apollo_timeout", "request_uncertain"),
+])
+def test_apollo_failure_stops_the_contact_pass_and_resume_continues_with_the_others(world, failure, reason, blocked):
+    """T17: un fallo de Apollo no se repite empresa tras empresa; reanudar sigue con las demás sin repetir la llamada."""
+    case = world.setup(apollo=True)
+    start(case)
+
+    def fail(operation, payload):
+        if operation != "people_search":
+            return None
+        if failure == "timeout":
+            raise TimeoutError("sin respuesta sintética")
+        return HttpResponse(status=failure, headers={"Content-Type": "application/json"},
+                            body=b'{"error": "Fallo sintetico de Apollo"}')
+
+    case.failure = fail
+    report = case.run()
+    assert report.status == CampaignStatus.PARTIAL and report.stop_reason == reason
+    searched = [json.loads(payload)["q_organization_domains_list"][0]
+                for operation, payload in case.events if operation == "people_search"]
+    assert len(searched) == 1
+    items = case.by_domain()
+    assert items[searched[0]].stop_reason == reason and items[searched[0]].error_message
+    waiting = [domain for domain, item in items.items() if domain != searched[0] and item.stage == RunStage.ASSESSED]
+    assert waiting and not any(row.company_id in {items[domain].company_id for domain in waiting}
+                               for row in case.db.list_usage(campaign_id=case.campaign.id, provider="apollo"))
+
+    case.failure = None
+    case.session()
+    case.run()
+    items = case.by_domain()
+    assert items[searched[0]].stop_reason == blocked
+    assert all(items[domain].stage == RunStage.COMPLETED for domain in waiting)
+    again = [json.loads(payload)["q_organization_domains_list"][0]
+             for operation, payload in case.events if operation == "people_search"]
+    assert again.count(searched[0]) == 1 and set(waiting) <= set(again)
+
+
+def test_exhausted_apollo_quota_mid_run_is_saved_and_stops_the_contact_pass(world):
+    """T17: si el cupo de Apollo se agota a mitad de la pasada, la ficha guarda el motivo y nadie más llama."""
+    case = world.setup(apollo=True)
+    case.budget.account_allowances = [
+        AccountAllowance.model_validate(item.model_dump() | {"credit_limit": "1"}) if item.provider == "apollo" else item
+        for item in case.budget.account_allowances]
+    start(case)
+    report = case.run()
+    assert report.status == CampaignStatus.PARTIAL and report.stop_reason == "apollo_access_unverified"
+    items = case.by_domain().values()
+    blocked = [item for item in items if item.stop_reason == "apollo_access_unverified"]
+    assert len(blocked) == 1 and blocked[0].error_message.startswith("Apollo bloqueado: cuota agotada")
+    apollo = case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")
+    assert len({row.company_id for row in apollo}) == 1 and blocked[0].company_id not in {row.company_id for row in apollo}
+
+
 def test_concurrent_run_returns_without_traffic_or_changes(world, tmp_path):
     """Otra sesión, con su propia conexión, pulsa mientras la primera espera una respuesta."""
     case = world.setup()
@@ -748,3 +805,7 @@ def test_stop_classification_separates_budget_from_provider_failures():
     assert not BUDGET_STOPS & PROVIDER_STOPS
     assert "company_budget_exceeded" not in BUDGET_STOPS | PROVIDER_STOPS
     assert not {"timeout", "time_limit", "invalid_output", "duplicate_request"} & (BUDGET_STOPS | PROVIDER_STOPS)
+    # T17: los fallos de Apollo detienen la pasada; los de Tavily y los bloqueos al reanudar, no.
+    assert APOLLO_STOP_REASONS <= PROVIDER_STOPS
+    assert not {"invalid_input", "provider_error", "transport_error", "invalid_response",
+                "request_uncertain", "result_unavailable"} & (BUDGET_STOPS | PROVIDER_STOPS)

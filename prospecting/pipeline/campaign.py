@@ -37,7 +37,7 @@ from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_iden
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
-from prospecting.providers.apollo import APOLLO_OPERATIONS, ApolloAccess, PROVIDER as APOLLO
+from prospecting.providers.apollo import APOLLO_OPERATIONS, APOLLO_STOP_REASONS, ApolloAccess, PROVIDER as APOLLO
 from prospecting.providers.tavily import EXTRACT_OPERATION, PROVIDER as TAVILY, SEARCH_OPERATION, TAVILY_OPERATIONS
 from prospecting.qualification import enterprise_sort_key
 from prospecting.sources import is_search_evidence
@@ -52,10 +52,11 @@ BUDGET_STOPS = {
 }
 # Solo se agotó el tope de una empresa: esa empresa se detiene y la campaña sigue.
 COMPANY_BUDGET_STOP = "company_budget_exceeded"
-# Proveedor no disponible para todas las empresas: se detiene la pasada, no la campaña.
+# Proveedor no disponible para todas las empresas: se detiene la pasada, no la campaña. Los motivos
+# propios de Apollo (T17) también la detienen: el mismo fallo se repetiría en cada empresa siguiente.
 PROVIDER_STOPS = {
     "permission_denied", "quota_exceeded", "rate_limited", "local_error", "local", "http_401", "http_403", "http_429",
-}
+} | APOLLO_STOP_REASONS
 # Extracción hecha, o fallida de forma que repetirla no ayuda: se sigue con la evidencia guardada.
 _EXTRACTION_SETTLED = {
     None, "page_limit", "no_valid_urls", "invalid_input", "provider_error", "timeout", "transport_error",
