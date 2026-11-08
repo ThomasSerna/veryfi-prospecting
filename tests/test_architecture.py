@@ -237,6 +237,25 @@ def test_enabled_provider_operations_only_search_read_or_verify():
     assert specs == READ_OPERATIONS
 
 
+def test_production_keys_reach_only_their_provider_host_and_legacy_hunter_stays_in_tests():
+    """T17: cada clave viaja solo al host de su proveedor; el adaptador histórico de Hunter no es código de ejecución."""
+    from urllib.parse import urlsplit
+
+    from prospecting.providers import OperationSpec
+
+    hosts = {"TAVILY_API_KEY": "api.tavily.com", "APOLLO_API_KEY": "api.apollo.io",
+             "ANTHROPIC_API_KEY": "api.anthropic.com"}
+    for name in modules():
+        for value in vars(importlib.import_module(name)).values():
+            for item in value if isinstance(value, (list, tuple)) else [value]:
+                if isinstance(item, OperationSpec):
+                    assert urlsplit(str(item.endpoint)).hostname == hosts[item.api_key_env], item.operation
+    for tree in [*trees().values(), *trees(INTERFACE).values()]:
+        names = {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+        names |= {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+        assert not any("legacy_hunter" in item for item in names)
+
+
 def test_every_module_imports_without_side_effects(tmp_path):
     script = """
 import os

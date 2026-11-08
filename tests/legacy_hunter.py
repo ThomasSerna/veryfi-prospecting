@@ -29,6 +29,8 @@ PROVIDER = "hunter"
 HunterOperation = Literal["domain_search", "email_finder", "email_verifier"]
 
 
+# Solo para calcular huellas históricas: `api_key_env` es un marcador porque el tipo ya no admite
+# HUNTER_API_KEY y las huellas lo ignoran. Nunca debe conectarse a un transporte real (T17).
 HUNTER_OPERATIONS = [
     OperationSpec(provider=PROVIDER, operation=operation, endpoint=f"https://api.hunter.io/v2/{path}",
                   method="GET", api_key_env="APOLLO_API_KEY", timeout_seconds=timeout)
