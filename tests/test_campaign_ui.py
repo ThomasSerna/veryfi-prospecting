@@ -200,6 +200,31 @@ def test_authorization_rejects_unbounded_or_unavailable_operation_before_client(
     assert list_saved_campaigns(path)[0].status == "created"
 
 
+@pytest.mark.parametrize("approvals, accepted", [
+    # Cupo de Apollo: 10 créditos. Search y Enrichment comparten la cuenta y sus topes se suman (T17).
+    ([("apollo", "people_search", "apollo-sintetica", "6"), ("apollo", "people_enrichment", "apollo-sintetica", "5")], False),
+    ([("apollo", "people_search", "apollo-sintetica", "0"), ("apollo", "people_enrichment", "apollo-sintetica", "10")], True),
+    # Tavily Search y Extract también comparten su cupo de 10 créditos.
+    ([("tavily", "search", "tavily-sintetica", "6"), ("tavily", "extract", "tavily-sintetica", "5")], False),
+    ([("tavily", "search", "tavily-sintetica", "5"), ("tavily", "extract", "tavily-sintetica", "5")], True),
+])
+def test_permissions_of_one_account_are_summed_against_its_allowance(
+        tmp_path, make_campaign, access, monkeypatch, approvals, accepted):
+    path = tmp_path / "synthetic.sqlite3"
+    campaign = prepare_campaign(path, make_campaign())
+    monkeypatch.setattr(bridge, "_execute", lambda *args: bridge._report(args[0], args[1], stop_reason="simulada"))
+    inputs = [approval(provider=provider, operation=operation, account_ref=account, max_credits=credits)
+              for provider, operation, account, credits in approvals]
+    if accepted:
+        assert execute_campaign(path, campaign.id, access=access, approvals=inputs).stop_reason == "simulada"
+    else:
+        monkeypatch.setattr(bridge, "ProviderClient", lambda *args: pytest.fail("No debe construir el cliente"))
+        with pytest.raises(ValueError, match="superan en conjunto los créditos"):
+            execute_campaign(path, campaign.id, access=access, approvals=inputs)
+    with Database(path) as db:
+        assert db.list_usage() == []
+
+
 def test_duplicate_permissions_rejected_and_saved_unknown_cost_blocks_execution(tmp_path, make_campaign, access):
     path = tmp_path / "synthetic.sqlite3"
     campaign = prepare_campaign(path, make_campaign())

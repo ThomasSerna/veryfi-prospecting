@@ -7,6 +7,7 @@ contacto, de mayor a menor prioridad. Ninguna función contacta a nadie.
 """
 
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 import threading
 import time
@@ -299,17 +300,23 @@ def _approve(budget: Budget, access: ProviderAccess, approvals: list[Authorizati
     costs = (snapshot.global_budget, snapshot.operating, snapshot.campaign)
     if snapshot.reservation_overrun or any(amount.unknown or amount.exceeded for amount in costs):
         raise ValueError("El consumo pendiente necesita conciliación antes de ejecutar.")
-    for item in inputs:
+    # Autorización consolidada por cuenta (T17): los permisos de todas las operaciones de una misma cuenta se
+    # suman antes de compararlos con su cupo, y el costo de todos los permisos, con los topes globales.
+    total_cost = sum((item.max_cost_usd for item in inputs), Decimal(0))
+    if total_cost > 0 and any(amount.available is None or total_cost > amount.available for amount in costs):
+        raise ValueError("Los permisos superan en conjunto el cupo económico disponible.")
+    for provider, account_ref in dict.fromkeys((item.provider, item.account_ref) for item in inputs):
+        grants = [item for item in inputs if (item.provider, item.account_ref) == (provider, account_ref)]
         account = next(account for account in snapshot.accounts if
-                       (account.provider, account.account_ref) == (item.provider, item.account_ref))
+                       (account.provider, account.account_ref) == (provider, account_ref))
         if account.cost.unknown or account.credits.unknown:
             raise ValueError("Hay consumo de la cuenta sin conciliar; no se autoriza tráfico.")
-        if item.max_cost_usd > 0 and any(amount.available is None or item.max_cost_usd > amount.available
-                                       for amount in (*costs, account.cost)):
-            raise ValueError("El permiso supera el cupo económico disponible.")
-        if item.max_credits > 0 and (account.credits.available is None or
-                                     item.max_credits > account.credits.available):
-            raise ValueError("El permiso supera los créditos comprobados disponibles.")
+        cost = sum((item.max_cost_usd for item in grants), Decimal(0))
+        credits = sum((item.max_credits for item in grants), Decimal(0))
+        if cost > 0 and (account.cost.available is None or cost > account.cost.available):
+            raise ValueError("Los permisos de la cuenta superan en conjunto su cupo económico disponible.")
+        if credits > 0 and (account.credits.available is None or credits > account.credits.available):
+            raise ValueError("Los permisos de la cuenta superan en conjunto los créditos comprobados disponibles.")
     return [budget.authorize(SpendingAuthorization(**item.model_dump(), authorized_at=utc_now())) for item in inputs]
 
 
