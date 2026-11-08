@@ -1,12 +1,13 @@
 """Reserva local conservadora; ninguna función realiza llamadas de red."""
 
+from datetime import timedelta
 from decimal import Decimal, localcontext
 import math
 import time
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictBool
+from pydantic import Field, StrictBool, StrictInt
 
 from prospecting.db import Database
 from prospecting.models import (
@@ -54,6 +55,23 @@ class SpendingAuthorization(Contract):
     responsible: Text
     source_reference: Text
     authorized_at: UtcDatetime
+
+
+class RequestLimit(Contract):
+    """Máximo de solicitudes de una operación y cuenta en una ventana deslizante (T17); no habilita gasto.
+
+    Se cuenta desde el ledger, así que también acota a otra sesión o conexión sobre la misma base. Una
+    ventana deslizante es al menos tan estricta como las ventanas fijas que publica el proveedor.
+    """
+
+    provider: Text
+    operation: Text
+    account_ref: Text
+    window_seconds: Literal[60, 3600, 86400]
+    max_requests: Annotated[StrictInt, Field(ge=1)]
+
+
+_WINDOW_NAMES = {60: "minuto", 3600: "hora", 86400: "día"}
 
 
 class Observation(Contract):
@@ -257,6 +275,34 @@ class Budget:
         self._request_grants: dict[UUID, tuple] = {}
         self._claimed_unsent: set[UUID] = set()
         self._proved_unsent: set[UUID] = set()
+        self._request_limits: dict[tuple, RequestLimit] = {}
+
+    def limit_requests(self, limits: list[RequestLimit]) -> None:
+        """Registra límites de solicitudes de la sesión; repetirlos no cambia nada y cambiarlos se rechaza."""
+        for limit in limits:
+            limit = RequestLimit.model_validate_json(limit.model_dump_json())
+            key = (limit.provider, limit.operation, limit.account_ref, limit.window_seconds)
+            previous = self._request_limits.get(key)
+            if previous is not None and previous != limit:
+                raise BudgetError("rate_limit_conflict", "El límite de solicitudes no puede cambiar durante la sesión.")
+            self._request_limits[key] = limit
+
+    def _check_request_limits(self, usage: Usage, rows: list[Usage]) -> None:
+        """Cuenta toda fila de la operación y cuenta creada o terminada dentro de la ventana, en cualquier estado."""
+        now = utc_now()
+        operation = (usage.provider, usage.operation, usage.account_ref)
+        for limit in self._request_limits.values():
+            if (limit.provider, limit.operation, limit.account_ref) != operation:
+                continue
+            since = now - timedelta(seconds=limit.window_seconds)
+            recent = sum(1 for row in rows if row.request_id != usage.request_id
+                         and (row.provider, row.operation, row.account_ref) == operation
+                         and (row.created_at >= since or row.finished_at is not None and row.finished_at >= since))
+            if recent + 1 > limit.max_requests:
+                raise BudgetError(
+                    "local_rate_limit",
+                    f"Se alcanzó el límite local de {limit.max_requests} solicitudes por "
+                    f"{_WINDOW_NAMES[limit.window_seconds]}; la llamada no se envió.", usage.request_id)
 
     def authorize(self, authorization: SpendingAuthorization) -> SpendingAuthorization:
         """Registra un permiso fresco después de la aprobación humana explícita."""
@@ -385,6 +431,7 @@ class Budget:
             raise BudgetError("authorization_unknown", "El consumo del permiso tiene importes desconocidos.", usage.request_id)
         if costs.exceeded or credits.exceeded:
             raise BudgetError("authorization_exceeded", "Las solicitudes acumulan más consumo que el permiso otorgado.", usage.request_id)
+        self._check_request_limits(usage, rows)
         return key
 
     def reserve(self, proposal: Usage, authorization: SpendingAuthorization | None, retry_of: UUID | None = None) -> Usage:

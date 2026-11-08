@@ -10,7 +10,7 @@ import pytest
 
 from prospecting.budget import (
     AccountAllowance, Budget, BudgetError, Confirmation, CreditValuation, Observation,
-    SpendingAuthorization,
+    RequestLimit, SpendingAuthorization,
 )
 import prospecting.budget as budget_module
 from prospecting.db import Database
@@ -741,3 +741,92 @@ def test_two_connections_cannot_reserve_the_same_remaining_balance(prepared, tmp
     assert results.count("company_budget_exceeded" if bound == "cost" else "budget_exceeded") == 1
     with Database(path) as restored:
         assert len(restored.list_usage()) == (2 if bound == "shared_credit" else 1)
+
+
+def settled_row(proposal, created_at, **changes):
+    """Fila ya conciliada sin consumo de la misma operación y cuenta, con otra huella."""
+    return proposal.model_copy(update={
+        "request_id": uuid4(), "request_fingerprint": uuid4().hex * 2, "reserved_cost_usd": Decimal(0),
+        "reserved_credits": Decimal(0), "credits": Decimal(0), "final_cost_usd": Decimal(0),
+        "outlay_usd": Decimal(0), "status": UsageStatus.RECONCILED, "outcome": "succeeded",
+        "created_at": created_at, "finished_at": created_at, "reconciled_at": created_at,
+    } | changes)
+
+
+def request_limit(proposal, window, maximum):
+    return RequestLimit(provider=proposal.provider, operation=proposal.operation, account_ref=proposal.account_ref,
+                        window_seconds=window, max_requests=maximum)
+
+
+@pytest.mark.parametrize("window", [60, 3600, 86400])
+def test_request_limit_counts_the_ledger_inside_each_window(prepared, window):
+    """T17: el límite local se calcula desde el ledger; una fila fuera de la ventana no cuenta."""
+    budget, proposal, grant = prepared
+    now = utc_now()
+    budget.db.save_usage(settled_row(proposal, now - timedelta(seconds=window + 5)))
+    budget.db.save_usage(settled_row(proposal, now - timedelta(seconds=window - 5)))
+    budget.db.save_usage(settled_row(proposal, now, operation="other_lookup"))
+    budget.limit_requests([request_limit(proposal, window, 2)])
+    first = budget.reserve(proposal.model_copy(update={"created_at": now}), grant)
+    assert first.status == UsageStatus.RESERVED
+    second = proposal.model_copy(update={"request_id": uuid4(), "request_fingerprint": "b" * 64, "created_at": now})
+    with pytest.raises(BudgetError) as error:
+        budget.reserve(second, grant)
+    assert error.value.code == "local_rate_limit"
+    assert "no se envió" in str(error.value)
+    assert budget.db.get_usage(second.request_id) is None
+
+
+def test_request_limit_is_checked_again_before_sending(prepared):
+    """Una reserva antigua sin enviar vuelve a comprobar el límite al reclamarse y queda sin enviar."""
+    budget, proposal, grant = prepared
+    now = utc_now()
+    budget.limit_requests([request_limit(proposal, 60, 1)])
+    reserved = budget.reserve(proposal.model_copy(update={"created_at": now}), grant)
+    budget.db.save_usage(settled_row(proposal, utc_now()))
+    with pytest.raises(BudgetError) as error:
+        budget.claim(reserved.request_id, reserved.request_fingerprint, grant)
+    assert error.value.code == "local_rate_limit"
+    assert budget.db.get_usage(reserved.request_id).status == UsageStatus.RESERVED
+
+
+def test_request_limits_are_idempotent_and_cannot_change_in_the_session(prepared):
+    budget, proposal, _ = prepared
+    budget.limit_requests([request_limit(proposal, 60, 5)])
+    budget.limit_requests([request_limit(proposal, 60, 5)])
+    with pytest.raises(BudgetError) as error:
+        budget.limit_requests([request_limit(proposal, 60, 6)])
+    assert error.value.code == "rate_limit_conflict"
+    with pytest.raises(ValueError):
+        request_limit(proposal, 120, 5)
+    with pytest.raises(ValueError):
+        request_limit(proposal, 60, 0)
+
+
+def test_two_connections_cannot_exceed_a_request_limit_together(prepared, tmp_path):
+    """Concurrencia local: con un máximo de 1 por minuto, solo una de dos conexiones reserva."""
+    budget, proposal, grant = prepared
+    path = tmp_path / "synthetic-rate.sqlite3"
+    with Database(path) as target:
+        target.save_campaign(budget.db.get_campaign(proposal.campaign_id))
+        target.save_company(budget.db.get_company(proposal.company_id), evidence=budget.db.list_evidence(proposal.company_id))
+        target.save_run_item(budget.db.get_run_item(proposal.campaign_id, proposal.company_id))
+    barrier = Barrier(2)
+
+    def reserve_one(fingerprint):
+        with Database(path) as connection:
+            candidate = proposal.model_copy(update={"request_id": uuid4(), "request_fingerprint": fingerprint,
+                                                    "created_at": utc_now()})
+            worker = Budget(connection, budget.global_limits, budget.account_allowances)
+            worker.limit_requests([request_limit(proposal, 60, 1)])
+            active = fresh_grant(worker, grant)
+            barrier.wait(timeout=10)
+            try:
+                return worker.reserve(candidate, active).status
+            except BudgetError as error:
+                return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = [future.result(timeout=15) for future in
+                   [executor.submit(reserve_one, fingerprint) for fingerprint in ("b" * 64, "c" * 64)]]
+    assert sorted(results) == ["local_rate_limit", UsageStatus.RESERVED]
