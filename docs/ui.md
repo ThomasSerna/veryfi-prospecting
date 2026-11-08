@@ -276,6 +276,34 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos.
 
+## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
+
+- La paleta procede de las imágenes de la [guía de marca](https://www.veryfi.com/brand/)
+  y de las variables y el degradado del botón principal de veryfi.com, consultados ese día.
+  Solo cambian colores; la distribución, el texto y la conducta se conservan.
+- Contraste calculado (WCAG 2.x): texto marfil sobre lienzo 15.71:1 y sobre paneles
+  13.91:1; texto secundario 7.89:1 como mínimo; estados sobre su fondo entre 5.60:1
+  (error) y 8.82:1 (aviso); texto navy sobre verde 11.78:1 y sobre turquesa 6.85:1;
+  bordes de controles 3.63:1.
+- `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
+  19 pruebas pasaron. Pasaron 185 pruebas de inicialización, interfaz, rediseño,
+  campaña, demostración, arquitectura e identificadores persistidos, y
+  `uv run --locked python manage.py check`.
+- En Chrome 157 sin interfaz, sobre la demo sintética, se revisaron inicio, historial,
+  nueva campaña, campaña, ficha (Resumen, Contactos y Evidencia) y el cajón abierto a
+  1440 px, y las mismas vistas con 512 px, el ancho mínimo de esa ventana. Los
+  estilos calculados confirmaron que las mezclas `color-mix()` se resuelven, también
+  en los destellos de Web Animations que leen `--accent`. Una simulación de
+  deuteranopía y protanopía sobre la campaña mantuvo legibles los estados por su
+  texto e iconos.
+- El detector de Impeccable quedó sin halos de color sin desplazamiento tras retirar
+  los de la línea de pestañas y la etapa lista. Mantiene el aviso por el degradado
+  verde-turquesa, que reproduce el de veryfi.com, y los previos por Inter, la
+  primera columna de la ficha y la sombra de los desplegables; su lectura de
+  contraste del pie del resumen se toma durante la entrada (calculado: 9.81:1).
+  Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
+  revisión con ventas.
+
 ## Verificación de campaña y ficha del 7 de noviembre de 2026
 
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:

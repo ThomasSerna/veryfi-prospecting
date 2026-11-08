@@ -2,27 +2,33 @@
 name: Veryfi Prospecting
 description: Interfaz local de campañas y revisión comercial.
 colors:
-  canvas: "#0D0F14"
-  surface: "#15171D"
-  sidebar: "#10151A"
-  accent: "#80DFF3"
-  accent-hover: "#A8ECF9"
-  accent-text: "#10252C"
-  text: "#F0F2F6"
-  text-muted: "#A4AAB8"
-  border: "#2B2E38"
-  border-strong: "#68727F"
-  soft: "#1C1F23"
-  info: "#A2C2FF"
-  info-background: "#1C2738"
-  warning: "#EBCE85"
-  warning-background: "#302B1E"
-  error: "#FFAAAA"
-  error-background: "#352123"
-  success: "#98DFB6"
-  success-background: "#1C3026"
-  violet: "#B7A5FA"
-  blue: "#97BDF1"
+  canvas: "#0D1026"
+  surface: "#171C3A"
+  surface-top: "#1A2544"
+  surface-hover: "#1B213F"
+  soft: "#1E2444"
+  accent: "#00FA6C"
+  accent-alt: "#2DB5D2"
+  accent-text: "#171C3A"
+  text: "#E9ECE4"
+  text-muted: "#B9BDB1"
+  text-disabled: "#9B9C98"
+  border: "#2D3352"
+  border-strong: "#70748F"
+  info: "#9BA6E8"
+  info-background: "#262C56"
+  warning: "#FFC56D"
+  warning-background: "#3B2A12"
+  error: "#FF7585"
+  error-background: "#461C24"
+  success: "#00D181"
+  success-background: "#0A3723"
+  unreviewed: "#FFC56D"
+  blue: "#9BA6E8"
+  blue-pale: "#C9D0E7"
+  sky: "#7081F0"
+  sky-dark: "#4553BA"
+  navy-medium: "#45495F"
 typography:
   heading:
     fontFamily: "Inter, Arial, Helvetica, sans-serif"
@@ -52,8 +58,6 @@ components:
     textColor: "{colors.accent-text}"
     rounded: "{rounded.sm}"
     padding: "10px 18px"
-  button-primary-hover:
-    backgroundColor: "{colors.accent-hover}"
   button-secondary:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.text}"
@@ -88,8 +92,8 @@ investigación y revisar empresas, personas y evidencia. El inicio destaca la
 campaña activa o, si no existe, la última guardada. Sus indicadores resumen
 empresas, revisión y contacto listo; el presupuesto se consulta en cada campaña.
 
-La dirección oscura combina grafito, cian y violeta con el nombre Veryfi
-Prospecting. El marco compartido, el inicio, el historial, la campaña y la ficha
+La dirección oscura usa la paleta de Veryfi: navy, marfil, verde Veryfi y
+turquesa, con Sky, Gold y Magenta para la información y los estados. El marco compartido, el inicio, el historial, la campaña y la ficha
 aplican esta dirección. Las vistas de trabajo usan menos texto que el inicio:
 cifras, barras, iconos y estados con su etiqueta. Las propuestas estáticas de
 campaña y ficha en `static/prototypes/` quedan como referencia histórica, con
@@ -99,31 +103,44 @@ datos exclusivamente sintéticos. La demostración identifica sus datos como sin
 
 ## Colors
 
-Paleta oscura de grafito con acento cian. Verde, azul y violeta distinguen
-información complementaria; los estados también usan texto, no solo color.
+Paleta de la [guía de marca de Veryfi](https://www.veryfi.com/brand/) para fondos
+oscuros, consultada el 7 de noviembre de 2026, más el turquesa #2DB5D2 del degradado
+del botón principal de veryfi.com. Veryfi no usa negro: el lienzo y el velo del
+cajón son navy. Los estados también usan texto, no solo color.
 
-- **Lienzo** (`canvas`, #0D0F14): fondo de página. Variable `--ivory`.
-- **Paneles** (`surface`, #15171D): tarjetas, filtros y tablas. Variable `--surface`.
-- **Navegación** (`sidebar`, #10151A): fondo del cajón lateral.
-  La variable `--navy` conserva #111315 para otros controles.
-- **Acento** (`accent`, #80DFF3; `accent-hover`, #A8ECF9; `accent-text`, #10252C):
-  acción principal y elemento seleccionado. Variables `--cyan` y `--cyan-hover`.
-- **Texto** (`text`, #F0F2F6; `text-muted`, #A4AAB8): variables `--ink` y `--muted`.
-- **Bordes** (`border`, #2B2E38; `border-strong`, #68727F): divisiones y controles.
-  Variables `--line` y `--line-strong`.
-- **Superficie secundaria** (`soft`, #1C1F23): filas, badges y campos deshabilitados.
-- **Estados**: `info`, `warning`, `error` y `success`, cada uno con su fondo
-  (`*-background`). `violet` y `blue` completan la información complementaria.
-- **Prioridad**: escala de azules derivada de `blue` (#97BDF1 alta, #5D7CA6 media,
-  #3C4F69 baja) y grises para evidencia insuficiente y excluidas. Se acompaña de
-  barras de señal y del texto de la prioridad.
+`static/css/app.css` declara los colores de marca como primitivas (`--veryfi-*`) y
+los componentes usan solo roles (`--canvas`, `--accent`…); probar otra paleta es
+reasignar esos roles. Los navy derivados se escriben en OKLCH con el matiz de Navy
+(274°); aquí figura su equivalente hexadecimal.
+
+- **Lienzo** (`canvas`, #0D1026): Navy oscurecido para el fondo de página. Variable `--canvas`.
+- **Paneles** (`surface`, Navy #171C3A): tarjetas, tablas y el cajón lateral.
+  `surface-top` (#1A2544) aclara hacia el turquesa la parte superior del resumen y del pulso.
+- **Superficies secundarias** (`soft`, #1E2444; `surface-hover`, #1B213F): filas,
+  badges, campos y la opción actual del menú.
+- **Acento** (`accent`, Veryfi Green #00FA6C; `accent-alt`, #2DB5D2; `accent-text`,
+  Navy): foco, selección, pestaña activa y botón principal. El botón usa el degradado
+  verde-turquesa de veryfi.com con texto navy (11.78:1).
+- **Texto** (`text`, Ivory #E9ECE4; `text-muted`, Ivory Medium #B9BDB1;
+  `text-disabled`, Ivory Dark #9B9C98): variables `--ink`, `--muted` y `--disabled-ink`.
+- **Bordes** (`border`, #2D3352; `border-strong`, Navy Light #70748F): divisiones y
+  controles. Variables `--line` y `--line-strong`.
+- **Estados**: `success` (Forest Light #00D181), `info` (Sky Light #9BA6E8),
+  `warning` (Gold #FFC56D) y `error` (Magenta Light #FF7585), cada uno con su fondo
+  (`*-background`). Sin revisar usa `unreviewed` (Gold) y Contacto listo, `success`.
+- **Datos**: encaje, match y Empresas usan `blue` (Sky Light); `blue-pale` (#C9D0E7)
+  marca prioridad media y cobertura.
+- **Prioridad**: escala Sky (#9BA6E8 alta, #7081F0 media, #4553BA baja) y navy
+  (#70748F evidencia insuficiente, #45495F excluidas). Se acompaña de barras de
+  señal y del texto de la prioridad.
 
 ## Typography
 
 Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes sans
 locales como alternativa. La fuente procede del
 [repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia SIL
-Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`.
+Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`. Las tipografías de marca
+de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 
 - **Encabezados** (`heading`): 2rem, peso 600, altura de línea 1.18, interletrado -0.03em.
 - **Texto** (`body`): 0.9375rem, altura de línea 1.55.
@@ -175,15 +192,15 @@ foco al control; sin JavaScript conserva la apertura y cierre nativos. El cajón
 inspira en el [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
 y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
 El botón del menú, sin caja propia, comparte la línea del logotipo; al señalarlo,
-su carril se llena de cian y el chevrón empuja hacia el cajón, a partir del icono
+su carril se llena de verde y el chevrón empuja hacia el cajón, a partir del icono
 animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons)
 (MIT), recreado en CSS. Durante una investigación muestra un punto que late.
 
 ### Campaña
 
 - **Pulso:** estado, cifra de investigadas con rodillo, un segmento por empresa y
-  tres cifras con su barra (Sin revisar en violeta, Contacto listo en verde,
-  Aceptadas en blanco). En curso, un haz recorre el borde.
+  tres cifras con su barra (Sin revisar en dorado, Contacto listo en verde,
+  Aceptadas en marfil). En curso, un haz recorre el borde.
 - **Prioridad:** barra apilada y leyenda con recuento; cada entrada filtra la tabla.
 - **Tabla:** avatar con la inicial tintado por prioridad, nombre con flecha al
   señalar, encaje con barra y cobertura, prioridad con barras de señal (3, 2 o 1),
@@ -241,7 +258,7 @@ distraer del trabajo comercial.
 En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
 cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
 durante el sondeo, solo se animan las diferencias. Una empresa nueva sube a su
-fila con un destello cian, una fila que cambia de puesto se desliza (FLIP) y una
+fila con un destello verde, una fila que cambia de puesto se desliza (FLIP) y una
 fila cuyo contenido cambia se ilumina; las cifras que crecen muestran `+n`. Al
 terminar la investigación, la página se actualiza en su sitio sin recargarse.
 Con movimiento reducido, todo llega en su estado final y los cambios solo se
