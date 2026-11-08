@@ -47,7 +47,7 @@ El 2026-11-07 (America/Bogota) se revisaron de nuevo solo metadatos locales. Se 
 El archivo sigue sin `apollo_access` ni cupo de Apollo, así que la ejecución real continúa
 bloqueada. Hasta esta fecha no se ha hecho ninguna llamada real a Apollo. El lote real de T17
 depende de que el responsable compruebe el panel y autorice proveedor, operación y tope; su
-resultado, o el bloqueo literal si el acceso falla, se registrará en este archivo.
+resultado está en «Lotes reales de Apollo de la T17».
 
 Documentación oficial consultada el 2026-11-07 ([Library-docs.md](Library-docs.md#apollo-personas-y-correos-profesionales)):
 People API Search cuesta 0 créditos y oculta el apellido, el correo y el teléfono.
@@ -73,6 +73,71 @@ a créditos agotados no está documentada.
   el mismo cupo de solicitudes, y el ledger local no lo ve.
 - Planes heredados o de pago pueden tener otros precios y límites; el adaptador solo admite
   el plan Free y sus límites, o unos más estrictos.
+- El panel de créditos de la parte principal de Apollo (Settings) queda inaccesible hasta
+  terminar el asistente de registro; el portal de desarrolladores (`developer.apollo.io`,
+  API Keys y Usage) sí muestra plan, créditos, claves y límites desde el principio.
+
+## Lotes reales de Apollo de la T17
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-08 (America/Bogota): lote 1 de 00:11 a 00:16 y lote 2 de 00:20 a 00:23 |
+| Cuenta | Se descartó una primera cuenta registrada con correo no laboral y en prueba del plan Professional: no cumple el requisito de correo laboral y el adaptador solo admite Free. Se usó una cuenta nueva (`apollo-eafit`) registrada con correo institucional, en su propio espacio de trabajo, plan Free, 0 de 85 créditos usados (la página de facturación no era visible hasta terminar el registro), con límites de 50/200/600 en People Search y People Enrichment y una clave sin master key creada para el proyecto. Revisado por el responsable y el agente en el portal de desarrolladores |
+| Ejecución | Desde la interfaz Django (`uv run --locked --env-file .env python manage.py runserver 127.0.0.1:8000 --noreload`), Colombia, `fintech_software` y `cpg_loyalty`, sin palabras clave ni lista de exclusiones validada. Lote 1 (campaña `5df50e7e`): máximo 2 empresas, `completed`. Lote 2 (campaña `62b40bb2`): máximo 5 empresas, `partial` |
+| Autorización | Responsable del cupo, en el chat y en la interfaz. Lote 1: Tavily `search` ≤ 10 y `extract` ≤ 10 créditos, Haiku ≤ USD 0,05, Apollo `people_search` 0 y `people_enrichment` ≤ 10 créditos. Lote 2: Tavily ≤ 25 y ≤ 25, Haiku ≤ USD 0,05, Apollo `people_enrichment` ≤ 25; `people_search` se registró por error con tope de 10 en lugar de 0, sin efecto en el gasto porque Search reserva y registra 0 créditos |
+
+| Operación | Llamadas | Sin respuesta (timeout) | Créditos reservados | Créditos observados o conciliados | Costo | Latencia |
+|---|---:|---:|---:|---:|---:|---|
+| Tavily Search (lotes 1 y 2) | 25 | 1 | 25 | 24 observados + 1 pendiente | USD 0 | 0,3–10,3 s (incluye el timeout) |
+| Tavily Extract (lotes 1 y 2) | 14 | 0 | 14 | 5 observados | USD 0 | 0,4–2,0 s |
+| Haiku `messages` (lote 2) | 2 | 0 | — | — | USD 0,0048 reservado, USD 0,0020 estimado | 2,1–7,5 s |
+| Apollo People Search (lote 2) | 2 | 0 | 0 | 0 conciliados | USD 0 | 0,4–0,8 s |
+| Apollo People Enrichment (lote 2) | 3 | 0 | 3 | 3 conciliados | USD 0 | 0,5–0,6 s |
+
+Ninguna llamada a Apollo falló ni superó su tope: la clave, People Search y People Enrichment
+funcionan con la cuenta Free de correo institucional. Ningún consumo superó su tope.
+
+**Resultados.** En el lote 1, Tavily devolvió dos sitios que no eran empresas colombianas con
+encaje (un proveedor de software español y un sitio de contenidos); ambos se detuvieron por
+identidad sin confirmar (`name_unconfirmed`, `identity_unverified`), sin llamar a Haiku ni a
+Apollo. En el lote 2, de cinco empresas, tres se detuvieron por identidad o país sin confirmar,
+una quedó pendiente por el timeout de Tavily y solo una gran empresa de consumo masivo, con
+prioridad media y encaje 65, llegó a contactos. People Search devolvió 20 candidatos con el
+apellido ofuscado y sin correo, como documenta Apollo; 9 tenían una función pertinente. Los 3
+enriquecimientos que permite la prioridad media se rechazaron con `entity_mismatch`: Apollo no
+confirmó el empleo actual en la entidad del dominio de la empresa, así que no se asignó ningún
+dato. Resultado: 0 identidades verificadas, 0 canales y 0 personas listas
+(`qualified_no_contact`, `enrichment_limit`).
+
+### Conciliación
+
+- **Apollo**: el portal de desarrolladores pasó de 0 a 3 créditos usados (2026-11-08 00:28,
+  America/Bogota) y mostró 3 solicitudes a Enrichment y 2 a Search en el día, exactamente las
+  del ledger. Se concilió con `manage.py reconcile_usage` y el comprobante
+  `data/conciliaciones/apollo-2026-11-08-t17.json` (`apollo_reconciliation_v1`, atribución por
+  solicitud: el salto de 3 créditos solo puede corresponder a los 3 enriquecimientos, con cota de 1
+  cada uno). Primero se ejecutó con `--dry-run`; repetirlo no cambió nada. La cuenta queda con 3
+  créditos confirmados, 0 pendientes y 82 disponibles en el ledger. El panel mostró después un
+  límite de 95 créditos; el cupo registrado se mantiene en 85 por prudencia.
+- **Tavily y Haiku**: los créditos de Tavily salen de las respuestas y el costo de Haiku es una
+  estimación por el uso informado. Falta conciliarlos con sus paneles, y la búsqueda de Tavily
+  sin respuesta sigue pendiente de conciliación.
+- Antes de cada lote y de la conciliación se guardaron copias de la base en `data/backups/`.
+
+### Observaciones y limitaciones
+
+- Apollo cobró los 3 enriquecimientos aunque el sistema rechazó a las tres personas: el costo por
+  contacto útil de este lote no está definido (0 listos). Con prioridad media solo se permiten
+  3 enriquecimientos, así que el rechazo de los primeros agotó el tope de la empresa.
+- El sistema no guarda qué condición de `entity_mismatch` falló (dominio principal, organización
+  u historial de empleo actual), y la respuesta de Apollo no se conserva. No se puede saber sin
+  otra llamada si la regla es demasiado estricta para grupos con filiales o marcas, como una
+  embotelladora frente a la marca global.
+- El descubrimiento con dos segmentos y sin palabras clave devolvió sitios sin encaje en 5 de
+  7 empresas: el sistema los detuvo antes de gastar en Haiku y Apollo, pero llegar a Apollo
+  exigió un segundo lote.
+- Es una muestra de una empresa: no mide cobertura de Apollo ni calidad de contactos. La
+  comparación con la línea base corresponde a T21.
 
 ## Tavily
 
