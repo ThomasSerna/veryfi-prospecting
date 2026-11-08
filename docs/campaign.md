@@ -133,8 +133,16 @@ tiempo del descubrimiento solo cuenta dentro de la sesión que lo ejecuta.
 - **Proveedor no disponible** (`permission_denied`, `quota_exceeded`, `rate_limited`, error
   local, HTTP 401/403/429 de Haiku): se detiene la pasada en curso. La empresa conserva su
   etapa, `stop_reason` y el mensaje literal del error.
-- **Fallos de una empresa** (timeout, respuesta inválida, salida de Haiku no válida): la
-  empresa queda pendiente con su motivo y las demás continúan. Una llamada enviada sin
+- **Fallos de Apollo** (T17: `apollo_access_unverified`, `apollo_api_inaccessible`,
+  `apollo_invalid_input`, `apollo_not_found`, `apollo_provider_error`, `apollo_timeout`,
+  `apollo_transport_error`, `apollo_invalid_response`) y el límite local de solicitudes
+  (`local_rate_limit`): también detienen la pasada de contactos, porque el mismo fallo se
+  repetiría en cada empresa siguiente. La campaña termina `partial`; las empresas que no
+  llegaron a consultar Apollo conservan su etapa y continúan al reanudar. La empresa
+  afectada guarda el motivo; al reanudar informa el bloqueo actual (`request_uncertain` o
+  `result_unavailable`), que no detiene la pasada, hasta que se concilie su llamada.
+- **Fallos de una empresa** (timeout de Tavily, respuesta inválida, salida de Haiku no válida):
+  la empresa queda pendiente con su motivo y las demás continúan. Una llamada enviada sin
   resultado guardado no se repite: requiere revisión y conciliación.
 
 Estados finales: `completed` si todas las empresas están cerradas; `partial` si alguna quedó
@@ -149,11 +157,15 @@ que se relanza. Una interrupción (por ejemplo, cerrar la aplicación) deja la c
   `stop_reason` de cada empresa.
 - Las consultas de descubrimiento omitidas por una parada no se reintentan al reanudar.
 - No hay reintentos automáticos: un segundo intento exige conciliar antes el fallo
-  ([Presupuesto y proveedores](budget-providers.md)).
+  ([Presupuesto y proveedores](budget-providers.md)). Conciliado como fallido y sin consumo
+  (`manage.py reconcile_usage`), la etapa de contactos lo repite una sola vez al reanudar.
 - El procesamiento es secuencial e interactivo; no continúa en segundo plano al cerrar la
   aplicación.
 - La guarda de ejecución única es por proceso: dos procesos distintos sobre la misma base
-  no se coordinan entre sí.
+  no se coordinan entre sí. El ledger sí impide enviar dos veces la misma reserva y los
+  límites de solicitudes se cuentan en la base, pero ejecutar la misma campaña desde dos
+  procesos queda fuera de alcance. `reconcile_usage` se niega mientras haya una campaña
+  `running`: tras un cierre inesperado, primero se cierra esa campaña.
 - El descubrimiento guarda las empresas al terminar. Si se interrumpe a mitad, al reanudar
   las búsquedas ya enviadas no se repiten y sus resultados aún no persistidos se pierden.
   La primera huella repetida produce `duplicate_request`, omite las consultas restantes

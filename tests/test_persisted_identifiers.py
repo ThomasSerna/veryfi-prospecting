@@ -243,3 +243,14 @@ def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
 def test_people_policy_version_is_fixed(role_config):
     """La versión del objetivo de personas (T16) identifica la regla de parada guardada en cada instantánea."""
     assert role_config.people_policy.version == "people_policy_v1"
+
+
+def test_reconciliation_receipt_and_rate_limit_identifiers_are_fixed():
+    """T17: el formato del comprobante y los límites Free quedan fijados; cambiarlos exige otra versión."""
+    from typing import get_args
+
+    from prospecting.pipeline import ReconciliationReceipt
+    from prospecting.providers.apollo import ApolloAccess
+
+    assert get_args(ReconciliationReceipt.model_fields["version"].annotation) == ("apollo_reconciliation_v1",)
+    assert "rate_limits" in ApolloAccess.model_fields and not ApolloAccess.model_fields["rate_limits"].is_required()

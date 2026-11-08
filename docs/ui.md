@@ -144,10 +144,19 @@ y sus cifras no sustituyen los cupos reales. Muestra la forma validada de `Provi
     "work_email_verified": true,
     "access_verified": true,
     "enrichment_credit_bound": "1",
-    "plan": "free"
+    "plan": "free",
+    "rate_limits": {
+      "people_search": {"per_minute": 50, "per_hour": 200, "per_day": 600},
+      "people_enrichment": {"per_minute": 50, "per_hour": 200, "per_day": 600}
+    }
   }
 }
 ```
+
+`rate_limits` es opcional: sin él rigen los límites publicados para el plan Free, y con
+plan `free` solo se admiten valores iguales o más estrictos. Solo se aceptan cupos de
+Tavily, Anthropic y Apollo: un cupo de un proveedor retirado, como Hunter, invalida el
+archivo y bloquea la ejecución hasta quitarlo (T17).
 
 Cada proveedor habilitado necesita una cuenta con la misma referencia y financiación;
 las referencias de consumo son únicas. Tavily usa crédito gratuito y Haiku la
@@ -171,7 +180,8 @@ necesitan `credit_valuation` comprobada, con `unit_value_usd`, `source_reference
 `observed_at`, para acotar el costo.
 
 Si el archivo local procede de la integración anterior, conserva las cuentas y cupos
-de Tavily y Anthropic, retira `hunter_access` y el cupo de Hunter del archivo y agrega
+de Tavily y Anthropic, retira `hunter_access` y el cupo de Hunter del archivo (ya no se
+cargan) y agrega
 la cuenta y comprobación reales de Apollo cuando estén disponibles. No completes
 campos con los valores sintéticos del ejemplo: la configuración antigua no habilita
 una ejecución nueva. Cambiar ese archivo no borra el ledger histórico de SQLite;
@@ -201,7 +211,8 @@ Contactos y Evidencia con píldoras de referencia cruzada que informan el origen
 número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
 cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
 `Sin evidencia`) junto a una bola de Harvey, caso de uso, contactos y motivos de
-detención sin jerga técnica. Al seguir una píldora, la fuente citada se ilumina
+detención sin jerga técnica (cada fallo de Apollo, el límite local de solicitudes y el bloqueo
+hasta conciliar tienen su propia explicación en `STOP_MESSAGES`, T17). Al seguir una píldora, la fuente citada se ilumina
 un instante. A la derecha se mantienen el mejor match y la revisión de ventas.
 Datos desconocidos se muestran separados de cero.
 

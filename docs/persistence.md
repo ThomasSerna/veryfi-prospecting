@@ -151,6 +151,8 @@ y las instantáneas de las pruebas del pipeline los fijan:
   (`research:expansion`, `research:web_queries`, `research:pages`) y las de contactos
   (`contacts:person:`, `request:`, `processed:`, `haiku`, `haiku_request:`,
   `verify:`, `domain_search`, `web_queries`, `pages`, `extract`, `hunter_enrichments`).
+  `verify:`, `domain_search` y `hunter_enrichments` son históricas de Hunter: ningún
+  flujo nuevo las escribe, pero se conservan para leer las campañas anteriores.
 - `Company.identity_key` (`dominio|nombre|países`), con índice único.
 - Ids `uuid5` de contactos de Hunter (`hunter:<id>`), de contactos públicos
   (`public:<canal>`) y de la evidencia de exclusión.
@@ -188,6 +190,13 @@ identificadores sin reescribir el ledger anterior:
   la fuente original. La variante no Apollo usa el prefijo `public_extraction_v2`.
   Este sufijo solo identifica el nuevo hecho de responsabilidad; las demás
   referencias históricas mantienen su formato.
+- Fallos conciliados sin consumo (T17): una fila `RECONCILED`, `failed` y con créditos,
+  costo y desembolso en cero admite un único reintento con `retry_of` en otra ejecución;
+  la decisión se toma de esos valores persistidos, nunca del texto del error.
+
+Fuera de SQLite, `data/provider-access.json` admite `ApolloAccess.rate_limits` (opcional;
+sin él rigen los límites del plan Free) y los comprobantes de `data/conciliaciones/` usan el
+formato `apollo_reconciliation_v1` ([budget-providers.md](budget-providers.md#conciliación-con-el-panel)).
 
 El porcentaje de match de contactos (`contact_match_v1`) no se guarda en SQLite: se
 recalcula al leer con `config/contact_match.json`, así que cambiar sus pesos no altera

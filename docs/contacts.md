@@ -126,7 +126,18 @@ del historial y la demo siguen disponibles.
 
 La comprobación compartida de `pipeline/calls.py` también se aplica al invocar
 `find_contacts` directamente, aunque el límite de búsquedas sea cero. Si falla,
-el informe queda `pending` con el motivo y no se llama a ningún proveedor.
+el informe queda `pending` con `apollo_access_unverified` y el mensaje literal, que se
+guardan en la empresa (T17), y no se llama a ningún proveedor. Si el cupo se agota a mitad
+de la pasada, la campaña la detiene con ese motivo. La misma comprobación registra los
+límites de solicitudes de `ApolloAccess.rate_limits` (por defecto, los del plan Free) antes
+de cualquier reserva.
+
+Cada fallo de Apollo tiene un motivo propio y detiene la pasada de contactos
+([campaign.md](campaign.md#parada-y-estado-de-la-campaña)). Una llamada enviada sin
+resultado (por ejemplo, un timeout) deja la empresa en `request_uncertain`; conciliada con
+el panel como fallida y sin consumo (`manage.py reconcile_usage`,
+[budget-providers.md](budget-providers.md#conciliación-con-el-panel)), se repite una sola vez
+al reanudar, sin ocupar otro intento del nivel de esfuerzo.
 
 Usar una referencia canónica por saldo real. Las operaciones admitidas son
 `people_search` y `people_enrichment`; sus permisos deben corresponder a la operación

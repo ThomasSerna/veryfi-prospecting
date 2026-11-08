@@ -100,7 +100,19 @@ No hay envío comercial, recargas, waterfall ni enriquecimiento móvil de pago.
 Los éxitos repetidos se bloquean para recuperar su resultado guardado; si falta
 ese resultado, requieren revisión. Un segundo intento necesita conciliación,
 fallo transitorio identificado por el adaptador y otra reserva; después de un
-reinicio no se deduce transitoriedad del mensaje guardado.
+reinicio no se deduce transitoriedad del mensaje guardado. La única prueba persistida
+que admite repetir en otra ejecución es una conciliación humana como fallida y sin
+consumo (`unconsumed_failure`: créditos, costo y desembolso en cero). Con un permiso
+nuevo, la etapa de contactos la repite una sola vez con `retry_of`, sin ocupar otro
+intento del nivel de esfuerzo; un segundo fallo ya no se repite.
+
+Los permisos de una misma cuenta se suman antes de ejecutar (`_approve`): Search y
+Enrichment de Apollo, o Search y Extract de Tavily, no pueden prometer juntos más
+créditos que los disponibles en la cuenta. `RequestLimit` limita las solicitudes por
+operación y cuenta en ventanas deslizantes de minuto, hora y día contadas en el ledger
+(`Budget.limit_requests`); se comprueba al reservar, reclamar e iniciar el envío, así
+que también acota a otra conexión sobre la misma base. Al alcanzarlo, `local_rate_limit`
+detiene la pasada sin reservar ni enviar.
 
 ## Consumo y respuestas de Apollo
 
@@ -128,6 +140,45 @@ Un resultado vacío o un timeout tampoco autorizan liberar importes sin confirma
 No hay reenvío automático. Los errores conservan etapa y motivo sin registrar claves
 ni cuerpos HTTP. Las búsquedas y el enriquecimiento no solicitan emails personales,
 teléfonos ni waterfall, y no escriben contactos en Apollo.
+
+`ApolloAccess.rate_limits` guarda los límites de solicitudes del plan; por defecto,
+los publicados para Free (`FREE_RATE_LIMITS`: 50 por minuto, 200 por hora y 600 por
+día en Search y en Enrichment), que con plan `free` solo pueden hacerse más estrictos.
+`require_apollo_access`, por el que pasa toda llamada a Apollo, los registra en el
+`Budget` de la sesión. Cada fallo de Apollo tiene su motivo (`apollo_api_inaccessible`,
+`apollo_invalid_input`, `apollo_timeout`, etc.; ver [Library-docs.md](Library-docs.md#apollo-personas-y-correos-profesionales))
+y detiene la pasada de contactos; el código del cuerpo (`ProviderError.provider_code`)
+y el `Retry-After` quedan en el mensaje persistido.
+
+### Conciliación con el panel
+
+La respuesta de Apollo no informa créditos. El responsable lee los créditos usados en
+el panel (Settings > Billing and credits) antes y después del lote y guarda un
+comprobante `apollo_reconciliation_v1` en `data/conciliaciones/`, fuera de Git:
+
+```json
+{"version": "apollo_reconciliation_v1", "provider": "apollo", "account_ref": "apollo-cuenta",
+ "responsible": "Responsable del cupo",
+ "panel_before": {"credits_used": "10", "observed_at": "2026-11-07T15:00:00Z", "source_reference": "Panel antes del lote"},
+ "panel_after": {"credits_used": "11", "observed_at": "2026-11-07T15:30:00Z", "source_reference": "Panel después del lote"},
+ "attribution": "inferred_from_total", "attribution_note": "El panel solo informa el total de la cuenta.",
+ "external_credits": "0", "external_note": null,
+ "requests": [{"request_id": "…", "operation": "people_enrichment", "outcome": "succeeded", "credits": "1", "no_send": false}]}
+```
+
+Los créditos de las solicitudes más los ajenos al ledger (`external_credits`, con
+nota) deben sumar exactamente el salto del panel, y el comprobante debe cubrir todas
+las solicitudes de la cuenta creadas entre las dos lecturas. Una atribución por fila
+deducida del total (`inferred_from_total`) necesita nota.
+
+```bash
+uv run --locked python manage.py reconcile_usage data/conciliaciones/apollo-2026-11-07-t17.json --dry-run
+```
+
+Sin `--dry-run`, `reconcile_usage` concilia todas las filas en una transacción o
+ninguna; repetir el comprobante no cambia nada y uno que contradiga lo ya conciliado
+se rechaza. No crea la base, no llama a proveedores y se niega mientras haya una
+investigación o una campaña `running`. Muestra solo la cuenta, conteos y créditos.
 
 El ledger de Hunter es histórico: sus referencias, gastos y comprobantes se
 conservan, pero no autorizan nuevas operaciones ni financian solicitudes de Apollo.
