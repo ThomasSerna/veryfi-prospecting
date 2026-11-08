@@ -119,9 +119,17 @@ dato. Resultado: 0 identidades verificadas, 0 canales y 0 personas listas
   cada uno). Primero se ejecutó con `--dry-run`; repetirlo no cambió nada. La cuenta queda con 3
   créditos confirmados, 0 pendientes y 82 disponibles en el ledger. El panel mostró después un
   límite de 95 créditos; el cupo registrado se mantiene en 85 por prudencia.
-- **Tavily y Haiku**: los créditos de Tavily salen de las respuestas y el costo de Haiku es una
-  estimación por el uso informado. Falta conciliarlos con sus paneles, y la búsqueda de Tavily
-  sin respuesta sigue pendiente de conciliación.
+- **Tavily**: el panel (Overview, clave del proyecto) mostró 29 de 1.000 créditos usados tras los
+  dos lotes; según el responsable estaba en 0 antes de empezar, porque el plan gratuito había
+  renovado sus créditos. Las respuestas informaron 11 créditos en el lote 1 y 18 en el lote 2, que
+  suman exactamente 29, así que la búsqueda con timeout se concilió como fallida y sin consumo.
+  Las 39 filas se conciliaron en una transacción; el comprobante está en
+  `data/conciliaciones/tavily-2026-11-08-t17.json`. El ledger de `tavily-cuenta-2` acumula
+  102 créditos confirmados: el cupo registrado no se renueva con el panel.
+- **Haiku**: las 2 llamadas se conciliaron con el costo estimado de los tokens que informó la API
+  (USD 0,0020453), sin captura de la consola, porque el responsable lo aceptó, como en T11. El
+  comprobante está en `data/conciliaciones/anthropic-2026-11-08-t17.json`. Tras la conciliación,
+  el único consumo sin conciliar del ledger es la fila histórica de Hunter de la T07.
 - Antes de cada lote y de la conciliación se guardaron copias de la base en `data/backups/`.
 
 ### Observaciones y limitaciones
