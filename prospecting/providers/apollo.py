@@ -36,6 +36,28 @@ APOLLO_OPERATIONS = [
 ]
 
 
+class ApolloRateLimit(Contract):
+    """Solicitudes por endpoint y equipo en cada ventana; se aplican localmente antes de reservar (T17)."""
+
+    per_minute: Annotated[StrictInt, Field(ge=1)]
+    per_hour: Annotated[StrictInt, Field(ge=1)]
+    per_day: Annotated[StrictInt, Field(ge=1)]
+
+    @model_validator(mode="after")
+    def validate_order(self):
+        if not self.per_minute <= self.per_hour <= self.per_day:
+            raise ValueError("Los límites de Apollo deben crecer de minuto a hora y a día.")
+        return self
+
+
+# Límites publicados para el plan Free, por equipo y endpoint (https://docs.apollo.io/reference/rate-limits,
+# consultado el 2026-11-07): Search y Enrichment individual, 50 por minuto, 200 por hora y 600 por día.
+FREE_RATE_LIMITS = {
+    "people_search": ApolloRateLimit(per_minute=50, per_hour=200, per_day=600),
+    "people_enrichment": ApolloRateLimit(per_minute=50, per_hour=200, per_day=600),
+}
+
+
 class ApolloAccess(Contract):
     """Comprobación de cuenta; no sustituye cupo ni autorización de sesión."""
 
@@ -48,6 +70,8 @@ class ApolloAccess(Contract):
     access_verified: StrictBool = False
     enrichment_credit_bound: Annotated[Money, Field(ge=1, le=1)] = Decimal("1")
     plan: Literal["free"] = "free"
+    # Valores del panel o de la documentación del plan; con `free` solo se admiten límites iguales o más estrictos.
+    rate_limits: dict[ApolloOperation, ApolloRateLimit] = Field(default_factory=lambda: dict(FREE_RATE_LIMITS))
 
     @model_validator(mode="after")
     def validate_access(self):
@@ -55,6 +79,12 @@ class ApolloAccess(Contract):
             raise ValueError("La comprobación de Apollo no puede tener fecha futura.")
         if len(self.enabled_operations) != len(set(self.enabled_operations)):
             raise ValueError("No se pueden habilitar operaciones duplicadas.")
+        if any(operation not in self.rate_limits for operation in self.enabled_operations):
+            raise ValueError("Cada operación habilitada de Apollo necesita sus límites de solicitudes.")
+        if self.plan == "free" and any(
+                getattr(limit, window) > getattr(FREE_RATE_LIMITS[operation], window)
+                for operation, limit in self.rate_limits.items() for window in ("per_minute", "per_hour", "per_day")):
+            raise ValueError("Los límites de Apollo no pueden superar los publicados para el plan Free.")
         return self
 
 

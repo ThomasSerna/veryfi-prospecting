@@ -14,7 +14,7 @@ from prospecting.contacts import ContactError
 from prospecting.models import Usage, utc_now
 from prospecting.providers import HttpResponse, ProviderClient, ProviderError
 from prospecting.providers.apollo import (
-    APOLLO_OPERATIONS, APOLLO_STOP_REASONS, ApolloAccess, ApolloEnrichmentResponse, ApolloSearchResponse,
+    APOLLO_OPERATIONS, APOLLO_STOP_REASONS, FREE_RATE_LIMITS, ApolloAccess, ApolloEnrichmentResponse, ApolloSearchResponse,
     classify_apollo_error, enrichment_request, parse_enrichment, parse_search,
     people_search_request, person_id,
 )
@@ -110,6 +110,26 @@ def test_search_and_enrichment_are_bounded_and_disable_optional_data(apollo_comp
         people_search_request(apollo_company.model_copy(update={"identity_status": "pending"}), [], "apollo-sintetico")
     with pytest.raises(ContactError):
         enrichment_request("", "apollo-sintetico")
+
+
+def test_free_plan_rate_limits_are_the_published_ones_and_cannot_be_loosened():
+    """T17: límites del plan Free publicados en docs.apollo.io/reference/rate-limits (2026-11-07)."""
+    published = {"per_minute": 50, "per_hour": 200, "per_day": 600}
+    assert {name: limit.model_dump() for name, limit in FREE_RATE_LIMITS.items()} == {
+        "people_search": published, "people_enrichment": published}
+    base = {"account_ref": "apollo-sintetico", "source_reference": "Comprobación sintética", "observed_at": NOW}
+    access = ApolloAccess.model_validate_json(json.dumps(base | {"observed_at": NOW.isoformat()}))
+    assert access.rate_limits == FREE_RATE_LIMITS
+    stricter = ApolloAccess(**base, rate_limits={
+        "people_search": {"per_minute": 10, "per_hour": 100, "per_day": 300},
+        "people_enrichment": {"per_minute": 5, "per_hour": 50, "per_day": 100}})
+    assert stricter.rate_limits["people_enrichment"].per_minute == 5
+    for limits in ({"people_search": {"per_minute": 51, "per_hour": 200, "per_day": 600},
+                    "people_enrichment": published},
+                   {"people_search": published},
+                   {"people_search": {"per_minute": 300, "per_hour": 200, "per_day": 600}, "people_enrichment": published}):
+        with pytest.raises(ValidationError):
+            ApolloAccess(**base, rate_limits=limits)
 
 
 def test_partial_search_identity_never_becomes_ready_and_id_is_stable(apollo_company):

@@ -5,7 +5,7 @@ import os
 import time
 from uuid import UUID
 
-from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization
+from prospecting.budget import Budget, BudgetError, Observation, RequestLimit, SpendingAuthorization
 from prospecting.haiku import MODEL_ID
 from prospecting.models import Campaign, TokenUsage, Usage, UsageStatus
 from prospecting.providers.apollo import ApolloAccess
@@ -39,6 +39,16 @@ def require_apollo_access(campaign: Campaign, access: ApolloAccess | None, budge
                    (item.provider, item.account_ref) == ("apollo", access.account_ref))
     if account.credits.unknown or account.credits.available is None or account.credits.available < access.enrichment_credit_bound:
         raise ValueError("Apollo bloqueado: cuota agotada o pendiente de conciliación.")
+    # Toda llamada a Apollo pasa por aquí: sus límites de solicitudes quedan registrados antes de reservar (T17).
+    budget.limit_requests(apollo_request_limits(access))
+
+
+def apollo_request_limits(access: ApolloAccess) -> list[RequestLimit]:
+    """Convierte los límites de la cuenta de Apollo en límites del ledger por operación y ventana."""
+    return [RequestLimit(provider="apollo", operation=operation, account_ref=access.account_ref,
+                         window_seconds=window, max_requests=getattr(limit, field))
+            for operation, limit in access.rate_limits.items() if operation in access.enabled_operations
+            for window, field in ((60, "per_minute"), (3600, "per_hour"), (86400, "per_day"))]
 
 
 def seconds_left(deadline: float | None) -> float | None:

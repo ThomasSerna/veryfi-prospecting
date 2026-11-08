@@ -13,7 +13,7 @@ import pytest
 from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
-from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, Evidence, RunItem, RunStage, UsageStatus, utc_now
+from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, Evidence, RunItem, RunStage, Usage, UsageStatus, utc_now
 from prospecting.pipeline import close_campaign, run_campaign, start_campaign
 from prospecting.pipeline.campaign import BUDGET_STOPS, PROVIDER_STOPS
 from prospecting.pipeline.contacts import ContactReport
@@ -738,6 +738,24 @@ def test_exhausted_apollo_quota_mid_run_is_saved_and_stops_the_contact_pass(worl
     assert len(blocked) == 1 and blocked[0].error_message.startswith("Apollo bloqueado: cuota agotada")
     apollo = case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")
     assert len({row.company_id for row in apollo}) == 1 and blocked[0].company_id not in {row.company_id for row in apollo}
+
+
+def test_apollo_free_rate_limit_blocks_the_pass_before_any_call(world):
+    """T17: con 50 búsquedas de Apollo en el último minuto, no se reserva ni se envía otra."""
+    case = world.setup(apollo=True)
+    start(case)
+    for _ in range(50):
+        case.db.save_usage(Usage(
+            campaign_id=case.campaign.id, provider="apollo", operation="people_search", account_ref=APOLLO,
+            request_fingerprint=uuid4().hex * 2, reserved_cost_usd=0, reserved_credits=0, credits=0,
+            final_cost_usd=0, outlay_usd=0, funding_source="free_credit", status=UsageStatus.RECONCILED,
+            outcome="succeeded", finished_at=utc_now(), reconciled_at=utc_now()))
+    report = case.run()
+    assert report.status == CampaignStatus.PARTIAL and report.stop_reason == "local_rate_limit"
+    assert not any(operation.startswith("people_") for operation, _ in case.events)
+    assert len(case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")) == 50
+    blocked = [item for item in case.by_domain().values() if item.stop_reason == "local_rate_limit"]
+    assert len(blocked) == 1 and "50 solicitudes por minuto" in blocked[0].error_message
 
 
 def test_concurrent_run_returns_without_traffic_or_changes(world, tmp_path):

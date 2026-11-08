@@ -56,6 +56,7 @@ COMPANY_BUDGET_STOP = "company_budget_exceeded"
 # propios de Apollo (T17) también la detienen: el mismo fallo se repetiría en cada empresa siguiente.
 PROVIDER_STOPS = {
     "permission_denied", "quota_exceeded", "rate_limited", "local_error", "local", "http_401", "http_403", "http_429",
+    "local_rate_limit",
 } | APOLLO_STOP_REASONS
 # Extracción hecha, o fallida de forma que repetirla no ayuda: se sigue con la evidencia guardada.
 _EXTRACTION_SETTLED = {
