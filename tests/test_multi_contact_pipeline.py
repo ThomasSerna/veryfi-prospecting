@@ -138,7 +138,7 @@ def test_rejected_identity_does_not_stop_the_others_or_repeat(contact_case, role
 
 def test_legacy_snapshot_keeps_the_rejection_pending(contact_case, role_config):
     """Sin `people_policy` se conserva la conducta anterior a T16: el rechazo deja la cuenta pendiente."""
-    case = multi(contact_case, role_config.model_copy(update={"people_policy": None}), ["Head of Product"],
+    case = multi(contact_case, role_config.model_copy(update={"people_policy": None, "employment_corroboration": None}), ["Head of Product"],
                  enriched={0: {"confidence": "low"}})
     report = case.find()
     assert (report.status, report.stop_reason) == ("pending", "identity_unconfirmed")
@@ -154,7 +154,7 @@ def test_a_usable_channel_does_not_end_the_account_before_the_target(contact_cas
 
 def test_legacy_snapshot_still_stops_at_the_first_preferred_channel(contact_case, role_config, monkeypatch):
     monkeypatch.setattr(stage_module, "derive_readiness", lambda *args, **kwargs: BusinessStatus.READY_PREFERRED)
-    case = multi(contact_case, role_config.model_copy(update={"people_policy": None}), ["Head of Product", "Product Manager"])
+    case = multi(contact_case, role_config.model_copy(update={"people_policy": None, "employment_corroboration": None}), ["Head of Product", "Product Manager"])
     report = case.find()
     assert report.stop_reason == "preferred_channel_found" and enriched_ids(case) == []
 

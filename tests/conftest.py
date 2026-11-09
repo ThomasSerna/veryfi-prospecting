@@ -43,17 +43,20 @@ def reject_external_network(monkeypatch):
 
 @pytest.fixture
 def config():
-    """Conserva la instantánea histórica para las pruebas previas a T15 y T16.
+    """Conserva la instantánea histórica para las pruebas previas a T15, T16 y T24.
 
-    Sin taxonomía ni objetivo de personas y con los topes anteriores (media 1/1, alta 3/3).
+    Sin taxonomía, objetivo de personas ni corroboración del empleo y con los topes anteriores (media 1/1, alta 3/3).
     """
     from prospecting.models import VeryfiConfig
 
     raw = json.loads((PROJECT_ROOT / "config" / "veryfi.json").read_text(encoding="utf-8"))
     raw.pop("role_taxonomy")
     raw.pop("people_policy")
+    raw.pop("employment_corroboration")
     for level, people in (("medium", 1), ("high", 3)):
         raw["defaults"]["effort"][level] |= {"people": people, "enrichments_per_provider": people}
+        for name in ("employment_queries", "employment_pages"):
+            raw["defaults"]["effort"][level].pop(name)
     return VeryfiConfig.model_validate(raw)
 
 

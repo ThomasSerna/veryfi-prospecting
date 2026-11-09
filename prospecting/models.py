@@ -275,6 +275,22 @@ class PeoplePolicy(Contract):
         return self
 
 
+class EmploymentCorroboration(Contract):
+    """Búsqueda dirigida del empleo de personas de Apollo sin evidencia corporativa (T24).
+
+    Propuesta pendiente de validación comercial. Los topes por empresa están en `limits.effort`
+    (`employment_queries`, `employment_pages`); aquí, cuántas búsquedas recibe cada persona y cuántas
+    personas entran en cada extracción con Haiku.
+    """
+
+    version: Literal["employment_corroboration_v1"]
+    validation_status: Literal["pending", "validated"]
+    source_reference: Text
+    source_date: date
+    searches_per_person: Annotated[StrictInt, Field(ge=1, le=1)]
+    people_per_extraction: Annotated[StrictInt, Field(ge=1, le=3)]
+
+
 class CriterionDefinition(Contract):
     name: Text
     weight: Annotated[StrictInt, Field(gt=0, le=100)]
@@ -351,6 +367,9 @@ class EffortLimits(Contract):
     enrichments_per_provider: Annotated[Count, Field(le=5)]
     people_queries: Annotated[Count, Field(le=2)]
     active_seconds: Count
+    # T24: búsquedas dirigidas y páginas para corroborar el empleo; None en instantáneas anteriores (sin fase).
+    employment_queries: Count | None = None
+    employment_pages: Count | None = None
 
 
 class CacheLimits(Contract):
@@ -435,6 +454,12 @@ class CampaignLimits(Contract):
         for level, values in caps.items():
             if any(getattr(self.effort[level], name) > cap for name, cap in zip(fields, values, strict=True)):
                 raise ValueError(f"El esfuerzo de {level} supera los topes del prototipo.")
+        # T24: corroboración del empleo, aprobada el 2026-11-08 (media 3/3, alta 5/5; los demás niveles, sin fase).
+        employment_caps = {"medium": 3, "high": 5}
+        for level, item in self.effort.items():
+            cap = employment_caps.get(level, 0)
+            if any(value is not None and value > cap for value in (item.employment_queries, item.employment_pages)):
+                raise ValueError(f"La corroboración del empleo de {level} supera los topes del prototipo.")
         return self
 
 
@@ -506,6 +531,7 @@ class VeryfiConfig(Contract):
     role_taxonomy: RoleTaxonomy | None = None
     people_policy: PeoplePolicy | None = None
     contact_match: ContactMatchConfig | None = None
+    employment_corroboration: EmploymentCorroboration | None = None
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
@@ -521,6 +547,12 @@ class VeryfiConfig(Contract):
                 raise ValueError("El objetivo de personas requiere la taxonomía de cargos y Apollo.")
             if any(target > self.defaults.effort[level].people for level, target in self.people_policy.target.items()):
                 raise ValueError("El objetivo de personas supera el tope de personas del nivel.")
+        if self.employment_corroboration is not None:
+            if self.people_policy is None:
+                raise ValueError("La corroboración del empleo requiere el objetivo de personas, la taxonomía y Apollo.")
+            if any(getattr(self.defaults.effort[level], name) is None
+                   for level in ("medium", "high") for name in ("employment_queries", "employment_pages")):
+                raise ValueError("La corroboración del empleo necesita sus topes de búsquedas y páginas en media y alta.")
         for profile in self.profiles:
             if not set(profile.products) <= set(product_ids):
                 raise ValueError("Un perfil referencia productos inexistentes.")
@@ -542,6 +574,9 @@ def _validate_limit_reduction(limits: dict, defaults: dict) -> None:
         maximum = defaults[name]
         if isinstance(value, dict):
             _validate_limit_reduction(value, maximum)
+        elif maximum is None and value is not None:
+            # Un tope ausente en la instantánea (p. ej., T24 en campañas anteriores) no se puede habilitar.
+            raise ValueError(f"El límite {name} no existe en la configuración de campaña.")
         elif isinstance(value, (int, float, Decimal)) and not isinstance(value, bool) and value > maximum:
             raise ValueError(f"El límite {name} supera la configuración de campaña.")
 

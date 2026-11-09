@@ -81,6 +81,16 @@ def test_default_limits_keep_the_documented_initial_values(role_config, config):
     assert (policy.version, policy.validation_status, policy.target, policy.min_functions) == (
         "people_policy_v1", "pending", {"medium": 2, "high": 3}, 2)
     assert config.people_policy is None
+    # T24: corroboración del empleo (media 3/3, alta 5/5); la instantánea histórica no tiene la fase.
+    assert {level: (item.employment_queries, item.employment_pages) for level, item in defaults.effort.items()} == {
+        "initial": (None, None), "insufficient_evidence": (None, None), "medium": (3, 3), "high": (5, 5),
+        "low": (None, None), "excluded": (None, None),
+    }
+    corroboration = role_config.employment_corroboration
+    assert (corroboration.version, corroboration.validation_status, corroboration.searches_per_person,
+            corroboration.people_per_extraction) == ("employment_corroboration_v1", "pending", 1, 3)
+    assert config.employment_corroboration is None
+    assert {(item.employment_queries, item.employment_pages) for item in config.defaults.effort.values()} == {(None, None)}
     assert (defaults.active_seconds, defaults.max_companies) == (2700, 20)
     assert (defaults.email_verifications_per_channel, defaults.evidence_expansions_per_company) == (1, 1)
     discovery = defaults.discovery
@@ -120,7 +130,53 @@ def test_snapshot_without_people_policy_still_loads(role_config):
     """Las campañas guardadas antes de T16 no tienen objetivo y conservan su parada histórica."""
     raw = role_config.model_dump(mode="json")
     raw.pop("people_policy")
+    raw.pop("employment_corroboration")
     assert VeryfiConfig.model_validate(raw).people_policy is None
+
+
+@pytest.mark.parametrize("change", [
+    lambda raw: raw.pop("people_policy"),
+    lambda raw: raw["employment_corroboration"].update(version="employment_corroboration_v2"),
+    lambda raw: raw["employment_corroboration"].update(searches_per_person=2),
+    lambda raw: raw["employment_corroboration"].update(searches_per_person=0),
+    lambda raw: raw["employment_corroboration"].update(people_per_extraction=4),
+    lambda raw: raw["defaults"]["effort"]["medium"].update(employment_queries=None),
+    lambda raw: raw["defaults"]["effort"]["high"].update(employment_pages=None),
+    lambda raw: raw["defaults"]["effort"]["medium"].update(employment_queries=4),
+    lambda raw: raw["defaults"]["effort"]["high"].update(employment_pages=6),
+    lambda raw: raw["defaults"]["effort"]["initial"].update(employment_queries=1),
+    lambda raw: raw["defaults"]["effort"]["low"].update(employment_pages=1),
+])
+def test_employment_corroboration_requires_people_policy_and_bounded_caps(role_config, change):
+    """La corroboración del empleo (T24) no supera sus topes ni existe sin objetivo de personas o sin topes."""
+    raw = role_config.model_dump(mode="json")
+    change(raw)
+    with pytest.raises(ValidationError):
+        VeryfiConfig.model_validate(raw)
+
+
+def test_snapshot_without_employment_corroboration_keeps_limits_closed(role_config, make_campaign):
+    """Una instantánea anterior a T24 carga sin la fase y una campaña no puede habilitar sus topes."""
+    raw = role_config.model_dump(mode="json")
+    raw.pop("employment_corroboration")
+    for level in raw["defaults"]["effort"].values():
+        level.pop("employment_queries")
+        level.pop("employment_pages")
+    previous = VeryfiConfig.model_validate(raw)
+    assert previous.employment_corroboration is None
+    assert previous.defaults.effort["high"].employment_queries is None
+    campaign = make_campaign()
+    limits = campaign.limits.model_dump(mode="json")
+    limits["effort"]["high"]["employment_queries"] = 1
+    with pytest.raises(ValidationError):
+        campaign.model_validate(campaign.model_dump() | {"limits": limits})
+    reduced = make_campaign(config_snapshot=role_config)
+    limits = reduced.limits.model_dump(mode="json")
+    limits["effort"]["high"] |= {"employment_queries": 2, "employment_pages": 0}
+    assert reduced.model_validate(reduced.model_dump() | {"limits": limits}).limits.effort["high"].employment_queries == 2
+    limits["effort"]["high"]["employment_queries"] = 6
+    with pytest.raises(ValidationError):
+        reduced.model_validate(reduced.model_dump() | {"limits": limits})
 
 
 @pytest.mark.parametrize("change", [
