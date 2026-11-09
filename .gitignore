@@ -37,6 +37,7 @@ dist/
 # Agents
 .impeccable/
 .agents/
+.claude/launch.json
 
 # Grafo local de Graphify
 /graphify-out/
