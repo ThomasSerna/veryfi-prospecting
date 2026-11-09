@@ -199,8 +199,11 @@ Antes de conciliar se guardó una copia de la base en `data/backups/`.
 - **Tavily**: el panel pasó de 29 a 50 créditos usados. Las 28 filas del lote informaron 21 créditos
   (17 de búsqueda y 4 de extracción), exactamente el salto. Se conciliaron en una transacción; el
   comprobante está en `data/conciliaciones/tavily-2026-11-09-t24.json`.
-- **Haiku**: las 2 llamadas siguen con el costo estimado (USD 0,0021728) a la espera de la consola o
-  de que el responsable acepte conciliar con el estimado.
+- **Haiku**: las 2 llamadas se conciliaron con el costo estimado de los tokens que informó la API
+  (USD 0,0021728), sin captura de la consola, porque el responsable lo aceptó el 2026-11-09, como en
+  T11 y T17. El comprobante está en `data/conciliaciones/anthropic-2026-11-09-t24.json`.
+- Las 35 solicitudes del lote quedaron conciliadas. En todo el ledger solo sigue sin conciliar la fila
+  histórica de Hunter de la T07.
 
 ### Observaciones y limitaciones
 
