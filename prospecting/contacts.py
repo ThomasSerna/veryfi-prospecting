@@ -17,7 +17,7 @@ from pydantic import Field, StrictBool, StrictInt
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignLimits, Channel, ChannelStatus, ChannelType,
     Company, Contact, ContactMatchConfig, Contract, Evidence, IdentityStatus, MATCH_LEVELS, MatchComponentConfig,
-    MatchComponentName, PENDING_LEVELS, Points, Priority, Text,
+    MatchComponentName, PENDING_LEVELS, Points, Priority, Text, UtcDatetime,
 )
 from prospecting.sources import is_search_evidence, url_host, within_domain
 
@@ -268,6 +268,7 @@ def _family_title(title: str, family) -> bool:
 def matched_role_family(contact: Contact, company: Company, assessment: Assessment, campaign: Campaign,
                         evidence: list[Evidence], now: datetime):
     """Devuelve familia y fuentes observadas; una responsabilidad no se deduce del título."""
+    contact, evidence = resolve_manual_employment(contact, evidence, campaign.limits, now)
     families = role_families(company, assessment, campaign, evidence=evidence)
     if not contact.title or not contact.name or not families:
         return None, []
@@ -340,7 +341,9 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
     """La identidad y el empleo no se deducen del email ni del momento de consulta.
 
     `roles` son los cargos de los perfiles (`target_roles`); sin ellos solo valen los elegidos en la evaluación.
+    Una confirmación manual vigente del empleo (T23) se lee con `resolve_manual_employment`, sin guardarse.
     """
+    contact, evidence = resolve_manual_employment(contact, evidence, limits, now)
     taxonomy = campaign is not None and campaign.config_snapshot.role_taxonomy is not None
     if taxonomy:
         contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
@@ -410,7 +413,9 @@ class EmploymentStatus(Contract):
     """Vigencia del empleo calculada al leer, sin guardarse ni autorizar llamadas (T18).
 
     Solo `corporate_evidence` habilita a la persona: una afirmación de proveedor (Apollo o el historial
-    de Hunter) nunca prueba el puesto. `reason` explica por qué no hay evidencia vigente.
+    de Hunter) nunca prueba el puesto. `reason` explica por qué no hay evidencia vigente. `basis` distingue
+    la evidencia pública del puesto (`source`) de una confirmación manual vigente de ventas (`manual`, T23),
+    cuya fecha, vencimiento, motivo y fuente consultada se exponen para la ficha y el CSV.
     """
 
     state: EmploymentState
@@ -418,11 +423,27 @@ class EmploymentStatus(Contract):
     reason: EmploymentReason | None = None
     evidence_ids: list[UUID] = Field(default_factory=list)
     review_required: StrictBool = False
+    basis: Literal["source", "manual"] | None = None
+    confirmed_at: UtcDatetime | None = None
+    confirmation_expires_at: UtcDatetime | None = None
+    confirmation_reason: Text | None = None
+    confirmation_source: Text | None = None
 
 
-def _employment(state: EmploymentState, origin: str | None, reason: str | None, ids) -> EmploymentStatus:
+def _employment(state: EmploymentState, origin: str | None, reason: str | None, ids, *,
+                manual: Evidence | None = None, limits: CampaignLimits | None = None) -> EmploymentStatus:
+    fields = {}
+    if manual is not None:
+        reason_text = (manual.claim.removeprefix(MANUAL_EMPLOYMENT_CLAIM).strip()
+                       if manual.claim.startswith(MANUAL_EMPLOYMENT_CLAIM) else "")
+        fields = {"confirmed_at": manual.retrieved_at,
+                  "confirmation_expires_at": manual.retrieved_at + timedelta(days=limits.cache.contact_days),
+                  "confirmation_reason": reason_text or None,
+                  "confirmation_source": None if manual.url is None else str(manual.url)}
     return EmploymentStatus(state=state, origin=origin, reason=reason, evidence_ids=list(dict.fromkeys(ids)),
-                            review_required=reason in _REVIEW_REASONS)
+                            review_required=reason in _REVIEW_REASONS,
+                            basis=None if state != "corporate_evidence" else "source" if manual is None else "manual",
+                            **fields)
 
 
 def _hunter_history_claim(contact: Contact, company: Company, evidence: list[Evidence],
@@ -456,13 +477,122 @@ def _title_confirmed(contact: Contact, company: Company, fact: Evidence, by_id: 
                and mentions(item.excerpt or item.claim, contact.title or "") for item in sources)
 
 
+# Confirmación manual del empleo (T23). Identificadores persistidos: no cambiarlos (docs/persistence.md).
+MANUAL_EMPLOYMENT_PROVIDER = "manual_review"
+MANUAL_EMPLOYMENT_REFERENCE = "manual-employment:"
+MANUAL_EMPLOYMENT_CLAIM = ("Empleo vigente confirmado manualmente por ventas, sin enviar mensajes, llamadas ni "
+                           "invitaciones. Motivo: ")
+_CITED_TITLE_PREFIXES = ("Apollo informa title: ", "Hecho nominal publicado: title=")
+
+
+def manual_employment_evidence(company: Company, contact: Contact, campaign_id: UUID, *, title: str,
+                               source_url: str, reason: str, now: datetime) -> Evidence:
+    """Hecho observado por ventas en la fuente que consultó; nunca se envía nada para obtenerlo.
+
+    El fragmento nombra persona, cargo y entidad porque las reglas leen `excerpt` antes que `claim`.
+    """
+    return Evidence(company_id=company.id, contact_id=contact.id, kind="observed", source_type="manual",
+                    provider=MANUAL_EMPLOYMENT_PROVIDER,
+                    external_reference=f"{MANUAL_EMPLOYMENT_REFERENCE}{campaign_id}:{contact.id}:{now.isoformat()}",
+                    url=source_url, retrieved_at=now, claim=f"{MANUAL_EMPLOYMENT_CLAIM}{reason}",
+                    excerpt=f"{contact.name}, {title}, {company.entity_name or company.name}")
+
+
+def is_manual_employment(fact: Evidence) -> bool:
+    return (fact.source_type == "manual" and fact.kind == "observed" and fact.provider == MANUAL_EMPLOYMENT_PROVIDER
+            and (fact.external_reference or "").startswith(MANUAL_EMPLOYMENT_REFERENCE) and not fact.contradiction_ids)
+
+
+def _manual_employment_fact(contact: Contact, evidence: list[Evidence], limits: CampaignLimits,
+                            now: datetime) -> Evidence | None:
+    """Confirmación manual vigente de la persona: citada, no futura, dentro de `cache.contact_days` y del cargo actual.
+
+    Si después cambia el cargo guardado, la confirmación deja de aplicar: confirmó otro puesto.
+    """
+    if not contact.name or contact.name_complete is not True or "*" in contact.name or not contact.title:
+        return None
+    cited = set(contact.employment_evidence_ids)
+    facts = [item for item in evidence if item.id in cited and item.contact_id == contact.id
+             and item.company_id == contact.company_id and is_manual_employment(item)
+             and _fresh(item.retrieved_at, limits.cache.contact_days, now)
+             and mentions(item.excerpt or "", contact.name) and mentions(item.excerpt or "", contact.title)]
+    return max(facts, key=lambda item: (item.retrieved_at, str(item.id)), default=None)
+
+
+def resolve_manual_employment(contact: Contact, evidence: list[Evidence], limits: CampaignLimits,
+                              now: datetime) -> tuple[Contact, list[Evidence]]:
+    """Proyección en memoria de una confirmación manual vigente (T23); nunca se guarda.
+
+    Las contradicciones de cargo de la persona observadas hasta la confirmación quedan resueltas por ella:
+    se omiten de las copias los enlaces hacia sus fuentes de cargo y, si la identidad estaba contradicha solo
+    por ese cambio, se lee como confirmada. Al vencer, o ante una contradicción posterior, salida nominal o
+    empleo en otra entidad, la persona vuelve a leerse como estaba. Es idempotente y no muta las entradas.
+    """
+    manual = _manual_employment_fact(contact, evidence, limits, now)
+    if manual is None or contact.current_employment is False:
+        return contact, evidence
+    titles = set(contact.provenance.get("title", []))
+    projected, resolved = [], False
+    for item in evidence:
+        if (item.contact_id == contact.id and item.retrieved_at <= manual.retrieved_at
+                and titles.intersection(item.contradiction_ids)):
+            item = item.model_copy(update={"contradiction_ids": [id for id in item.contradiction_ids if id not in titles]})
+            resolved = True
+        projected.append(item)
+    if resolved and contact.identity_status == IdentityStatus.CONTRADICTED:
+        contact = contact.model_copy(update={"identity_status": IdentityStatus.CONFIRMED})
+    return contact, projected
+
+
+def _cited_title(fact: Evidence | None) -> str | None:
+    """Cargo de una fuente de título en los formatos conocidos de Apollo y de la extracción pública."""
+    if fact is None or fact.kind != "observed":
+        return None
+    prefix = next((item for item in _CITED_TITLE_PREFIXES if fact.claim.startswith(item)), None)
+    return None if prefix is None else fact.claim.removeprefix(prefix).strip() or None
+
+
+def employment_confirmation_titles(contact: Contact, company: Company, evidence: list[Evidence],
+                                   limits: CampaignLimits, now: datetime) -> list[str]:
+    """Cargos que ventas puede confirmar a mano (T23); vacío si la persona no admite la confirmación.
+
+    Solo personas de Apollo enriquecidas, con nombre completo y sin empleo marcado como no vigente, cuyo empleo
+    declara solo el proveedor o cuyo cargo cambió (`title_changed`). En ese caso se elige uno de los cargos ya
+    citados; nunca un cargo nuevo sin fuente. Una salida, otra entidad o una fuente contradicha no se confirman.
+    """
+    own = [item for item in evidence if item.contact_id == contact.id and item.company_id == contact.company_id]
+    enriched = any(item.provider == "apollo" and (item.external_reference or "").startswith("apollo_v1:")
+                   and item.external_reference.endswith("#enrichment") for item in own)
+    if (contact.company_id != company.id or not enriched or not contact.name or contact.name_complete is not True
+            or "*" in contact.name or not contact.title or contact.current_employment is False):
+        return []
+    status = employment_status(contact, company, evidence, limits, now)
+    if status.state == "provider_claim" and status.origin == "apollo":
+        return [contact.title]
+    if (status.state, status.reason) != ("contradicted", "title_changed"):
+        return []
+    titles = contact.provenance.get("title", [])
+    involved = {id for item in own for id in item.contradiction_ids if id in titles}
+    involved |= {item.id for item in own if item.id in titles and set(titles).intersection(item.contradiction_ids)}
+    by_id = {item.id: item for item in own}
+    values = [contact.title] + [_cited_title(by_id.get(id)) for id in titles if id in involved]
+    unique = {}
+    for value in values:
+        if value:
+            unique.setdefault(fold_words(value), value)
+    return list(unique.values())
+
+
 def employment_status(contact: Contact, company: Company, evidence: list[Evidence],
                       limits: CampaignLimits, now: datetime) -> EmploymentStatus:
     """Separa lo que declara el proveedor de la evidencia pública del puesto (T18, §10.2).
 
-    Orden: contradicción, evidencia corporativa o pública vigente, afirmación del proveedor y desconocido.
-    Ni el correo, ni su verificación, ni la fecha de actualización del perfil de Apollo prueban el empleo.
+    Orden: contradicción, evidencia corporativa o pública vigente (o confirmación manual vigente de ventas,
+    T23), afirmación del proveedor y desconocido. Ni el correo, ni su verificación, ni la fecha de
+    actualización del perfil de Apollo prueban el empleo.
     """
+    contact, evidence = resolve_manual_employment(contact, evidence, limits, now)
+    manual = _manual_employment_fact(contact, evidence, limits, now)
     by_id = {item.id: item for item in evidence if item.company_id == contact.company_id}
     own = [item for item in by_id.values() if item.contact_id == contact.id]
     apollo = any(item.provider == "apollo" and (item.external_reference or "").startswith("apollo_v1:") for item in own)
@@ -498,6 +628,9 @@ def employment_status(contact: Contact, company: Company, evidence: list[Evidenc
                 failures.setdefault("title_unconfirmed", []).append(item.id)
             else:
                 justified.append(item.id)
+        # Confirmación manual vigente (T23): ventas comprobó el puesto; sin `current_employment=False` (paso 1).
+        if manual is not None:
+            return _employment("corporate_evidence", origin, None, [manual.id] + justified, manual=manual, limits=limits)
         if justified and contact.current_employment is True:
             return _employment("corporate_evidence", origin, None, justified)
     reason = next((item for item in _CORROBORATION_ORDER if item in failures), None)
@@ -604,6 +737,7 @@ def person_stage(contact: Contact, company: Company, assessment: Assessment, evi
     - `channel_usable`: además, un canal que supera `channel_is_usable`.
     - `ready`: supera `validate_contact` y tiene un canal utilizable; es la misma condición de listo.
     """
+    contact, evidence = resolve_manual_employment(contact, evidence, limits, now)
     if campaign is not None and campaign.config_snapshot.role_taxonomy is not None:
         contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
     apollo = [item for item in evidence if item.contact_id == contact.id and item.provider == "apollo"
@@ -714,6 +848,7 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
                   limits: CampaignLimits, now: datetime, roles: list[str], config: ContactMatchConfig, *,
                   campaign: Campaign | None = None) -> ContactMatch:
     """Match determinístico, sin red ni IA, con las mismas reglas de persona y canal (§10)."""
+    contact, evidence = resolve_manual_employment(contact, evidence, limits, now)
     selected = [role for role in assessment.target_roles if role in roles]
     taxonomy = campaign is not None and campaign.config_snapshot.role_taxonomy is not None
     if taxonomy:
