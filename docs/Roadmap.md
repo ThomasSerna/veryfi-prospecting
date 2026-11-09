@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-08 (America/Bogota). Instantánea de los 24 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19 y T21 cerrados el 2026-11-08 y T22 a T24 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
+- **Fecha de corte:** 2026-11-08 (America/Bogota). Instantánea de los 24 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T23 cerrados el 2026-11-08 y T22 y T24 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -32,21 +32,21 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T20 | [#21](https://github.com/ThomasSerna/veryfi-prospecting/issues/21) | Evaluar tres alternativas de interfaz para cuentas enterprise y contactos Apollo | Cerrado 2026-11-07 | P1 (paralelizable) | Evaluación UX/UI | T12 para definir estados de Apollo, T13 para escenarios enterprise |
 | T21 | [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22) | Validar el pipeline enterprise con Apollo frente a la línea base Hunter | Cerrado 2026-11-08 | P0 para cierre, ejecutar al final | QA/evaluación | T12, T13, T14, T15, T16, T17, T18 (T19 si aplica) |
 | T22 | [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23) | [SPIKE no funcional] Evaluar Snov.io vs Apollo en rama experimental aislada | Abierto | P2 (posterior a migración y baseline) | Spike técnico/no funcional | T12, T17, T16, T18 y T21 |
-| T23 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Abierto | P1 | Revisión humana/backend e interfaz | T18 |
+| T23 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Cerrado 2026-11-08 | P1 | Revisión humana/backend e interfaz | T18 |
 | T24 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Abierto | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
 
 Las prioridades y los tipos solo existen en los issues T12 a T24. Los criterios de aceptación de cada tarea están en su issue.
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T21 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T21 y T23 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Listas para empezar | T23 (P1) y T24 (P1) | Sus dependencias están cerradas. T23 permite confirmar el empleo a mano; T24 corrobora con Tavily el empleo de personas de Apollo dentro de la política de esfuerzo de T16 |
+| Lista para empezar | T24 (P1) | Sus dependencias están cerradas. Corrobora con Tavily el empleo de personas de Apollo dentro de la política de esfuerzo de T16 |
 | Desbloqueada, posterior | T22 (P2) | Sus dependencias están cerradas; requiere autorizar la rama `experiment/snov-benchmark` y comprobar acceso y precio antes de cualquier llamada |
 
-T23 y T24 están listas para comenzar; T22 queda desbloqueada con prioridad posterior.
+T24 está lista para comenzar; T22 queda desbloqueada con prioridad posterior.
 
 ## Dependencias entre tareas
 
@@ -63,7 +63,7 @@ flowchart LR
     T20["T20 Alternativas de interfaz (cerrada)"]:::closed
     T21["T21 Validación enterprise (cerrada)"]:::closed
     T22["T22 Spike Snov.io"]:::ready
-    T23["T23 Confirmación manual del empleo"]:::ready
+    T23["T23 Confirmación manual del empleo (cerrada)"]:::closed
     T24["T24 Corroboración con Tavily"]:::ready
     T12 --> T13
     T12 --> T17
@@ -356,12 +356,12 @@ Como equipo de producto, quiero comparar el nuevo sistema Apollo + puntuación e
 - Se reportan errores, duplicados, puestos obsoletos y empresas grandes sin encaje.
 - El pipeline principal no introduce Snov ni otros proveedores de contactos.
 
-### Seguimiento de T18 (T23 y T24, abiertas)
+### Seguimiento de T18 (T23 cerrada; T24 abierta)
 
 #### T23 · Permitir que ventas confirme manualmente el empleo vigente de una persona
 
 - **Issue:** [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-08
 - **Prioridad:** P1
 - **Dependencias:** T18
 - **Tipo:** Revisión humana/backend e interfaz
@@ -547,7 +547,7 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
   - la fuente consultada es una URL http(s) obligatoria;
   - `title_changed` se resuelve al leer, sin reescribir contradicciones ni identidad.
 
-  Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo), el cálculo en [contacts.md](contacts.md#confirmación-manual-del-empleo-t23) y los identificadores en [persistence.md](persistence.md#identificadores-persistidos). Se verificó solo con datos sintéticos (pruebas sin red y navegador local). El issue sigue abierto en el tracker hasta su cierre.
+  Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo), el cálculo en [contacts.md](contacts.md#confirmación-manual-del-empleo-t23) y los identificadores en [persistence.md](persistence.md#identificadores-persistidos). Se verificó solo con datos sintéticos (pruebas sin red y navegador local). Cerrada en el tracker el 2026-11-08 con los cinco criterios marcados.
 - **T24:** cambia el esfuerzo y el gasto de la etapa de contactos (`_search_public`): requiere aprobación de presupuesto ([Budget-policy.md](Budget-policy.md)) y coordinarse con T16. Las llamadas reales requieren autorización explícita.
 
 ## Responsables por módulo
