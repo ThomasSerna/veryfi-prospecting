@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
-{% load prospecting_ui %}
+{% load static prospecting_ui %}
 {% block title %}Resumen · Veryfi Prospecting{% endblock %}
 {% block breadcrumb %}<span>Resumen</span>{% endblock %}
+{% block scripts %}<script src="{% static 'js/background.js' %}" defer></script>{% endblock %}
 {% block content %}
+<canvas class="summary-background" aria-hidden="true" hidden></canvas>
 <div class="home-panel" data-live-dashboard data-live-region="dashboard" data-entering>
   <header class="home-heading">
     <div>
