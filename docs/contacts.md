@@ -37,7 +37,9 @@ El orden de trabajo es:
 4. Complementar con búsquedas y extracción de URLs públicas mediante Tavily,
    dentro del cupo. Si se proporcionó Haiku y su autorización, extraer hechos
    nominales citados de evidencia nueva o ya disponible. Las páginas de LinkedIn
-   no se automatizan.
+   no se automatizan. Con `employment_corroboration_v1`, las búsquedas por persona
+   salen de este paso y van a una fase propia, después de la extracción
+   ([Corroboración dirigida del empleo](#corroboración-dirigida-del-empleo-t24)).
 5. Comprobar independientemente identidad, empresa actual, cargo, vigencia y canal.
    Una fecha de consulta no es una fecha de verificación: un correo sin esta fecha
    permanece pendiente salvo publicación nominal corporativa vigente.
@@ -64,9 +66,10 @@ no se recuperan.
 La prioridad media permite hasta 3 personas, 2 búsquedas Apollo, 3 enriquecimientos
 Apollo, 2 consultas web, 2 páginas y 90 segundos adicionales. La prioridad alta permite
 hasta 5 personas, 2 búsquedas Apollo, 5 enriquecimientos, 4 consultas web, 4 páginas
-y 180 segundos. Las campañas guardadas antes de T16 conservan sus topes (media 1/1,
-alta 3/3). Las reducciones de configuración y los límites económicos siguen
-vigentes; esos máximos no obligan a agotarlos.
+y 180 segundos. Con T24 se suman hasta 3 búsquedas dirigidas y 3 páginas en media, y
+5 y 5 en alta, para corroborar el empleo. Las campañas guardadas antes de T16 conservan
+sus topes (media 1/1, alta 3/3). Las reducciones de configuración y los límites
+económicos siguen vigentes; esos máximos no obligan a agotarlos.
 
 ### Varias personas por cuenta (T16)
 
@@ -121,6 +124,61 @@ reales queda por medir en T17/T21.
 una solicitud enviada con resultado faltante o consumo incierto exige revisión y
 no se repite. Las cachés de resultados usan inicialmente 30 días para web y 30 para
 contactos; reutilizar no vuelve actual una verificación ni un empleo caducados.
+
+### Corroboración dirigida del empleo (T24)
+
+`config/veryfi.json` define `employment_corroboration` (`employment_corroboration_v1`,
+pendiente de validación comercial): `searches_per_person=1` y `people_per_extraction=3`.
+La búsqueda por persona y sus topes los aprobó el usuario el 2026-11-08. Los topes por
+empresa están en `limits.effort`: `employment_queries` y `employment_pages`, 3 y 3 en media
+y 5 y 5 en alta. La configuración exige `people_policy` y esos topes. Una campaña puede
+reducirlos, pero no habilitarlos si su instantánea no los tiene. Las instantáneas
+anteriores no tienen la política ni los topes y conservan la búsqueda pública anterior.
+
+Con la política, la búsqueda pública general solo hace las consultas genéricas de
+directorio. Después de la extracción general con Haiku, la etapa:
+
+1. Elige a las personas de Apollo enriquecidas en `provider_claim` con motivo
+   `provider_claim_only`, `title_unconfirmed`, `undated_source` o `stale_source`
+   (`needs_employment_corroboration`), en el orden de pertinencia y diversidad de T16.
+   Exige nombre completo sin `*`, cargo, función pertinente y ningún descarte de
+   `contact_match_v2`. Un directorio vigente que no las nombra ya no lo impide, y quien
+   ya tiene `corporate_evidence` no se busca.
+2. Busca a cada una con `"nombre" "empresa" cargo` (1 crédito). Con el cupo de la empresa
+   agotado, la persona queda pendiente con `employment_search_limit`, sin buscarla. Un
+   resultado ya procesado en otra campaña Apollo dentro de la caché web se reutiliza sin gasto.
+3. De los resultados de cada persona toma una URL no extraída antes cuyo snippet la nombre
+   junto a la empresa o sea del dominio corporativo, y prefiere el dominio. Hace una sola
+   extracción con todas, hasta `employment_pages` (1 crédito por cada 5 URL).
+4. Envía a Haiku solo los fragmentos de esa extracción que nombran a la persona junto a la
+   empresa o son del dominio (`names_person_at_company`), en lotes de hasta 3 personas. Usa
+   `contacts_extraction_v2` con las mismas reglas de citas literales y asociación nominal;
+   los cargos del prompt siguen saliendo de la evidencia de la empresa. Un rechazo de los
+   hechos (por ejemplo `identity_mismatch` o `ambiguous_identity`) queda procesado con su
+   código y la etapa sigue.
+
+El gasto adicional máximo por empresa es de 3 búsquedas, 1 extracción (1 crédito) y 1
+llamada a Haiku en media, y de 5 búsquedas, 1 extracción y 2 llamadas en alta. Cada
+solicitud reserva antes de llamar, respeta permisos, cupos, topes de campaña y empresa y
+el tiempo de contactos, y no se repite al reanudar. La fase no añade proveedores ni envía
+mensajes.
+
+`employment_corroboration` calcula el resultado al leer; la ficha y el CSV lo muestran:
+`corroborated` (la evidencia vigente del puesto sale de esa extracción),
+`searched_not_corroborated`, `employment_search_limit` o el código del rechazo. Las reglas
+de vigencia no cambian. Un fragmento de Extract no trae fecha, así que una página
+secundaria sin fecha deja a la persona en `undated_source`, para revisión humana, que la
+confirmación de T23 puede resolver. Una salida o un cargo distinto la contradicen, sin
+mirar la fecha de la fuente.
+
+`manage.py corroboration_report --campaign <id>` resume, sin datos personales:
+
+- personas buscadas, corroboradas, pendientes por cupo y rechazadas;
+- el consumo de las solicitudes de la fase: créditos de Tavily observados y costo de Haiku
+  estimado o conciliado;
+- el costo por empleo verificado, que queda sin definir si no hay corroboraciones.
+
+Las pruebas son sintéticas: la conversión real queda por medir con un lote autorizado.
 
 ## Acceso a Apollo
 
@@ -252,6 +310,8 @@ Nunca cuentan como evidencia del puesto el correo ni su verificación, el
 contradicción se revisa en ambos sentidos: el hecho que contradice y el que es
 contradicho. Las páginas corporativas y directorios que localiza Tavily en la
 etapa de contactos son la vía de corroboración; T18 no añade llamadas ni proveedores.
+Desde T24, una búsqueda dirigida por persona completa esa vía
+([Corroboración dirigida del empleo](#corroboración-dirigida-del-empleo-t24)).
 
 ### Confirmación manual del empleo (T23)
 

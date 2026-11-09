@@ -114,6 +114,15 @@ operación y cuenta en ventanas deslizantes de minuto, hora y día contadas en e
 que también acota a otra conexión sobre la misma base. Al alcanzarlo, `local_rate_limit`
 detiene la pasada sin reservar ni enviar.
 
+La corroboración dirigida del empleo (T24) añade a la etapa de contactos, por empresa, hasta
+`employment_queries` búsquedas de Tavily (3 en media, 5 en alta; 1 crédito cada una), una
+extracción de hasta `employment_pages` URL (1 crédito por cada 5) y una llamada a Haiku por
+cada 3 personas (1 en media, 2 en alta). Usa los mismos permisos de Tavily `search` y
+`extract` y de Haiku `messages`, que se suman por cuenta como el resto. Cada solicitud
+reserva antes de llamar y queda marcada con `contacts:employment_request:` para que
+`manage.py corroboration_report` mida su consumo
+([persistence.md](persistence.md#identificadores-persistidos)).
+
 ## Consumo y respuestas de Apollo
 
 `ApolloAccess` (`prospecting/providers/apollo.py`) registra las operaciones

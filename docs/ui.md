@@ -277,6 +277,11 @@ empleo» muestran «Confirmado manualmente por ventas» con la fecha, el vencimi
 y el enlace a la fuente. La identidad guardada sigue indicando sus contradicciones. El
 formulario se bloquea durante una ejecución y no existe en campañas históricas.
 
+La tarjeta de cada persona también explica el resultado de la búsqueda dirigida del empleo
+(T24, [Corroboración dirigida del empleo](contacts.md#corroboración-dirigida-del-empleo-t24)):
+fuente pública que lo corroboró, búsqueda sin corroboración, cupo de búsquedas agotado o
+hechos citados que no superaron la validación. Sin búsqueda ni pendiente, no aparece.
+
 ## Exportación CSV
 
 La descarga principal incluye personas actualmente listas con canales utilizables
@@ -298,6 +303,9 @@ del empleo, recalculados al descargar. Con una confirmación manual vigente (T23
 `employment_basis` vale `manual` y `employment_confirmed_at`,
 `employment_confirmation_reason` y `employment_confirmation_source` llevan su fecha, motivo y
 URL. Con evidencia pública vale `source`, y sin vigencia comprobada queda vacía.
+`employment_corroboration` lleva el resultado de la búsqueda dirigida (T24): `corroborated`,
+`searched_not_corroborated`, `employment_search_limit` o el código del rechazo; queda vacía
+si la persona no se buscó ni quedó pendiente.
 `function_id` lleva la función del cargo y
 `people_functions` la lista JSON de funciones representadas por personas pertinentes.
 `person_stage` lleva la etapa de la persona;
@@ -317,7 +325,8 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos. La confirmación manual del empleo (T23)
 se verificó con pruebas sin red y en el navegador local sobre una base temporal
-exclusivamente sintética; no se ha usado con personas reales.
+exclusivamente sintética; no se ha usado con personas reales. El aviso y la columna de la
+corroboración dirigida (T24) se verificaron con pruebas sin red.
 
 ## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 
