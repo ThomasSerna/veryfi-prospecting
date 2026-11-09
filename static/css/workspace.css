@@ -494,7 +494,6 @@ a.sequence-link:active { transform: scale(.96); }
 .harvey-unknown { box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -1.5px; }
 
 /* Contactos: personas separadas por líneas; cada canal es una fila con su estado y copia. */
-.company-page p.people-summary { display: inline-flex; margin: 0 0 16px; padding: 6px 12px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: .8125rem; }
 .company-page .contact-detail > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .company-page .contact-identity { display: block; min-width: 0; }
 .company-page .contact-initial { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(145deg, var(--line), var(--soft)); color: var(--ink); font-size: 1rem; font-weight: 600; }

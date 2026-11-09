@@ -237,18 +237,14 @@ orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
 La pestaña Contactos lista a todas las personas encontradas, con su porcentaje de match,
 su desglose, sus datos pendientes y la marca de las descartadas por regla. En v2, las
-personas no descartadas y la pertinencia preceden al porcentaje en el orden. La ficha
-indica que v2 es una propuesta pendiente de validación comercial. Cada persona muestra
-su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
+personas no descartadas y la pertinencia preceden al porcentaje en el orden. Cada persona
+muestra su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
 o Lista), la función de su cargo y, si Apollo no la confirmó al enriquecerla, el motivo.
-Encima, un resumen indica el objetivo del nivel, cuántas personas son candidatas,
-pertinentes y listas y qué funciones representan las pertinentes; sin `people_policy`
-se omite el objetivo. Las campañas nuevas usan el match v2 de su instantánea; las
-anteriores sin ella usan v1. El match ordena la revisión y la prioridad de
-enriquecimiento, mientras «listo» sigue dependiendo de las
-reglas de persona y canal. Si falta una configuración v1 válida para una campaña
-histórica, o el archivo declara otra versión, la ficha lo avisa y muestra a las personas
-sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
+Las campañas nuevas usan el match v2 de su instantánea; las anteriores sin ella usan v1.
+El match ordena la revisión y la prioridad de enriquecimiento, mientras «listo» sigue
+dependiendo de las reglas de persona y canal. Si falta una configuración v1 válida para
+una campaña histórica, o el archivo declara otra versión, la ficha lo avisa y muestra a
+las personas sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
 
 Cada persona muestra la vigencia de su empleo ([Vigencia del empleo](contacts.md#vigencia-del-empleo-t18)):
 el estado (vigente según fuente corporativa o pública, declarado por Apollo, inferido del

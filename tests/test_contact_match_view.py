@@ -181,7 +181,13 @@ def test_v2_snapshot_drives_view_html_and_csv_despite_a_broken_external_path(peo
         (READY, 100), (SALES, 40), (CONTRADICTED, 73)]
     assert [row["contact_match"] for row in csv_rows(export_csv(view, include_all=True))] == ["100", "40", "73"]
     html = page(people, "webapp:company", people.tmp_path / "inexistente.json", company_id=people.company.id)
-    assert "contact_match_v2" in html and "Propuesta pendiente de validación comercial" in html
+    assert "contact_match_v2" not in html and "Propuesta pendiente de validación comercial" not in html
+    contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', html, re.S)
+    assert contacts is not None
+    assert "people-summary" not in contacts[1] and "3 candidatas" not in contacts[1]
+    assert "Objetivo " not in contacts[1] and "Funciones:" not in contacts[1]
+    assert contacts[1].count("Desglose de match") == 3
+    assert "100 %</strong> de match" in contacts[1] and "40 %</strong> de match" in contacts[1]
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert 'id="lead-title">Mejor match' in html
     assert "El porcentaje de match no está disponible" not in html

@@ -118,8 +118,6 @@
     </section>
     <section id="contacts" class="tab-panel surface company-panel" aria-labelledby="contacts-title">
       <h2 id="contacts-title" class="sr-only">Contactos</h2>
-      {% if result.people %}<p class="people-summary">{{ result.people|people_summary }}</p>{% endif %}
-      {% if view.contact_match_version %}<p class="cell-note">{{ view.contact_match_version }}{% if campaign.config_snapshot.contact_match.validation_status == 'proposed' %} · Propuesta pendiente de validación comercial{% endif %}</p>{% endif %}
       {% if not view.contact_match_version and result.contacts %}
       <div class="notice notice-warning"><strong>El porcentaje de match no está disponible.</strong></div>
       {% endif %}
