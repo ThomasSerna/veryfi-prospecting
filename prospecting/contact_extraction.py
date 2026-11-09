@@ -59,9 +59,16 @@ def contacts_prompt_version(campaign: Campaign) -> str:
 
 
 def build_contacts_request(company: Company, assessment: Assessment, campaign: Campaign,
-                            evidence: list[Evidence], contacts: list[Contact]) -> tuple[dict, list[Evidence]]:
-    """Entrega fragmentos acotados, nunca herramientas ni el resumen de búsqueda como prueba."""
+                            evidence: list[Evidence], contacts: list[Contact], *,
+                            role_evidence: list[Evidence] | None = None) -> tuple[dict, list[Evidence]]:
+    """Entrega fragmentos acotados, nunca herramientas ni el resumen de búsqueda como prueba.
+
+    `role_evidence` (T24) respalda los cargos y familias del prompt cuando solo se envían fragmentos nuevos;
+    por defecto son los mismos fragmentos, y la solicitud y su huella no cambian.
+    """
     from anthropic import transform_schema
+
+    role_evidence = evidence if role_evidence is None else role_evidence
 
     taxonomy = campaign.config_snapshot.role_taxonomy is not None
     schema = transform_schema(HaikuRoleContacts if taxonomy else HaikuContacts)
@@ -74,7 +81,7 @@ source_date solo si la fuente publica una fecha explícita: valor ISO y cita lit
 con el mismo nombre, empresa y cargo compatible. Si hay homónimos, no los fusiones. Sin prueba, omite el hecho.
 No infieras autoridad de compra; no completes email por patrón. No trates una URL de LinkedIn como acceso a mensajería.
 Para una entidad corporativa actual incluye nombre, cargo y empresa en las citas; preserva la diferencia entre teléfono y WhatsApp.
-Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign, evidence=evidence))}."""
+Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign, evidence=role_evidence))}."""
     if taxonomy:
         system += "\nresponsibilities es una responsabilidad funcional literal asociada nominalmente a la persona en una fuente corporativa; no infieras funciones ni autoridad por el título. Omite responsabilidades negadas o contradictorias."
     context = {"company": {"name": company.name, "entity_name": company.entity_name, "domain": company.domain,
@@ -82,7 +89,7 @@ Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign, evide
                "contacts": [{"contact_id": str(item.id), "name": item.name, "title": item.title} for item in contacts]}
     if taxonomy:
         context["role_families"] = [{"id": family.id, "functions": family.function_terms}
-                                    for family in role_families(company, assessment, campaign, evidence=evidence)]
+                                    for family in role_families(company, assessment, campaign, evidence=role_evidence)]
     overhead = len(system) + len(json.dumps(schema)) + len(prompt_json(context)) + 200
     available = campaign.limits.llm.max_input_tokens * CHARS_PER_TOKEN - overhead
     if available <= 0:
@@ -95,7 +102,7 @@ Cargos pertinentes: {', '.join(target_roles(company, assessment, campaign, evide
               for item in usable}
     # Si no cabe todo, entran primero los fragmentos nominales (T09): directorios corporativos y
     # menciones de cargos objetivo o personas conocidas, los más recientes antes.
-    nominal = target_roles(company, assessment, campaign, evidence=evidence) + [item.name for item in contacts if item.name]
+    nominal = target_roles(company, assessment, campaign, evidence=role_evidence) + [item.name for item in contacts if item.name]
     chosen, used = set(), 0
     for item in sorted(usable, key=lambda fact: (fact.source_type != "primary", not current_directory(fact),
                                                  not any(mentions(fact.excerpt[:800], value) for value in nominal),

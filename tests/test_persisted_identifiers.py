@@ -245,6 +245,22 @@ def test_people_policy_version_is_fixed(role_config):
     assert role_config.people_policy.version == "people_policy_v1"
 
 
+def test_employment_corroboration_version_and_attempt_keys_are_fixed(role_config):
+    """T24: reanudar sin repetir búsquedas dirigidas, extracción ni Haiku depende de estos textos."""
+    from prospecting.pipeline.contacts import (
+        EMPLOYMENT_EXTRACT_KEY, EMPLOYMENT_EXTRACTED_KEY, EMPLOYMENT_FRAGMENT_KEY, EMPLOYMENT_PENDING_KEY,
+        EMPLOYMENT_QUERIES_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_SEARCH_KEY, EMPLOYMENT_SEARCH_LIMIT,
+    )
+
+    assert role_config.employment_corroboration.version == "employment_corroboration_v1"
+    assert (EMPLOYMENT_QUERIES_KEY, EMPLOYMENT_SEARCH_KEY, EMPLOYMENT_EXTRACT_KEY, EMPLOYMENT_FRAGMENT_KEY) == (
+        "contacts:employment_queries", "contacts:employment_search:", "contacts:employment_extract",
+        "contacts:employment_fragment:")
+    assert (EMPLOYMENT_EXTRACTED_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_PENDING_KEY, EMPLOYMENT_SEARCH_LIMIT) == (
+        "contacts:employment_extracted:", "contacts:employment_request:", "contacts:employment_pending:",
+        "employment_search_limit")
+
+
 def test_reconciliation_receipt_and_rate_limit_identifiers_are_fixed():
     """T17: el formato del comprobante y los límites Free quedan fijados; cambiarlos exige otra versión."""
     from typing import get_args

@@ -12,9 +12,9 @@ from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthori
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
     ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
-    employment_confirmation_titles, employment_status, manual_employment_evidence, matched_role_family, merge_contact,
-    people_progress, people_target, person_function, role_families, role_position, rank_contact_matches, target_roles,
-    validate_contact,
+    employment_confirmation_titles, employment_status, manual_employment_evidence, matched_role_family,
+    merge_contact, names_person_at_company, needs_employment_corroboration, people_progress, people_target,
+    person_function, role_families, role_position, rank_contact_matches, target_roles, validate_contact,
 )
 from prospecting.db import Database
 from prospecting.models import (
@@ -28,10 +28,11 @@ from prospecting.providers.apollo import (
     people_search_request, enrichment_request, parse_search, parse_enrichment, person_id,
 )
 from prospecting.providers.tavily import (
-    SEARCH_CREDITS, TavilyExtractResponse, TavilySearchResponse, classify_tavily_error, contact_search_evidence,
-    contact_search_request, extract_credits, extract_request, parse_extract,
+    PROVIDER as TAVILY, SEARCH_CREDITS, SEARCH_OPERATION, TavilyExtractResponse, TavilySearchResponse,
+    classify_tavily_error, contact_search_evidence, contact_search_request, extract_credits, extract_request,
+    parse_extract,
 )
-from prospecting.sources import CONTACT_SEARCH_REFERENCE, is_non_business, url_host
+from prospecting.sources import CONTACT_SEARCH_REFERENCE, is_non_business, is_search_evidence, url_host, within_domain
 
 
 class ContactReport(Contract):
@@ -189,6 +190,15 @@ EXTRACT_KEY = "contacts:extract"
 ENRICHMENTS_KEY = "contacts:apollo_enrichments"
 # T16: Apollo no confirmó a esa persona (`<código>:<contact_id>`); su resultado queda procesado y no se repite.
 REJECTED_KEY = "contacts:apollo_rejected:"
+# T24: corroboración dirigida del empleo, con cupos propios separados de la búsqueda pública general.
+EMPLOYMENT_QUERIES_KEY = "contacts:employment_queries"  # búsquedas dirigidas de la empresa
+EMPLOYMENT_SEARCH_KEY = "contacts:employment_search:"  # <contact_id>: búsquedas que recibió la persona
+EMPLOYMENT_EXTRACT_KEY = "contacts:employment_extract"  # extracción única de la fase
+EMPLOYMENT_FRAGMENT_KEY = "contacts:employment_fragment:"  # <evidence_id>: fragmento nuevo de esa extracción
+EMPLOYMENT_EXTRACTED_KEY = "contacts:employment_extracted:"  # <contact_id>: persona enviada a Haiku por la fase
+EMPLOYMENT_REQUEST_KEY = "contacts:employment_request:"  # <request_id>: solicitud de la fase, para medir su coste
+EMPLOYMENT_PENDING_KEY = "contacts:employment_pending:"  # <código>:<contact_id>: motivo por el que no se corroboró
+EMPLOYMENT_SEARCH_LIMIT = "employment_search_limit"
 
 
 def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
@@ -370,8 +380,11 @@ class _ContactStage:
         raise BudgetError("duplicate_request", "La solicitud ya se repitió una vez; no se vuelve a enviar.", sent[-1].request_id)
 
     def perform(self, request, response_model, *, credits, count_key, cap, consumed,
-                parse, funding="free_credit", pages=0):
-        """Reserva, llama, valida y guarda el resultado en un checkpoint; respeta caché y cupos."""
+                parse, funding="free_credit", pages=0, extra_attempts=None, tag_key=None):
+        """Reserva, llama, valida y guarda el resultado en un checkpoint; respeta caché y cupos.
+
+        `extra_attempts` se guarda junto al contador cuando la solicitud sale; `tag_key` marca su id (T24).
+        """
         fingerprint = self.client.fingerprint(request)
         limits = self.campaign.limits
         days = limits.cache.web_days if request.provider == "tavily" else limits.cache.contact_days
@@ -387,8 +400,10 @@ class _ContactStage:
         usage = reserve_credits(self.budget, request, fingerprint, Decimal(credits), funding_source=funding,
                                 authorization=grant, retry_of=retry_of, **self.base)
         self.requests.append(usage.request_id)
-        self.checkpoint(attempts={f"{REQUEST_KEY}{usage.request_id}": 1})
+        tag = {} if tag_key is None else {f"{tag_key}{usage.request_id}": 1}
+        self.checkpoint(attempts={f"{REQUEST_KEY}{usage.request_id}": 1} | tag)
         attempts = {} if retry_of is not None else {count_key: self.run.attempts.get(count_key, 0) + 1}
+        attempts |= extra_attempts or {}
         if pages and retry_of is None:
             attempts[PAGES_KEY] = self.run.attempts.get(PAGES_KEY, 0) + pages
         try:
@@ -510,7 +525,8 @@ class _ContactStage:
             return self.finish("people_limit")
         try:
             for phase in (self._recover_pending, self._reuse_known_people, self._search_apollo,
-                          self._enrich_people, self._search_public, self._extract_public, self._reuse_known_people):
+                          self._enrich_people, self._search_public, self._extract_public,
+                          self._corroborate_employment, self._reuse_known_people):
                 report = phase()
                 if report is not None:
                     return report
@@ -600,8 +616,10 @@ class _ContactStage:
         if self.tavily_account_ref is None or stored_public or self.run.attempts.get(HAIKU_KEY, 0):
             return None
         # Primero las personas resueltas por Apollo; un apellido ofuscado nunca se usa como nombre completo.
-        queries = [f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.ranked_people()
-                   if item.name and item.name_complete is True and item.relevant_function is True]
+        # Con la corroboración de T24, cada persona se busca solo en su fase, con cupo propio.
+        queries = [] if campaign.config_snapshot.employment_corroboration is not None else [
+            f'"{item.name}" "{company.name}" {item.title or "cargo actual"}' for item in self.ranked_people()
+            if item.name and item.name_complete is True and item.relevant_function is True]
         queries += [f'"{company.name}" {" ".join(self.roles[:4])} equipo directorio {" ".join(campaign.countries)}']
         queries += [f'"{company.name}" equipo producto ingeniería marketing contacto profesional']
         for query in list(dict.fromkeys(queries))[:effort.web_queries]:
@@ -647,11 +665,12 @@ class _ContactStage:
         self._run_haiku(payload, supplied, people, sent={HAIKU_KEY: 1})
         return None
 
-    def _run_haiku(self, payload, supplied, people, *, sent):
+    def _run_haiku(self, payload, supplied, people, *, sent, tag_key=None, rejected=None):
         """Reserva, llama y valida una extracción de Haiku sobre los fragmentos `supplied`.
 
         `sent` son las claves que se guardan cuando la solicitud salió; si no llegó a enviarse, se retiran. Una
-        extracción ya procesada se reutiliza sin repetirla y una enviada sin resultado nunca se repite.
+        extracción ya procesada se reutiliza sin repetirla y una enviada sin resultado nunca se repite. Con
+        `rejected` (T24), un rechazo de los hechos queda procesado con las claves que devuelve y la etapa sigue.
         """
         claude, account, campaign = self.claude, self.claude_account_ref, self.campaign
         fingerprint = claude.fingerprint(payload, account)
@@ -664,6 +683,8 @@ class _ContactStage:
                                funding_source=self.claude_funding_source, authorization=grant, **self.base)
         self.requests.append(usage.request_id)
         attempts = sent | {f"{HAIKU_REQUEST_KEY}{usage.request_id}": 1}
+        if tag_key is not None:
+            attempts[f"{tag_key}{usage.request_id}"] = 1
         try:
             call = claude.create(usage.request_id, payload, account_ref=account, authorization=grant,
                                  remaining_seconds=seconds_left(self.deadline))
@@ -679,11 +700,135 @@ class _ContactStage:
             parsed = parse_contacts_output(call.text, call.stop_reason, self.company, self.assessment, campaign,
                                            supplied, utc_now(), usage.request_id, contacts=people)
             aggregates, facts = self.save_candidates(parsed)
-        except ContactError:
-            raise
+        except ContactError as error:
+            if rejected is None:
+                raise
+            self.warnings.append(f"Haiku no corroboró el empleo: {error.message}")
+            self.checkpoint(attempts={f"{PROCESSED_KEY}{fingerprint}": 1} | rejected(error))
+            return
         except (ValueError, TypeError):
             raise BudgetError("invalid_contact_output", "Haiku no devolvió hechos de contacto respaldados.", usage.request_id) from None
         self.checkpoint(attempts={f"{PROCESSED_KEY}{fingerprint}": 1}, aggregates=aggregates, facts=facts)
+
+    def _corroborate_employment(self):
+        """Busca una fuente pública dirigida para cada persona de Apollo cuyo empleo solo declara el proveedor (T24).
+
+        Va después de la extracción general, así que una persona ya nombrada por el directorio no se busca, y un
+        directorio vigente que no la nombra ya no lo impide. Cada persona recibe como máximo `searches_per_person`
+        búsquedas y la empresa `employment_queries`; una sola extracción lee hasta `employment_pages` URLs y Haiku
+        solo los fragmentos nuevos que nombran a la persona junto a la empresa. Sin la política, no hace nada.
+        """
+        policy = self.campaign.config_snapshot.employment_corroboration
+        if policy is None or not self.effort.employment_queries or self.tavily_account_ref is None:
+            return None
+        self._search_employment(policy)
+        self._extract_employment()
+        self._read_employment(policy)
+        return None
+
+    def employment_candidates(self):
+        """Personas en `provider_claim` corroborables, por pertinencia y diversidad (T16); sin descartes de v2."""
+        facts, now = self.facts(), utc_now()
+        return [person for person in self.ranked_people() if needs_employment_corroboration(
+            person, self.company, facts, self.campaign.limits, now) and not self.match_blocked(person, facts)]
+
+    def employment_request(self, contact):
+        return contact_search_request(f'"{contact.name}" "{self.company.name}" {contact.title}', self.tavily_account_ref)
+
+    def retryable(self, request) -> bool:
+        """Solicitud de esta campaña con un único fallo conciliado sin consumo: admite su reintento (T17)."""
+        try:
+            return self.retry_target(request, self.client.fingerprint(request)) is not None
+        except BudgetError:
+            return False
+
+    def _search_employment(self, policy):
+        cap = self.effort.employment_queries
+        for contact in self.employment_candidates():
+            key, request = f"{EMPLOYMENT_SEARCH_KEY}{contact.id}", self.employment_request(contact)
+            if self.run.attempts.get(key, 0) >= policy.searches_per_person and not self.retryable(request):
+                continue
+            if self.run.attempts.get(EMPLOYMENT_QUERIES_KEY, 0) >= cap and not self.retryable(request):
+                # Cupo de la empresa agotado: la persona queda pendiente con su motivo, sin buscarla.
+                self.checkpoint(attempts={f"{EMPLOYMENT_PENDING_KEY}{EMPLOYMENT_SEARCH_LIMIT}:{contact.id}": 1})
+                continue
+            self.perform(request, TavilySearchResponse, credits=SEARCH_CREDITS, count_key=EMPLOYMENT_QUERIES_KEY,
+                         cap=cap, consumed={"web_queries": 1}, extra_attempts={key: 1}, tag_key=EMPLOYMENT_REQUEST_KEY,
+                         parse=lambda data, request_id: ([], contact_search_evidence(self.company.id, data, request_id)))
+            if not self.run.attempts.get(key, 0):
+                # Resultado ya procesado en otra campaña Apollo dentro de la caché web: buscada, sin gasto nuevo.
+                self.checkpoint(attempts={key: 1})
+
+    def employment_hits(self, contact):
+        """Resultados vigentes de la búsqueda dirigida de la persona, de esta campaña o reutilizados de la caché."""
+        fingerprint = self.client.fingerprint(self.employment_request(contact))
+        ids = {row.request_id for row in self.db.list_usage(company_id=self.company.id, provider=TAVILY)
+               if (row.operation, row.request_fingerprint) == (SEARCH_OPERATION, fingerprint)}
+        prefixes = tuple(f"{CONTACT_SEARCH_REFERENCE}{id}:" for id in ids)
+        now, days = utc_now(), self.campaign.limits.cache.web_days
+        return [item for item in self.facts() if prefixes and item.url is not None
+                and (item.external_reference or "").startswith(prefixes)
+                and now - timedelta(days=days) <= item.retrieved_at <= now]
+
+    def _extract_employment(self):
+        """Una URL nueva por persona buscada, que la nombre junto a la empresa y preferiblemente del dominio, en un solo Extract."""
+        if self.run.attempts.get(EMPLOYMENT_EXTRACT_KEY, 0) or not self.effort.employment_pages:
+            return
+        company, facts = self.company, self.facts()
+        extracted = {str(item.url) for item in facts if item.url is not None and item.provider == TAVILY
+                     and not is_search_evidence(item)}
+        urls, names = [], []
+        for contact in self.employment_candidates():
+            if not self.run.attempts.get(f"{EMPLOYMENT_SEARCH_KEY}{contact.id}", 0):
+                continue
+            # El snippet debe nombrar a la persona junto a la empresa: un homónimo de otra empresa no gasta Extract.
+            hits = [str(item.url) for item in self.employment_hits(contact) if names_person_at_company(item, contact, company)
+                    and url_host(str(item.url)) is not None and not is_non_business(url_host(str(item.url)))
+                    and str(item.url) not in extracted and str(item.url) not in urls]
+            hits.sort(key=lambda url: company.domain is None or not within_domain(url_host(url), company.domain))
+            if hits:
+                urls.append(hits[0])
+                names.append(contact.name)
+        urls = urls[:self.effort.employment_pages]
+        if not urls:
+            return
+        request = extract_request(urls, f'{company.name}; {"; ".join(names[:len(urls)])}; cargo y empleo actual',
+                                  self.tavily_account_ref)
+
+        def parse(data, request_id):
+            fragments, failures = parse_extract(company, urls, data, request_id, utc_now())
+            self.warnings.extend(f"Tavily Extract: {reason}" for _, reason in failures)
+            # Los fragmentos se marcan en el mismo checkpoint que los guarda: Haiku solo leerá estos.
+            self.parsed_attempts |= {f"{EMPLOYMENT_FRAGMENT_KEY}{item.id}": 1 for item in fragments}
+            return [], fragments
+
+        self.perform(request, TavilyExtractResponse, credits=extract_credits(len(urls)), count_key=EMPLOYMENT_EXTRACT_KEY,
+                     cap=1, consumed={"pages": len(urls)}, tag_key=EMPLOYMENT_REQUEST_KEY, parse=parse)
+
+    def _read_employment(self, policy):
+        """Haiku lee los fragmentos nuevos en lotes de personas; un rechazo queda pendiente sin detener la etapa."""
+        if self.claude is None or self.claude_account_ref is None:
+            return
+        ids = {key[len(EMPLOYMENT_FRAGMENT_KEY):] for key in self.run.attempts if key.startswith(EMPLOYMENT_FRAGMENT_KEY)}
+        now, days, company, facts = utc_now(), self.campaign.limits.cache.web_days, self.company, self.facts()
+        fragments = [item for item in facts if str(item.id) in ids
+                     and now - timedelta(days=days) <= item.retrieved_at <= now]
+        people = [person for person in self.employment_candidates()
+                  if self.run.attempts.get(f"{EMPLOYMENT_SEARCH_KEY}{person.id}", 0)
+                  and not self.run.attempts.get(f"{EMPLOYMENT_EXTRACTED_KEY}{person.id}", 0)
+                  and any(names_person_at_company(item, person, company) for item in fragments)]
+        for start in range(0, len(people), policy.people_per_extraction):
+            batch = people[start:start + policy.people_per_extraction]
+            selected = [item for item in fragments if any(names_person_at_company(item, person, company) for person in batch)]
+            # Los cargos del prompt salen de la evidencia de la empresa; solo se envían los fragmentos nuevos.
+            payload, supplied = build_contacts_request(company, self.assessment, self.campaign, selected, batch,
+                                                       role_evidence=facts)
+            if not supplied:
+                continue
+            self._run_haiku(payload, supplied, batch, sent={f"{EMPLOYMENT_EXTRACTED_KEY}{person.id}": 1 for person in batch},
+                            tag_key=EMPLOYMENT_REQUEST_KEY,
+                            rejected=lambda error, batch=batch: {
+                                f"{EMPLOYMENT_PENDING_KEY}{error.code}:{person.id}": 1 for person in batch})
 
     def _enrich_people(self):
         """Resuelve candidatos pertinentes por ID antes de exigir nombre completo y empleo público.

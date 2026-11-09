@@ -654,6 +654,37 @@ def employment_status(contact: Contact, company: Company, evidence: list[Evidenc
     return _employment("unknown", origin, reason or "no_employment_evidence", failed)
 
 
+# T24: motivos de `provider_claim` que una fuente pública nueva puede resolver con una búsqueda dirigida.
+CORROBORATION_REASONS = frozenset({"provider_claim_only", "title_unconfirmed", "undated_source", "stale_source"})
+
+
+def needs_employment_corroboration(contact: Contact, company: Company, evidence: list[Evidence],
+                                   limits: CampaignLimits, now: datetime) -> bool:
+    """Persona de Apollo cuyo empleo solo declara el proveedor y que una búsqueda dirigida podría corroborar (T24).
+
+    Exige nombre completo sin ofuscar, cargo y función pertinente; nunca una identidad contradicha ni un
+    empleo terminado. No autoriza llamadas: la etapa de contactos aplica topes y presupuesto.
+    """
+    if (contact.name_complete is not True or not contact.name or "*" in contact.name or not contact.title
+            or contact.relevant_function is not True or contact.identity_status == IdentityStatus.CONTRADICTED
+            or contact.current_employment is False):
+        return False
+    status = employment_status(contact, company, evidence, limits, now)
+    return status.state == "provider_claim" and status.origin == "apollo" and status.reason in CORROBORATION_REASONS
+
+
+def names_person_at_company(fact: Evidence, contact: Contact, company: Company) -> bool:
+    """Fragmento que puede corroborar el empleo: nombra a la persona y es del dominio de la empresa o la nombra.
+
+    Barrera previa a Haiku contra homónimos de otras empresas (T24); no prueba el empleo por sí misma.
+    """
+    text = fact.excerpt or ""
+    if not contact.name or not mentions(text, contact.name):
+        return False
+    return _corporate(company, fact) or any(mentions(text, value) for value in (
+        company.name, company.entity_name, *(company.aliases or []), company.domain) if value)
+
+
 def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidence],
                       limits: CampaignLimits, now: datetime, company: Company) -> bool:
     if (channel.contact_id != contact.id or contact.company_id != company.id or
