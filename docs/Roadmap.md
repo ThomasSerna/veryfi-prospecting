@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 25 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T25 cerrado el 2026-11-09 y T22 y T23 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
+- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 25 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22 y T25 cerrados el 2026-11-09 y T23 abierto. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -31,7 +31,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T19 | [#20](https://github.com/ThomasSerna/veryfi-prospecting/issues/20) | Versionar contact_match_v2 y priorizar personas obtenidas con Apollo | Cerrado 2026-11-08 | P1 | Ranking/backend | T15, T18 |
 | T20 | [#21](https://github.com/ThomasSerna/veryfi-prospecting/issues/21) | Evaluar tres alternativas de interfaz para cuentas enterprise y contactos Apollo | Cerrado 2026-11-07 | P1 (paralelizable) | Evaluación UX/UI | T12 para definir estados de Apollo, T13 para escenarios enterprise |
 | T21 | [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22) | Validar el pipeline enterprise con Apollo frente a la línea base Hunter | Cerrado 2026-11-08 | P0 para cierre, ejecutar al final | QA/evaluación | T12, T13, T14, T15, T16, T17, T18 (T19 si aplica) |
-| T22 | [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23) | [SPIKE no funcional] Preparar comparación Snov.io vs Apollo sin llamadas reales | Abierto | P2 | Spike técnico/no funcional | T12, T16, T17, T18 y antecedentes técnicos de T21 |
+| T22 | [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23) | [SPIKE no funcional] Preparar comparación Snov.io vs Apollo sin llamadas reales | Cerrado 2026-11-09 | P2 | Spike técnico/no funcional | T12, T16, T17, T18 y antecedentes técnicos de T21 |
 | T23 | [#28](https://github.com/ThomasSerna/veryfi-prospecting/issues/28) | [SPIKE no funcional] Evaluar Snov.io frente a Apollo con una muestra real pareada | Abierto | P2 | Spike técnico/no funcional | T22, T12, T16, T17, T18 y antecedentes técnicos de T21 |
 | T24 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Cerrado 2026-11-08 | P1 | Revisión humana/backend e interfaz | T18 |
 | T25 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Cerrado 2026-11-09 | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
@@ -42,14 +42,13 @@ Las prioridades y los tipos solo existen en los issues T12 a T25. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T21, T24 y T25 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T22, T24 y T25 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Desbloqueada, posterior | T22 (P2) | Preparación en la rama experimental autorizada, exclusivamente con pruebas sintéticas y sin llamadas reales |
-| Pendiente | T23 (P2) | Depende de T22; la muestra real, el acceso, los precios y la autorización de cada proveedor siguen pendientes |
+| Preparación técnica lista; evaluación pendiente | T23 (P2) | T22 está cerrada; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
 
-T22 y T23 están abiertas. El cierre técnico de T21 no acredita una línea base real pareada para T23.
+T23 es la única tarea abierta. El cierre técnico de T21 no acredita una línea base real pareada para T23.
 
 ## Dependencias entre tareas
 
@@ -65,8 +64,8 @@ flowchart LR
     T19["T19 contact_match_v2 (cerrada)"]:::closed
     T20["T20 Alternativas de interfaz (cerrada)"]:::closed
     T21["T21 Validación enterprise (cerrada)"]:::closed
-    T22["T22 Preparación sin red de Snov.io"]:::ready
-    T23["T23 Evaluación real pareada"]:::blocked
+    T22["T22 Preparación sin red de Snov.io (cerrada)"]:::closed
+    T23["T23 Evaluación real pareada"]:::pending
     T24["T24 Confirmación manual del empleo (cerrada)"]:::closed
     T25["T25 Corroboración con Tavily (cerrada)"]:::closed
     T12 --> T13
@@ -93,11 +92,10 @@ flowchart LR
     T18 --> T25
     T16 --> T25
     classDef closed fill:#d4edda,stroke:#2e7d32
-    classDef ready fill:#fff3cd,stroke:#b8860b
-    classDef blocked fill:#e2e3e5,stroke:#6c757d
+    classDef pending fill:#e2e3e5,stroke:#6c757d
 ```
 
-Verde: cerrada. Amarillo: lista para empezar. Gris: pendiente de otra tarea. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). Las tareas abiertas dependen de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
+Verde: cerrada. Gris: pendiente de muestra, acceso y autorización. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
 
 ## Copia del backlog
 
@@ -433,12 +431,14 @@ Hoy `_search_public` (`prospecting/pipeline/contacts.py`) no se ejecuta si ya ha
 
 **Identificador histórico:** esta tarea se denominó T24 al implementarse; su número de issue permanece #25.
 
-### Exploración (T22, abierta)
+<a id="exploración-t22-abierta"></a>
+
+### Exploración (T22 cerrada y T23 abierta)
 
 #### T22 · [SPIKE no funcional] Preparar comparación Snov.io vs Apollo sin llamadas reales
 
 - **Issue:** [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P2
 - **Dependencias:** T12, T16, T17, T18 y antecedentes técnicos de T21
 - **Tipo:** Spike técnico/no funcional
@@ -472,6 +472,12 @@ Como equipo técnico de Veryfi Prospecting, queremos preparar una comparación a
 - La metodología especifica misma muestra, cargos y evidencia empresarial, así como fuentes y fechas de cada proveedor, reglas de verificación y denominadores de las métricas.
 - La documentación identifica lo que está verificado sin red y lo que queda pendiente para [T23 (#28)](https://github.com/ThomasSerna/veryfi-prospecting/issues/28); no presenta resultados reales ni una decisión de proveedor.
 - No se hicieron llamadas reales a Snov, Apollo u otros proveedores; no se enviaron mensajes ni se expusieron secretos o datos personales.
+
+**Evidencia de cierre**
+
+- Preparación en la rama **local** `experiment/snov-benchmark`, con implementación y guía hasta el commit `f803775`. La rama no se ha publicado ni fusionado a `main`.
+- Verificación offline con fixtures sintéticos: suite completa de **1544 pruebas aprobadas** (331 s) y suite dedicada final de **83 pruebas aprobadas**. Son ejecuciones distintas y sus conteos no se suman.
+- No se hicieron llamadas reales a proveedores. El acceso, la muestra pareada, los costos reales y la evaluación comparativa quedan pendientes en [T23 (#28)](https://github.com/ThomasSerna/veryfi-prospecting/issues/28).
 
 #### T23 · [SPIKE no funcional] Evaluar Snov.io frente a Apollo con una muestra real pareada
 
@@ -586,8 +592,8 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
 - **T19:** cerrada el 2026-11-08. Las campañas nuevas guardan `contact_match_v2` desde `config/contact_match_v2.json`; las anteriores conservan `contact_match_v1` y `config/contact_match.json`. El cálculo y su estado de validación están en [contacts.md](contacts.md#porcentaje-de-match).
 - **T20:** cerrada en el tracker el 2026-11-07. Solo UX/UI; no cambió backend, puntuación ni proveedores. Contexto visual en `DESIGN.md` y [ui.md](ui.md).
 - **T21:** el protocolo y los formatos de evaluación están en [t10-evaluation.md](t10-evaluation.md); la línea base, en [evaluation.md](evaluation.md) y [delivery.md](delivery.md) (0 personas listas). La preparación y sus límites están en [t21-evaluation.md](t21-evaluation.md). El lote con `rubric_v2` espera la condición de T14; las llamadas nuevas requieren cupos verificados y autorización explícita. Cerrada en el tracker el 2026-11-08 como completada, con las casillas de los criterios sin marcar en el issue.
-- **T22:** el usuario autorizó la rama aislada `experiment/snov-benchmark` el 2026-11-09. La preparación usa fixtures y transporte simulado; no se agregan configuración ni dependencias Snov a `main` y no se hacen llamadas reales.
-- **T23:** evaluación posterior de la ruta de contactos, pendiente de T22, muestra comparable, acceso y autorización por proveedor, operación y tope. La preparación offline de T21 no constituye una línea base real pareada.
+- **T22:** cerrada el 2026-11-09. El código y la guía están en la rama local `experiment/snov-benchmark`, hasta el commit `f803775`, sin publicar ni fusionar a `main`. Las verificaciones usaron fixtures y transporte simulado; no se hicieron llamadas reales.
+- **T23:** la preparación técnica de T22 está lista. La evaluación de la ruta de contactos sigue pendiente de muestra comparable, acceso y autorización por proveedor, operación y tope. La preparación offline de T21 no constituye una línea base real pareada.
 - **T24 (antes T23):** implementada en `main` el 2026-11-08 sin llamadas a proveedores. Decisiones aprobadas por el usuario ese día:
   - la confirmación manual cuenta como `corporate_evidence` con `basis="manual"` y habilita listo;
   - la fuente consultada es una URL http(s) obligatoria;
