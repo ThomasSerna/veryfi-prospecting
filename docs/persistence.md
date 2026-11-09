@@ -122,6 +122,19 @@ recalculado del `RunItem` en una sola transacción. Si falla una escritura, se r
 todo. Se conservan las fuentes, advertencias y verificaciones negativas; la
 confirmación no demuestra identidad ni empleo por sí sola.
 
+Confirmar manualmente el empleo (T23) guarda en una sola transacción:
+
+- una nueva `Evidence` con `source_type="manual"`, `provider="manual_review"`, la URL
+  consultada por ventas en `url`, la fecha en `retrieved_at`, el motivo en `claim` y
+  persona, cargo y entidad en `excerpt`;
+- su id añadido a `employment_evidence_ids` y, si se eligió otro cargo ya citado, ese
+  `title`;
+- el `business_status` recalculado del `RunItem`.
+
+No cambia el esquema ni reescribe fuentes, contradicciones, `identity_status`,
+`current_employment` ni datos del proveedor. Su vigencia y la resolución de un cambio de cargo
+se calculan al leer ([Personas y canales](contacts.md#confirmación-manual-del-empleo-t23)).
+
 `data/provider-access.json` contiene `ProviderAccess`: cupos iniciales comprobados
 y referencias de acceso. No contiene claves ni permisos. Cada ejecución crea
 autorizaciones frescas después de abrir `Budget`; el consumo permanece en `Usage`
@@ -208,6 +221,11 @@ identificadores sin reescribir el ledger anterior:
   la fuente original. La variante no Apollo usa el prefijo `public_extraction_v2`.
   Este sufijo solo identifica el nuevo hecho de responsabilidad; las demás
   referencias históricas mantienen su formato.
+- Confirmación manual del empleo (T23): `external_reference` con el formato
+  `manual-employment:<campaign_id>:<contact_id>:<fecha ISO>` y `provider="manual_review"`.
+  `claim` empieza por `Empleo vigente confirmado manualmente por ventas, sin enviar mensajes,
+  llamadas ni invitaciones. Motivo: ` seguido del motivo. Las reglas reconocen la confirmación
+  y leen su motivo con estos valores.
 - Fallos conciliados sin consumo (T17): una fila `RECONCILED`, `failed` y con créditos,
   costo y desembolso en cero admite un único reintento con `retry_of` en otra ejecución;
   la decisión se toma de esos valores persistidos, nunca del texto del error.

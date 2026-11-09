@@ -261,6 +261,22 @@ comprobado y añade notas de verificación. El pipeline guarda evidencia
 manual, fecha y disponibilidad recalculada en una sola transacción. Una URL de perfil
 por sí sola no basta; la confirmación tampoco elimina una verificación negativa.
 
+«Confirmar empleo vigente» (T23) aparece en la tarjeta de las personas que la lectura declara
+confirmables, es decir, las que tienen `employment_titles`
+([Confirmación manual del empleo](contacts.md#confirmación-manual-del-empleo-t23)). El formulario
+pide:
+
+- la URL de la fuente consultada;
+- el motivo;
+- la casilla «Comprobé el empleo vigente en esa fuente sin enviar mensajes, llamar ni enviar invitaciones»;
+- con un cambio de cargo, cuál de los cargos ya citados es el vigente.
+
+Un dato inválido devuelve la ficha con el error y sin cambios; un cargo no citado o una
+persona ajena se rechazan. Al confirmar, el aviso de la tarjeta y la fila «Vigencia del
+empleo» muestran «Confirmado manualmente por ventas» con la fecha, el vencimiento, el motivo
+y el enlace a la fuente. La identidad guardada sigue indicando sus contradicciones. El
+formulario se bloquea durante una ejecución y no existe en campañas históricas.
+
 ## Exportación CSV
 
 La descarga principal incluye personas actualmente listas con canales utilizables
@@ -278,7 +294,11 @@ score y cobertura, criterios, canales, fuentes con fechas, revisión, advertenci
 motivos. También incluye el porcentaje de match de cada persona, su versión, el motivo
 de descarte y el desglose; las filas de cada empresa siguen ese orden. Las columnas
 `employment_status` y `employment_reason` llevan el estado y el motivo de la vigencia
-del empleo, recalculados al descargar. `function_id` lleva la función del cargo y
+del empleo, recalculados al descargar. Con una confirmación manual vigente (T23),
+`employment_basis` vale `manual` y `employment_confirmed_at`,
+`employment_confirmation_reason` y `employment_confirmation_source` llevan su fecha, motivo y
+URL. Con evidencia pública vale `source`, y sin vigencia comprobada queda vacía.
+`function_id` lleva la función del cargo y
 `people_functions` la lista JSON de funciones representadas por personas pertinentes.
 `person_stage` lleva la etapa de la persona;
 `people_candidates`, `people_relevant`, `people_ready`, `people_target` y
@@ -295,7 +315,9 @@ Las pruebas de la interfaz, revisión, confirmación y CSV usan proveedores simu
 y SQLite temporal, sin red. Los dos lotes reales de la T09 se ejecutaron desde la interfaz
 y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluation.md)).
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
-canales solo se han verificado con datos sintéticos.
+canales solo se han verificado con datos sintéticos. La confirmación manual del empleo (T23)
+se verificó con pruebas sin red y en el navegador local sobre una base temporal
+exclusivamente sintética; no se ha usado con personas reales.
 
 ## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 

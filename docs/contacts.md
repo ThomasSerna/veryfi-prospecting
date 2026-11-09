@@ -253,6 +253,41 @@ contradicción se revisa en ambos sentidos: el hecho que contradice y el que es
 contradicho. Las páginas corporativas y directorios que localiza Tavily en la
 etapa de contactos son la vía de corroboración; T18 no añade llamadas ni proveedores.
 
+### Confirmación manual del empleo (T23)
+
+Ventas puede confirmar desde la ficha el empleo vigente de una persona, sin enviar mensajes,
+llamadas ni invitaciones. `employment_confirmation_titles` decide a quién se le ofrece y con
+qué cargos: personas de Apollo enriquecidas, con nombre completo sin `*` y sin
+`current_employment=False`, en `provider_claim` de Apollo (se confirma el cargo actual) o en
+`title_changed` (se elige uno de los cargos ya citados en sus fuentes de título, de Apollo o
+de la extracción pública). Quedan fuera `employment_ended`, `contradicted_source`, `unknown`,
+quien ya tiene `corporate_evidence` y las campañas históricas. `read_campaign` lo publica en
+`ContactResult.employment_titles`, vacío con exclusión confirmada o ambigua o sin evaluación.
+
+`confirm_current_employment` exige aceptación explícita, un motivo y una URL http(s). En una
+sola transacción guarda una `Evidence` `manual` (`manual_employment_evidence`) y añade su id a
+`employment_evidence_ids`; en `title_changed` guarda además el cargo elegido como `title`. Sin
+taxonomía, también recalcula la pertinencia de ese cargo. Por último guarda el
+`business_status` recalculado. No toca `identity_status`, `current_employment`, las fuentes,
+sus `contradiction_ids` ni los datos de Apollo. Un fallo revierte todo, y el candado de
+ejecución la bloquea mientras corre una campaña.
+
+`employment_status` acepta la confirmación cuando es la más reciente de la persona, está
+citada, no es futura, tiene menos de `cache.contact_days` días y su fragmento nombra a la
+persona y su cargo actual. El resultado es `corporate_evidence` con `basis="manual"` y
+`confirmed_at`, `confirmation_expires_at`, `confirmation_reason` y `confirmation_source`; la
+evidencia pública vigente se muestra con `basis="source"`. `resolve_manual_employment` aplica al
+leer, sin guardarla, una proyección que usan `employment_status`, `validate_contact`,
+`person_stage`, `contact_match` y `matched_role_family`:
+
+- quita de las copias los enlaces de contradicción hacia las fuentes de cargo de la persona
+  observadas hasta la confirmación;
+- si eso resolvió una contradicción, lee la identidad como confirmada.
+
+Los controles de gasto siguen leyendo la identidad guardada. Al vencer, la persona se lee igual
+que sin la confirmación. Una salida nominal, `current_employment=False` o una contradicción de
+cargo observada después la anulan. Si el cargo guardado cambia, deja de aplicar.
+
 La vigencia inferida de Hunter se conserva solo para leer registros históricos:
 correo nominal del dominio confirmado verificado `valid` dentro de `email_days` y
 una fuente de Hunter con `still_on_page=True` y `last_seen_on` dentro de
