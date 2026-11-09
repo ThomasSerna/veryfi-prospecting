@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-08 (America/Bogota). Instantánea de los 24 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17 y T19 cerrados el 2026-11-08 y T21 a T24 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
+- **Fecha de corte:** 2026-11-08 (America/Bogota). Instantánea de los 24 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19 y T21 cerrados el 2026-11-08 y T22 a T24 abiertos. El [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12) es un PR fusionado (rediseño visual de la interfaz), no una tarea.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -30,7 +30,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T18 | [#19](https://github.com/ThomasSerna/veryfi-prospecting/issues/19) | Verificar empleo vigente y canales profesionales de contactos Apollo | Cerrado 2026-11-07 | P0 | Calidad de datos/backend | T12, T15 |
 | T19 | [#20](https://github.com/ThomasSerna/veryfi-prospecting/issues/20) | Versionar contact_match_v2 y priorizar personas obtenidas con Apollo | Cerrado 2026-11-08 | P1 | Ranking/backend | T15, T18 |
 | T20 | [#21](https://github.com/ThomasSerna/veryfi-prospecting/issues/21) | Evaluar tres alternativas de interfaz para cuentas enterprise y contactos Apollo | Cerrado 2026-11-07 | P1 (paralelizable) | Evaluación UX/UI | T12 para definir estados de Apollo, T13 para escenarios enterprise |
-| T21 | [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22) | Validar el pipeline enterprise con Apollo frente a la línea base Hunter | Abierto | P0 para cierre, ejecutar al final | QA/evaluación | T12, T13, T14, T15, T16, T17, T18 (T19 si aplica) |
+| T21 | [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22) | Validar el pipeline enterprise con Apollo frente a la línea base Hunter | Cerrado 2026-11-08 | P0 para cierre, ejecutar al final | QA/evaluación | T12, T13, T14, T15, T16, T17, T18 (T19 si aplica) |
 | T22 | [#23](https://github.com/ThomasSerna/veryfi-prospecting/issues/23) | [SPIKE no funcional] Evaluar Snov.io vs Apollo en rama experimental aislada | Abierto | P2 (posterior a migración y baseline) | Spike técnico/no funcional | T12, T17, T16, T18 y T21 |
 | T23 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Abierto | P1 | Revisión humana/backend e interfaz | T18 |
 | T24 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Abierto | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
@@ -39,15 +39,14 @@ Las prioridades y los tipos solo existen en los issues T12 a T24. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T20 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T21 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
 | Listas para empezar | T23 (P1) y T24 (P1) | Sus dependencias están cerradas. T23 permite confirmar el empleo a mano; T24 corrobora con Tavily el empleo de personas de Apollo dentro de la política de esfuerzo de T16 |
-| Preparación sin red | T21 (P0 para cierre) | Sus dependencias están cerradas; el lote con `rubric_v2` espera el cumplimiento de la condición de T14 y autorización de gasto. Parte de los lotes reales de T17 ([provider-check.md](provider-check.md#lotes-reales-de-apollo-de-la-t17)) |
-| Bloqueada | T22 (espera T21) | Dependencia abierta |
+| Desbloqueada, posterior | T22 (P2) | Sus dependencias están cerradas; requiere autorizar la rama `experiment/snov-benchmark` y comprobar acceso y precio antes de cualquier llamada |
 
-T23 y T24 están listas para comenzar. T21 permanece abierta durante la preparación y la evaluación; T22 espera su cierre.
+T23 y T24 están listas para comenzar; T22 queda desbloqueada con prioridad posterior.
 
 ## Dependencias entre tareas
 
@@ -62,8 +61,8 @@ flowchart LR
     T18["T18 Empleo vigente y canales (cerrada)"]:::closed
     T19["T19 contact_match_v2 (cerrada)"]:::closed
     T20["T20 Alternativas de interfaz (cerrada)"]:::closed
-    T21["T21 Validación enterprise"]:::ready
-    T22["T22 Spike Snov.io"]
+    T21["T21 Validación enterprise (cerrada)"]:::closed
+    T22["T22 Spike Snov.io"]:::ready
     T23["T23 Confirmación manual del empleo"]:::ready
     T24["T24 Corroboración con Tavily"]:::ready
     T12 --> T13
@@ -98,7 +97,7 @@ Verde: cerrada. Amarillo: lista para empezar. La línea punteada marca una depen
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
 
-### Enterprise sobre Apollo (T13 a T20 cerradas; T21 abierta)
+### Enterprise sobre Apollo (T13 a T21 cerradas)
 
 #### T13 · Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes
 
@@ -331,7 +330,7 @@ Como usuario comercial de Veryfi, quiero evaluar distintas interfaces para revis
 #### T21 · Validar el pipeline enterprise con Apollo frente a la línea base Hunter
 
 - **Issue:** [#22](https://github.com/ThomasSerna/veryfi-prospecting/issues/22)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-08
 - **Prioridad:** P0 para cierre, ejecutar al final
 - **Dependencias:** T12, T13, T14, T15, T16, T17, T18 (T19 si aplica)
 - **Tipo:** QA/evaluación
@@ -541,7 +540,7 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
 - **T18:** cerrada; implementada en `main` el 2026-11-07: `employment_status` en `prospecting/contacts.py` sustituye a `hunter_signal` en las reglas activas y el estado se calcula al leer, sin persistirse ([contacts.md](contacts.md#vigencia-del-empleo-t18)). Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo). Issue cerrado el 2026-11-07.
 - **T19:** cerrada el 2026-11-08. Las campañas nuevas guardan `contact_match_v2` desde `config/contact_match_v2.json`; las anteriores conservan `contact_match_v1` y `config/contact_match.json`. El cálculo y su estado de validación están en [contacts.md](contacts.md#porcentaje-de-match).
 - **T20:** cerrada en el tracker el 2026-11-07. Solo UX/UI; no cambió backend, puntuación ni proveedores. Contexto visual en `DESIGN.md` y [ui.md](ui.md).
-- **T21:** el protocolo y los formatos de evaluación están en [t10-evaluation.md](t10-evaluation.md); la línea base, en [evaluation.md](evaluation.md) y [delivery.md](delivery.md) (0 personas listas). La preparación y sus límites están en [t21-evaluation.md](t21-evaluation.md). El lote con `rubric_v2` espera la condición de T14; las llamadas nuevas requieren cupos verificados y autorización explícita.
+- **T21:** el protocolo y los formatos de evaluación están en [t10-evaluation.md](t10-evaluation.md); la línea base, en [evaluation.md](evaluation.md) y [delivery.md](delivery.md) (0 personas listas). La preparación y sus límites están en [t21-evaluation.md](t21-evaluation.md). El lote con `rubric_v2` espera la condición de T14; las llamadas nuevas requieren cupos verificados y autorización explícita. Cerrada en el tracker el 2026-11-08 como completada, con las casillas de los criterios sin marcar en el issue.
 - **T22:** el issue planea la rama `experiment/snov-benchmark`, pero `AGENTS.md` indica trabajar en `main`: pedir autorización al responsable antes de crearla. No se agrega `SNOV_API_KEY` ni dependencias a `main`.
 - **T23:** seguir el patrón de `confirm_alternative_channel` en `prospecting/pipeline/contacts.py`. Que la confirmación manual habilite listo cambia «Vigencia del empleo» en [Business-rules.md](Business-rules.md#vigencia-del-empleo) y requiere aprobación.
 - **T24:** cambia el esfuerzo y el gasto de la etapa de contactos (`_search_public`): requiere aprobación de presupuesto ([Budget-policy.md](Budget-policy.md)) y coordinarse con T16. Las llamadas reales requieren autorización explícita.
