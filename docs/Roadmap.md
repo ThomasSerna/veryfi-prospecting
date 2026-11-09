@@ -43,7 +43,7 @@ Derivado de las dependencias y prioridades del tracker. Con T12 a T21 y T23 cerr
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| En curso | T24 (P1) | Implementada en `main` el 2026-11-08; lote real ejecutado el 2026-11-09; faltan la conciliación y el cierre en el tracker |
+| En curso | T24 (P1) | Implementada en `main` el 2026-11-08; lote real ejecutado y conciliado (Apollo y Tavily) el 2026-11-09; faltan Haiku y el cierre en el tracker |
 | Desbloqueada, posterior | T22 (P2) | Sus dependencias están cerradas; requiere autorizar la rama `experiment/snov-benchmark` y comprobar acceso y precio antes de cualquier llamada |
 
 T24 está en curso; T22 queda desbloqueada con prioridad posterior.
@@ -553,7 +553,7 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
   - 1 búsqueda por persona (media hasta 3, alta hasta 5), una sola extracción y Haiku en lotes de 3 personas;
   - en las campañas con la política, las búsquedas por persona salen de `_search_public` y van a su propia fase.
 
-  El cálculo está en [contacts.md](contacts.md#corroboración-dirigida-del-empleo-t24), las reglas en [Business-rules.md](Business-rules.md#esfuerzo-de-búsqueda-y-parada) y las claves en [persistence.md](persistence.md#identificadores-persistidos). El lote real autorizado se ejecutó el 2026-11-09 ([provider-check.md](provider-check.md#lote-real-de-la-t24)): 3 personas buscadas y 0 corroboradas, porque Tavily Extract no devolvió el texto de las páginas encontradas. Expuso un bloqueo previo (un rechazo de la extracción general dejaba la empresa pendiente), corregido ese día. Quedan la conciliación con los paneles y el cierre en el tracker.
+  El cálculo está en [contacts.md](contacts.md#corroboración-dirigida-del-empleo-t24), las reglas en [Business-rules.md](Business-rules.md#esfuerzo-de-búsqueda-y-parada) y las claves en [persistence.md](persistence.md#identificadores-persistidos). El lote real autorizado se ejecutó el 2026-11-09 ([provider-check.md](provider-check.md#lote-real-de-la-t24)): 3 personas buscadas y 0 corroboradas, porque Tavily Extract no devolvió el texto de las páginas encontradas. Expuso un bloqueo previo (un rechazo de la extracción general dejaba la empresa pendiente), corregido ese día. Apollo y Tavily quedaron conciliados con sus paneles; quedan la conciliación de Haiku y el cierre en el tracker.
 
 ## Responsables por módulo
 
