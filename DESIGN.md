@@ -250,20 +250,20 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
-Las transiciones respetan `prefers-reduced-motion`, y el movimiento posicional se
-desactiva en dispositivos táctiles. Las animaciones deben comprobarse en el
-navegador: el resultado debe transmitir una experiencia interactiva refinada sin
-distraer del trabajo comercial.
+Las transiciones respetan `prefers-reduced-motion`. Se desactivan las respuestas
+al movimiento del puntero táctil; el fondo de Resumen puede animarse en estos
+dispositivos. Las animaciones deben comprobarse en el navegador: el resultado debe
+transmitir una experiencia interactiva refinada sin distraer del trabajo comercial.
 
 En Resumen, incluso sin campañas, un lienzo WebGL local aporta círculos suaves
 verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
-(consultado el 9 de noviembre de 2026). Tiene opacidad 0,28, velocidad del 40 %
+(consultado el 9 de noviembre de 2026). Tiene opacidad 0,55, velocidad del 100 %
 de la referencia y resolución del área visible dividida por 15 y redondeada; el
 dibujo se limita a 30 fotogramas por segundo. El lienzo queda fuera de la región
 del sondeo. La animación se pausa si la página está oculta o el panel de Resumen
-sale de la vista y queda estática con movimiento reducido o en dispositivos
-táctiles. Con colores forzados o si falla WebGL se conserva el fondo habitual.
-El fondo no descarga recursos externos ni añade dependencias.
+sale de la vista y queda estática con movimiento reducido. Con colores forzados o
+si falla WebGL se conserva el fondo habitual. El fondo no descarga recursos
+externos ni añade dependencias.
 
 En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
 cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
@@ -277,7 +277,7 @@ funden o cambian de color.
 ## Do's and Don'ts
 
 - **Do** acompañar cada estado con texto además del color.
-- **Do** mantener el movimiento dentro de `prefers-reduced-motion` y, en táctil, sin desplazamiento posicional.
+- **Do** respetar `prefers-reduced-motion` y reservar las respuestas al puntero para dispositivos con puntero fino que detecten el paso del cursor.
 - **Do** preferir en las vistas de trabajo una cifra, una barra o un icono con su etiqueta breve antes que una frase explicativa.
 - **Don't** usar `|safe` ni `mark_safe` en contenido externo; el autoescape de Django se conserva.
 - **Don't** usar el color como único indicador de estado.
