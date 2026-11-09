@@ -255,6 +255,16 @@ desactiva en dispositivos táctiles. Las animaciones deben comprobarse en el
 navegador: el resultado debe transmitir una experiencia interactiva refinada sin
 distraer del trabajo comercial.
 
+En Resumen, incluso sin campañas, un lienzo WebGL local aporta círculos suaves
+verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
+(consultado el 9 de noviembre de 2026). Tiene opacidad 0,28, velocidad del 40 %
+de la referencia y resolución del área visible dividida por 15 y redondeada; el
+dibujo se limita a 30 fotogramas por segundo. El lienzo queda fuera de la región
+del sondeo. La animación se pausa si la página está oculta o el panel de Resumen
+sale de la vista y queda estática con movimiento reducido o en dispositivos
+táctiles. Con colores forzados o si falla WebGL se conserva el fondo habitual.
+El fondo no descarga recursos externos ni añade dependencias.
+
 En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
 cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
 durante el sondeo, solo se animan las diferencias. Una empresa nueva sube a su
