@@ -4,6 +4,7 @@ import csv
 from io import StringIO
 import json
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -71,7 +72,9 @@ def scenario(case, role_config, titles, *, priority="medium", directory=True, hi
                                content=[SimpleNamespace(type="text", text=json.dumps({"candidates": candidates}))])
 
     case.replies |= {"search": search, "extract": extract}
-    sdk = SimpleNamespace(with_options=lambda **kwargs: SimpleNamespace(messages=SimpleNamespace(create=model_reply)))
+    case.model_reply = model_reply
+    sdk = SimpleNamespace(with_options=lambda **kwargs: SimpleNamespace(
+        messages=SimpleNamespace(create=lambda **payload: case.model_reply(**payload))))
     case.claude = ClaudeClient(case.budget, sdk_client=sdk)
     case.public = case.public | {"claude": case.claude}
     return case
@@ -373,3 +376,65 @@ def test_summary_without_corroborations_leaves_the_cost_undefined(contact_case, 
     summary = employment_corroboration_summary(tmp_path / "synthetic.sqlite3", case.campaign.id)
     assert (summary.people_searched, summary.people_corroborated, summary.tavily_requests) == (1, 0, 1)
     assert summary.credits_per_corroboration is None and summary.haiku_usd_per_corroboration is None
+
+
+def reject_general_extraction(case):
+    """La extracción general no cumple el contrato de hechos citados; las siguientes responden normalmente."""
+    answer = case.model_reply
+
+    def reply(**payload):
+        if case.model_calls:
+            return answer(**payload)
+        case.model_calls.append(payload)
+        text = json.dumps({"candidates": [{"contact_id": str(uuid4()), "name": "Persona Inexistente", "facts": []}]})
+        return SimpleNamespace(id="mensaje-sintetico", model=payload["model"], stop_reason="end_turn",
+                               usage=SimpleNamespace(input_tokens=500, output_tokens=100),
+                               content=[SimpleNamespace(type="text", text=text)])
+
+    case.model_reply = reply
+
+
+def test_rejected_general_extraction_is_processed_and_the_corroboration_continues(contact_case, role_config):
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
+                                              f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
+    reject_general_extraction(case)
+    report = case.find(**case.public)
+    assert report.status == "checked" and attempts(case)["contacts:haiku_rejected:invalid_output"] == 1
+    assert len(targeted(case)) == 1 and len(case.model_calls) == 2
+    assert person(case, "Persona Sintética Uno")[1].state == "corporate_evidence"
+
+
+def test_rejection_saved_before_the_fix_is_recovered_without_repeating_haiku(contact_case, role_config, monkeypatch):
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
+                                              f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
+    reject_general_extraction(case)
+    run_haiku = stage_module._ContactStage._run_haiku
+
+    def before_fix(self, *args, rejected=None, **kwargs):
+        return run_haiku(self, *args, **kwargs)
+
+    # Conducta anterior: el rechazo deja la empresa pendiente y la extracción sin marcar como procesada.
+    monkeypatch.setattr(stage_module._ContactStage, "_run_haiku", before_fix)
+    report = case.find(**case.public)
+    assert (report.status, report.stop_reason) == ("pending", "invalid_output") and targeted(case) == []
+    monkeypatch.setattr(stage_module._ContactStage, "_run_haiku", run_haiku)
+    report = case.find(**case.public)
+    assert report.status == "checked" and attempts(case)["contacts:haiku_rejected:invalid_output"] == 1
+    assert len(targeted(case)) == 1 and len(case.model_calls) == 2
+
+
+def test_a_sent_extraction_without_result_still_blocks_the_stage(contact_case, role_config, monkeypatch):
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.find(**case.public)
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    stage = stage_module._ContactStage.__new__(stage_module._ContactStage)
+    stage.campaign, stage.run = case.campaign, run.model_copy(update={"stop_reason": "request_uncertain"})
+    [usage] = [row for row in case.db.list_usage(company_id=case.company.id, provider="anthropic")][:1]
+    assert not stage.rejected_before_fix(usage)
+    stage.run = run.model_copy(update={"stop_reason": "nominal_association"})
+    assert stage.rejected_before_fix(usage)
+    stage.campaign = case.campaign.model_copy(update={"config_snapshot": role_config.model_copy(
+        update={"employment_corroboration": None})})
+    assert not stage.rejected_before_fix(usage)

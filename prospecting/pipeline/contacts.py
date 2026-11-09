@@ -199,6 +199,14 @@ EMPLOYMENT_EXTRACTED_KEY = "contacts:employment_extracted:"  # <contact_id>: per
 EMPLOYMENT_REQUEST_KEY = "contacts:employment_request:"  # <request_id>: solicitud de la fase, para medir su coste
 EMPLOYMENT_PENDING_KEY = "contacts:employment_pending:"  # <código>:<contact_id>: motivo por el que no se corroboró
 EMPLOYMENT_SEARCH_LIMIT = "employment_search_limit"
+# T24: la extracción general rechazada (`<código>`) queda procesada en campañas con la política; la etapa sigue.
+HAIKU_REJECTED_KEY = "contacts:haiku_rejected:"
+# Códigos de `parse_contacts_output` y de la parada de Haiku: la respuesta llegó y Python la rechazó.
+HAIKU_REJECTION_CODES = frozenset({
+    "refusal", "max_tokens", "invalid_output", "unknown_contact", "identity_mismatch", "ambiguous_identity",
+    "duplicate_fact", "unknown_evidence", "unsupported_quote", "nominal_association", "partial_name",
+    "entity_mismatch", "date_mismatch", "invalid_channel", "unsafe_url",
+})
 
 
 def employment_corroboration(attempts: dict, contact: Contact, employment, evidence: list[Evidence]) -> str | None:
@@ -578,9 +586,25 @@ class _ContactStage:
             if key.startswith(HAIKU_REQUEST_KEY):
                 prior = self.db.get_usage(UUID(key.split(":")[-1]))
                 if prior is not None and not run.attempts.get(f"{PROCESSED_KEY}{prior.request_fingerprint}", 0):
+                    if self.rejected_before_fix(prior):
+                        # Rechazo guardado antes de T24: la respuesta llegó y Python la rechazó; queda procesado.
+                        self.checkpoint(attempts={f"{PROCESSED_KEY}{prior.request_fingerprint}": 1,
+                                                  f"{HAIKU_REJECTED_KEY}{run.stop_reason}": 1})
+                        continue
                     return self.finish(_blocked_reason(prior), status="pending",
                                        message=run.error_message or "La extracción enviada no tiene un resultado validado persistido.")
         return None
+
+    def rejected_before_fix(self, usage) -> bool:
+        """Extracción general que llegó con éxito y cuyos hechos Python rechazó, guardada como parada pendiente.
+
+        Solo en campañas con `employment_corroboration_v1`: el motivo guardado es el código del rechazo, y una
+        llamada sin resultado (timeout, caída antes del checkpoint) nunca guarda uno de esos códigos.
+        """
+        return (self.campaign.config_snapshot.employment_corroboration is not None
+                and usage.provider == CLAUDE_PROVIDER and usage.outcome == "succeeded"
+                and usage.status in (UsageStatus.SUCCEEDED, UsageStatus.RECONCILED)
+                and self.run.stop_reason in HAIKU_REJECTION_CODES)
 
     def _reuse_known_people(self):
         """Las personas válidas ocupan su cupo; sin política, un canal preferido ya guardado termina la etapa."""
@@ -682,7 +706,10 @@ class _ContactStage:
         payload, supplied = build_contacts_request(self.company, self.assessment, campaign, public, people)
         if not supplied:
             return None
-        self._run_haiku(payload, supplied, people, sent={HAIKU_KEY: 1})
+        # Con T24, un rechazo de los hechos queda procesado con su código y la corroboración sigue después.
+        rejected = None if campaign.config_snapshot.employment_corroboration is None else (
+            lambda error: {f"{HAIKU_REJECTED_KEY}{error.code}": 1})
+        self._run_haiku(payload, supplied, people, sent={HAIKU_KEY: 1}, rejected=rejected)
         return None
 
     def _run_haiku(self, payload, supplied, people, *, sent, tag_key=None, rejected=None):

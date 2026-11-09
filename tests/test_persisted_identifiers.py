@@ -259,6 +259,9 @@ def test_employment_corroboration_version_and_attempt_keys_are_fixed(role_config
     assert (EMPLOYMENT_EXTRACTED_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_PENDING_KEY, EMPLOYMENT_SEARCH_LIMIT) == (
         "contacts:employment_extracted:", "contacts:employment_request:", "contacts:employment_pending:",
         "employment_search_limit")
+    from prospecting.pipeline.contacts import HAIKU_REJECTED_KEY
+
+    assert HAIKU_REJECTED_KEY == "contacts:haiku_rejected:"
 
 
 def test_reconciliation_receipt_and_rate_limit_identifiers_are_fixed():
