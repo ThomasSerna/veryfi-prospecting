@@ -149,11 +149,14 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 ## Layout
 
 - La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
-  campaña. Su botón queda alineado con el logotipo en la barra superior, que
-  muestra la ruta y, en la ficha, Anterior y Siguiente. La barra superior no
-  resume el presupuesto: cada campaña muestra el suyo.
-- El inicio muestra el avance y tres indicadores de la campaña destacada; el
-  historial está en una vista independiente. Las cifras no suman campañas.
+  campaña. Su botón queda alineado con el logotipo y Prospecting en la barra
+  superior. Cada campaña muestra su presupuesto.
+- El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
+  subtítulo ni nota explicativa. El inicio muestra el avance y tres indicadores
+  de la campaña destacada; el historial está en una vista independiente. Las
+  cifras no suman campañas. Los paneles se separan 24 px en escritorio y 16 px
+  en móvil; el panel destacado tiene 32 px de relleno interior en escritorio y
+  24 px en móvil.
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
   campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
 - La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
@@ -164,7 +167,8 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
   empresas, no inventa un porcentaje. Las descargas están en el encabezado.
 - La ficha presenta identidad y estados en el encabezado, conserva las pestañas
   Resumen, Contactos y Evidencia, las fuentes enlazadas y, a la derecha, el mejor
-  match y la revisión de ventas. Anterior y Siguiente preservan los filtros.
+  match y la revisión de ventas. Volver a la campaña y, cuando corresponda,
+  Anterior y Siguiente están encima del encabezado y preservan los filtros.
   Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
 
 ## Elevation & Depth
@@ -203,9 +207,9 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
   Aceptadas en marfil). En curso, un haz recorre el borde.
 - **Prioridad:** barra apilada y leyenda con recuento; cada entrada filtra la tabla.
 - **Tabla:** avatar con la inicial tintado por prioridad, nombre con flecha al
-  señalar, encaje con barra y cobertura, prioridad con barras de señal (3, 2 o 1),
-  disponibilidad, revisión con icono (círculo, marca o cruz) y contactos con su
-  mejor match. Toda la fila abre la ficha; el nombre es el único enlace.
+  señalar, dominio, encaje con barra, prioridad con barras de señal (3, 2 o 1),
+  disponibilidad, revisión con icono (círculo, marca o cruz) y cantidad de
+  contactos. Toda la fila abre la ficha; el nombre es el único enlace.
 - **Presupuesto:** libro de cuatro importes con el disponible destacado y las
   cuentas en un desplegable.
 

@@ -22,11 +22,14 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Inicio y navegación
 
-El inicio muestra la campaña activa o, si no la hay, la última guardada. El
-panel resume su avance y cuenta las empresas encontradas, sin revisar y con
-contacto listo; no suma resultados de campañas distintas. Desde «Sin revisar»
-se puede abrir la siguiente empresa pendiente cuando no hay una investigación
-en curso. Si no existen campañas, se ofrece preparar la primera.
+El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
+subtítulo ni nota explicativa. El inicio muestra la campaña activa o, si no la
+hay, la última guardada. El panel resume su avance y cuenta las empresas
+encontradas, sin revisar y con contacto listo; no suma resultados de campañas
+distintas. Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel
+destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Desde
+«Sin revisar» se puede abrir la siguiente empresa pendiente cuando no hay una
+investigación en curso. Si no existen campañas, se ofrece preparar la primera.
 
 Resumen e Historial muestran un fondo local de círculos verdes y turquesas,
 también cuando no hay campañas. Se anima también en dispositivos táctiles, se
@@ -50,9 +53,10 @@ anticipa la apertura del cajón y, durante una investigación, muestra un punto 
 late. Al abrirla, el contenido queda detrás de una capa oscurecida y desenfocada.
 Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
 sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
-muestra la ruta y, en la ficha, Anterior y Siguiente; no resume el presupuesto,
-que se consulta en la sección Presupuesto de cada campaña. Un importe desconocido
-o pendiente conserva esa condición.
+contiene el botón y la marca Veryfi Prospecting. En la ficha, Volver a la campaña
+y, cuando corresponda, Anterior y Siguiente están encima del encabezado y preservan
+los filtros. El presupuesto se consulta en la sección Presupuesto de cada campaña.
+Un importe desconocido o pendiente conserva esa condición.
 
 Las propuestas estáticas de [campaña](../static/prototypes/campaign.html) y
 [ficha](../static/prototypes/company.html) siguen disponibles en el servidor
@@ -207,9 +211,10 @@ validada, la interfaz muestra su estado y no afirma que se aplicó una lista val
 La vista de campaña abre con un pulso de la investigación: un segmento por empresa
 encontrada, la cifra de investigadas y tres cifras con su barra (sin revisar,
 contacto listo y aceptadas), además de una barra apilada de prioridades cuya
-leyenda filtra la tabla. La tabla permite buscar y filtrar por país, segmento,
-prioridad y disponibilidad desde una sola barra; toda la fila abre la ficha y el
-nombre sigue siendo el único enlace para teclado y lectores de pantalla. Las dos
+leyenda filtra la tabla. La tabla muestra nombre, dominio, encaje, prioridad,
+disponibilidad, revisión y cantidad de contactos; permite buscar y filtrar por país,
+segmento, prioridad y disponibilidad desde una sola barra. Toda la fila abre la ficha
+y el nombre sigue siendo el único enlace para teclado y lectores de pantalla. Las dos
 descargas están en el encabezado. Durante una investigación, la vista consulta el
 estado cada dos segundos y compara cada sección en su sitio: las empresas nuevas
 entran en su fila, las que cambian de puesto se desplazan hasta él y las que
@@ -238,10 +243,9 @@ su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
 o Lista), la función de su cargo y, si Apollo no la confirmó al enriquecerla, el motivo.
 Encima, un resumen indica el objetivo del nivel, cuántas personas son candidatas,
 pertinentes y listas y qué funciones representan las pertinentes; sin `people_policy`
-se omite el objetivo. La tabla de la campaña muestra cuántas personas tiene
-cada empresa, cuántas son pertinentes y listas, y su mejor match. Las campañas nuevas
-usan el match v2 de su instantánea; las anteriores sin ella usan v1. El match ordena la
-revisión y la prioridad de enriquecimiento, mientras «listo» sigue dependiendo de las
+se omite el objetivo. Las campañas nuevas usan el match v2 de su instantánea; las
+anteriores sin ella usan v1. El match ordena la revisión y la prioridad de
+enriquecimiento, mientras «listo» sigue dependiendo de las
 reglas de persona y canal. Si falta una configuración v1 válida para una campaña
 histórica, o el archivo declara otra versión, la ficha lo avisa y muestra a las personas
 sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
