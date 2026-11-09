@@ -32,11 +32,14 @@ from prospecting.identity import (
     match_exclusion,
 )
 from prospecting.models import (
-    Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract,
+    Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract, Count,
     Evidence, Money, Priority, RunItem, RunStage, Text, UsageStatus, UtcDatetime, utc_now,
 )
 from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
-from prospecting.pipeline.contacts import REJECTED_KEY, employment_corroboration, find_contacts
+from prospecting.pipeline.contacts import (
+    EMPLOYMENT_PENDING_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_SEARCH_KEY, REJECTED_KEY, employment_corroboration,
+    find_contacts,
+)
 from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
@@ -438,6 +441,67 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
         return CampaignView(campaign=campaign, companies=companies, budget=budget,
                             is_executing=_EXECUTION.locked(), exclusions_status=exclusions_status(exclusions),
                             contact_match_version=None if weights is None else weights.version)
+
+
+class CorroborationSummary(Contract):
+    """Agregados de la corroboración dirigida del empleo (T24) de una campaña, sin nombres ni datos personales.
+
+    El consumo sale del ledger de las solicitudes de la fase: créditos de Tavily observados en sus respuestas y
+    costo de Haiku estimado por tokens o conciliado. Sin corroboraciones, o con consumo sin observar, el costo por
+    empleo verificado queda en None, nunca en 0.
+    """
+
+    campaign_id: UUID
+    policy_version: Text | None
+    people_searched: Count
+    people_corroborated: Count
+    people_pending_limit: Count
+    people_rejected: Count
+    tavily_requests: Count
+    tavily_credits_reserved: Money
+    tavily_credits_observed: Money
+    tavily_unobserved: Count
+    haiku_requests: Count
+    haiku_reserved_usd: Money
+    haiku_cost_usd: Money
+    haiku_unestimated: Count
+    credits_per_corroboration: Money | None
+    haiku_usd_per_corroboration: Money | None
+
+
+def employment_corroboration_summary(db_path: Path, campaign_id: UUID) -> CorroborationSummary:
+    """Cuántas afirmaciones de Apollo pasaron a evidencia corporativa y su costo; solo lee la base local."""
+    view = read_campaign(db_path, campaign_id)
+    attempts = [key for result in view.companies for key in result.run_item.attempts]
+    pending = [key[len(EMPLOYMENT_PENDING_KEY):].rsplit(":", 1)[0] for key in attempts if key.startswith(EMPLOYMENT_PENDING_KEY)]
+    corroborated = sum(person.employment_corroboration == "corroborated"
+                       for result in view.companies for person in result.contacts)
+    with _saved_database(db_path) as db:
+        rows = [db.get_usage(UUID(key[len(EMPLOYMENT_REQUEST_KEY):])) for key in attempts
+                if key.startswith(EMPLOYMENT_REQUEST_KEY)]
+    rows = [row for row in rows if row is not None]
+    tavily = [row for row in rows if row.provider == "tavily"]
+    haiku = [row for row in rows if row.provider == "anthropic"]
+    observed = sum((row.credits for row in tavily if row.credits is not None), Decimal(0))
+    cost = sum((row.final_cost_usd if row.final_cost_usd is not None else row.estimated_cost_usd for row in haiku
+                if row.final_cost_usd is not None or row.estimated_cost_usd is not None), Decimal(0))
+    unobserved = sum(row.credits is None for row in tavily)
+    unestimated = sum(row.final_cost_usd is None and row.estimated_cost_usd is None for row in haiku)
+    policy = view.campaign.config_snapshot.employment_corroboration
+    return CorroborationSummary(
+        campaign_id=campaign_id, policy_version=None if policy is None else policy.version,
+        people_searched=sum(key.startswith(EMPLOYMENT_SEARCH_KEY) for key in attempts),
+        people_corroborated=corroborated,
+        people_pending_limit=pending.count("employment_search_limit"),
+        people_rejected=sum(code != "employment_search_limit" for code in pending),
+        tavily_requests=len(tavily),
+        tavily_credits_reserved=sum((row.reserved_credits or Decimal(0) for row in tavily), Decimal(0)),
+        tavily_credits_observed=observed, tavily_unobserved=unobserved,
+        haiku_requests=len(haiku), haiku_reserved_usd=sum((row.reserved_cost_usd or Decimal(0) for row in haiku), Decimal(0)),
+        haiku_cost_usd=cost, haiku_unestimated=unestimated,
+        credits_per_corroboration=None if not corroborated or unobserved else observed / corroborated,
+        haiku_usd_per_corroboration=None if not corroborated or unestimated else cost / corroborated,
+    )
 
 
 def _exclusion_match(company: Company, campaign: Campaign, exclusions: ExclusionList | None) -> ExclusionMatch | None:

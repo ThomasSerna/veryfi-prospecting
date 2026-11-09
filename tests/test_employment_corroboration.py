@@ -340,3 +340,36 @@ def test_company_page_explains_the_targeted_search_result(ui_paths, client, cont
     case.find(**case.public)
     page = text(client.get(url("company", case.campaign.id, case.company.id)))
     assert "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona" in page
+
+
+def test_summary_and_command_measure_conversion_and_cost_without_personal_data(contact_case, role_config, tmp_path):
+    from django.core.management import call_command
+    from django.test import override_settings
+    from prospecting.pipeline import employment_corroboration_summary
+
+    case = scenario(contact_case, role_config, ["Head of Product", "Engineering Manager"])
+    case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
+                                              f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
+    case.find(**case.public)
+    summary = employment_corroboration_summary(tmp_path / "synthetic.sqlite3", case.campaign.id)
+    assert (summary.policy_version, summary.people_searched, summary.people_corroborated,
+            summary.people_pending_limit, summary.people_rejected) == ("employment_corroboration_v1", 2, 1, 0, 0)
+    # Dos búsquedas y una extracción de 1 crédito cada una (respuestas sintéticas) y una llamada a Haiku.
+    assert (summary.tavily_requests, summary.tavily_credits_observed, summary.tavily_unobserved) == (3, 3, 0)
+    assert summary.haiku_requests == 1 and summary.haiku_cost_usd > 0 and summary.haiku_unestimated == 0
+    assert summary.credits_per_corroboration == 3 and summary.haiku_usd_per_corroboration == summary.haiku_cost_usd
+    out = StringIO()
+    with override_settings(PROSPECTING_DB_PATH=tmp_path / "synthetic.sqlite3"):
+        call_command("corroboration_report", "--campaign", str(case.campaign.id), stdout=out)
+    report = out.getvalue()
+    assert "Personas buscadas: 2; corroboradas: 1" in report and "Persona Sintética" not in report
+
+
+def test_summary_without_corroborations_leaves_the_cost_undefined(contact_case, role_config, tmp_path):
+    from prospecting.pipeline import employment_corroboration_summary
+
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.find(**case.public)
+    summary = employment_corroboration_summary(tmp_path / "synthetic.sqlite3", case.campaign.id)
+    assert (summary.people_searched, summary.people_corroborated, summary.tavily_requests) == (1, 0, 1)
+    assert summary.credits_per_corroboration is None and summary.haiku_usd_per_corroboration is None
