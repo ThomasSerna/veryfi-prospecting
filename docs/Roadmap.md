@@ -43,10 +43,10 @@ Derivado de las dependencias y prioridades del tracker. Con T12 a T21 y T23 cerr
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Lista para empezar | T24 (P1) | Sus dependencias están cerradas. Corrobora con Tavily el empleo de personas de Apollo dentro de la política de esfuerzo de T16 |
+| En curso | T24 (P1) | Implementada en `main` el 2026-11-08 y verificada sin red; faltan el lote real autorizado y el cierre en el tracker |
 | Desbloqueada, posterior | T22 (P2) | Sus dependencias están cerradas; requiere autorizar la rama `experiment/snov-benchmark` y comprobar acceso y precio antes de cualquier llamada |
 
-T24 está lista para comenzar; T22 queda desbloqueada con prioridad posterior.
+T24 está en curso; T22 queda desbloqueada con prioridad posterior.
 
 ## Dependencias entre tareas
 
@@ -64,7 +64,7 @@ flowchart LR
     T21["T21 Validación enterprise (cerrada)"]:::closed
     T22["T22 Spike Snov.io"]:::ready
     T23["T23 Confirmación manual del empleo (cerrada)"]:::closed
-    T24["T24 Corroboración con Tavily"]:::ready
+    T24["T24 Corroboración con Tavily (en curso)"]:::ready
     T12 --> T13
     T12 --> T17
     T13 --> T14
@@ -548,7 +548,12 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
   - `title_changed` se resuelve al leer, sin reescribir contradicciones ni identidad.
 
   Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo), el cálculo en [contacts.md](contacts.md#confirmación-manual-del-empleo-t23) y los identificadores en [persistence.md](persistence.md#identificadores-persistidos). Se verificó solo con datos sintéticos (pruebas sin red y navegador local). Cerrada en el tracker el 2026-11-08 con los cinco criterios marcados.
-- **T24:** cambia el esfuerzo y el gasto de la etapa de contactos (`_search_public`): requiere aprobación de presupuesto ([Budget-policy.md](Budget-policy.md)) y coordinarse con T16. Las llamadas reales requieren autorización explícita.
+- **T24:** implementada en `main` el 2026-11-08 y verificada solo con pruebas sin red. Decisiones aprobadas por el usuario ese día:
+  - versionar como T16: política `employment_corroboration_v1` y topes `employment_queries` y `employment_pages` en `limits.effort`;
+  - 1 búsqueda por persona (media hasta 3, alta hasta 5), una sola extracción y Haiku en lotes de 3 personas;
+  - en las campañas con la política, las búsquedas por persona salen de `_search_public` y van a su propia fase.
+
+  El cálculo está en [contacts.md](contacts.md#corroboración-dirigida-del-empleo-t24), las reglas en [Business-rules.md](Business-rules.md#esfuerzo-de-búsqueda-y-parada) y las claves en [persistence.md](persistence.md#identificadores-persistidos). Quedan el lote real autorizado (Tavily `search` ≤ 40 y `extract` ≤ 25 créditos, Haiku ≤ USD 0,05, Apollo `people_search` 0 y `people_enrichment` ≤ 15) y el cierre en el tracker.
 
 ## Responsables por módulo
 
