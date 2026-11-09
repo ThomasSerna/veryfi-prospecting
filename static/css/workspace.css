@@ -1,6 +1,6 @@
 /* Resumen: la campaña destacada, su avance por empresa y tres indicadores, sin agregados ni historial. */
 .main-content:has(> .summary-background) { isolation: isolate; }
-.main-content:has(> .summary-background) .demo-notice { background: var(--canvas); }
+.main-content:has(> .summary-background) .demo-notice { max-width: 1080px; margin-inline: auto; color: var(--ink); }
 .summary-background { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: .55; pointer-events: none; }
 .home-panel { max-width: 1080px; margin: 36px auto 0; }
 .home-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
