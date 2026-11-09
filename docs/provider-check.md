@@ -189,9 +189,18 @@ verificado queda sin definir. Resultado comercial: 0 personas listas (`qualified
 
 ### Conciliación
 
-Pendiente de leer los paneles. Los créditos de Tavily y el costo de Haiku son los informados por las
-respuestas; los 3 enriquecimientos de Apollo siguen reservados hasta conciliarlos con
-`manage.py reconcile_usage` y un comprobante en `data/conciliaciones/`.
+Antes de conciliar se guardó una copia de la base en `data/backups/`.
+
+- **Apollo**: el panel pasó de 3 a 6 créditos usados, según la lectura del responsable del
+  2026-11-09. Se concilió con `manage.py reconcile_usage` (primero con `--dry-run`) y el comprobante
+  `data/conciliaciones/apollo-2026-11-09-t24.json` (`apollo_reconciliation_v1`, atribución por
+  solicitud: el salto de 3 corresponde a los 3 enriquecimientos). Repetirlo no cambia nada. La cuenta
+  queda con 0 créditos pendientes y 79 disponibles en el ledger.
+- **Tavily**: el panel pasó de 29 a 50 créditos usados. Las 28 filas del lote informaron 21 créditos
+  (17 de búsqueda y 4 de extracción), exactamente el salto. Se conciliaron en una transacción; el
+  comprobante está en `data/conciliaciones/tavily-2026-11-09-t24.json`.
+- **Haiku**: las 2 llamadas siguen con el costo estimado (USD 0,0021728) a la espera de la consola o
+  de que el responsable acepte conciliar con el estimado.
 
 ### Observaciones y limitaciones
 
