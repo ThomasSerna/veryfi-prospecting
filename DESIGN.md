@@ -251,19 +251,20 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
 Las transiciones respetan `prefers-reduced-motion`. Se desactivan las respuestas
-al movimiento del puntero táctil; el fondo de Resumen puede animarse en estos
-dispositivos. Las animaciones deben comprobarse en el navegador: el resultado debe
-transmitir una experiencia interactiva refinada sin distraer del trabajo comercial.
+al movimiento del puntero táctil; el fondo de Resumen e Historial puede animarse
+en estos dispositivos. Las animaciones deben comprobarse en el navegador: el
+resultado debe transmitir una experiencia interactiva refinada sin distraer del
+trabajo comercial.
 
-En Resumen, incluso sin campañas, un lienzo WebGL local aporta círculos suaves
-verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
+En Resumen e Historial, incluso sin campañas, un lienzo WebGL local aporta círculos
+suaves verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
 (consultado el 9 de noviembre de 2026). Tiene opacidad 0,55, velocidad del 100 %
 de la referencia y resolución del área visible dividida por 15 y redondeada; el
-dibujo se limita a 30 fotogramas por segundo. El lienzo queda fuera de la región
-del sondeo. La animación se pausa si la página está oculta o el panel de Resumen
-sale de la vista y queda estática con movimiento reducido. Con colores forzados o
-si falla WebGL se conserva el fondo habitual. El fondo no descarga recursos
-externos ni añade dependencias.
+dibujo se limita a 30 fotogramas por segundo. En Resumen, el lienzo queda fuera
+de la región del sondeo. La animación se pausa si la página está oculta o el panel
+correspondiente sale de la vista y queda estática con movimiento reducido. Con
+colores forzados o si falla WebGL se conserva el fondo habitual. El fondo no
+descarga recursos externos ni añade dependencias.
 
 En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
 cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
