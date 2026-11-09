@@ -149,6 +149,59 @@ dato. Resultado: 0 identidades verificadas, 0 canales y 0 personas listas
 - Es una muestra de una empresa: no mide cobertura de Apollo ni calidad de contactos. La
   comparación con la línea base corresponde a T21.
 
+## Lote real de la T24
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-09 (America/Bogota): ejecución de 01:42 a 01:44 y reanudación de 01:52 a 01:53 |
+| Cuentas | Las de T17: Apollo Free de correo institucional (`apollo-eafit`), `tavily-cuenta-2` y Haiku prepagado |
+| Ejecución | Desde la interfaz Django local, campaña nueva `cec467b6` con `employment_corroboration_v1`: Colombia y México, `fintech_software` y `cpg_loyalty`, sin palabras clave, máximo 5 empresas. Antes de cada ejecución se copió la base en `data/backups/` |
+| Autorización | Responsable del cupo, en el chat del 2026-11-08, para todo el lote: Tavily `search` ≤ 40 y `extract` ≤ 25 créditos, Haiku ≤ USD 0,05, Apollo `people_search` 0 y `people_enrichment` ≤ 15. La reanudación usó los topes restantes (26, 15, USD 0,04, 0 y 12) |
+
+| Operación | Llamadas | Créditos reservados | Créditos observados | Costo |
+|---|---:|---:|---:|---|
+| Tavily Search | 17 | 17 | 17 | USD 0 (crédito gratuito) |
+| Tavily Extract | 11 | 11 | 4 | USD 0 (crédito gratuito) |
+| Haiku `messages` | 2 | — | — | USD 0,0048 reservado, USD 0,0022 estimado |
+| Apollo People Search | 2 | 0 | — | USD 0 |
+| Apollo People Enrichment | 3 | 3 | Pendiente de conciliar con el panel | USD 0 |
+
+Ninguna llamada falló ni superó su tope.
+
+**Resultados.** De cinco empresas, cuatro se detuvieron por nombre o país sin confirmar, antes de
+gastar en Haiku o Apollo. Una cuenta de prioridad alta llegó a contactos. People Search devolvió
+8 candidatos y People Enrichment confirmó a 3 personas pertinentes. Por primera vez en un lote real
+no hubo rechazos de entidad. Las tres quedaron con el empleo solo declarado por Apollo
+(`provider_claim_only`).
+
+En la primera ejecución, la extracción general con Haiku devolvió un hecho sin asociación nominal
+(`nominal_association`). La conducta anterior dejó la empresa pendiente, sin llegar a la fase de
+T24. Se corrigió ese bloqueo (`contacts:haiku_rejected:<código>`, [contacts.md](contacts.md#corroboración-dirigida-del-empleo-t24))
+y se reanudó la empresa. La fase buscó a las 3 personas (1 búsqueda cada una): 20 resultados, sin
+ninguno del dominio corporativo. Los 3 snippets elegidos nombraban a la persona junto a la empresa.
+La extracción única de esas 3 URL no devolvió contenido (0 créditos observados), así que Haiku no
+se llamó.
+
+`manage.py corroboration_report`: 3 personas buscadas, 0 corroboradas, 0 pendientes por cupo,
+0 rechazos de Haiku; 4 solicitudes de Tavily en la fase (3 créditos observados). El costo por empleo
+verificado queda sin definir. Resultado comercial: 0 personas listas (`qualified_no_contact`,
+`people_target_reached`), las tres en «búsqueda dirigida sin corroboración».
+
+### Conciliación
+
+Pendiente de leer los paneles. Los créditos de Tavily y el costo de Haiku son los informados por las
+respuestas; los 3 enriquecimientos de Apollo siguen reservados hasta conciliarlos con
+`manage.py reconcile_usage` y un comprobante en `data/conciliaciones/`.
+
+### Observaciones y limitaciones
+
+- Es una sola empresa con tres personas: no mide la tasa de conversión de T24.
+- Las páginas que encontró la búsqueda dirigida no eran del dominio corporativo, y Tavily Extract no
+  devolvió su texto. El motivo literal de cada URL solo figura en los avisos de la ejecución, que no
+  se guardan.
+- Aunque Extract hubiera devuelto texto, una página no corporativa sin fecha publicada habría dejado
+  a la persona en `undated_source` (revisión humana), no en `corporate_evidence`.
+
 ## Tavily
 
 | Campo | Valor observado |
