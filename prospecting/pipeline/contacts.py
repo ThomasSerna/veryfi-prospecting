@@ -6,14 +6,15 @@ import time
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, HttpUrl, TypeAdapter
 
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization, unconsumed_failure
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
     ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
-    matched_role_family, merge_contact, people_progress, people_target, person_function, role_families, role_position,
-    rank_contact_matches, target_roles, validate_contact,
+    employment_confirmation_titles, employment_status, manual_employment_evidence, matched_role_family, merge_contact,
+    people_progress, people_target, person_function, role_families, role_position, rank_contact_matches, target_roles,
+    validate_contact,
 )
 from prospecting.db import Database
 from prospecting.models import (
@@ -100,6 +101,65 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         people, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
         readiness = derive_readiness(assessment, people, evidence,
                                      campaign.limits, now, company, roles, campaign=campaign)
+        return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
+
+
+def confirm_current_employment(db: Database, campaign_id: UUID, contact_id: UUID, *, title: str, source_url: str,
+                               reason: str, confirmed: bool) -> RunItem:
+    """Registra que ventas comprobó el empleo vigente en una fuente (T23), sin enviar mensajes ni llamar.
+
+    Guarda la evidencia manual, el contacto y la disponibilidad recalculada en una sola transacción. Conserva
+    fuentes, contradicciones y datos del proveedor; solo cambia el cargo cuando se elige otro ya citado.
+    """
+    if confirmed is not True:
+        raise ValueError("La confirmación requiere declarar explícitamente que se comprobó el empleo sin enviar "
+                         "mensajes, llamar ni enviar invitaciones.")
+    reason = TypeAdapter(Text).validate_python(reason)
+    title = TypeAdapter(Text).validate_python(title)
+    source_url = TypeAdapter(Text).validate_python(source_url)
+    try:
+        url = TypeAdapter(HttpUrl).validate_python(source_url)
+    except ValueError:
+        raise ValueError("La fuente consultada necesita una URL http o https válida.") from None
+    if url.scheme not in ("http", "https"):
+        raise ValueError("La fuente consultada necesita una URL http o https válida.")
+    with db.transaction():
+        campaign, contact = db.get_campaign(campaign_id), db.get_contact(contact_id)
+        run = None if contact is None else db.get_run_item(campaign_id, contact.company_id)
+        if campaign is None or contact is None or run is None:
+            raise ValueError("El contacto no pertenece a la campaña.")
+        if campaign.config_snapshot.people_provider != "apollo":
+            raise ValueError("La campaña histórica solo permite consulta y exportación.")
+        company = db.get_company(contact.company_id)
+        assessment = None if run.last_assessment_id is None else db.get_assessment(run.last_assessment_id)
+        people, evidence = contact_context(campaign, db.list_contacts(contact.company_id), db.list_evidence(contact.company_id))
+        if contact.id not in {item.id for item in people}:
+            raise ValueError("El contacto no pertenece al flujo Apollo de esta campaña.")
+        if assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED:
+            raise ValueError("La empresa necesita una evaluación vigente y no excluida antes de confirmar el empleo.")
+        now = utc_now()
+        titles = employment_confirmation_titles(contact, company, evidence, campaign.limits, now)
+        if not titles:
+            raise ValueError("Solo se confirma el empleo de personas de Apollo enriquecidas, con nombre completo, cuyo "
+                             "empleo declara solo el proveedor o cuyo cargo cambió; nunca tras una salida o una "
+                             "fuente contradicha.")
+        if title not in titles:
+            raise ValueError("El cargo debe ser uno de los ya citados en las fuentes de la persona.")
+        fact = manual_employment_evidence(company, contact, campaign_id, title=title, source_url=str(url),
+                                          reason=reason, now=now)
+        updated = contact.model_copy(update={"title": title,
+                                             "employment_evidence_ids": contact.employment_evidence_ids + [fact.id]})
+        if title != contact.title and campaign.config_snapshot.role_taxonomy is None:
+            # Sin taxonomía la pertinencia se guarda: se recalcula para el cargo elegido (con taxonomía, al leer).
+            updated = apply_target_roles(updated, target_roles(company, assessment, campaign, evidence=evidence))
+        updated = Contact.model_validate(updated)
+        status = employment_status(updated, company, evidence + [fact], campaign.limits, now)
+        if (status.state, status.basis) != ("corporate_evidence", "manual"):
+            raise ValueError("La persona conserva una contradicción o una fuente con fecha futura; no se puede confirmar.")
+        db.save_contact(updated, evidence=[fact])
+        people, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
+        roles = target_roles(company, assessment, campaign, evidence=evidence)
+        readiness = derive_readiness(assessment, people, evidence, campaign.limits, now, company, roles, campaign=campaign)
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 

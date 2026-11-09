@@ -265,3 +265,24 @@ def test_entity_mismatch_codes_are_fixed():
         "entity_mismatch_name", "entity_mismatch_not_current",
     )
     assert all(":" not in code for code in ENTITY_MISMATCH_CODES)
+
+
+def test_manual_employment_references_are_fixed():
+    """T23: la confirmación manual del empleo se reconoce por proveedor, prefijo y texto fijos; no se renombran."""
+    from uuid import UUID
+
+    from prospecting.contacts import (
+        MANUAL_EMPLOYMENT_CLAIM, MANUAL_EMPLOYMENT_PROVIDER, MANUAL_EMPLOYMENT_REFERENCE, is_manual_employment,
+        manual_employment_evidence,
+    )
+
+    assert (MANUAL_EMPLOYMENT_PROVIDER, MANUAL_EMPLOYMENT_REFERENCE) == ("manual_review", "manual-employment:")
+    assert MANUAL_EMPLOYMENT_CLAIM == ("Empleo vigente confirmado manualmente por ventas, sin enviar mensajes, "
+                                       "llamadas ni invitaciones. Motivo: ")
+    campaign_id = UUID("00000000-0000-4000-8000-0000000000aa")
+    person = contact()
+    fact = manual_employment_evidence(company(), person, campaign_id, title="CTO", source_url="https://empresa-uno.example/equipo",
+                                      reason="Motivo sintético.", now=NOW)
+    assert fact.external_reference == f"manual-employment:{campaign_id}:{person.id}:{NOW.isoformat()}"
+    assert (fact.source_type, fact.kind, fact.provider) == ("manual", "observed", "manual_review")
+    assert fact.claim == MANUAL_EMPLOYMENT_CLAIM + "Motivo sintético." and is_manual_employment(fact)

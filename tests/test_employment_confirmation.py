@@ -14,7 +14,10 @@ from prospecting.contacts import (
     load_contact_match, manual_employment_evidence, mentions, person_function, person_stage, resolve_manual_employment,
     target_roles, validate_contact,
 )
-from prospecting.models import ChannelStatus, Evidence
+from prospecting.db import Database
+from prospecting.models import BusinessStatus, ChannelStatus, Evidence, RunItem
+from prospecting.pipeline import campaign as bridge
+from prospecting.pipeline.contacts import confirm_current_employment
 from prospecting.providers.apollo import ApolloEnrichmentResponse, ApolloSearchResponse, parse_enrichment, parse_search
 
 
@@ -260,3 +263,149 @@ def test_only_apollo_claims_and_title_changes_admit_confirmation(case):
                                     contradiction_ids=[employment.id])]
     assert status(case, merged, disputed).reason == "contradicted_source"
     assert employment_confirmation_titles(merged, case.company, disputed, case.limits, NOW) == []
+
+
+# Confirmación persistida desde el pipeline: una sola transacción, sin proveedores ni envíos.
+
+CONFIRMED_AT = NOW + timedelta(hours=1)
+
+
+@pytest.fixture
+def saved(tmp_path, make_campaign, make_company, make_assessment, monkeypatch):
+    campaign = make_campaign(status="completed")
+    company, sources = make_company(domain="example.com", entity_name="Empresa sintética", segments=["fintech_software"],
+                                    identity_status="confirmed")
+    assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=[TITLE])
+    case = SimpleNamespace(campaign=campaign, company=company, assessment=assessment, limits=campaign.limits)
+    contact, facts = apollo_person(case)
+    contact = verified(contact)
+    run = RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed", last_assessment_id=assessment.id,
+                  business_status="qualified_no_contact", stop_reason="contact_plan_exhausted",
+                  review_status="pending")
+    for module in ("prospecting.pipeline.contacts", "prospecting.pipeline.campaign"):
+        monkeypatch.setattr(f"{module}.utc_now", lambda: CONFIRMED_AT)
+    path = tmp_path / "employment-synthetic.sqlite3"
+    with Database(path) as db:
+        with db.transaction():
+            db.save_campaign(campaign)
+            db.save_company(company, evidence=sources)
+            db.save_run_item(run.model_copy(update={"last_assessment_id": None}))
+            db.save_assessment(assessment)
+            db.save_run_item(run)
+            db.save_contact(contact, evidence=facts)
+        yield SimpleNamespace(db=db, path=path, case=case, campaign=campaign, company=company, contact=contact,
+                              run=db.get_run_item(campaign.id, company.id))
+
+
+def persist(saved, **overrides):
+    fields = dict(title=TITLE, source_url=SOURCE_URL, reason=f"  {REASON}  ", confirmed=True)
+    return confirm_current_employment(saved.db, saved.campaign.id, saved.contact.id, **(fields | overrides))
+
+
+def unchanged(saved, evidence):
+    assert saved.db.get_contact(saved.contact.id) == saved.contact
+    by_id = lambda items: sorted(items, key=lambda item: str(item.id))
+    assert by_id(saved.db.list_evidence(saved.company.id)) == by_id(evidence)
+    assert saved.db.get_run_item(saved.campaign.id, saved.company.id) == saved.run
+
+
+def test_confirmation_saves_manual_evidence_and_recalculates_readiness(saved, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Confirmar el empleo no crea clientes de proveedores ni hace tráfico.")
+
+    monkeypatch.setattr("prospecting.providers.ProviderClient.__init__", forbidden)
+    monkeypatch.setattr("prospecting.providers.ClaudeClient.__init__", forbidden)
+    before = saved.db.list_evidence(saved.company.id)
+    run = persist(saved)
+    assert run.business_status == "ready_preferred"
+    assert run.model_dump(exclude={"business_status", "updated_at"}) == saved.run.model_dump(
+        exclude={"business_status", "updated_at"})
+    contact = saved.db.get_contact(saved.contact.id)
+    [fact] = [item for item in saved.db.list_evidence(saved.company.id) if item.id not in {old.id for old in before}]
+    assert contact.model_dump(exclude={"employment_evidence_ids"}) == saved.contact.model_dump(
+        exclude={"employment_evidence_ids"})
+    assert contact.employment_evidence_ids == saved.contact.employment_evidence_ids + [fact.id]
+    assert (fact.source_type, fact.kind, fact.provider, fact.contact_id) == (
+        "manual", "observed", "manual_review", saved.contact.id)
+    assert fact.external_reference == f"manual-employment:{saved.campaign.id}:{saved.contact.id}:{CONFIRMED_AT.isoformat()}"
+    assert str(fact.url) == SOURCE_URL and fact.retrieved_at == CONFIRMED_AT
+    assert fact.claim.endswith(f"Motivo: {REASON}") and NAME in fact.excerpt and TITLE in fact.excerpt
+    assert [item for item in saved.db.list_evidence(saved.company.id) if item.id != fact.id] == before
+    assert saved.db.list_usage(campaign_id=saved.campaign.id) == []
+    view = bridge.read_campaign(saved.path, saved.campaign.id)
+    [person] = view.companies[0].contacts
+    assert person.eligible and person.employment_titles == [] and person.employment.basis == "manual"
+    assert person.employment.confirmation_reason == REASON
+
+
+@pytest.mark.parametrize("overrides, message", [
+    ({"confirmed": False}, "explícitamente"), ({"confirmed": None}, "explícitamente"), ({"confirmed": "true"}, "explícitamente"),
+    ({"reason": "   "}, "at least 1 character"), ({"source_url": "ftp://example.com/equipo"}, "URL http"),
+    ({"source_url": "directorio corporativo"}, "URL http"), ({"source_url": "javascript:alert(1)"}, "URL http"),
+    ({"title": "CEO"}, "ya citados"),
+])
+def test_confirmation_rejects_missing_acceptance_reason_url_or_uncited_title(saved, overrides, message):
+    before = saved.db.list_evidence(saved.company.id)
+    with pytest.raises(ValueError, match=message):
+        persist(saved, **overrides)
+    unchanged(saved, before)
+
+
+def test_offered_titles_come_from_the_read_view(saved):
+    view = bridge.read_campaign(saved.path, saved.campaign.id)
+    [person] = view.companies[0].contacts
+    assert person.employment_titles == [TITLE] and not person.eligible
+    assert person.employment.state == "provider_claim"
+
+
+def test_departure_excluded_company_or_foreign_campaign_cannot_confirm(saved, make_campaign):
+    before = saved.db.list_evidence(saved.company.id)
+    news = Evidence(company_id=saved.company.id, contact_id=saved.contact.id, url="https://example.com/noticias",
+                    provider="tavily", external_reference=f"tavily-sintetico#{uuid4()}", claim="Noticia sintética.",
+                    excerpt=f"{NAME} dejó la empresa en octubre.", retrieved_at=NOW, kind="observed",
+                    source_type="secondary")
+    with saved.db.transaction():
+        saved.db.save_evidence(news)
+    with pytest.raises(ValueError, match="salida"):
+        persist(saved)
+    unchanged(saved, before + [news])
+    saved.db.save_run_item(saved.run.model_copy(update={"business_status": BusinessStatus.EXCLUDED}))
+    with pytest.raises(ValueError, match="no excluida"):
+        persist(saved)
+    other = make_campaign()
+    saved.db.save_campaign(other)
+    with pytest.raises(ValueError, match="no pertenece"):
+        confirm_current_employment(saved.db, other.id, saved.contact.id, title=TITLE, source_url=SOURCE_URL,
+                                   reason=REASON, confirmed=True)
+
+
+def test_historic_campaign_is_read_only(saved, make_campaign):
+    legacy = make_campaign(config_snapshot=saved.campaign.config_snapshot.model_copy(update={"people_provider": None}))
+    saved.db.save_campaign(legacy)
+    saved.db.save_run_item(RunItem(campaign_id=legacy.id, company_id=saved.company.id))
+    with pytest.raises(ValueError, match="histórica"):
+        confirm_current_employment(saved.db, legacy.id, saved.contact.id, title=TITLE, source_url=SOURCE_URL,
+                                   reason=REASON, confirmed=True)
+
+
+def test_confirmation_rolls_back_contact_and_evidence_when_the_checkpoint_fails(saved, monkeypatch):
+    before = saved.db.list_evidence(saved.company.id)
+
+    def failed_checkpoint(run):
+        assert len(saved.db.list_evidence(saved.company.id)) == len(before) + 1
+        raise RuntimeError("Fallo sintético después de guardar contacto y evidencia.")
+
+    monkeypatch.setattr(saved.db, "save_run_item", failed_checkpoint)
+    with pytest.raises(RuntimeError, match="Fallo sintético"):
+        persist(saved)
+    monkeypatch.undo()
+    unchanged(saved, before)
+
+
+def test_running_campaign_blocks_the_confirmation(saved):
+    before = saved.db.list_evidence(saved.company.id)
+    with bridge._EXECUTION:
+        with pytest.raises(ValueError, match="ejecutándose"):
+            bridge.confirm_current_employment(saved.path, saved.campaign.id, saved.contact.id, title=TITLE,
+                                              source_url=SOURCE_URL, reason=REASON, confirmed=True)
+    unchanged(saved, before)

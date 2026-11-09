@@ -21,7 +21,8 @@ from prospecting.budget import (
 )
 from prospecting.contacts import (
     ContactMatch, ContactMatchConfig, EmploymentStatus, apply_campaign_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
-    PeopleProgress, PersonStage, employment_status, load_contact_match, people_progress, person_stage,
+    PeopleProgress, PersonStage, employment_confirmation_titles, employment_status, load_contact_match,
+    people_progress, person_stage,
     person_function, rank_contact_matches, role_families, target_roles, validate_contact,
 )
 from prospecting.db import Database
@@ -149,6 +150,8 @@ class ContactResult(Contract):
     # Ordena para que ventas elija; no cambia eligible, canales utilizables ni disponibilidad.
     match: ContactMatch | None = None
     function_id: Text | None = None
+    # Cargos citados que ventas puede confirmar a mano (T23); vacío si la persona no admite la confirmación.
+    employment_titles: list[Text] = Field(default_factory=list)
 
 
 class CompanyResult(Contract):
@@ -401,9 +404,13 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     ranking = None if weights is None or assessment is None else contact_match(
                         contact, company, assessment, evidence, campaign.limits, now, roles, weights, campaign=campaign)
                     function = None if assessment is None else person_function(contact, company, assessment, campaign, evidence, now)
+                    # Sin evaluación, con exclusión confirmada o ambigua, o en campaña histórica no se confirma el empleo.
+                    titles = [] if (excluded or match is not None or assessment is None
+                                    or campaign.config_snapshot.people_provider != "apollo") else (
+                        employment_confirmation_titles(contact, company, evidence, campaign.limits, now))
                     results.append(ContactResult(contact=contact, eligible=eligible, stage=stage, usable_channels=usable,
                                                  employment=employment, match=ranking,
-                                                 function_id=function,
+                                                 function_id=function, employment_titles=titles,
                                                  enrichment_rejected=rejected.get(str(contact.id))))
                 people = None if assessment is None else people_progress(
                     contacts, company, assessment, evidence, now, roles, campaign=campaign, stages=stages)
@@ -539,6 +546,21 @@ def confirm_alternative_channel(db_path: Path, campaign_id: UUID, contact_id: UU
         with _saved_database(db_path) as db:
             return confirm_channel(db, campaign_id, contact_id, channel_type, channel_value,
                                    reason=reason, confirmed=confirmed)
+    finally:
+        _EXECUTION.release()
+
+
+def confirm_current_employment(db_path: Path, campaign_id: UUID, contact_id: UUID, *, title: str, source_url: str,
+                               reason: str, confirmed: bool) -> RunItem:
+    """Confirmación manual del empleo vigente (T23); bloqueada mientras se ejecuta una campaña."""
+    from prospecting.pipeline.contacts import confirm_current_employment as confirm_employment
+
+    if not _EXECUTION.acquire(blocking=False):
+        raise ValueError("La campaña está ejecutándose; espera antes de confirmar el empleo.")
+    try:
+        with _saved_database(db_path) as db:
+            return confirm_employment(db, campaign_id, contact_id, title=title, source_url=source_url,
+                                      reason=reason, confirmed=confirmed)
     finally:
         _EXECUTION.release()
 
