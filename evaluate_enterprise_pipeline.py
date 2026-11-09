@@ -632,6 +632,8 @@ def report_captures(paths):
 
 
 def main(argv=None):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_subparsers(dest="mode", required=True)
     run = modes.add_parser("run", help="Captura una celda autorizada o registra su bloqueo sin tráfico.")

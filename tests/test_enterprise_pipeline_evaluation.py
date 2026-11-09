@@ -3,6 +3,9 @@
 from datetime import timedelta
 from decimal import Decimal
 import json
+import os
+import subprocess
+import sys
 from uuid import uuid4
 
 import pytest
@@ -237,6 +240,15 @@ def test_cli_report_writes_new_output_only(tmp_path, captured):
     original = output.read_bytes()
     assert evaluation.main(["report", str(path), "--output", str(output)]) == 2
     assert output.read_bytes() == original
+
+
+def test_cli_help_is_utf8_when_output_is_redirected():
+    """En Windows, una salida redirigida usaría cp1252 y rompería las tildes de la ayuda."""
+    env = {key: value for key, value in os.environ.items() if key not in {"PYTHONIOENCODING", "PYTHONUTF8"}}
+    result = subprocess.run([sys.executable, str(evaluation.ROOT / "evaluate_enterprise_pipeline.py"), "--help"],
+                            capture_output=True, env=env | {"PYTHONUTF8": "0"}, timeout=60)
+    assert result.returncode == 0
+    assert "Evaluación T21".encode("utf-8") in result.stdout
 
 
 def test_review_time_means_and_sample_completeness_are_explicit(tmp_path, captured):
