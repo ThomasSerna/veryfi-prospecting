@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
-{% load prospecting_ui %}
+{% load static prospecting_ui %}
 {% block title %}Historial · Veryfi Prospecting{% endblock %}
 {% block breadcrumb %}<a href="{% url 'webapp:campaigns' %}">Resumen</a><span>/</span><span>Historial</span>{% endblock %}
+{% block scripts %}<script src="{% static 'js/background.js' %}?v=cloud-4" defer></script>{% endblock %}
 {% block content %}
+<canvas class="summary-background" aria-hidden="true" hidden></canvas>
 <div class="history-page">
   <header class="page-heading"><div><h1>Historial</h1><p>Tus campañas y los resultados que conservan.</p></div>
     <a class="button button-primary" href="{% url 'webapp:new_campaign' %}" data-idle-only {% if execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Nueva campaña</a>

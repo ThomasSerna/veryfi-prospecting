@@ -2,7 +2,7 @@
   'use strict';
 
   const canvas = document.querySelector('.summary-background');
-  const panel = document.querySelector('.home-panel');
+  const panel = document.querySelector('.home-panel, .history-page');
   if (!canvas || !panel || canvas.dataset.backgroundInitialized) return;
   canvas.dataset.backgroundInitialized = 'true';
 

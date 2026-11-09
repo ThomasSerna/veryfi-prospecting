@@ -63,7 +63,8 @@ function harness(options = {}) {
   const panel = {};
   const document = {
     ...events('document'), hidden: false,
-    querySelector: selector => selector === '.summary-background' ? canvas : panel,
+    querySelector: selector => selector === '.summary-background' ? canvas
+      : selector.split(',').map(part => part.trim()).includes(options.panel || '.home-panel') ? panel : null,
   };
   const window = {
     ...events('window'), innerWidth: 1500, innerHeight: 900,
@@ -115,8 +116,9 @@ function harness(options = {}) {
   };
 }
 
-test('Inicia una vez al entrar en pantalla y conserva shader, clamp y semilla del original', () => {
-  const h = harness();
+for (const panel of ['.home-panel', '.history-page']) {
+test(`${panel}: inicia una vez y conserva shader, clamp y semilla del original`, () => {
+  const h = harness({ panel });
   assert.equal(h.contexts, 0);
   assert.equal(h.canvas.hidden, true);
   h.visible(true);
@@ -141,6 +143,7 @@ test('Inicia una vez al entrar en pantalla y conserva shader, clamp y semilla de
   assert.ok(h.draws.every(draw => draw.u_rand === 0.375));
   assert.equal(h.frames.size, 1);
 });
+}
 
 test('Limita dibujos a 30 fps y avanza a la velocidad original solo durante tiempo activo', () => {
   const h = harness();

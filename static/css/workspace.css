@@ -92,6 +92,8 @@
 .home-empty-note { margin-top: 18px; color: var(--muted); font-size: .75rem; }
 
 .history-page { max-width: 1160px; margin: 28px auto 0; }
+.main-content:has(> .history-page) .demo-notice { max-width: 1160px; }
+.history-page > .page-heading p { color: var(--ink); }
 .history-surface { overflow: hidden; }
 .history-surface .data-table { min-width: 760px; }
 .history-surface .table-action { white-space: nowrap; }
