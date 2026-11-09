@@ -8,8 +8,9 @@ from uuid import uuid4
 import pytest
 
 import evaluate_enterprise_pipeline as evaluation
+from prospecting.contacts import load_contact_match
 from prospecting.db import Database
-from prospecting.models import Channel, CompanySize, Contact, Evidence, RunItem, Usage, utc_now
+from prospecting.models import Channel, CompanySize, Contact, Evidence, RoleTaxonomy, RunItem, Usage, utc_now
 from prospecting.pipeline import CampaignReport, DiscoveryReport, read_campaign
 
 
@@ -105,6 +106,58 @@ def test_frozen_date_is_used_for_freshness_and_validated_without_channel_is_not_
     no_channel.view.companies[0].contacts[0].contact.channels = []
     counts, _ = evaluation.company_metrics(no_channel.view.companies[0], no_channel.view.campaign, no_channel.evaluated_at)
     assert counts["employment_verified"] == 1 and counts["ready"] == 0
+
+
+def test_match_replay_uses_the_view_functions_and_diversity_counts_only_pertinent_people(
+        tmp_path, config, make_campaign, make_company, make_assessment, monkeypatch):
+    """La función desempata igual que en la ficha aunque la identidad siga pendiente; la diversidad no la cuenta."""
+    profile = next(item for item in config.profiles if item.id == "expense_reimbursement")
+    common = {"profile_ids": [profile.id], "departments": ["Producto"], "excluded_titles": [], "seniorities": [],
+              "function_terms": ["integración de APIs"], "source_reference": "Patrones sintéticos sin personas reales",
+              "source_date": "2026-11-01", "validation_status": "pending"}
+    taxonomy = RoleTaxonomy(version="role_taxonomy_v1", source_date="2026-11-01", validation_status="pending", families=[
+        common | {"id": "product", "function_id": "product", "buying_role": "business_champion",
+                  "titles_en": ["Head of Product"], "titles_es": ["Director de Producto"]},
+        common | {"id": "engineering", "function_id": "engineering", "buying_role": "technical_champion",
+                  "titles_en": ["Solutions Architect"], "titles_es": ["Arquitecto de Soluciones"]}])
+    weights = load_contact_match(evaluation.ROOT / "config" / "contact_match_v2.json")
+    campaign = make_campaign(status="completed", config_snapshot=config.model_copy(update={
+        "people_provider": None, "role_taxonomy": taxonomy, "contact_match": weights}))
+    company, facts = make_company(name="Cuenta Sintética Example", domain="example.com", identity_status="confirmed",
+                                  operating_countries=["CO"], segments=["fintech_software"])
+    now = utc_now()
+    use_case = Evidence(company_id=company.id, claim="Caso de uso sintético", excerpt="La empresa gestiona recibos y reembolsos.",
+                        url="https://example.com/producto", retrieved_at=now, kind="observed", source_type="primary")
+    assessment = make_assessment(campaign.id, company.id, priority="high", profile_matches=[{
+        "profile_id": profile.id, "citations": [{"evidence_id": use_case.id, "quote": use_case.excerpt}]}])
+    path = tmp_path / "functions.sqlite3"
+    with Database(path) as db:
+        db.save_campaign(campaign)
+        db.save_company(company, evidence=[*facts, use_case])
+        db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id))
+        for title, identity in (("Head of Product", "confirmed"), ("Solutions Architect", "pending")):
+            contact_id = uuid4()
+            name = f"Persona Sintética {str(contact_id)[:8]}"
+            fact = Evidence(company_id=company.id, contact_id=contact_id, kind="observed", source_type="primary",
+                            url="https://example.com/equipo", retrieved_at=now, claim="Directorio sintético",
+                            excerpt=f"{name} es {title} de {company.name}.")
+            db.save_contact(Contact(id=contact_id, company_id=company.id, name=name, title=title, name_complete=True,
+                                    current_employment=True, identity_status=identity,
+                                    provenance={field: [fact.id] for field in ("name", "title")},
+                                    employment_evidence_ids=[fact.id]), evidence=[fact])
+        db.save_assessment(assessment)
+        db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, last_assessment_id=assessment.id,
+                                 stage="completed", business_status="qualified_no_contact"))
+    result = read_campaign(path, campaign.id).companies[0]
+    shown = {person.contact.id: person.function_id for person in result.contacts if person.function_id}
+    assert sorted(shown.values()) == ["engineering", "product"]
+    assert sorted(person.stage for person in result.contacts) == ["candidate", "relevant"]
+    calls, rank = [], evaluation.rank_contact_matches
+    monkeypatch.setattr(evaluation, "rank_contact_matches",
+                        lambda entries, roles, **kwargs: calls.append(kwargs["function_ids"]) or rank(entries, roles, **kwargs))
+    counts, _ = evaluation.company_metrics(result, campaign, now)
+    assert calls == [shown, shown]
+    assert counts["distinct_functions"] == 1 and counts["diverse_functions"] == 0
 
 
 def test_provider_claim_does_not_become_employment_verified_or_ready(tmp_path, captured):

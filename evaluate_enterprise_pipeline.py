@@ -433,12 +433,13 @@ def company_metrics(result, campaign, now):
             emails_observed=sum(item.type == "email" for item in contact.channels),
             emails_usable=sum(item.type == "email" for item in channels), channels_usable=len(channels),
             ready=int(eligible and bool(channels)), preferred_ready=int(eligible and any(item.type in {"email", "phone", "whatsapp"} for item in channels)))
-        if stage in {"relevant", "channel_usable", "ready"} and assessment is not None:
+        if assessment is not None:
+            # Desempata con la misma función que la ficha y el pipeline; la diversidad solo cuenta pertinentes.
             function = person_function(contact, company, assessment, campaign, facts, now)
             if function is not None:
-                functions.add(function)
                 functions_by_contact[contact.id] = function
-        if assessment is not None:
+                if stage in {"relevant", "channel_usable", "ready"}:
+                    functions.add(function)
             for weight in weights:
                 ranking = contact_match(contact, company, assessment, facts, campaign.limits, now, roles, weight, campaign=campaign)
                 rankings[weight.version].append((contact, ranking, eligible))
