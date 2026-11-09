@@ -136,7 +136,9 @@ reducirlos, pero no habilitarlos si su instantánea no los tiene. Las instantán
 anteriores no tienen la política ni los topes y conservan la búsqueda pública anterior.
 
 Con la política, la búsqueda pública general solo hace las consultas genéricas de
-directorio. Después de la extracción general con Haiku, la etapa:
+directorio. Si Python rechaza los hechos de la extracción general con Haiku, el rechazo
+queda procesado con su código (`contacts:haiku_rejected:<código>`) y la etapa sigue, en
+lugar de dejar la empresa pendiente. Después de esa extracción, la etapa:
 
 1. Elige a las personas de Apollo enriquecidas en `provider_claim` con motivo
    `provider_claim_only`, `title_unconfirmed`, `undated_source` o `stale_source`

@@ -241,6 +241,10 @@ identificadores sin reescribir el ledger anterior:
 
   Las llamadas siguen usando `contacts:request:`, `contacts:processed:` y
   `contacts:haiku_request:`; la fase no escribe `contacts:haiku`.
+  En campañas con la política, una extracción general cuyos hechos Python rechaza queda
+  procesada con `contacts:haiku_rejected:<código>` y la etapa sigue. Un rechazo guardado
+  antes como parada pendiente (motivo igual a un código de `HAIKU_REJECTION_CODES` y llamada
+  de Haiku con éxito) se marca así al reanudar, sin volver a llamar.
 - Fallos conciliados sin consumo (T17): una fila `RECONCILED`, `failed` y con créditos,
   costo y desembolso en cero admite un único reintento con `retry_of` en otra ejecución;
   la decisión se toma de esos valores persistidos, nunca del texto del error.
