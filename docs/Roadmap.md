@@ -542,7 +542,12 @@ No son parte de los issues: salen de este repositorio y de `AGENTS.md`.
 - **T20:** cerrada en el tracker el 2026-11-07. Solo UX/UI; no cambió backend, puntuación ni proveedores. Contexto visual en `DESIGN.md` y [ui.md](ui.md).
 - **T21:** el protocolo y los formatos de evaluación están en [t10-evaluation.md](t10-evaluation.md); la línea base, en [evaluation.md](evaluation.md) y [delivery.md](delivery.md) (0 personas listas). La preparación y sus límites están en [t21-evaluation.md](t21-evaluation.md). El lote con `rubric_v2` espera la condición de T14; las llamadas nuevas requieren cupos verificados y autorización explícita. Cerrada en el tracker el 2026-11-08 como completada, con las casillas de los criterios sin marcar en el issue.
 - **T22:** el issue planea la rama `experiment/snov-benchmark`, pero `AGENTS.md` indica trabajar en `main`: pedir autorización al responsable antes de crearla. No se agrega `SNOV_API_KEY` ni dependencias a `main`.
-- **T23:** seguir el patrón de `confirm_alternative_channel` en `prospecting/pipeline/contacts.py`. Que la confirmación manual habilite listo cambia «Vigencia del empleo» en [Business-rules.md](Business-rules.md#vigencia-del-empleo) y requiere aprobación.
+- **T23:** implementada en `main` el 2026-11-08 sin llamadas a proveedores. Decisiones aprobadas por el usuario ese día:
+  - la confirmación manual cuenta como `corporate_evidence` con `basis="manual"` y habilita listo;
+  - la fuente consultada es una URL http(s) obligatoria;
+  - `title_changed` se resuelve al leer, sin reescribir contradicciones ni identidad.
+
+  Las reglas están en [Business-rules.md](Business-rules.md#vigencia-del-empleo), el cálculo en [contacts.md](contacts.md#confirmación-manual-del-empleo-t23) y los identificadores en [persistence.md](persistence.md#identificadores-persistidos). Se verificó solo con datos sintéticos (pruebas sin red y navegador local). El issue sigue abierto en el tracker hasta su cierre.
 - **T24:** cambia el esfuerzo y el gasto de la etapa de contactos (`_search_public`): requiere aprobación de presupuesto ([Budget-policy.md](Budget-policy.md)) y coordinarse con T16. Las llamadas reales requieren autorización explícita.
 
 ## Responsables por módulo
