@@ -151,3 +151,47 @@ test('El servidor no cierra un desplegable abierto ni reactiva la entrada termin
   assert.equal(page.hasAttribute('data-entering'), false);
   assert.deepEqual(entered, []);
 });
+
+test('El sondeo real actualiza su región sin tocar el canvas ni su estado del cliente', async () => {
+  const canvas = h('canvas', { class: 'summary-background', width: '96', height: '67' });
+  canvas.dataset = { backgroundInitialized: 'true' };
+  const root = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, ['0'])]);
+  root.dataset = { liveRegion: 'dashboard' };
+  root.querySelectorAll = () => [];
+  root.querySelector = () => null;
+  const main = h('main', {}, [canvas, root]);
+  const timers = [];
+  let polls = 0;
+  const document = {
+    body: { dataset: { running: 'true' } },
+    querySelector: () => root,
+    querySelectorAll: selector => selector === '[data-live-region]' ? [root] : [],
+    importNode: (node, deep) => node.cloneNode(deep),
+  };
+  const context = {
+    document,
+    window: {
+      location: { href: 'http://127.0.0.1/synthetic/' },
+      matchMedia: () => ({ matches: false }),
+      setTimeout: callback => timers.push(callback),
+    },
+    fetch: async () => ({ ok: true, text: async () => 'Respuesta exclusivamente sintética' }),
+    DOMParser: class {
+      parseFromString() {
+        polls++;
+        const next = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, [String(polls)])]);
+        return { body: { dataset: { running: polls === 1 ? 'true' : 'false' } }, querySelector: () => next };
+      }
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/dashboard.js'), 'utf8'), context);
+  await timers.shift()();
+  await timers.shift()();
+  assert.equal(root.firstChild.firstChild.nodeValue, '2');
+  assert.equal(main.firstChild, canvas);
+  assert.equal(canvas.getAttribute('width'), '96');
+  assert.equal(canvas.getAttribute('height'), '67');
+  assert.equal(canvas.dataset.backgroundInitialized, 'true');
+  assert.equal(main.childNodes.length, 2);
+  assert.equal(timers.length, 0);
+});

@@ -1,11 +1,14 @@
 /* Resumen: la campaña destacada, su avance por empresa y tres indicadores, sin agregados ni historial. */
+.main-content:has(> .summary-background) { isolation: isolate; }
+.main-content:has(> .summary-background) .demo-notice { max-width: 1080px; margin-inline: auto; color: var(--ink); }
+.summary-background { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: .55; pointer-events: none; }
 .home-panel { max-width: 1080px; margin: 36px auto 0; }
 .home-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
 .home-title { margin-bottom: 10px; font-size: 2.375rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.08; }
 .reveal-line { display: inline-block; overflow: clip; padding-bottom: .12em; margin-bottom: -.12em; vertical-align: bottom; }
 .reveal-line > span { display: inline-block; }
-.home-intro { margin: 0; color: var(--muted); font-size: .9375rem; }
-.home-history-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 0; color: var(--muted); font-size: .8125rem; white-space: nowrap; text-decoration: none; }
+.home-intro { margin: 0; color: var(--ink); font-size: .9375rem; }
+.home-history-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 0; color: var(--ink); font-size: .8125rem; white-space: nowrap; text-decoration: none; }
 .home-history-link:hover { color: var(--ink); }
 .home-history-link svg { width: 16px; height: 16px; }
 .home-live-notice { margin-bottom: 18px; }
@@ -71,7 +74,7 @@
 .home-metric .text-link { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: .8125rem; text-decoration: none; }
 .home-metric .text-link:hover { color: var(--unreviewed); }
 .home-metric .motion-arrow { width: 14px; height: 14px; }
-.home-footnote { display: block; max-width: 90ch; margin: 20px 0 0; color: var(--muted); font-size: .75rem; }
+.home-footnote { display: block; max-width: 90ch; margin: 20px 0 0; color: var(--ink); font-size: .75rem; }
 
 /* Cifras con rodillo: el dígito real fija ancho y línea base; el rodillo es solo dibujo. */
 .ticker { display: inline-flex; line-height: 1.15; }
@@ -89,6 +92,8 @@
 .home-empty-note { margin-top: 18px; color: var(--muted); font-size: .75rem; }
 
 .history-page { max-width: 1160px; margin: 28px auto 0; }
+.main-content:has(> .history-page) .demo-notice { max-width: 1160px; }
+.history-page > .page-heading p { color: var(--ink); }
 .history-surface { overflow: hidden; }
 .history-surface .data-table { min-width: 760px; }
 .history-surface .table-action { white-space: nowrap; }
@@ -176,6 +181,7 @@
 }
 
 @media (forced-colors: active) {
+  .summary-background { display: none; }
   .progress-segment { border: 1px solid CanvasText; }
   .progress-segment.is-done { background: Highlight; }
 }

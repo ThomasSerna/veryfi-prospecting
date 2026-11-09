@@ -28,6 +28,12 @@ contacto listo; no suma resultados de campañas distintas. Desde «Sin revisar»
 se puede abrir la siguiente empresa pendiente cuando no hay una investigación
 en curso. Si no existen campañas, se ofrece preparar la primera.
 
+Resumen e Historial muestran un fondo local de círculos verdes y turquesas,
+también cuando no hay campañas. Se anima también en dispositivos táctiles, se
+pausa si la página está oculta o el panel correspondiente sale de la vista y
+queda estático con movimiento reducido. Si se usan colores forzados o falla WebGL,
+se conserva el fondo habitual.
+
 El avance dibuja un segmento por empresa encontrada y enciende los terminados;
 sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
 permanece en el documento para lectores de pantalla. Durante una investigación,

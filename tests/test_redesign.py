@@ -170,3 +170,26 @@ def test_preparation_keeps_its_groups_and_active_campaign_block(redesign_paths, 
     assert all(f"<legend>{name}</legend>" in content for name in ("Mercado", "Alcance", "Resumen"))
     assert "Hay una campaña sin terminar." in content
     assert "disabled" in content and str(active.id) in content
+
+
+@pytest.mark.parametrize("with_campaign", [False, True])
+@pytest.mark.parametrize("route, boundary", [
+    ("webapp:campaigns", 'data-live-region="dashboard"'),
+    ("webapp:campaign_history", 'class="history-page"'),
+])
+def test_background_is_shared_by_summary_and_history(redesign_paths, make_campaign, with_campaign, route, boundary):
+    if with_campaign:
+        with Database(redesign_paths.db) as db:
+            db.save_campaign(make_campaign(status="completed"))
+    client = Client(SERVER_NAME="localhost")
+    response = client.get(reverse(route))
+    assert response.status_code == 200
+    content = response.content.decode()
+    canvas = '<canvas class="summary-background" aria-hidden="true" hidden></canvas>'
+    assert content.count(canvas) == 1
+    assert content.index(canvas) < content.index(boundary)
+    assert content.count('src="/static/js/background.js?v=cloud-4"') == 1
+    other = client.get(reverse("webapp:new_campaign"))
+    assert other.status_code == 200
+    assert "summary-background" not in other.content.decode()
+    assert "/static/js/background.js" not in other.content.decode()
