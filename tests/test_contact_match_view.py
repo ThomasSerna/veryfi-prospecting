@@ -5,6 +5,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -16,7 +17,7 @@ import pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
-from core.presentation import export_csv
+from core.presentation import export_csv, label
 from prospecting.contacts import load_contact_match
 from prospecting.db import Database
 from prospecting.models import Channel, Contact, Evidence, IdentityStatus, RunItem, utc_now
@@ -35,9 +36,10 @@ def people(tmp_path, make_campaign, make_company, make_assessment, config, reque
     weights = load_contact_match(MATCH_PATH.with_name("contact_match_v2.json")) if getattr(request, "param", None) == "v2" else None
     campaign = make_campaign(status="completed", config_snapshot=config.model_copy(update={"people_provider": None, "contact_match": weights}))
     company, company_evidence = make_company(domain="example.com", identity_status="confirmed",
-                                             segments=["fintech_software"])
+                                             operating_countries=["CO"], segments=["fintech_software"])
     assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=["CTO"])
-    item = RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed",
+    item = RunItem(campaign_id=campaign.id, company_id=company.id,
+                   stage="researched" if getattr(request, "param", None) == "researched" else "completed",
                    last_assessment_id=assessment.id, business_status="ready_preferred")
     with Database(path) as db:
         db.save_campaign(campaign)
@@ -63,7 +65,7 @@ def people(tmp_path, make_campaign, make_company, make_assessment, config, reque
                                     relevant_function=title == "CTO",
                                     provenance={field: [fact.id] for field in ("name", "title", "relevant_function")},
                                     employment_evidence_ids=[fact.id], channels=channels), evidence=[fact, verified])
-    return SimpleNamespace(path=path, campaign=campaign, company=company, tmp_path=tmp_path)
+    return SimpleNamespace(path=path, campaign=campaign, company=company, tmp_path=tmp_path, stage=item.stage)
 
 
 def test_every_saved_person_is_returned_ordered_by_match_with_blocked_last(people):
@@ -109,6 +111,8 @@ def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(pe
     assert "Descartada por regla: su identidad tiene contradicciones" in html
     assert html.count("Desglose de match") == 3 and "Cargo fuera de los perfiles" in html
     assert "El porcentaje de match no está disponible" not in html
+    assert "Cobertura de evidencia" in html
+    assert label("CO") in html and label("fintech_software") in html
 
 
 def test_company_page_warns_when_weights_are_invalid(people, monkeypatch):
@@ -120,9 +124,23 @@ def test_company_page_warns_when_weights_are_invalid(people, monkeypatch):
     assert all(name in html for name in (READY, SALES, CONTRADICTED))
 
 
-def test_campaign_table_shows_people_count_and_best_match(people):
+@pytest.mark.parametrize("people", ["completed", "researched"], indirect=True)
+def test_campaign_table_keeps_only_the_people_count_and_essential_company_data(people):
     html = page(people, "webapp:campaign")
-    assert "<th class=\"numeric\">Contactos</th>" in html and "Mejor match 100 %" in html
+    table = re.search(r'<table\b[^>]*\bresults-table\b[^>]*>(.*?)</table>', html, re.S)
+    assert table is not None
+    headings = [" ".join(re.sub(r"<[^>]*>", "", cell).split())
+                for cell in re.findall(r"<th\b[^>]*>(.*?)</th>", table[1].split("</thead>")[0], re.S)]
+    assert headings == ["Empresa", "Encaje", "Prioridad", "Disponibilidad", "Revisión", "Contactos"]
+    row = table[1].split("<tbody>")[1]
+    assert people.company.name in row and people.company.domain in row
+    assert label("CO") not in row and label("fintech_software") not in row
+    assert "Cobertura" not in row and "Mejor match" not in row
+    cells = [" ".join(re.sub(r"<[^>]*>", "", cell).split())
+             for cell in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.S)]
+    assert cells[-1] == "3"
+    assert all(name not in row for name in (READY, SALES, CONTRADICTED))
+    assert (label("researched") in row) is (people.stage == "researched")
 
 
 def csv_rows(content):

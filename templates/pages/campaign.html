@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% load prospecting_ui %}
 {% block title %}{{ campaign|campaign_short_title }} · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<a href="{% url 'webapp:campaign_history' %}">Historial</a><span aria-hidden="true">/</span><span>{{ campaign|campaign_short_title }}</span>{% endblock %}
 {% block content %}
 <div id="campaign-page" class="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}" data-entering>
   <header class="campaign-head">

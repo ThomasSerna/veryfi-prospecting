@@ -87,7 +87,6 @@
                 <div class="company-cell-copy">
                   <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}<svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
                   <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
-                  <span class="cell-note">{% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %} · {% for segment in result.company.segments %}{{ segment|label }}{% if not forloop.last %}, {% endif %}{% empty %}Segmento pendiente{% endfor %}</span>
                   {% if result.run_item.stage != 'completed' %}<span class="stage-chip">{{ result.run_item.stage|label }}</span>{% endif %}
                 </div>
               </div>
@@ -96,18 +95,13 @@
               <span class="fit-cell{% if result.assessment.fit_score == None %} is-unknown{% endif %}">
                 <strong>{{ result.assessment.fit_score|score }}</strong>
                 {% if result.assessment.fit_score != None %}<span class="fit-meter" aria-hidden="true"><span style="--value: {{ result.assessment.fit_score|floatformat:'0' }}"></span></span>{% endif %}
-                <span class="cell-note">{% if result.assessment.coverage != None %}Cobertura {{ result.assessment.coverage|percentage }}{% else %}Cobertura pendiente{% endif %}</span>
               </span>
             </td>
             <td><span class="priority priority-{{ result.assessment.priority|default:'pending' }}">{{ result.assessment.priority|label }}</span></td>
             <td><span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span></td>
             <td><span class="review review-{{ result.run_item.review_status }}">{{ result.run_item.review_status|label }}</span></td>
             <td class="numeric">
-              <span class="contacts-cell">
-                <span class="contacts-count"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/></svg>{{ result.contacts|length }}</span>
-                {% if result.people %}<span class="cell-note">{{ result.people|people_counts }}</span>{% endif %}
-                {% with best=result.contacts.0 %}{% if best.match and not best.match.blocked_reason %}<span class="cell-note">Mejor match {{ best.match.score }} %</span>{% endif %}{% endwith %}
-              </span>
+              <span class="contacts-count"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/></svg>{{ result.contacts|length }}</span>
             </td>
           </tr>
           {% endfor %}

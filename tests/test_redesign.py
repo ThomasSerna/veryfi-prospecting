@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 import os
+import re
 from types import SimpleNamespace
 
 import django
@@ -14,6 +15,7 @@ django.setup()
 
 from core import execution, views
 from prospecting.db import Database
+from prospecting.models import RunItem
 
 
 @pytest.fixture
@@ -130,6 +132,55 @@ def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_path
     assert 'aria-label="Historial de campañas"' in content
     assert str(active.id) in content and str(latest.id) in content
     assert 'aria-current="page">' in content
+
+
+@pytest.mark.parametrize("with_campaign", [False, True])
+def test_summary_has_one_headline_without_repeated_explanations(redesign_paths, make_campaign, with_campaign):
+    if with_campaign:
+        with Database(redesign_paths.db) as db:
+            db.save_campaign(make_campaign(status="completed"))
+    response = Client(SERVER_NAME="localhost").get(reverse("webapp:campaigns"))
+    assert response.status_code == 200
+    content = response.content.decode()
+    heading = re.search(r"<h1\b[^>]*>(.*?)</h1>", content, re.S)
+    assert heading is not None
+    assert " ".join(re.sub(r"<[^>]*>", "", heading[1]).split()) == "Tu investigación, de un vistazo."
+    assert "Una mirada." not in content and "El siguiente paso." not in content
+    assert "Tu investigación, donde la dejaste." not in content
+    assert "El resumen corresponde a" not in content
+    assert "La disponibilidad del contacto y la revisión son independientes." not in content
+
+
+@pytest.mark.parametrize("with_campaign", [False, True])
+def test_topbar_keeps_only_the_brand_across_routes(redesign_paths, make_campaign, make_company, with_campaign):
+    routes = [reverse(f"webapp:{name}") for name in ("campaigns", "campaign_history", "new_campaign")]
+    if with_campaign:
+        campaign = make_campaign(status="completed")
+        with Database(redesign_paths.db) as db:
+            db.save_campaign(campaign)
+            for name in ("Primera empresa sintética", "Segunda empresa sintética"):
+                company, facts = make_company(name=name)
+                db.save_company(company, evidence=facts)
+                db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id))
+        routes += [reverse("webapp:campaign", kwargs={"campaign_id": campaign.id}),
+                   reverse("webapp:company", kwargs={"campaign_id": campaign.id, "company_id": company.id})]
+    client = Client(SERVER_NAME="localhost")
+    for route in routes:
+        response = client.get(route)
+        assert response.status_code == 200
+        content = response.content.decode()
+        topbar = re.search(r'<header class="topbar">(.*?)</header>', content, re.S)
+        assert topbar is not None
+        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == "Prospecting"
+        assert 'aria-label="Veryfi Prospecting, inicio"' in topbar[1]
+        assert "/static/img/veryfi-logo.svg" in topbar[1]
+        assert 'aria-label="Menú principal"' in content
+        assert "breadcrumb" not in topbar[1] and "sequence-nav" not in topbar[1]
+    if with_campaign:
+        company_page = content[content.index('class="company-page"'):]
+        assert 'aria-label="Navegación secuencial de empresas"' in company_page
+        assert f'href="{reverse("webapp:campaign", kwargs={"campaign_id": campaign.id})}"' in company_page
+        assert "Volver a la campaña" in company_page
 
 
 def test_history_reads_only_one_campaign_for_budget_and_global_execution(redesign_paths, make_campaign, monkeypatch):

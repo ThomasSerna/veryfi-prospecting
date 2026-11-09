@@ -114,7 +114,6 @@ body[data-nav-open] .sidebar-close { display: inline-flex; }
 .workspace-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 40px; color: var(--ink); text-decoration: none; }
 .workspace-brand img { width: 70px; height: 26px; object-fit: contain; }
 .workspace-brand span { font-size: .8125rem; font-weight: 500; letter-spacing: -.01em; }
-.topbar .breadcrumb::before { width: 1px; height: 18px; margin-right: 6px; background: var(--line); content: ''; }
 
 .sidebar {
   position: fixed;
@@ -256,7 +255,6 @@ body:has(.navigation-drawer[open]) { overflow: hidden; }
   .menu-toggle { left: 12px; top: 12px; }
   .topbar { padding-left: 60px; min-height: 64px; align-content: flex-start; }
   .workspace-brand img { width: 52px; height: 20px; }
-  .topbar .breadcrumb { flex-basis: 0; }
   body:not([data-nav-open]) .navigation-drawer[open] > .menu-toggle { left: min(228px, calc(88vw - 58px)); top: 24px; }
 }
 

@@ -8,9 +8,9 @@
   <meta name="color-scheme" content="dark">
   <title>{% block title %}Veryfi Prospecting{% endblock %}</title>
   <link rel="preload" href="{% static 'fonts/InterVariable.woff2' %}" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=colors-1">
-  <link rel="stylesheet" href="{% static 'css/workspace.css' %}?v=cloud-4">
-  <link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=colors-1">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=layout-2">
+  <link rel="stylesheet" href="{% static 'css/workspace.css' %}?v=layout-2">
+  <link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=layout-2">
   <link rel="stylesheet" href="{% static 'css/motion.css' %}?v=colors-1">
   <script src="{% static 'js/app.js' %}?v=colors-1" defer></script>
   <script src="{% static 'js/navigation.js' %}?v=colors-1" defer></script>
@@ -40,8 +40,6 @@
       <a class="skip-link" href="#main">Saltar al contenido</a>
       <header class="topbar">
         <a class="workspace-brand" href="{% url 'webapp:campaigns' %}" aria-label="Veryfi Prospecting, inicio"><img src="{% static 'img/veryfi-logo.svg' %}" alt="" width="70" height="26"><span>Prospecting</span></a>
-        <nav class="breadcrumb" aria-label="Ruta de navegación">{% block breadcrumb %}<span>Campañas</span>{% endblock %}</nav>
-        {% block topbar_actions %}{% endblock %}
       </header>
       <main id="main" class="main-content" tabindex="-1">
         {% if demo_mode %}<div class="notice notice-info demo-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><strong>Demostración con datos exclusivamente sintéticos.</strong></div>{% endif %}

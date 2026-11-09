@@ -1,16 +1,12 @@
 {% extends 'base.html' %}
 {% load static prospecting_ui %}
 {% block title %}Resumen · Veryfi Prospecting{% endblock %}
-{% block breadcrumb %}<span>Resumen</span>{% endblock %}
 {% block scripts %}<script src="{% static 'js/background.js' %}?v=cloud-4" defer></script>{% endblock %}
 {% block content %}
 <canvas class="summary-background" aria-hidden="true" hidden></canvas>
 <div class="home-panel" data-live-dashboard data-live-region="dashboard" data-entering>
   <header class="home-heading">
-    <div>
-      <h1 class="home-title"><span class="reveal-line"><span>Una mirada.</span></span> <span class="reveal-line"><span>El siguiente paso.</span></span></h1>
-      <p class="home-intro">Tu investigación, donde la dejaste.</p>
-    </div>
+    <h1 class="home-title"><span class="reveal-line"><span>Tu investigación, de un vistazo.</span></span></h1>
     <a class="text-link home-history-link" href="{% url 'webapp:campaign_history' %}">Ver historial <svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
   </header>
   {% if execution.is_executing %}<div class="notice notice-info home-live-notice" role="status"><strong>Investigación en curso.</strong> Abre la campaña para seguir sus resultados.</div>{% endif %}
@@ -67,7 +63,6 @@
       </div>
     </dl>
   </div>
-  <p class="home-footnote" data-live-swap>El resumen corresponde a {% if highlighted_is_active %}la campaña activa{% else %}la última campaña{% endif %}. La disponibilidad del contacto y la revisión son independientes.</p>
   {% else %}
   <section class="home-empty surface" data-motion-surface aria-labelledby="empty-title">
     <span class="empty-radar" aria-hidden="true"><svg class="empty-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23" pathLength="1"/><circle cx="32" cy="32" r="12" pathLength="1"/><path d="M32 5v12m0 30v12M5 32h12m30 0h12" pathLength="1"/></svg></span>
