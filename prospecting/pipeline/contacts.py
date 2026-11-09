@@ -640,39 +640,50 @@ class _ContactStage:
                   and now - timedelta(days=campaign.limits.cache.web_days) <= item.retrieved_at <= now]
         if not public:
             return None
-        payload, supplied = build_contacts_request(self.company, self.assessment, campaign, public, self.people())
+        people = self.people()
+        payload, supplied = build_contacts_request(self.company, self.assessment, campaign, public, people)
         if not supplied:
             return None
+        self._run_haiku(payload, supplied, people, sent={HAIKU_KEY: 1})
+        return None
+
+    def _run_haiku(self, payload, supplied, people, *, sent):
+        """Reserva, llama y valida una extracción de Haiku sobre los fragmentos `supplied`.
+
+        `sent` son las claves que se guardan cuando la solicitud salió; si no llegó a enviarse, se retiran. Una
+        extracción ya procesada se reutiliza sin repetirla y una enviada sin resultado nunca se repite.
+        """
+        claude, account, campaign = self.claude, self.claude_account_ref, self.campaign
         fingerprint = claude.fingerprint(payload, account)
         if self.cached(fingerprint, CLAUDE_PROVIDER, CLAUDE_OPERATION, account, campaign.limits.cache.contact_days):
-            return None
+            return
         if seconds_left(self.deadline) <= 0:
             raise BudgetError("time_limit", "Se agotó el tiempo antes de extraer contactos.")
         grant = grant_for(self.grants, CLAUDE_PROVIDER, CLAUDE_OPERATION, account)
         usage = reserve_claude(self.budget, fingerprint, payload, account_ref=account,
                                funding_source=self.claude_funding_source, authorization=grant, **self.base)
         self.requests.append(usage.request_id)
-        attempts = {HAIKU_KEY: 1, f"{HAIKU_REQUEST_KEY}{usage.request_id}": 1}
+        attempts = sent | {f"{HAIKU_REQUEST_KEY}{usage.request_id}": 1}
         try:
             call = claude.create(usage.request_id, payload, account_ref=account, authorization=grant,
                                  remaining_seconds=seconds_left(self.deadline))
         except ProviderError as error:
             if error.no_send:
-                attempts.pop(HAIKU_KEY)
+                for key in sent:
+                    attempts.pop(key)
             raise
         finally:
             if self.db.get_usage(usage.request_id).status != UsageStatus.RESERVED:
                 self.checkpoint(attempts=attempts)
         try:
             parsed = parse_contacts_output(call.text, call.stop_reason, self.company, self.assessment, campaign,
-                                           supplied, utc_now(), usage.request_id, contacts=self.people())
+                                           supplied, utc_now(), usage.request_id, contacts=people)
             aggregates, facts = self.save_candidates(parsed)
         except ContactError:
             raise
         except (ValueError, TypeError):
             raise BudgetError("invalid_contact_output", "Haiku no devolvió hechos de contacto respaldados.", usage.request_id) from None
         self.checkpoint(attempts={f"{PROCESSED_KEY}{fingerprint}": 1}, aggregates=aggregates, facts=facts)
-        return None
 
     def _enrich_people(self):
         """Resuelve candidatos pertinentes por ID antes de exigir nombre completo y empleo público.
