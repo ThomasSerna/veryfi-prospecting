@@ -196,6 +196,23 @@ Las instantáneas, las revisiones originales y los resultados por caso permanece
 guardados e inferencias nuevas, y separan la revisión académica de la atribuida a
 Veryfi. Sin etiquetas comerciales documentadas no se presenta precisión comercial.
 
+### Evaluación enterprise del pipeline
+
+El evaluador del pipeline captura una combinación de país y segmento por ejecución
+y genera agregados a partir de capturas privadas. Ejemplo para generar un informe
+sin red, con una captura existente y un archivo de salida nuevo:
+
+```console
+uv run --locked python evaluate_enterprise_pipeline.py report data/evaluation/t21/run-co-fintech/capture.json --output data/evaluation/t21/report-co-fintech.json
+```
+
+Para capturar una celda se usa `run` con un plan, una base y una autorización de
+la sesión. Si sus condiciones pasan, el comando ejecuta la campaña real y puede
+consumir créditos; si no pasan, conserva el bloqueo sin llamar a proveedores. La
+[guía de evaluación](docs/t21-evaluation.md#captura-y-reporte) detalla las rutas,
+el formato de autorización, los resultados y los límites de la comparación. Cada
+celda y reanudación requiere autorización nueva; `data/` no se versiona.
+
 ## Verificación
 
 ```console
@@ -248,6 +265,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `static/`: estilos en `css/`, JavaScript en `js/` y logotipo en `img/`.
 - `demo.py`: demostración local de la interfaz con una base temporal exclusivamente sintética.
 - `evaluate_qualification.py`: evaluación offline de instantáneas, etiquetas y trazas locales.
+- `evaluate_enterprise_pipeline.py`: captura autorizada por celda y reporte agregado offline del pipeline enterprise.
 - `prospecting/models.py`: contratos de datos, configuración y validación.
 - `prospecting/db.py`: SQLite, integridad, transacciones y consultas.
 - `prospecting/budget.py`: cupos, autorización, reserva y conciliación de consumo.
@@ -274,6 +292,7 @@ una persona lista. Si una política de Windows bloquea `pytest.exe`,
 - `docs/evaluation.md`: pruebas por riesgo, resultados de los lotes reales, métricas y gasto.
 - `docs/delivery.md`: estado de la entrega, resultados medidos, límites de producción y condiciones del piloto.
 - `docs/t10-evaluation.md`: protocolo, formatos y reproducción de evaluaciones independientes.
+- `docs/t21-evaluation.md`: estado y método de evaluación enterprise frente a la línea base Hunter.
 - `PRODUCT.md` y `DESIGN.md`: contexto de ventas y decisiones visuales de la interfaz.
 - `pyproject.toml`, `uv.lock` y `.python-version`: entorno reproducible con uv y Python 3.13.
 - `.gitignore` y `.env.example`: protección de archivos locales y nombres de claves sin valores.
