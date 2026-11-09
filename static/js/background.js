@@ -59,7 +59,6 @@ void main() {
   gl_FragColor = color;
 }`;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const touch = window.matchMedia('(hover: none), (pointer: coarse)');
   const forced = window.matchMedia('(forced-colors: active)');
   const seed = Math.random();
   const shaders = [];
@@ -146,7 +145,7 @@ void main() {
       if (canvas.height !== height) canvas.height = height;
       gl.viewport(0, 0, width, height);
       gl.uniform2f(uniforms.u_resolution, width, height);
-      gl.uniform1f(uniforms.u_time, time * 0.00010);
+      gl.uniform1f(uniforms.u_time, time * 0.00025);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (gl.getError() !== gl.NO_ERROR) throw new Error('Error al dibujar WebGL');
       canvas.hidden = false;
@@ -172,7 +171,7 @@ void main() {
     if (!inView || document.hidden || !initialize()) return;
     const now = performance.now();
     if (needsDraw || canvas.hidden) draw(elapsed, now);
-    if (!failed && !reduced.matches && !touch.matches) {
+    if (!failed && !reduced.matches) {
       startedAt = now;
       frame = window.requestAnimationFrame(animate);
     }
@@ -184,7 +183,7 @@ void main() {
     needsDraw = true;
     if (startedAt === null) synchronize();
   });
-  [reduced, touch, forced].forEach(query => query.addEventListener('change', synchronize));
+  [reduced, forced].forEach(query => query.addEventListener('change', synchronize));
   observer = new IntersectionObserver(entries => {
     inView = entries.some(entry => entry.target === panel && entry.isIntersecting);
     synchronize();

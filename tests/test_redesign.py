@@ -184,7 +184,7 @@ def test_summary_background_stays_outside_polling_and_other_pages(redesign_paths
     canvas = '<canvas class="summary-background" aria-hidden="true" hidden></canvas>'
     assert content.count(canvas) == 1
     assert content.index(canvas) < content.index('data-live-region="dashboard"')
-    assert content.count('src="/static/js/background.js"') == 1
+    assert content.count('src="/static/js/background.js?v=cloud-2"') == 1
     for route in ("webapp:campaign_history", "webapp:new_campaign"):
         other = client.get(reverse(route))
         assert other.status_code == 200

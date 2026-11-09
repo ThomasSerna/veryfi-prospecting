@@ -142,25 +142,25 @@ test('Inicia una vez al entrar en pantalla y conserva shader, clamp y semilla de
   assert.equal(h.frames.size, 1);
 });
 
-test('Limita dibujos a 30 fps y avanza al 40 % original solo durante tiempo activo', () => {
+test('Limita dibujos a 30 fps y avanza a la velocidad original solo durante tiempo activo', () => {
   const h = harness();
   h.visible(true);
   [16, 32, 34, 50, 68, 100].forEach(time => h.step(time));
   assert.deepEqual(h.draws.map(draw => draw.at), [0, 34, 68]);
-  assert.equal(h.draws[2].u_time, 68 * 0.00010);
+  assert.equal(h.draws[2].u_time, 68 * 0.00025);
   h.hidden(true);
   assert.equal(h.frames.size, 0);
   h.clock(10000);
   h.hidden(false);
   h.step(10034);
-  assert.equal(h.draws.at(-1).u_time, 134 * 0.00010);
+  assert.equal(h.draws.at(-1).u_time, 134 * 0.00025);
   h.clock(10050);
   h.visible(false);
   assert.equal(h.frames.size, 0);
   h.clock(20000);
   h.visible(true);
   h.step(20034);
-  assert.equal(h.draws.at(-1).u_time, 184 * 0.00010);
+  assert.equal(h.draws.at(-1).u_time, 184 * 0.00025);
 });
 
 test('Redimensiona a viewport/15 sin DPR, con mínimo un píxel y sin reiniciar semilla', () => {
@@ -180,27 +180,35 @@ test('Redimensiona a viewport/15 sin DPR, con mínimo un píxel y sin reiniciar 
   assert.equal(h.randomCalls, 1);
 });
 
-for (const mode of ['reduced', 'touch']) {
-  test(`${mode}: composición estática, redibujo al cambiar tamaño y reacción a preferencias`, () => {
-    const h = harness({ [mode]: true });
-    h.visible(true);
-    assert.equal(h.draws.length, 1);
-    assert.equal(h.frames.size, 0);
-    h.clock(10000);
-    h.resize(900, 600);
-    assert.equal(h.draws.length, 2);
-    assert.equal(h.draws[1].u_time, 0);
-    assert.equal(h.frames.size, 0);
-    h.media(mode, false);
-    h.step(10040);
-    assert.equal(h.draws.at(-1).u_time, 40 * 0.00010);
-    h.media(mode, true);
-    assert.equal(h.frames.size, 0);
-    h.clock(20000);
-    h.resize(1200, 800);
-    assert.equal(h.draws.at(-1).u_time, 40 * 0.00010);
-  });
-}
+test('Movimiento reducido: composición estática, redibujo al cambiar tamaño y reacción a preferencias', () => {
+  const h = harness({ reduced: true });
+  h.visible(true);
+  assert.equal(h.draws.length, 1);
+  assert.equal(h.frames.size, 0);
+  h.clock(10000);
+  h.resize(900, 600);
+  assert.equal(h.draws.length, 2);
+  assert.equal(h.draws[1].u_time, 0);
+  assert.equal(h.frames.size, 0);
+  h.media('reduced', false);
+  h.step(10040);
+  assert.equal(h.draws.at(-1).u_time, 40 * 0.00025);
+  h.media('reduced', true);
+  assert.equal(h.frames.size, 0);
+  h.clock(20000);
+  h.resize(1200, 800);
+  assert.equal(h.draws.at(-1).u_time, 40 * 0.00025);
+});
+
+test('El puntero táctil conserva el movimiento de las dos capas del fondo', () => {
+  const h = harness({ touch: true });
+  h.visible(true);
+  h.step(40);
+  assert.equal(h.frames.size, 1);
+  assert.equal(h.draws.length, 2);
+  assert.equal(h.draws[1].u_time, 40 * 0.00025);
+  assert.equal(h.draws[0].u_rand, h.draws[1].u_rand);
+});
 
 test('Colores forzados oculta y detiene, incluida la activación y desactivación posterior', () => {
   const h = harness({ forced: true });
@@ -217,7 +225,7 @@ test('Colores forzados oculta y detiene, incluida la activación y desactivació
   assert.equal(h.frames.size, 0);
   h.clock(20000);
   h.media('forced', false);
-  assert.equal(h.draws.at(-1).u_time, 40 * 0.00010);
+  assert.equal(h.draws.at(-1).u_time, 40 * 0.00025);
   assert.equal(h.contexts, 1);
 });
 
