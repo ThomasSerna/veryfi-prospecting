@@ -130,6 +130,13 @@ uv run --locked python manage.py reconcile_usage data/conciliaciones/apollo-AAAA
 Una llamada sin resultado conciliada como fallida y sin consumo se repite una sola vez al
 reanudar.
 
+Para medir cuántas afirmaciones de Apollo pasaron a evidencia corporativa con la búsqueda
+dirigida del empleo, y su costo, sin datos personales ni llamadas:
+
+```console
+uv run --locked python manage.py corroboration_report --campaign <id>
+```
+
 ## Demostración sin consumo
 
 Para recorrer la interfaz sin claves, sin red y sin tocar `data/`:
