@@ -1,5 +1,7 @@
 """Corroboración dirigida del empleo con Tavily (T24); personas, páginas y respuestas exclusivamente sintéticas."""
 
+import csv
+from io import StringIO
 import json
 from types import SimpleNamespace
 
@@ -15,6 +17,7 @@ from prospecting.pipeline.contacts import (
 from prospecting.providers import ClaudeClient
 from test_contact_pipeline import contact_case, enable_role_taxonomy  # noqa: F401 (fixture)
 from test_multi_contact_pipeline import multi
+from test_ui import client, text, ui_paths, url  # noqa: F401 (fixtures)
 
 PRODUCT = ("Head of Product", "Product Manager", "Director of Product", "Senior Product Manager")
 
@@ -301,3 +304,39 @@ def test_fragment_must_name_the_person_with_the_company_or_come_from_its_domain(
                                                 "https://prensa-sintetica.example/nota"), contact, case.company)
     assert not names_person_at_company(fragment(f"Equipo de {case.company.name}.", f"https://{case.company.domain}/equipo"),
                                        contact, case.company)
+
+
+
+def read_view(case, tmp_path):
+    from prospecting.pipeline import read_campaign
+
+    return read_campaign(tmp_path / "synthetic.sqlite3", case.campaign.id)
+
+
+def test_read_and_csv_report_the_targeted_search_result(contact_case, role_config, tmp_path):
+    from core.presentation import export_csv
+
+    case = scenario(contact_case, role_config, list(PRODUCT), priority="high")
+    case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
+                                              f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
+    limits = case.campaign.limits.model_dump(mode="json")
+    limits["effort"]["high"]["employment_queries"] = 2
+    case.campaign = Campaign.model_validate(case.campaign.model_dump() | {"limits": limits})
+    case.db.save_campaign(case.campaign)
+    case.find(**case.public)
+    view = read_view(case, tmp_path)
+    [result] = [item for item in view.companies if item.company.id == case.company.id]
+    codes = {person.contact.name: person.employment_corroboration for person in result.contacts}
+    assert codes["Persona Sintética Uno"] == "corroborated"
+    assert sorted(code for name, code in codes.items() if name != "Persona Sintética Uno" and code) == [
+        "employment_search_limit", "searched_not_corroborated"]
+    rows = list(csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig"))))
+    assert {row["contact_name"]: row["employment_corroboration"] for row in rows}["Persona Sintética Uno"] == "corroborated"
+
+
+def test_company_page_explains_the_targeted_search_result(ui_paths, client, contact_case, role_config):
+    # `ui_paths` va primero: retira las claves del entorno antes de que el caso fije las sintéticas.
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.find(**case.public)
+    page = text(client.get(url("company", case.campaign.id, case.company.id)))
+    assert "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona" in page

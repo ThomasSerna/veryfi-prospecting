@@ -124,6 +124,15 @@ ENRICHMENT_REJECTIONS = {
     "entity_mismatch_name": "El nombre de la organización en Apollo no coincide con esta empresa.",
     "entity_mismatch_not_current": "Apollo no informa un empleo actual de la persona en esta organización.",
 }
+# T24: resultado de la búsqueda dirigida del empleo; los demás códigos son rechazos de los hechos citados por Haiku.
+EMPLOYMENT_CORROBORATIONS = {
+    "corroborated": "Búsqueda dirigida: una fuente pública vigente corroboró el empleo.",
+    "searched_not_corroborated": "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona con su cargo en esta empresa.",
+    "employment_search_limit": "Búsqueda dirigida pendiente: se agotó el cupo de búsquedas de la empresa.",
+    "identity_mismatch": "Búsqueda dirigida sin corroboración: el nombre citado no corresponde a la persona.",
+    "ambiguous_identity": "Búsqueda dirigida sin corroboración: hay homónimos que no se pueden distinguir.",
+    "entity_mismatch": "Búsqueda dirigida sin corroboración: la fuente asocia a la persona con otra entidad.",
+}
 STOP_MESSAGES = {
     "budget_exceeded": "Presupuesto disponible agotado.",
     "company_budget_exceeded": "Se alcanzó el tope de esta empresa.",
@@ -335,6 +344,11 @@ def enrichment_rejection(code):
     return ENRICHMENT_REJECTIONS.get(code, "Apollo no confirmó a esta persona.") if code else ""
 
 
+def employment_corroboration(code):
+    return EMPLOYMENT_CORROBORATIONS.get(
+        code, "Búsqueda dirigida sin corroboración: los hechos citados no superaron la validación.") if code else ""
+
+
 def _count(number, singular, plural):
     return f"{number} {singular if number == 1 else plural}"
 
@@ -398,7 +412,7 @@ CSV_FIELDS = (
     "contact_name", "title", "buying_role", "function_id", "contact_eligible", "contact_ready", "person_stage",
     "people_candidates", "people_relevant", "people_ready", "people_target", "people_policy_version", "people_functions",
     "employment_status", "employment_reason", "employment_basis", "employment_confirmed_at",
-    "employment_confirmation_reason", "employment_confirmation_source",
+    "employment_confirmation_reason", "employment_confirmation_source", "employment_corroboration",
     "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
     "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
@@ -454,6 +468,8 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 else person.employment.confirmed_at.isoformat(),
                 "employment_confirmation_reason": None if person is None else person.employment.confirmation_reason,
                 "employment_confirmation_source": None if person is None else person.employment.confirmation_source,
+                # T24: resultado de la búsqueda dirigida del empleo; vacío si no se buscó ni quedó pendiente.
+                "employment_corroboration": None if person is None else person.employment_corroboration,
                 # Sin match la celda queda vacía, nunca 0.
                 "contact_match": None if match is None else match.score,
                 "contact_match_version": None if match is None else match.version,

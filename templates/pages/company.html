@@ -137,6 +137,7 @@
           </div>
         </header>
         {% if person.enrichment_rejected %}<div class="notice notice-info">{{ person.enrichment_rejected|enrichment_rejection }} Queda como candidata.</div>{% endif %}
+        {% if person.employment_corroboration %}<div class="notice notice-info">{{ person.employment_corroboration|employment_corroboration }}</div>{% endif %}
         {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>
         {% elif person.employment.state != 'corporate_evidence' %}<div class="notice {% if person.employment.state == 'contradicted' %}notice-warning{% else %}notice-info{% endif %}"><strong>{{ person.employment|employment_label }}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</div>
         {% elif person.employment.basis == 'manual' %}<div class="notice notice-info"><strong>{{ person.employment|employment_label }}.</strong> {% include 'components/_manual_employment.html' with employment=person.employment %}</div>{% endif %}

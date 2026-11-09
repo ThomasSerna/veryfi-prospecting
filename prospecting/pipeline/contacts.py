@@ -201,6 +201,26 @@ EMPLOYMENT_PENDING_KEY = "contacts:employment_pending:"  # <código>:<contact_id
 EMPLOYMENT_SEARCH_LIMIT = "employment_search_limit"
 
 
+def employment_corroboration(attempts: dict, contact: Contact, employment, evidence: list[Evidence]) -> str | None:
+    """Resultado de la búsqueda dirigida del empleo (T24) para la ficha, el CSV y la medición, calculado al leer.
+
+    `corroborated`: la evidencia vigente del puesto sale de una extracción de la fase; `searched_not_corroborated`:
+    se buscó sin lograrlo; o el código pendiente guardado (cupo agotado o rechazo de Haiku). None si no aplica.
+    """
+    requests = {key[len(EMPLOYMENT_REQUEST_KEY):] for key in attempts if key.startswith(EMPLOYMENT_REQUEST_KEY)}
+    by_id = {item.id: item for item in evidence}
+    if employment.state == "corporate_evidence":
+        sources = [(by_id[id].external_reference or "").split("#")[0].removeprefix("apollo_public_v1:")
+                   for id in employment.evidence_ids if id in by_id]
+        return "corroborated" if employment.basis == "source" and requests.intersection(sources) else None
+    suffix = f":{contact.id}"
+    pending = sorted(key[len(EMPLOYMENT_PENDING_KEY):-len(suffix)] for key in attempts
+                     if key.startswith(EMPLOYMENT_PENDING_KEY) and key.endswith(suffix))
+    if pending:
+        return pending[0]
+    return "searched_not_corroborated" if attempts.get(f"{EMPLOYMENT_SEARCH_KEY}{contact.id}") else None
+
+
 def _rank(contact: Contact, roles: list[str], selected: set[UUID]):
     """Orden de investigación (T09): seleccionadas, nombre completo, cargo pertinente y su prioridad, canal verificado."""
     return (contact.id not in selected, contact.name_complete is not True, contact.relevant_function is not True,

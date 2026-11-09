@@ -36,7 +36,7 @@ from prospecting.models import (
     Evidence, Money, Priority, RunItem, RunStage, Text, UsageStatus, UtcDatetime, utc_now,
 )
 from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
-from prospecting.pipeline.contacts import REJECTED_KEY, find_contacts
+from prospecting.pipeline.contacts import REJECTED_KEY, employment_corroboration, find_contacts
 from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
@@ -152,6 +152,8 @@ class ContactResult(Contract):
     function_id: Text | None = None
     # Cargos citados que ventas puede confirmar a mano (T23); vacío si la persona no admite la confirmación.
     employment_titles: list[Text] = Field(default_factory=list)
+    # Resultado de la búsqueda dirigida del empleo (T24); None si no se buscó ni quedó pendiente.
+    employment_corroboration: Text | None = None
 
 
 class CompanyResult(Contract):
@@ -411,7 +413,9 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     results.append(ContactResult(contact=contact, eligible=eligible, stage=stage, usable_channels=usable,
                                                  employment=employment, match=ranking,
                                                  function_id=function, employment_titles=titles,
-                                                 enrichment_rejected=rejected.get(str(contact.id))))
+                                                 enrichment_rejected=rejected.get(str(contact.id)),
+                                                 employment_corroboration=employment_corroboration(
+                                                     item.attempts, contact, employment, evidence)))
                 people = None if assessment is None else people_progress(
                     contacts, company, assessment, evidence, now, roles, campaign=campaign, stages=stages)
                 families = [] if assessment is None else role_families(company, assessment, campaign, evidence=evidence)
