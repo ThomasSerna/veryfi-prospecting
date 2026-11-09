@@ -220,6 +220,19 @@ consumir créditos; si no pasan, conserva el bloqueo sin llamar a proveedores. L
 el formato de autorización, los resultados y los límites de la comparación. Cada
 celda y reanudación requiere autorización nueva; `data/` no se versiona.
 
+### Experimento Snov.io frente a Apollo
+
+Esta rama incluye una comparación aislada de la ruta de contactos. Para probarla
+con datos sintéticos, sin claves ni llamadas a proveedores:
+
+```console
+uv run --locked python -m experiments.snov_benchmark fixtures --output <dir>
+```
+
+Las pruebas sintéticas no acreditan acceso, calidad ni costo reales. La
+[guía del experimento](docs/experiments/snov-vs-apollo.md) explica la muestra,
+los controles y las condiciones para una evaluación real posterior autorizada.
+
 ## Verificación
 
 ```console
