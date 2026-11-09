@@ -59,7 +59,7 @@ def _retry_after(headers):
 def _json(response):
     try:
         value = json.loads(response.body, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         raise BenchmarkProviderError("invalid_response", "El proveedor devolvió JSON inválido.",
                                      http_status=response.status) from None
     if not isinstance(value, dict):

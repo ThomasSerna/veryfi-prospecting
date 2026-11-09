@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 import json
+import sys
 from urllib.error import URLError
 from uuid import uuid4
 
@@ -230,6 +231,22 @@ def test_logical_error_redacts_memory_only_oauth_token(monkeypatch):
         transport.send(snov_search_request(company()), timeout_seconds=1)
     assert "token-solo-memoria" not in error.value.message
     assert error.value.code == "provider_error"
+
+
+def test_provider_decoder_recursion_error_becomes_safe_invalid_response(monkeypatch):
+    depth = sys.getrecursionlimit() + 100
+    raw = HttpResponse(status=200, headers={"Content-Type": "application/json"},
+                       body=b'{"nested":' * depth + b"0" + b"}" * depth)
+
+    def reject_deep_json(value, **kwargs):
+        assert value == raw.body
+        raise RecursionError("Profundidad sintética del proveedor.")
+
+    # El límite del decoder C varía por versión de Python; comprobamos la excepción concreta.
+    monkeypatch.setattr("experiments.snov_benchmark.transport.json.loads", reject_deep_json)
+    with pytest.raises(BenchmarkProviderError) as error:
+        decode_response(raw)
+    assert error.value.code == "invalid_response"
 
 
 def test_timeout_redirect_and_oversize_fail_closed(monkeypatch):
