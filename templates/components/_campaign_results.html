@@ -50,7 +50,6 @@
 <div class="results-card surface">
   <div class="results-head" data-live-section="results-head">
     <h2 id="results-title">Empresas</h2>
-    <span class="result-count">{{ results|length }} de {{ counts.total }}</span>
   </div>
   <form method="get" class="results-toolbar" data-live-filters aria-label="Filtrar empresas" {% if not counts.total and not has_active_filters %}hidden{% endif %}>
     <label class="results-search"><span class="sr-only">{{ filter_form.q.label }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>{{ filter_form.q|render_field }}</label>

@@ -43,14 +43,6 @@
         <dd>
           <span class="home-metric-value" data-value="{{ campaign_insights.review_pending }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.review_pending %}</span>
           {% if campaign_insights.total %}<span class="home-metric-share"><span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio campaign_insights.review_pending campaign_insights.total 100 %}"></span></span><span>de {{ campaign_insights.total }}</span></span>{% endif %}
-          <span class="home-metric-note" data-live-swap>{% if campaign_insights.next_review and not execution.is_executing %}<a class="text-link" href="{% url 'webapp:company' highlighted_campaign.id campaign_insights.next_review.company.id %}">Revisar siguiente <svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>{% elif execution.is_executing %}La revisión se habilita al terminar{% else %}Sin decisiones pendientes{% endif %}</span>
-        </dd>
-      </div>
-      <div class="home-metric surface home-metric-total" data-motion-surface>
-        <dt>Empresas</dt>
-        <dd>
-          <span class="home-metric-value" data-value="{{ campaign_insights.total }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.total %}</span>
-          <span class="home-metric-note">Descubiertas en esta campaña</span>
         </dd>
       </div>
       <div class="home-metric surface home-metric-ready" data-motion-surface>
@@ -58,7 +50,6 @@
         <dd>
           <span class="home-metric-value" data-value="{{ campaign_insights.ready }}" data-delta>{% include 'components/_ticker.html' with value=campaign_insights.ready %}</span>
           {% if campaign_insights.total %}<span class="home-metric-share"><span class="metric-meter" aria-hidden="true"><span style="--share: {% widthratio campaign_insights.ready campaign_insights.total 100 %}"></span></span><span>de {{ campaign_insights.total }}</span></span>{% endif %}
-          <span class="home-metric-note">Empresas con un canal disponible</span>
         </dd>
       </div>
     </dl>

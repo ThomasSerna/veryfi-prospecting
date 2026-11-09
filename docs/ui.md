@@ -24,12 +24,11 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
 subtítulo ni nota explicativa. El inicio muestra la campaña activa o, si no la
-hay, la última guardada. El panel resume su avance y cuenta las empresas
-encontradas, sin revisar y con contacto listo; no suma resultados de campañas
+hay, la última guardada. El panel resume su avance y dos indicadores de igual tamaño
+cuentan las empresas sin revisar y con contacto listo; no suma resultados de campañas
 distintas. Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel
-destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Desde
-«Sin revisar» se puede abrir la siguiente empresa pendiente cuando no hay una
-investigación en curso. Si no existen campañas, se ofrece preparar la primera.
+destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Si no existen
+campañas, se ofrece preparar la primera.
 
 Resumen e Historial muestran un fondo local de círculos verdes y turquesas,
 también cuando no hay campañas. Se anima también en dispositivos táctiles, se
@@ -214,9 +213,10 @@ contacto listo y aceptadas), además de una barra apilada de prioridades cuya
 leyenda filtra la tabla. La tabla muestra nombre, dominio, encaje, prioridad,
 disponibilidad, revisión y cantidad de contactos; permite buscar y filtrar por país,
 segmento, prioridad y disponibilidad desde una sola barra. Toda la fila abre la ficha
-y el nombre sigue siendo el único enlace para teclado y lectores de pantalla. Las dos
-descargas están en el encabezado. Durante una investigación, la vista consulta el
-estado cada dos segundos y compara cada sección en su sitio: las empresas nuevas
+y el nombre sigue siendo el único enlace para teclado y lectores de pantalla. El botón
+Descargar del encabezado despliega las opciones para empresas listas o todas las
+empresas. Durante una investigación, la vista consulta el estado cada dos segundos
+y compara cada sección en su sitio: las empresas nuevas
 entran en su fila, las que cambian de puesto se desplazan hasta él y las que
 cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
 lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de

@@ -90,7 +90,7 @@ components:
 Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
 investigación y revisar empresas, personas y evidencia. El inicio destaca la
 campaña activa o, si no existe, la última guardada. Sus indicadores resumen
-empresas, revisión y contacto listo; el presupuesto se consulta en cada campaña.
+revisión y contacto listo; el presupuesto se consulta en cada campaña.
 
 La dirección oscura usa la paleta de Veryfi: navy, marfil, verde Veryfi y
 turquesa, con Sky, Gold y Magenta para la información y los estados. El marco compartido, el inicio, el historial, la campaña y la ficha
@@ -128,7 +128,7 @@ reasignar esos roles. Los navy derivados se escriben en OKLCH con el matiz de Na
 - **Estados**: `success` (Forest Light #00D181), `info` (Sky Light #9BA6E8),
   `warning` (Gold #FFC56D) y `error` (Magenta Light #FF7585), cada uno con su fondo
   (`*-background`). Sin revisar usa `unreviewed` (Gold) y Contacto listo, `success`.
-- **Datos**: encaje, match y Empresas usan `blue` (Sky Light); `blue-pale` (#C9D0E7)
+- **Datos**: encaje y match usan `blue` (Sky Light); `blue-pale` (#C9D0E7)
   marca prioridad media y cobertura.
 - **Prioridad**: escala Sky (#9BA6E8 alta, #7081F0 media, #4553BA baja) y navy
   (#70748F evidencia insuficiente, #45495F excluidas). Se acompaña de barras de
@@ -152,11 +152,11 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
   campaña. Su botón queda alineado con el logotipo y Prospecting en la barra
   superior. Cada campaña muestra su presupuesto.
 - El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
-  subtítulo ni nota explicativa. El inicio muestra el avance y tres indicadores
-  de la campaña destacada; el historial está en una vista independiente. Las
-  cifras no suman campañas. Los paneles se separan 24 px en escritorio y 16 px
-  en móvil; el panel destacado tiene 32 px de relleno interior en escritorio y
-  24 px en móvil.
+  subtítulo ni nota explicativa. El inicio muestra el avance y dos indicadores
+  de igual tamaño, Sin revisar y Con contacto listo, de la campaña destacada;
+  el historial está en una vista independiente. Las cifras no suman campañas.
+  Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel destacado
+  tiene 32 px de relleno interior en escritorio y 24 px en móvil.
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
   campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
 - La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
@@ -164,7 +164,8 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
   prioridades con su leyenda enlazada a filtros. Debajo, la tabla con búsqueda y
   filtros en una sola barra, y el presupuesto. El progreso usa las empresas
   encontradas como denominador; durante el descubrimiento, si todavía no hay
-  empresas, no inventa un porcentaje. Las descargas están en el encabezado.
+  empresas, no inventa un porcentaje. El botón Descargar del encabezado despliega
+  las opciones para empresas listas o todas las empresas.
 - La ficha presenta identidad y estados en el encabezado, conserva las pestañas
   Resumen, Contactos y Evidencia, las fuentes enlazadas y, a la derecha, el mejor
   match y la revisión de ventas. Volver a la campaña y, cuando corresponda,

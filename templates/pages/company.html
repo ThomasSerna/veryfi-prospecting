@@ -286,7 +286,6 @@
         <span class="lead-match"><span class="match-meter" aria-hidden="true"><span style="--value: {{ lead.match.score }}"></span></span>{{ lead.match.score }} %</span>
         <span class="person-stage"><span class="stage-steps stage-{{ lead.stage }}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="status {% if lead.stage == 'ready' %}status-accepted{% else %}status-pending{% endif %}">{{ lead.stage|person_stage_label }}</span></span>
       </div>
-      <a href="#contacts" class="text-link lead-link">Ver contactos<svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
     </section>
     {% endif %}
     {% endwith %}

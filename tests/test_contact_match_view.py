@@ -190,6 +190,7 @@ def test_v2_snapshot_drives_view_html_and_csv_despite_a_broken_external_path(peo
     assert "100 %</strong> de match" in contacts[1] and "40 %</strong> de match" in contacts[1]
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert 'id="lead-title">Mejor match' in html
+    assert "Ver contactos" not in html
     assert "El porcentaje de match no está disponible" not in html
 
 

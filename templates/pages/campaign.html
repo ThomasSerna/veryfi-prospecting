@@ -17,8 +17,13 @@
       <a href="#authorization" class="button button-primary" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5v13l11-6.5z"/></svg>{% if campaign.status == 'created' %}Iniciar{% else %}Reanudar{% endif %}</a>
       {% endif %}
       {% if counts.total %}
-      <a href="{% url 'webapp:export' campaign.id %}?mode=ready" class="button button-ghost" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>Descargar listos <span class="button-count">{{ counts.ready }}</span></a>
-      <a href="{% url 'webapp:export' campaign.id %}?mode=all" class="button button-ghost" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>Descargar todos <span class="button-count">{{ counts.total }}</span></a>
+      <details class="download-menu">
+        <summary class="button button-ghost"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>Descargar</summary>
+        <div class="download-options">
+          <a href="{% url 'webapp:export' campaign.id %}?mode=all" data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar todos <span class="button-count">{{ counts.total }}</span></a>
+          <a href="{% url 'webapp:export' campaign.id %}?mode=ready" data-idle-only {% if is_executing or not counts.ready %}aria-disabled="true" tabindex="-1"{% endif %}>Descargar listos <span class="button-count">{{ counts.ready }}</span></a>
+        </div>
+      </details>
       {% endif %}
     </div>
   </header>

@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function navigationPage({ isMobile = false, withPreview = false, reducedMotion = false } = {}) {
+function navigationPage({ isMobile = false, withPreview = false, reducedMotion = false, withDropdowns = false } = {}) {
   const document = { activeElement: null };
   function element() {
     const handlers = new Map();
@@ -59,6 +59,18 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
   preview.querySelectorAll = selector => choices.filter(input =>
     selector === `input[name="${input.name}"]:checked` && input.checked);
   const events = element();
+  const dropdowns = [element(), element()];
+  const summaries = [element(), element()];
+  const downloadLink = element();
+  dropdowns.forEach((dropdown, index) => {
+    dropdown.closest = () => dropdown;
+    dropdown.contains = target => target === summaries[index] || (index === 1 && target === downloadLink);
+    dropdown.querySelector = () => summaries[index];
+  });
+  downloadLink.closest = selector => selector === 'a[aria-disabled="true"]'
+    ? (downloadLink.getAttribute('aria-disabled') === 'true' ? downloadLink : null)
+    : selector === 'a:not([aria-disabled="true"])' && downloadLink.getAttribute('aria-disabled') !== 'true'
+      ? downloadLink : null;
   Object.assign(document, {
     body,
     addEventListener: events.addEventListener,
@@ -67,7 +79,8 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
       '[data-campaign-preview]': withPreview ? preview : null,
     })[selector] ?? null,
     getElementById: id => ({ 'navigation-drawer': drawer, navigation: sidebar, 'workspace-main': workspace })[id] ?? null,
-    querySelectorAll: () => [],
+    querySelectorAll: selector => withDropdowns && selector === '.filter-choice details[open], .download-menu[open]'
+      ? dropdowns.filter(dropdown => dropdown.open) : [],
   });
   const timers = new Map();
   const pageEvents = element();
@@ -88,11 +101,18 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
   return {
     body, drawer, menu, sidebar, workspace, close, backdrop, firstLink, lastLink, document, timers,
     preview, choices, maximum, outputs,
+    dropdowns, summaries, downloadLink,
+    openDropdown(index) {
+      dropdowns[index].open = true;
+      events.dispatch('toggle', { target: dropdowns[index] });
+    },
     click(target) {
       target.focus();
-      const event = { target, preventDefault() {} };
+      let prevented = false;
+      const event = { target, preventDefault() { prevented = true; } };
       target.dispatch('click', event);
       events.dispatch('click', event);
+      return prevented;
     },
     key(key, shiftKey = false) {
       let prevented = false;
@@ -106,6 +126,28 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
     },
   };
 }
+
+test('Descargas y filtros cierran al elegir, señalar fuera o pulsar Escape; una opción deshabilitada no descarga', () => {
+  const page = navigationPage({ withDropdowns: true });
+  page.openDropdown(0);
+  page.openDropdown(1);
+  assert.equal(page.dropdowns[0].open, false);
+  page.summaries[1].focus();
+  page.key('Escape');
+  assert.equal(page.dropdowns[1].open, false);
+  assert.equal(page.document.activeElement, page.summaries[1]);
+  page.openDropdown(1);
+  page.click(page.firstLink);
+  assert.equal(page.dropdowns[1].open, false);
+  page.openDropdown(1);
+  page.downloadLink.setAttribute('aria-disabled', 'true');
+  assert.equal(page.click(page.downloadLink), true);
+  assert.equal(page.dropdowns[1].open, true);
+  page.downloadLink.removeAttribute('aria-disabled');
+  assert.equal(page.click(page.downloadLink), false);
+  assert.equal(page.dropdowns[1].open, false);
+  assert.equal(page.document.activeElement, page.summaries[1]);
+});
 
 for (const isMobile of [false, true]) {
   test(`El menú de ${isMobile ? 'móvil' : 'escritorio'} carga cerrado y aísla el fondo al abrir`, () => {

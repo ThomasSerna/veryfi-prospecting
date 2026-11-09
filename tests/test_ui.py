@@ -1,6 +1,7 @@
 """Interfaz Django con bases temporales y datos exclusivamente sintéticos, sin tráfico real."""
 
 import csv
+from contextlib import nullcontext
 from datetime import timedelta
 from decimal import Decimal
 from html import escape
@@ -385,6 +386,32 @@ def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results
         assert client.post(url("close", case.campaign.id)).status_code == 409
         assert prepare(client).status_code == 409
         assert client.get(url("export", case.campaign.id)).status_code == 409
+
+
+@pytest.mark.parametrize("ready,running", [(False, False), (True, False), (True, True)])
+def test_download_menu_keeps_both_modes_and_their_availability(ui_results, client, ready, running):
+    case = ui_results
+    if ready:
+        bridge.confirm_alternative_channel(case.paths.db, case.campaign.id, case.contact.id, "linkedin",
+                                           case.contact.channels[0].value,
+                                           reason="Acceso profesional sintético comprobado sin envío.", confirmed=True)
+    with bridge._EXECUTION if running else nullcontext():
+        response = client.get(url("campaign", case.campaign.id))
+    assert response.status_code == 200
+    html = text(response)
+    menu = re.search(r'<details class="download-menu">(.*?)</details>', html, re.S)
+    assert menu is not None and " open" not in menu[0].split(">")[0]
+    summary = re.search(r"<summary[^>]*>(.*?)</summary>", menu[1], re.S)
+    assert "".join(re.sub(r"<[^>]*>", "", summary[1]).split()) == "Descargar"
+    links = dict(re.findall(r'<a href="([^"]+)"([^>]*)>', menu[1]))
+    assert set(links) == {url("export", case.campaign.id) + f"?mode={mode}" for mode in ("all", "ready")}
+    for mode, disabled in (("all", running), ("ready", running or not ready)):
+        attributes = links[url("export", case.campaign.id) + f"?mode={mode}"]
+        assert ('aria-disabled="true"' in attributes) is disabled
+        assert ('tabindex="-1"' in attributes) is disabled
+        assert "data-idle-only" in attributes
+    results_head = re.search(r'<div class="results-head"[^>]*>(.*?)</div>', html, re.S)
+    assert results_head is not None and "result-count" not in results_head[1]
 
 
 def test_download_rechecks_freshness_at_request_and_keeps_modes_separate(ui_results, client, monkeypatch):

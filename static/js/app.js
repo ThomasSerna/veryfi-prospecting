@@ -87,7 +87,7 @@
       summaryText.textContent = `${selected.length} seleccionados`;
     }
   }
-  const openFilters = () => Array.from(document.querySelectorAll('.filter-choice details[open]'));
+  const openDropdowns = () => Array.from(document.querySelectorAll('.filter-choice details[open], .download-menu[open]'));
   document.addEventListener('change', event => {
     const choice = event.target?.closest?.('.filter-choice');
     if (choice) syncChoice(choice);
@@ -95,16 +95,19 @@
   // `toggle` no burbujea: se escucha en captura para cerrar los demás desplegables.
   document.addEventListener('toggle', event => {
     const filter = event.target;
-    if (filter?.open && filter.closest?.('.filter-choice')) {
-      openFilters().forEach(other => { if (other !== filter) other.open = false; });
+    if (filter?.open && filter.closest?.('.filter-choice, .download-menu')) {
+      openDropdowns().forEach(other => { if (other !== filter) other.open = false; });
     }
   }, true);
-  document.addEventListener('click', event => openFilters().forEach(filter => {
-    if (!filter.contains(event.target)) filter.open = false;
+  document.addEventListener('click', event => openDropdowns().forEach(filter => {
+    const inside = filter.contains(event.target);
+    const chosen = inside && event.target.closest?.('a:not([aria-disabled="true"])');
+    if (!inside || chosen) filter.open = false;
+    if (chosen) filter.querySelector('summary')?.focus();
   }));
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
-    const open = openFilters();
+    const open = openDropdowns();
     open.forEach(filter => { filter.open = false; });
     if (open.some(filter => filter.contains(document.activeElement))) open[0].querySelector('summary')?.focus();
   });

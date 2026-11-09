@@ -122,7 +122,10 @@ def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_path
     assert "<table" not in content and "Campañas recientes" not in content
     assert "Prioridad de empresas" not in content
     assert str(active.id) in content and str(latest.id) not in content
-    assert content.count('class="home-metric ') == 3
+    assert content.count('class="home-metric ') == 2
+    assert "home-metric-total" not in content and "Revisar siguiente" not in content
+    assert "Empresas con un canal disponible" not in content
+    assert "Sin revisar" in content and "Con contacto listo" in content
     assert 'href="/campaigns/"' in content
     # La barra superior ya no resume el presupuesto ni el menú anuncia el servicio local.
     assert "data-budget-summary" not in content and "Servicio local" not in content
