@@ -3,6 +3,7 @@
 from decimal import Decimal, ROUND_DOWN
 import os
 from django import forms
+from django.core.validators import URLValidator
 from pydantic import ValidationError
 
 from prospecting.models import Campaign, CampaignFilters
@@ -88,6 +89,24 @@ class ConfirmationForm(forms.Form):
     channel_value = forms.CharField(max_length=2048, widget=forms.HiddenInput)
     reason = forms.CharField(label="Notas de verificación", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
     confirmed = forms.BooleanField(label="Canal directo comprobado")
+
+
+class EmploymentConfirmationForm(forms.Form):
+    """Confirmación manual del empleo (T23): el cargo sale de los ya citados; Python valida la persona."""
+
+    contact_id = forms.UUIDField(widget=forms.HiddenInput)
+    title = forms.CharField(label="Cargo vigente", max_length=500, widget=forms.HiddenInput)
+    source_url = forms.URLField(label="Fuente consultada (URL)", max_length=2048, assume_scheme="https",
+                                validators=[URLValidator(schemes=["http", "https"])])
+    reason = forms.CharField(label="Motivo de la confirmación", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+    confirmed = forms.BooleanField(
+        label="Comprobé el empleo vigente en esa fuente sin enviar mensajes, llamar ni enviar invitaciones")
+
+    def __init__(self, *args, titles=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        if len(titles) > 1:
+            # Con un cambio de cargo, ventas elige cuál de los cargos ya citados es el vigente.
+            self.fields["title"].widget = forms.RadioSelect(choices=[(value, value) for value in titles])
 
 
 OPERATION_LABELS = {

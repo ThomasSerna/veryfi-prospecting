@@ -376,6 +376,9 @@ def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results
         for name, fields in [
             ("review", {"status": "accepted", "reason": "Motivo sintético."}),
             ("confirm_channel", confirmation(case, confirmed="on")),
+            ("confirm_employment", {"contact_id": str(case.contact.id), "title": "CTO",
+                                    "source_url": "https://synthetic-co.example/team",
+                                    "reason": "Empleo sintético comprobado sin envío.", "confirmed": "on"}),
         ]:
             response = client.post(url(name, case.campaign.id, case.companies[0].id), fields)
             assert response.status_code == 409
@@ -751,3 +754,85 @@ def test_each_entity_mismatch_condition_has_its_own_explanation():
     labels = [enrichment_rejection(code) for code in ENTITY_MISMATCH_CODES]
     assert generic not in labels and len(set(labels)) == len(labels)
     assert enrichment_rejection("entity_mismatch") == "Apollo no confirmó que trabaje actualmente en esta entidad."
+
+
+# Confirmación manual del empleo (T23) desde la ficha, con una persona de Apollo exclusivamente sintética.
+
+@pytest.fixture
+def ui_employment(ui_paths, make_campaign, make_company, make_assessment, monkeypatch):
+    from test_employment_confirmation import CONFIRMED_AT, TITLE, apollo_person, verified
+
+    campaign = make_campaign(status="completed")
+    company, sources = make_company(domain="example.com", entity_name="Empresa sintética", segments=["fintech_software"],
+                                    identity_status="confirmed")
+    assessment = make_assessment(campaign.id, company.id, priority="high", target_roles=[TITLE])
+    contact, facts = apollo_person(SimpleNamespace(campaign=campaign, company=company, assessment=assessment,
+                                                   limits=campaign.limits))
+    contact = verified(contact)
+    for module in ("prospecting.pipeline.contacts", "prospecting.pipeline.campaign"):
+        monkeypatch.setattr(f"{module}.utc_now", lambda: CONFIRMED_AT)
+    with Database(ui_paths.db) as db:
+        db.save_campaign(campaign)
+        db.save_company(company, evidence=sources)
+        item = db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed",
+                                        business_status="qualified_no_contact"))
+        db.save_assessment(assessment)
+        db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+        db.save_contact(contact, evidence=facts)
+    return SimpleNamespace(paths=ui_paths, campaign=campaign, company=company, contact=contact, title=TITLE)
+
+
+def employment(case, **fields):
+    return {"contact_id": str(case.contact.id), "title": case.title, "source_url": "https://example.com/equipo-sintetico",
+            "reason": "Directorio corporativo sintético revisado; figura con ese cargo.", **fields}
+
+
+def test_employment_confirmation_form_appears_only_for_confirmable_people(ui_employment, ui_results, client):
+    page = text(client.get(url("company", ui_employment.campaign.id, ui_employment.company.id)))
+    assert "Confirmar empleo vigente" in page
+    assert f'action="{url("confirm_employment", ui_employment.campaign.id, ui_employment.company.id)}"' in page
+    assert "sin enviar mensajes, llamar ni enviar invitaciones" in page
+    # La persona del directorio, sin enriquecimiento de Apollo, no admite la confirmación manual del empleo.
+    other = text(client.get(url("company", ui_results.campaign.id, ui_results.companies[0].id)))
+    assert "Confirmar empleo vigente" not in other
+
+
+@pytest.mark.parametrize("fields", [
+    {}, {"confirmed": "on", "reason": ""}, {"confirmed": "on", "source_url": "directorio corporativo"},
+    {"confirmed": "on", "source_url": "ftp://example.com/equipo"},
+])
+def test_employment_confirmation_requires_checkbox_reason_and_url(ui_employment, client, fields):
+    case = ui_employment
+    response = client.post(url("confirm_employment", case.campaign.id, case.company.id), employment(case, **fields))
+    assert response.status_code == 400 and "Confirmar empleo vigente" in text(response)
+    with Database(case.paths.db) as db:
+        assert db.get_contact(case.contact.id) == case.contact
+
+
+def test_uncited_title_or_foreign_person_is_rejected(ui_employment, client):
+    case = ui_employment
+    path = url("confirm_employment", case.campaign.id, case.company.id)
+    assert client.post(path, employment(case, title="CEO", confirmed="on")).status_code == 400
+    assert client.post(path, employment(case, contact_id=str(uuid4()), confirmed="on")).status_code == 404
+    with Database(case.paths.db) as db:
+        assert db.get_contact(case.contact.id) == case.contact
+
+
+def test_employment_confirmation_shows_manual_origin_and_exports_it(ui_employment, client):
+    case = ui_employment
+    company_path = url("company", case.campaign.id, case.company.id)
+    response = client.post(url("confirm_employment", case.campaign.id, case.company.id), employment(case, confirmed="on"))
+    assert response.status_code == 302 and response.url == f"{company_path}?saved=employment#contacts"
+    page = text(client.get(response.url))
+    assert "Empleo vigente confirmado manualmente." in page and "Confirmado manualmente por ventas" in page
+    assert "Directorio corporativo sintético revisado" in page and "Confirmar empleo vigente" not in page
+    links = Links()
+    links.feed(page)
+    assert "https://example.com/equipo-sintetico" in links.urls
+    [result] = read_campaign(case.paths.db, case.campaign.id).companies
+    assert result.business_status == "ready_preferred" and result.contacts[0].eligible
+    rows = list(csv.DictReader(StringIO(client.get(url("export", case.campaign.id)).content.decode("utf-8-sig"))))
+    assert len(rows) == 1 and rows[0]["employment_status"] == "corporate_evidence"
+    assert rows[0]["employment_basis"] == "manual" and rows[0]["employment_confirmed_at"].startswith("2026-10-20T13:00")
+    assert rows[0]["employment_confirmation_reason"] == "Directorio corporativo sintético revisado; figura con ese cargo."
+    assert rows[0]["employment_confirmation_source"] == "https://example.com/equipo-sintetico"

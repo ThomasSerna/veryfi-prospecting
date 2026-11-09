@@ -18,4 +18,6 @@ urlpatterns = [
     path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/", views.company, name="company"),
     path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/review/", views.review, name="review"),
     path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/confirm/", views.confirm_channel, name="confirm_channel"),
+    path("campaigns/<uuid:campaign_id>/companies/<uuid:company_id>/confirm-employment/", views.confirm_employment,
+         name="confirm_employment"),
 ]

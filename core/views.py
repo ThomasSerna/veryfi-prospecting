@@ -16,17 +16,20 @@ from pydantic import ValidationError
 
 from prospecting.models import VeryfiConfig
 from prospecting.pipeline import (
-    confirm_alternative_channel, finish_campaign, list_saved_campaigns, load_provider_access,
-    prepare_campaign, read_campaign, review_company,
+    confirm_alternative_channel, confirm_current_employment, finish_campaign, list_saved_campaigns,
+    load_provider_access, prepare_campaign, read_campaign, review_company,
 )
 from core import execution
-from core.forms import AuthorizationForm, CampaignForm, ConfirmationForm, FilterForm, ReviewForm
+from core.forms import (
+    AuthorizationForm, CampaignForm, ConfirmationForm, EmploymentConfirmationForm, FilterForm, ReviewForm,
+)
 from core.presentation import READY, download_csv, evidence_pill, label
 
 SAVED_MESSAGES = {
     "closed": "Campaña cerrada.",
     "review": "Revisión guardada.",
     "channel": "Canal confirmado.",
+    "employment": "Empleo vigente confirmado manualmente.",
 }
 FILTER_KEYS = ("q", "countries", "segments", "priorities", "availability")
 PRIORITY_ORDER = {value: index for index, value in enumerate(("high", "medium", "insufficient_evidence", "low", "excluded"))}
@@ -178,7 +181,8 @@ def _campaign_context(request, campaign_id):
     return context
 
 
-def _company_context(request, campaign_id, company_id, *, review_form=None, confirmation_form=None):
+def _company_context(request, campaign_id, company_id, *, review_form=None, confirmation_form=None,
+                     employment_form=None):
     context = _campaign_context(request, campaign_id)
     result = next((item for item in context["view"].companies if item.company.id == company_id), None)
     if result is None:
@@ -201,10 +205,21 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
                 form = confirmation_form
             form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
             forms.append({"person": person, "channel": channel, "form": form})
+    # Confirmación manual del empleo (T23): solo para las personas que la lectura declara confirmables.
+    employment_forms = []
+    for person in ([] if context["legacy_readonly"] else result.contacts):
+        if not person.employment_titles:
+            continue
+        form = EmploymentConfirmationForm(initial={"contact_id": person.contact.id, "title": person.employment_titles[0]},
+                                          titles=person.employment_titles)
+        if employment_form is not None and str(person.contact.id) == request.POST.get("contact_id"):
+            form = employment_form
+        form.auto_id = f"employment_{person.contact.id}_%s"
+        employment_forms.append({"person": person, "form": form})
     evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
-                   confirmation_forms=forms, nav_active="campaign_history",
+                   confirmation_forms=forms, employment_forms=employment_forms, nav_active="campaign_history",
                    prev_company=prev_company, next_company=next_company,
                    sequence_position=idx + 1, sequence_total=len(sequence),
                    evidence_items=evidence_items)
@@ -388,6 +403,34 @@ def confirm_channel(request, campaign_id, company_id):
                                     form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=form.cleaned_data["confirmed"])
     query = context["filter_query"]
     suffix = f"?{query}&saved=channel" if query else "?saved=channel"
+    return redirect(f"{reverse('webapp:company', kwargs={'campaign_id': campaign_id, 'company_id': company_id})}{suffix}#contacts")
+
+
+@require_POST
+@_handled
+def confirm_employment(request, campaign_id, company_id):
+    """Confirmación manual del empleo vigente (T23); nunca envía mensajes, llamadas ni invitaciones."""
+    with execution.idle_action():
+        context = _company_context(request, campaign_id, company_id)
+        _require_idle(context["view"])
+        try:
+            contact_id = UUID(request.POST.get("contact_id", ""))
+        except ValueError:
+            contact_id = None
+        person = next((person for person in context["result"].contacts if person.contact.id == contact_id), None)
+        if person is None:
+            raise Http404("La persona no pertenece a esta empresa.")
+        if context["legacy_readonly"] or not person.employment_titles:
+            raise ValueError("La persona no admite la confirmación manual del empleo con la evidencia y las exclusiones actuales.")
+        form = EmploymentConfirmationForm(request.POST, titles=person.employment_titles)
+        if not form.is_valid():
+            return render(request, "pages/company.html",
+                          _company_context(request, campaign_id, company_id, employment_form=form), status=400)
+        confirm_current_employment(_paths()[0], campaign_id, contact_id, title=form.cleaned_data["title"],
+                                   source_url=form.cleaned_data["source_url"], reason=form.cleaned_data["reason"],
+                                   confirmed=form.cleaned_data["confirmed"])
+    query = context["filter_query"]
+    suffix = f"?{query}&saved=employment" if query else "?saved=employment"
     return redirect(f"{reverse('webapp:company', kwargs={'campaign_id': campaign_id, 'company_id': company_id})}{suffix}#contacts")
 
 

@@ -83,6 +83,8 @@ MATCH_LABELS = {
 # Vigencia del empleo (T18): estado, origen y motivo calculados al leer; solo la evidencia del puesto habilita.
 EMPLOYMENT_LABELS = {
     "corporate_evidence": "Vigente según fuente corporativa o pública",
+    # T23: ventas comprobó el puesto en la fuente que cita; vence según `cache.contact_days`.
+    "corporate_evidence:manual": "Confirmado manualmente por ventas",
     "provider_claim:apollo": "Declarado por Apollo; sin evidencia del puesto",
     "provider_claim:hunter": "Inferido del historial de Hunter; sin evidencia del puesto",
     "contradicted": "Contradicho por una fuente",
@@ -247,7 +249,12 @@ def employment_label(status):
     """Estado de la vigencia del empleo; una afirmación del proveedor nombra su origen."""
     if status is None or status == "":
         return "Sin comprobar"
-    key = f"{status.state}:{status.origin}" if status.state == "provider_claim" else status.state
+    if status.state == "provider_claim":
+        key = f"{status.state}:{status.origin}"
+    elif status.state == "corporate_evidence" and getattr(status, "basis", None) == "manual":
+        key = "corporate_evidence:manual"
+    else:
+        key = status.state
     return EMPLOYMENT_LABELS.get(key, EMPLOYMENT_LABELS["unknown"])
 
 
@@ -390,7 +397,8 @@ CSV_FIELDS = (
     "fit_score", "coverage", "priority", "products", "assessment_id", "rubric_version", "criteria",
     "contact_name", "title", "buying_role", "function_id", "contact_eligible", "contact_ready", "person_stage",
     "people_candidates", "people_relevant", "people_ready", "people_target", "people_policy_version", "people_functions",
-    "employment_status", "employment_reason",
+    "employment_status", "employment_reason", "employment_basis", "employment_confirmed_at",
+    "employment_confirmation_reason", "employment_confirmation_source",
     "contact_match", "contact_match_version", "contact_match_blocked", "contact_match_detail",
     "email", "phone", "whatsapp", "linkedin", "other", "channels", "sources",
     "company_provenance", "contact_provenance", "review_status", "review_reason", "reviewed_at", "warnings",
@@ -440,6 +448,12 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
                 "people_functions": None if result.people is None else json.dumps(result.people.function_ids),
                 "employment_status": None if person is None else person.employment.state,
                 "employment_reason": None if person is None else person.employment.reason,
+                # T23: origen manual, fecha, motivo y fuente consultada por ventas; vacíos sin confirmación vigente.
+                "employment_basis": None if person is None else person.employment.basis,
+                "employment_confirmed_at": None if person is None or person.employment.confirmed_at is None
+                else person.employment.confirmed_at.isoformat(),
+                "employment_confirmation_reason": None if person is None else person.employment.confirmation_reason,
+                "employment_confirmation_source": None if person is None else person.employment.confirmation_source,
                 # Sin match la celda queda vacía, nunca 0.
                 "contact_match": None if match is None else match.score,
                 "contact_match_version": None if match is None else match.version,

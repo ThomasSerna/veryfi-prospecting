@@ -138,7 +138,35 @@
         </header>
         {% if person.enrichment_rejected %}<div class="notice notice-info">{{ person.enrichment_rejected|enrichment_rejection }} Queda como candidata.</div>{% endif %}
         {% if person.match.blocked_reason %}<div class="notice notice-warning">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</div>
-        {% elif person.employment.state != 'corporate_evidence' %}<div class="notice {% if person.employment.state == 'contradicted' %}notice-warning{% else %}notice-info{% endif %}"><strong>{{ person.employment|employment_label }}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</div>{% endif %}
+        {% elif person.employment.state != 'corporate_evidence' %}<div class="notice {% if person.employment.state == 'contradicted' %}notice-warning{% else %}notice-info{% endif %}"><strong>{{ person.employment|employment_label }}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</div>
+        {% elif person.employment.basis == 'manual' %}<div class="notice notice-info"><strong>{{ person.employment|employment_label }}.</strong> {% include 'components/_manual_employment.html' with employment=person.employment %}</div>{% endif %}
+        {% for item in employment_forms %}
+          {% if item.person.contact.id == person.contact.id %}
+          <details class="confirmation-details" {% if item.form.errors %}open{% endif %}>
+            <summary>Confirmar empleo vigente</summary>
+            <form method="post" action="{% url 'webapp:confirm_employment' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
+              {% for hidden in item.form.hidden_fields %}{{ hidden }}{% endfor %}
+              <fieldset {% if is_executing %}disabled{% endif %}>
+                {% if item.form.non_field_errors %}<div class="notice notice-error">{{ item.form.non_field_errors }}</div>{% endif %}
+                {% if person.employment_titles|length > 1 %}
+                <fieldset class="employment-title-field">
+                  <legend>{{ item.form.title.label }}</legend>
+                  {% for choice in item.form.title %}<label class="employment-title-option" for="{{ choice.id_for_label }}">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
+                  {% if item.form.title.errors %}<div class="field-errors" role="alert">{% for error in item.form.title.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+                </fieldset>
+                {% else %}
+                <p class="quiet-note">Cargo vigente: {{ person.employment_titles.0 }}</p>
+                {% endif %}
+                {% include 'components/_field.html' with field=item.form.source_url %}
+                {% include 'components/_field.html' with field=item.form.reason %}
+                <div class="consent-field">{{ item.form.confirmed }}{{ item.form.confirmed.label_tag }}{{ item.form.confirmed.errors }}</div>
+                <p class="quiet-note">La confirmación vence a los {{ campaign.limits.cache.contact_days }} días y una fuente posterior que la contradiga la anula.</p>
+                <button class="button button-small button-secondary" type="submit" data-idle-only>Confirmar empleo</button>
+              </fieldset>
+            </form>
+          </details>
+          {% endif %}
+        {% endfor %}
         {% if person.match %}
         <details class="match-details">
           <summary>Desglose de match</summary>
@@ -194,7 +222,7 @@
           <summary>Datos de la persona</summary>
           <dl class="detail-grid">
             <div><dt>Identidad</dt><dd>{% if person.contact.identity_status == 'confirmed' %}Confirmada{% elif person.contact.identity_status == 'contradicted' %}Con contradicciones{% else %}Pendiente{% endif %}</dd></div>
-            <div><dt>Vigencia del empleo</dt><dd>{{ person.employment|employment_label }}{% if person.employment.reason %} · {{ person.employment|employment_reason }}{% endif %}{% for evidence_id in person.employment.evidence_ids %}{% if forloop.first %}<br>{% endif %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% endfor %}</dd></div>
+            <div><dt>Vigencia del empleo</dt><dd>{{ person.employment|employment_label }}{% if person.employment.reason %} · {{ person.employment|employment_reason }}{% endif %}{% if person.employment.basis == 'manual' %}<br>{% include 'components/_manual_employment.html' with employment=person.employment %}{% endif %}{% for evidence_id in person.employment.evidence_ids %}{% if forloop.first %}<br>{% endif %}{% with pill=evidence_items|evidence_item:evidence_id %}<a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>{% endwith %}{% if not forloop.last %} {% endif %}{% endfor %}</dd></div>
             <div><dt>Función pertinente</dt><dd>{{ person.contact.relevant_function|yesno:'Sí,No,Pendiente' }}</dd></div>
             <div><dt>Función del cargo</dt><dd>{{ person.function_id|label }}</dd></div>
             <div><dt>Alcance geográfico</dt><dd>{{ person.contact.geographic_scope|default_if_none:'Pendiente' }}</dd></div>
