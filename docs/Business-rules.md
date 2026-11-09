@@ -154,12 +154,20 @@ Distinguir lo que declara el proveedor de la evidencia del puesto. Python asigna
 
 | Estado | Cuándo | ¿Permite listo? |
 |---|---|---|
-| `corporate_evidence` | Fuente corporativa o pública observada, vigente según la frescura anterior, que nombra a la persona con nombre completo y, si la persona viene de Apollo, con su cargo actual; sin contradicciones en ningún sentido | Sí, si se cumplen los demás requisitos |
+| `corporate_evidence` | Fuente corporativa o pública observada, vigente según la frescura anterior, que nombra a la persona con nombre completo y, si la persona viene de Apollo, con su cargo actual; sin contradicciones en ningún sentido. También una confirmación manual vigente de ventas (ver abajo), que se muestra con origen manual | Sí, si se cumplen los demás requisitos |
 | `provider_claim` | Solo el proveedor declara el empleo: Apollo informa un empleo actual, o el historial de Hunter lo infiere | No |
 | `contradicted` | Salida nominal, empleo marcado como no vigente o en otra entidad, fuente corporativa con otro cargo o fuente del puesto contradicha | No |
 | `unknown` | Sin evidencia vigente ni afirmación reciente del proveedor | No |
 
 Ni un correo, ni su verificación, ni la fecha de actualización de un perfil, ni un dato del proveedor prueban el empleo. Una persona sin `corporate_evidence` nunca aparece como lista; la interfaz y el CSV muestran el estado y el motivo (por ejemplo, fuente vencida, fecha futura, fuente sin fecha, fuente que no nombra a la persona, cargo sin confirmar, nombre incompleto o solo afirmación del proveedor). Los casos ambiguos (otro cargo, fuente sin fecha o sin la persona, cargo sin confirmar e inferencia histórica de Hunter) quedan marcados para revisión humana. Las páginas corporativas y directorios localizados con Tavily son la vía de corroboración; justificar el empleo nunca exige enviar mensajes.
+
+Confirmación manual del empleo (T23, aprobada por el usuario el 8 de noviembre de 2026): ventas puede registrar en la ficha que comprobó el empleo vigente de una persona de Apollo enriquecida, con nombre completo, cuyo empleo solo declara el proveedor o que quedó para revisión. Debe indicar la URL de la fuente consultada, un motivo y aceptar explícitamente que no envió mensajes, llamadas ni invitaciones. La confirmación:
+
+- Cuenta como `corporate_evidence` con origen manual y habilita listo si se cumplen los demás requisitos; la ficha y el CSV muestran el origen, la fecha, el vencimiento, el motivo y la fuente.
+- Vence a los `cache.contact_days` días (30); al vencer, la persona se lee exactamente como antes de confirmarla.
+- No se admite tras una salida nominal, un empleo en otra entidad o una fuente del puesto contradicha. Una salida, otra entidad o una contradicción de cargo observadas después la anulan.
+- Con un cambio de cargo (`title_changed`), ventas elige cuál de los cargos ya citados es el vigente; no se acepta un cargo nuevo sin fuente. Mientras la confirmación esté vigente, las contradicciones de cargo anteriores a ella se dan por resueltas al leer, sin borrarse: la identidad guardada sigue marcada como contradicha.
+- Se guarda como evidencia `manual` sin reescribir las fuentes, las contradicciones ni los datos del proveedor, y queda bloqueada durante una ejecución y en campañas históricas. Las personas del historial de Hunter solo existen en campañas históricas, así que no se confirman.
 
 La vigencia inferida que se aplicó a los datos históricos de Hunter se conserva en el [Historial](#historial) como afirmación del proveedor.
 
