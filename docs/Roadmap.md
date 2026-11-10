@@ -249,7 +249,7 @@ En el lote real de T24, la extracción de 3 URL no devolvió texto. El motivo li
 
 **Alcance**
 
-- Guardar cada fallo en `RunItem.attempts`, sin cambios de esquema, con las claves `contacts:extract_failed:<hash de URL>` y `research:extract_failed:<hash de URL>`, la URL y el motivo recortado.
+- Guardar cada fallo en `RunItem.attempts`, sin cambios de esquema, con las claves `contacts:extract_failed:<url> <motivo>` y `research:extract_failed:<url> <motivo>` y valor 1: `attempts` solo admite contadores, así que la URL y el motivo recortado van en la clave.
 - Mostrar los fallos en la ficha de la empresa y su conteo en `manage.py corroboration_report`.
 - Documentar las claves en `docs/persistence.md`.
 
