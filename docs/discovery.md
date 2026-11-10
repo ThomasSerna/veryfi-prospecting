@@ -35,6 +35,27 @@ candidato seleccionado, `Company`, `Evidence` y `RunItem` en la etapa `discovere
 el resto de candidatos solo aparece en el informe. Si la campaña ya tiene empresas
 guardadas, la función no vuelve a llamar.
 
+### Filtro local y lectura de identidad (T26, `discovery_policy_v2`)
+
+Las instantáneas con `config_snapshot.discovery_policy` (ausente o `null`: conducta anterior)
+aplican, después de la búsqueda y sin cambiar el payload enviado a Tavily ni su huella:
+
+- **Descarte `non_business_site`:** hosts de `non_business_domains` (portales de contenido,
+  directorios, bolsas de empleo, marketplaces) y subdominios de contenido (`blog.`, `noticias.`…)
+  no se convierten en candidatas. El conteo aparece en `DiscoveryReport.discarded`.
+- **Dominios de otro país:** un sufijo de país ajeno a la campaña (`.es`, `.com.pe`) no se
+  excluye, porque un ccTLD extranjero solo añade una advertencia ([Business-rules.md](Business-rules.md#identidad-y-exclusiones)).
+  En la selección va detrás de las candidatas locales de su combinación, así que solo ocupa
+  plaza cuando faltan locales. Los sufijos de uso genérico (`.co`, `.io`, `.ai`…) no cuentan
+  como país.
+- **Páginas iniciales:** la portada y las páginas propias de «nosotros» o «contacto» van
+  primero, dentro del mismo tope de páginas.
+- **Consulta de Extract:** la extracción inicial reordena los fragmentos con el nombre inferido,
+  «quiénes somos», «contacto» y los países, seguidos de las señales de los perfiles.
+
+Las listas son propuestas pendientes de validación, tomadas de las paradas por identidad de
+los lotes reales de T17 y T24.
+
 Límites actuales frente a IDEA §7.1: las consultas son siempre de plantilla, porque
 Haiku no reformula consultas aunque falten resultados. El informe con las
 combinaciones que no alcanzaron la meta (`DiscoveryReport.combinations`) y los

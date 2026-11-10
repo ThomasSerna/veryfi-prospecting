@@ -187,7 +187,10 @@ y las instantáneas de las pruebas del pipeline los fijan:
   `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
   `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
   `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`, `people_policy_v1`,
-  `employment_corroboration_v1` y el esquema SQLite `user_version=2`.
+  `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=2`.
+  `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro
+  local, con la portada al final y la consulta de Extract histórica); su motivo de descarte en el
+  informe de descubrimiento es `non_business_site`.
   Las instantáneas sin taxonomía conservan los prompts v3/v4 según rúbrica y
   `contacts_extraction_v1`; las nuevas usan v5 y `contacts_extraction_v2` sin
   reinterpretar solicitudes ni evaluaciones históricas.
