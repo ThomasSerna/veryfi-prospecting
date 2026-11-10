@@ -40,7 +40,7 @@ from prospecting.pipeline.contacts import (
     EMPLOYMENT_PENDING_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_SEARCH_KEY, REJECTED_KEY, employment_corroboration,
     find_contacts,
 )
-from prospecting.pipeline.discovery import DiscoveryReport, resolve_company_identity, run_discovery
+from prospecting.pipeline.discovery import DiscoveryReport, promote_reserves, resolve_company_identity, run_discovery
 from prospecting.pipeline.qualification import qualify_company
 from prospecting.pipeline.research import EXPANSION_KEY, extract_company_pages, research_company
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient
@@ -798,10 +798,22 @@ class _Run:
                                   item.stop_reason if item.business_status == BusinessStatus.EXCLUDED else
                                   "excluded_account" if confirmed else "exclusion_review")
                 self.notify(item.company_id)
-        for stage in (self.initial_pass, self.qualification_pass, self.contacts_pass):
-            if self.paused or self.out_of_time():
+        while True:
+            for stage in (self.initial_pass, self.qualification_pass):
+                if self.paused or self.out_of_time():
+                    break
+                stage()
+            # T27: una empresa cerrada por identidad cede su plaza a la siguiente reserva, que repite las
+            # pasadas anteriores. El número de reservas acota las vueltas; contactos va al final.
+            if self.paused or self.stop_reason or self.out_of_time():
                 break
-            stage()
+            promoted = promote_reserves(self.db, self.campaign.id)
+            for company_id in promoted:
+                self.notify(company_id)
+            if not promoted:
+                break
+        if not (self.paused or self.out_of_time()):
+            self.contacts_pass()
         return discovery
 
     def initial_pass(self) -> None:

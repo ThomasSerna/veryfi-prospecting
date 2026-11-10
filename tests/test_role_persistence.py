@@ -38,7 +38,54 @@ def test_migration_preserves_results_and_spending(tmp_path, records, persist_rec
     with Database(path) as reopened, Database(tmp_path / "synthetic-new.sqlite3") as fresh:
         assert _schema_signature(reopened._connection) == _schema_signature(fresh._connection)
         assert reopened.list_usage() == [records.usage]
-        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert reopened.list_reserves(records.campaign.id) == []
+
+
+def v2_database(path, records, persist_records):
+    """Base sintética en el esquema v2 (antes de T27), con sus registros."""
+    from prospecting.db import _SCHEMA_V2
+
+    current = path.with_name("synthetic-current-v3.sqlite3")
+    with Database(current) as database:
+        persist_records(database, records)
+    with sqlite3.connect(current) as source, sqlite3.connect(path) as destination:
+        destination.executescript(_SCHEMA_V2 + "PRAGMA user_version=2;")
+        for table in ("campaigns", "companies", "contacts", "evidence", "run_items", "assessments", "usage"):
+            columns = [row[1] for row in destination.execute(f"PRAGMA table_info({table})")]
+            names = ",".join(columns)
+            rows = source.execute(f"SELECT {names} FROM {table}").fetchall()
+            destination.executemany(f"INSERT INTO {table} ({names}) VALUES ({','.join('?' for _ in columns)})", rows)
+
+
+def test_v2_migration_adds_reserves_and_keeps_results_and_spending(tmp_path, records, persist_records):
+    path = tmp_path / "synthetic-v2.sqlite3"
+    v2_database(path, records, persist_records)
+    with Database(path) as database, Database(tmp_path / "synthetic-new-v3.sqlite3") as fresh:
+        assert _schema_signature(database._connection) == _schema_signature(fresh._connection)
+        assert database._connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert database.list_usage() == [records.usage]
+        assert database.get_run_item(records.campaign.id, records.company.id) == records.run_item
+        assert database.list_reserves(records.campaign.id) == []
+
+
+def test_v2_migration_rolls_back_if_verification_fails(tmp_path, records, persist_records, monkeypatch):
+    path = tmp_path / "synthetic-v2-rollback.sqlite3"
+    v2_database(path, records, persist_records)
+    verify = Database._verify_schema
+
+    def reject_v3(self, *, version=3):
+        if version == 3:
+            raise sqlite3.DatabaseError("Fallo sintético de validación posterior.")
+        verify(self, version=version)
+
+    monkeypatch.setattr(Database, "_verify_schema", reject_v3)
+    with pytest.raises(sqlite3.DatabaseError, match="sintético"):
+        Database(path)
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("SELECT name FROM sqlite_schema WHERE name='discovery_reserves'").fetchone() is None
+        assert connection.execute("SELECT request_id FROM usage").fetchone()[0] == str(records.usage.request_id)
 
 
 def test_migration_rolls_back_if_verification_fails(tmp_path, records, persist_records, monkeypatch):
@@ -46,8 +93,8 @@ def test_migration_rolls_back_if_verification_fails(tmp_path, records, persist_r
     legacy_database(path, records, persist_records)
     verify = Database._verify_schema
 
-    def reject_v2(self, *, version=2):
-        if version == 2:
+    def reject_v2(self, *, version=3):
+        if version == 2 and self._connection.execute("PRAGMA user_version").fetchone()[0] == 2:
             raise sqlite3.DatabaseError("Fallo sintético de validación posterior.")
         verify(self, version=version)
 

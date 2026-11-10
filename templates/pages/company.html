@@ -39,7 +39,7 @@
 </header>
 <div class="company-alerts">
 {% if is_executing %}<div class="notice notice-info" role="status"><strong>Investigación en curso.</strong></div>{% endif %}
-{% if result.run_item.stop_reason %}<div class="notice notice-{{ result.run_item.stop_reason|stop_tone }}"><strong>{{ result.run_item.stop_reason|stop_message }}</strong></div>{% endif %}
+{% if result.run_item.stop_reason %}<div class="notice notice-{{ result.run_item.stop_reason|stop_tone }}"><strong>{{ result.run_item.stop_reason|stop_message }}</strong>{% with note=result.run_item|reserve_note %}{% if note %}<p>{{ note }}</p>{% endif %}{% endwith %}</div>{% endif %}
 {% if result.run_item.error_message %}<div class="notice notice-error" role="alert"><strong>Fallo en {{ result.run_item.error_stage|label }}</strong><p class="literal-detail">{{ result.run_item.error_message }}</p></div>{% endif %}
 </div>
 <div class="company-layout">

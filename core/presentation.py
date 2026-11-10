@@ -5,7 +5,7 @@ from io import StringIO
 import json
 from urllib.parse import urlsplit
 
-from prospecting.pipeline import CampaignView, read_campaign
+from prospecting.pipeline import CampaignView, read_campaign, reserve_outcome
 from prospecting.sources import validate_public_url
 
 
@@ -375,6 +375,17 @@ def people_summary(people):
 
 def _stop_key(reason, messages):
     return next((key for key in messages if reason == key or reason.startswith(key + "_") or reason.startswith(key + ":")), None)
+
+
+RESERVE_NOTES = {
+    "replaced": "Una candidata de reserva ocupó su plaza en la campaña.",
+    "exhausted": "No quedaban candidatas de reserva para ocupar su plaza.",
+}
+
+
+def reserve_note(run_item):
+    """T27: aviso de la empresa cerrada por identidad; vacío si no corresponde."""
+    return RESERVE_NOTES.get(reserve_outcome(run_item.attempts), "")
 
 
 def stop_message(reason):

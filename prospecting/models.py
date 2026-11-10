@@ -994,6 +994,18 @@ class ConsumedLimits(Contract):
     contacts_active_seconds: Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)] = 0.0
 
 
+class DiscoveryReserve(Contract):
+    """Candidata de reserva del descubrimiento (T27); `candidate` la valida `prospecting.discovery`."""
+
+    campaign_id: UUID
+    position: Count
+    host: Text
+    candidate: dict
+    company_id: UUID | None = None
+    replaces_company_id: UUID | None = None
+    promoted_at: UtcDatetime | None = None
+
+
 class RunItem(Contract):
     campaign_id: UUID
     company_id: UUID

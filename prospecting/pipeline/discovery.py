@@ -8,7 +8,7 @@ from pydantic import Field
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import (
-    CombinationReport, PlannedQuery, build_company, build_hit_evidence, build_search_queries, group_candidates,
+    Candidate, CombinationReport, PlannedQuery, build_company, build_hit_evidence, build_search_queries, group_candidates,
     policy_discard_reason, select_candidates,
 )
 from prospecting.identity import (
@@ -16,7 +16,7 @@ from prospecting.identity import (
     exclusions_status, find_reusable, match_exclusion,
 )
 from prospecting.models import (
-    BusinessStatus, Company, Contract, Count, EntityType, IdentityStatus, Money, RunItem, RunStage, Text, utc_now,
+    BusinessStatus, Campaign, Company, Contract, Count, EntityType, IdentityStatus, Money, RunItem, RunStage, Text, utc_now,
 )
 from prospecting.pipeline.calls import call_free_credit
 from prospecting.providers import ProviderClient, ProviderError
@@ -52,6 +52,78 @@ class DiscoveryReport(Contract):
     exclusions_status: ExclusionStatus = "missing"
     excluded: list[ExcludedCandidate] = Field(default_factory=list)
     reused_company_ids: list[UUID] = Field(default_factory=list)
+    # T27: candidatas guardadas para reemplazar empresas que no confirmen su identidad.
+    reserves: Count = 0
+
+
+# T27: claves de `RunItem.attempts` de la empresa reemplazada y paradas de identidad que se reemplazan.
+REPLACED_KEY = "discovery:replaced_by:"
+RESERVE_EXHAUSTED_KEY = "discovery:reserve_exhausted"
+REPLACEABLE_STOPS = frozenset({"name_unconfirmed", "country_unconfirmed", "identity_unverified", "domain_unknown"})
+
+
+def _reserve_candidates(kept: list[Candidate], selected: list[Candidate], review: set[str],
+                        campaign: Campaign) -> list[Candidate]:
+    """Continúa la misma selección más allá de `max_companies`, sin cuentas en revisión de exclusión."""
+    chosen = {item.host for item in selected}
+    pool = [item for item in kept if item.host not in review]
+    ordered, _ = select_candidates(pool, campaign.model_copy(update={"max_companies": 2 * campaign.max_companies}))
+    return [item for item in ordered if item.host not in chosen][:campaign.max_companies]
+
+
+def reserve_outcome(attempts: dict[str, int]) -> Literal["replaced", "exhausted"] | None:
+    """Si una empresa cerrada por identidad cedió su plaza a una reserva o no quedaban reservas."""
+    if any(key.startswith(REPLACED_KEY) for key in attempts):
+        return "replaced"
+    return "exhausted" if RESERVE_EXHAUSTED_KEY in attempts else None
+
+
+def promote_reserves(db: Database, campaign_id: UUID) -> list[UUID]:
+    """Reemplaza cada empresa cerrada por identidad con la siguiente reserva; no llama a proveedores (T27).
+
+    Cada empresa caída se reemplaza una sola vez y cada reserva se usa una sola vez (restricciones de
+    `discovery_reserves`); la empresa caída conserva su resultado y deja de ocupar plaza.
+    """
+    campaign = db.get_campaign(campaign_id)
+    if campaign is None or campaign.config_snapshot.discovery_policy is None:
+        return []
+    reserves = db.list_reserves(campaign_id)
+    replaced = {item.replaces_company_id for item in reserves if item.replaces_company_id is not None}
+    queue = [item for item in reserves if item.company_id is None]
+    in_campaign = {item.company_id for item in db.list_run_items(campaign_id)}
+    confirmed = [item for item in _known_companies(db) if item.identity_status == IdentityStatus.CONFIRMED]
+    promoted = []
+    for item in db.list_run_items(campaign_id):
+        if (item.stage != RunStage.COMPLETED or item.stop_reason not in REPLACEABLE_STOPS
+                or item.company_id in replaced or RESERVE_EXHAUSTED_KEY in item.attempts):
+            continue
+        while queue:
+            reserve = queue.pop(0)
+            candidate = Candidate.model_validate(reserve.candidate)
+            existing = find_reusable(candidate, confirmed)
+            if existing is not None and existing.id in in_campaign:
+                continue
+            with db.transaction():
+                if existing is None:
+                    company, evidence = build_company(candidate)
+                    db.save_company(company, evidence=evidence)
+                    company_id = company.id
+                else:
+                    company_id = existing.id
+                    for fact in build_hit_evidence(candidate, company_id):
+                        db.save_evidence(fact)
+                # La reserva se marca antes de guardar la empresa nueva: la caída deja de ocupar plaza.
+                db.promote_reserve(campaign_id, reserve.position, company_id, item.company_id, utc_now())
+                db.save_run_item(RunItem(campaign_id=campaign_id, company_id=company_id))
+                db.save_run_item(item.model_copy(update={
+                    "attempts": item.attempts | {f"{REPLACED_KEY}{company_id}": 1}, "updated_at": utc_now()}))
+            promoted.append(company_id)
+            in_campaign.add(company_id)
+            break
+        else:
+            db.save_run_item(item.model_copy(update={
+                "attempts": item.attempts | {RESERVE_EXHAUSTED_KEY: 1}, "updated_at": utc_now()}))
+    return promoted
 
 
 def _known_companies(db: Database) -> list[Company]:
@@ -142,6 +214,8 @@ def run_discovery(db: Database, budget: Budget, client: ProviderClient, campaign
     if excluded:
         discarded["excluded_account"] = len(excluded)
     selected, combinations = select_candidates(kept, campaign)
+    reserves = ([] if campaign.config_snapshot.discovery_policy is None
+                else _reserve_candidates(kept, selected, set(review), campaign))
     confirmed = [item for item in _known_companies(db) if item.identity_status == IdentityStatus.CONFIRMED]
     company_ids, reused = [], []
     with db.transaction():
@@ -164,11 +238,13 @@ def run_discovery(db: Database, budget: Budget, client: ProviderClient, campaign
                 stop_reason=None if match is None else "exclusion_review",
             ))
             company_ids.append(company_id)
+        if reserves:
+            db.save_reserves(campaign_id, [(item.host, item.model_dump(mode="json")) for item in reserves])
     return DiscoveryReport(
         campaign_id=campaign_id, queries=outcomes, raw_hits=len(hits),
         candidates=len(candidates), discarded=discarded, selected_company_ids=company_ids,
         combinations=combinations, stop_reason=stop, exclusions_status=status,
-        excluded=excluded, reused_company_ids=reused,
+        excluded=excluded, reused_company_ids=reused, reserves=len(reserves),
     )
 
 

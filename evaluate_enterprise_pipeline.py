@@ -28,7 +28,7 @@ from prospecting.contacts import (
     load_contact_match, person_function, person_stage, rank_contact_matches,
     role_families, target_roles, validate_contact,
 )
-from prospecting.db import Database
+from prospecting.db import SCHEMA_VERSION, Database
 from prospecting.discovery import load_icp_enterprise
 from prospecting.identity import ExclusionEntry, ExclusionList, load_exclusions
 from prospecting.models import (
@@ -310,8 +310,8 @@ def run_plan(plan_path, *, country, segment, db_path, access_path, approvals_pat
         blockers.append("ledger_fingerprint_mismatch")
     if db_path.is_file():
         header = db_path.read_bytes()[:100]
-        # Abrir el constructor migraría un histórico v1; el encabezado permite bloquearlo sin SQL.
-        if header[:16] != b"SQLite format 3\x00" or int.from_bytes(header[60:64], "big") != 2:
+        # Abrir el constructor migraría un histórico anterior; el encabezado permite bloquearlo sin SQL.
+        if header[:16] != b"SQLite format 3\x00" or int.from_bytes(header[60:64], "big") != SCHEMA_VERSION:
             blockers.append("ledger_schema_unverified")
         if any(Path(str(db_path) + suffix).exists() and Path(str(db_path) + suffix).stat().st_size
                for suffix in ("-wal", "-journal")):

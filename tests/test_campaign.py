@@ -239,6 +239,56 @@ def test_campaign_runs_every_stage_in_order_and_completes(world):
     assert_no_request_sent_twice(case)
 
 
+def test_identity_failure_is_replaced_by_the_next_reserve_once(world, role_config, monkeypatch):
+    """T27: con `discovery_policy_v2`, una empresa cerrada por identidad cede su plaza a la reserva siguiente."""
+    import sys
+
+    from prospecting.pipeline import reserve_outcome
+    from prospecting.pipeline.discovery import promote_reserves
+
+    module = sys.modules[__name__]
+    # «Fantasma Cinco» va primero en los resultados y sus páginas no la nombran ni dicen su país.
+    monkeypatch.setattr(module, "WORLD", {"fantasma-cinco.example": ("Fantasma Cinco", (1, 1, 0.5, 1, None)), **WORLD})
+    original_page = module.page
+    monkeypatch.setattr(module, "page", lambda url: (
+        "Una empresa procesa recibos de gastos." if "fantasma-cinco" in url else original_page(url)))
+    case = world.setup()
+    case.campaign = case.campaign.model_copy(update={"max_companies": 3, "config_snapshot": case.config.model_copy(
+        update={"discovery_policy": role_config.discovery_policy})})
+    start(case)
+    report = case.run()
+    assert report.status == CampaignStatus.COMPLETED and report.discovery.reserves == 2
+    items = case.by_domain()
+    assert set(items) == {"fantasma-cinco.example", "alta-uno.example", "media-dos.example", "baja-tres.example"}
+    fantasma, baja = items["fantasma-cinco.example"], items["baja-tres.example"]
+    assert fantasma.stop_reason == "name_unconfirmed" and fantasma.business_status == "insufficient_evidence"
+    assert reserve_outcome(fantasma.attempts) == "replaced"
+    assert fantasma.attempts[f"discovery:replaced_by:{baja.company_id}"] == 1
+    assert baja.stage == RunStage.COMPLETED and baja.business_status == "low_fit"
+    reserves = case.db.list_reserves(case.campaign.id)
+    assert [(item.host, item.company_id, item.replaces_company_id) for item in reserves] == [
+        ("baja-tres.example", baja.company_id, fantasma.company_id), ("dudosa-cuatro.example", None, None)]
+    assert_no_request_sent_twice(case)
+    # Reanudar no promueve otra vez: la empresa caída ya fue reemplazada.
+    events = len(case.events)
+    assert promote_reserves(case.db, case.campaign.id) == [] and len(case.events) == events
+    # Con una segunda caída se usa la última reserva; con una tercera, se agotan.
+    for domain in ("alta-uno.example", "media-dos.example"):
+        item = case.by_domain()[domain]
+        case.db.save_run_item(item.model_copy(update={"stop_reason": "country_unconfirmed"}))
+    promoted = promote_reserves(case.db, case.campaign.id)
+    assert [case.db.get_company(company_id).domain for company_id in promoted] == ["dudosa-cuatro.example"]
+    outcomes = {domain: reserve_outcome(item.attempts) for domain, item in case.by_domain().items()}
+    assert sorted(outcome for outcome in outcomes.values() if outcome) == ["exhausted", "replaced", "replaced"]
+    assert promote_reserves(case.db, case.campaign.id) == [] and len(case.events) == events
+    # La ficha explica por qué la empresa caída ya no ocupa plaza, sin interpretar claves crudas.
+    from core.presentation import reserve_note
+
+    notes = {reserve_note(item) for item in case.by_domain().values()} - {""}
+    assert notes == {"Una candidata de reserva ocupó su plaza en la campaña.",
+                     "No quedaban candidatas de reserva para ocupar su plaza."}
+
+
 @pytest.mark.parametrize("expanded", [False, True])
 def test_resume_qualification_preserves_expansion_time_and_consumption(
         world, make_company, make_assessment, monkeypatch, expanded):

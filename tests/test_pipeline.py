@@ -628,6 +628,8 @@ def test_discovery_policy_filters_hits_locally_without_changing_the_search_paylo
         hosts = {case.db.get_company(item).domain for item in report.selected_company_ids}
         if policy is None:
             assert "softwaredoit.es" in hosts and "non_business_site" not in report.discarded
+            # T27: sin la política no se guardan reservas.
+            assert report.reserves == 0 and case.db.list_reserves(case.campaign.id) == []
         else:
             assert hosts == {"nueva-uno.example", "sesamehr.es"}
             assert report.discarded["non_business_site"] == 2 * len(payloads[-1])

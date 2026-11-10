@@ -8,7 +8,7 @@ from typing import Iterator, Sequence
 from uuid import UUID
 
 from prospecting.models import (
-    Assessment, Campaign, Company, Contact, Evidence, RunItem, RunStage, Usage,
+    Assessment, Campaign, Company, Contact, DiscoveryReserve, Evidence, RunItem, RunStage, Usage,
 )
 
 
@@ -140,7 +140,26 @@ CREATE INDEX usage_by_fingerprint ON usage(request_fingerprint);
 """
 
 _MIGRATION_V2 = "ALTER TABLE assessments ADD COLUMN profile_matches TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(profile_matches));"
-_SCHEMA = _SCHEMA_V1 + _MIGRATION_V2
+# T27: candidatas de reserva del descubrimiento. `candidate` guarda la candidata tal como la seleccionó
+# `prospecting.discovery`; una reserva se promueve una sola vez y cada empresa caída se reemplaza una sola vez.
+_MIGRATION_V3 = """
+CREATE TABLE discovery_reserves (
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    position INTEGER NOT NULL CHECK(position >= 0),
+    host TEXT NOT NULL,
+    candidate TEXT NOT NULL CHECK(json_valid(candidate)),
+    company_id TEXT REFERENCES companies(id),
+    replaces_company_id TEXT REFERENCES companies(id),
+    promoted_at TEXT,
+    PRIMARY KEY(campaign_id, position),
+    UNIQUE(campaign_id, host),
+    UNIQUE(campaign_id, replaces_company_id),
+    CHECK((company_id IS NULL) = (promoted_at IS NULL))
+);
+"""
+_SCHEMA_V2 = _SCHEMA_V1 + _MIGRATION_V2
+_SCHEMA = _SCHEMA_V2 + _MIGRATION_V3
+SCHEMA_VERSION = 3
 
 
 def _schema_signature(connection: sqlite3.Connection) -> list[tuple]:
@@ -169,24 +188,31 @@ class Database:
             self._connection.execute("PRAGMA foreign_keys=ON")
             if is_new:
                 self._connection.executescript(
-                    "BEGIN IMMEDIATE;\n" + _SCHEMA + "\nPRAGMA user_version=2;\nCOMMIT;"
+                    "BEGIN IMMEDIATE;\n" + _SCHEMA + f"\nPRAGMA user_version={SCHEMA_VERSION};\nCOMMIT;"
                 )
-            elif self._connection.execute("PRAGMA user_version").fetchone()[0] == 1:
+            elif self._connection.execute("PRAGMA user_version").fetchone()[0] in (1, 2):
+                # Migración aditiva en una sola transacción: un fallo deja la base en su versión original.
                 with self.transaction():
-                    self._verify_schema(version=1)
-                    self._connection.execute(_MIGRATION_V2)
-                    self._connection.execute("PRAGMA user_version=2")
+                    if self._connection.execute("PRAGMA user_version").fetchone()[0] == 1:
+                        self._verify_schema(version=1)
+                        self._connection.execute(_MIGRATION_V2)
+                        self._connection.execute("PRAGMA user_version=2")
+                    self._verify_schema(version=2)
+                    for statement in _MIGRATION_V3.split(";"):
+                        if statement.strip():
+                            self._connection.execute(statement)
+                    self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
                     self._verify_schema()
             self._verify_schema()
         except BaseException:
             self._connection.close()
             raise
 
-    def _verify_schema(self, *, version: int = 2) -> None:
+    def _verify_schema(self, *, version: int = SCHEMA_VERSION) -> None:
         if self._connection.execute("PRAGMA user_version").fetchone()[0] != version:
             raise sqlite3.DatabaseError("Versión de base de datos incompatible; no se modificó el esquema.")
         with sqlite3.connect(":memory:") as expected:
-            expected.executescript(_SCHEMA_V1 if version == 1 else _SCHEMA)
+            expected.executescript({1: _SCHEMA_V1, 2: _SCHEMA_V2}.get(version, _SCHEMA))
             if _schema_signature(self._connection) != _schema_signature(expected):
                 raise sqlite3.DatabaseError("Esquema incompleto o incompatible; no se recreó la base.")
         if self._connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
@@ -412,10 +438,7 @@ class Database:
                 for field in ("created_at", "rubric_version", "config_snapshot"):
                     if getattr(old, field) != getattr(campaign, field):
                         raise ValueError("La configuración original de campaña es inmutable.")
-            count = self._connection.execute(
-                "SELECT count(*) FROM run_items WHERE campaign_id=?", (str(campaign.id),)
-            ).fetchone()[0]
-            if count > campaign.max_companies:
+            if self._active_companies(campaign.id) > campaign.max_companies:
                 raise ValueError("El máximo de campaña no puede ser menor que las empresas guardadas.")
             for existing in self.list_campaigns():
                 for version, rubric in campaign.config_snapshot.rubrics.items():
@@ -537,10 +560,7 @@ class Database:
                 raise sqlite3.IntegrityError("La campaña no existe.")
             old = self._load(RunItem, run_item.campaign_id, run_item.company_id)
             if old is None:
-                count = self._connection.execute(
-                    "SELECT count(*) FROM run_items WHERE campaign_id=?", (str(run_item.campaign_id),)
-                ).fetchone()[0]
-                if count >= campaign.max_companies:
+                if self._active_companies(run_item.campaign_id) >= campaign.max_companies:
                     raise ValueError("La campaña alcanzó el límite de empresas.")
             else:
                 stages = list(RunStage)
@@ -560,8 +580,42 @@ class Database:
     def get_run_item(self, campaign_id: UUID, company_id: UUID) -> RunItem | None:
         return self._get(RunItem, campaign_id, company_id)
 
+    def _active_companies(self, campaign_id: UUID) -> int:
+        """Empresas que ocupan plaza: una reemplazada por una reserva (T27) conserva su fila, pero no cuenta."""
+        return self._connection.execute(
+            "SELECT count(*) FROM run_items WHERE campaign_id=? AND company_id NOT IN ("
+            "SELECT replaces_company_id FROM discovery_reserves WHERE campaign_id=? AND replaces_company_id IS NOT NULL)",
+            (str(campaign_id), str(campaign_id))).fetchone()[0]
+
     def list_run_items(self, campaign_id: UUID) -> list[RunItem]:
         return self._list(RunItem, filters=[("campaign_id", campaign_id)], order="company_id")
+
+    def save_reserves(self, campaign_id: UUID, reserves: Sequence[tuple[str, dict]]) -> None:
+        """Guarda las candidatas de reserva (`host`, candidata) en el orden de selección (T27)."""
+        with self._atomic():
+            if self._load(Campaign, campaign_id) is None:
+                raise sqlite3.IntegrityError("La campaña no existe.")
+            for position, (host, candidate) in enumerate(reserves):
+                self._connection.execute(
+                    "INSERT INTO discovery_reserves (campaign_id, position, host, candidate) VALUES (?, ?, ?, ?)",
+                    (str(campaign_id), position, host, json.dumps(candidate, ensure_ascii=False)))
+
+    def list_reserves(self, campaign_id: UUID) -> list[DiscoveryReserve]:
+        rows = self._connection.execute(
+            "SELECT * FROM discovery_reserves WHERE campaign_id=? ORDER BY position", (str(campaign_id),)).fetchall()
+        return [DiscoveryReserve.model_validate(dict(row) | {"candidate": json.loads(row["candidate"])}) for row in rows]
+
+    def promote_reserve(self, campaign_id: UUID, position: int, company_id: UUID,
+                        replaces_company_id: UUID | None, promoted_at) -> None:
+        """Marca la reserva como usada; una reserva o una empresa reemplazada no se usan dos veces."""
+        with self._atomic():
+            cursor = self._connection.execute(
+                "UPDATE discovery_reserves SET company_id=?, replaces_company_id=?, promoted_at=? "
+                "WHERE campaign_id=? AND position=? AND company_id IS NULL",
+                (str(company_id), None if replaces_company_id is None else str(replaces_company_id),
+                 promoted_at.isoformat(), str(campaign_id), position))
+            if cursor.rowcount != 1:
+                raise ValueError("La reserva no existe o ya se usó.")
 
     def save_usage(self, usage: Usage) -> Usage:
         usage = self._validated(Usage, usage)

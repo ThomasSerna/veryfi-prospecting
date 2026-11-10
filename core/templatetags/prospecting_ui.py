@@ -9,7 +9,7 @@ from core.presentation import (
     employment_label, employment_reason,
     enrichment_rejection, ineligible_reason, label as present_label,
     match_label, money as present_money, money_summary as present_money_summary,
-    people_counts, people_summary, person_stage_label, stop_message, stop_tone,
+    people_counts, people_summary, person_stage_label, reserve_note, stop_message, stop_tone,
 )
 
 register = template.Library()
@@ -28,6 +28,7 @@ register.filter("enrichment_rejection", enrichment_rejection)
 register.filter("employment_corroboration", employment_corroboration)
 register.filter("people_summary", people_summary)
 register.filter("people_counts", people_counts)
+register.filter("reserve_note", reserve_note)
 register.filter("extract_failures", lambda run_item: extract_failures(run_item.attempts))
 
 

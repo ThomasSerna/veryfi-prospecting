@@ -14,7 +14,8 @@ from prospecting.pipeline.campaign import (
 from prospecting.pipeline.campaign import ExtractFailure, extract_failures
 from prospecting.pipeline.contacts import ContactReport, find_contacts
 from prospecting.pipeline.discovery import (
-    DiscoveryReport, ExcludedCandidate, IdentityReport, QueryOutcome, resolve_company_identity, run_discovery,
+    DiscoveryReport, ExcludedCandidate, IdentityReport, QueryOutcome, reserve_outcome, resolve_company_identity,
+    run_discovery,
 )
 from prospecting.pipeline.qualification import QualificationReport, qualify_company
 from prospecting.pipeline.research import (
@@ -31,4 +32,5 @@ __all__ = [
     "finish_campaign", "list_saved_campaigns", "load_provider_access", "prepare_campaign", "provider_operations",
     "read_campaign", "review_company", "ReconciliationReceipt", "ReconciliationSummary", "reconcile_usage",
     "CorroborationSummary", "employment_corroboration_summary", "ExtractFailure", "extract_failures",
+    "reserve_outcome",
 ]

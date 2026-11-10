@@ -175,15 +175,16 @@ def test_deterministic_ids_do_not_change(config):
 
 
 def test_sqlite_schema_versions_are_fixed(tmp_path):
-    from prospecting.db import _SCHEMA_V1
+    from prospecting.db import _SCHEMA_V1, _SCHEMA_V2
 
-    with sqlite3.connect(":memory:") as legacy:
-        legacy.executescript(_SCHEMA_V1)
-        original = legacy.execute(
-            "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
-        ).fetchall()
-    assert hashlib.sha256(json.dumps(original, ensure_ascii=False).encode("utf-8")).hexdigest() == (
-        "041bdf146760695410c12672702ddcdec7a3c19a301f5a623d197ca0e66dff47")
+    for script, expected in ((_SCHEMA_V1, "041bdf146760695410c12672702ddcdec7a3c19a301f5a623d197ca0e66dff47"),
+                             (_SCHEMA_V2, "14880148696ceb55146937607e51777ff4a43f37a647582a580b37bc09c1d486")):
+        with sqlite3.connect(":memory:") as legacy:
+            legacy.executescript(script)
+            original = legacy.execute(
+                "SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
+            ).fetchall()
+        assert hashlib.sha256(json.dumps(original, ensure_ascii=False).encode("utf-8")).hexdigest() == expected
     path = tmp_path / "synthetic-schema.sqlite3"
     with Database(path):
         pass
@@ -194,7 +195,8 @@ def test_sqlite_schema_versions_are_fixed(tmp_path):
         ).fetchall()
     connection.close()
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode("utf-8")).hexdigest()
-    assert (version, digest) == (2, "14880148696ceb55146937607e51777ff4a43f37a647582a580b37bc09c1d486")
+    # T27: v3 añade solo la tabla `discovery_reserves`.
+    assert (version, digest) == (3, "ca1a9fb8ca3c8dd2a4a5819e3aa94a1a3f30c1af3058f980b797ad10d19d58c0")
 
 
 def test_reserved_model_has_a_published_price():
@@ -256,6 +258,14 @@ def test_channel_policy_version_and_status_are_fixed(role_config, config):
     assert ChannelStatus.PROVIDER_VERIFIED == "provider_verified"
     assert role_config.defaults.freshness.channel_policy == "channel_policy_v2"
     assert config.defaults.freshness.channel_policy is None
+
+
+def test_reserve_keys_are_fixed():
+    """T27: la ficha y la reanudación leen estas claves de la empresa reemplazada."""
+    from prospecting.pipeline.discovery import REPLACEABLE_STOPS, REPLACED_KEY, RESERVE_EXHAUSTED_KEY
+
+    assert (REPLACED_KEY, RESERVE_EXHAUSTED_KEY) == ("discovery:replaced_by:", "discovery:reserve_exhausted")
+    assert REPLACEABLE_STOPS == {"name_unconfirmed", "country_unconfirmed", "identity_unverified", "domain_unknown"}
 
 
 def test_extract_failure_keys_are_fixed():
