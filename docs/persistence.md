@@ -190,7 +190,10 @@ y las instantáneas de las pruebas del pipeline los fijan:
   `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=2`.
   `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro
   local, con la portada al final y la consulta de Extract histórica); su motivo de descarte en el
-  informe de descubrimiento es `non_business_site`.
+  informe de descubrimiento es `non_business_site`. `channel_policy_v2` vive en
+  `limits.freshness.channel_policy` (ausente o `null`: el correo de Apollo queda pendiente) y el
+  estado de canal `provider_verified`, en el JSON de canales, marca el `verified` de Apollo sin
+  fecha de verificación propia.
   Las instantáneas sin taxonomía conservan los prompts v3/v4 según rúbrica y
   `contacts_extraction_v1`; las nuevas usan v5 y `contacts_extraction_v2` sin
   reinterpretar solicitudes ni evaluaciones históricas.

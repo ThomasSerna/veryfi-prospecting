@@ -148,7 +148,7 @@ La publicación corporativa de un email prueba que se ofrece como contacto, no g
 
 Conservar estado original del proveedor y un estado normalizado: `verified`, `published_professional`, `accept_all`, `unknown`, `invalid` o `manual_confirmed`. `accept_all`/`unknown` no son por sí solos verificados. Si además existe publicación nominal corporativa vigente, conservar ambos hechos y la advertencia; una verificación `invalid` bloquea ese canal hasta resolverla.
 
-Frescura propuesta: verificación de email hasta 30 días; evidencia fechada del puesto preferiblemente dentro de 365 días, o directorio corporativo actual consultado. Si la fuente no permite estimar vigencia, marcar incertidumbre y requerir revisión antes de listo. Estos plazos son reglas del prototipo, no garantías del proveedor.
+Frescura propuesta: verificación de email hasta 30 días; evidencia fechada del puesto preferiblemente dentro de 365 días, o directorio corporativo actual consultado. Si la fuente no permite estimar vigencia, marcar incertidumbre y requerir revisión antes de listo. Estos plazos son reglas del prototipo, no garantías del proveedor. Con `channel_policy_v2` (aprobada por el usuario el 2026-11-09, T28), un correo nominal del dominio confirmado que Apollo informa con `email_status=verified` cuenta como verificado por el proveedor durante 30 días desde la consulta (`retrieved_at`), porque Apollo no informa una fecha de verificación propia. Se muestra como «Verificado por Apollo (sin fecha de verificación propia)». `catch_all`, `unknown` e `invalid` no cambian, y la identidad, el cargo pertinente y el empleo vigente siguen siendo obligatorios para marcar a la persona como lista.
 
 ### Vigencia del empleo
 

@@ -382,9 +382,14 @@ cambiar instrucciones, presupuesto ni condición de listo.
   dominio no cuenta aunque una fuente lo marque como profesional), con verificación vigente de
   hasta 30 días; también puede servir la publicación nominal corporativa vigente
   sin verificación negativa. La publicación no garantiza entregabilidad.
-- **Estados:** se conservan el original y `verified`, `published_professional`,
-  `accept_all`, `unknown`, `invalid` o `manual_confirmed`. `accept_all` y `unknown`
-  necesitan otro respaldo utilizable. `invalid` bloquea el canal hasta resolverse
+  Con `channel_policy_v2` (T28), un correo que Apollo informa con `email_status=verified`
+  también sirve durante 30 días desde la consulta (`retrieved_at`), porque Apollo no informa
+  una fecha de verificación propia; la identidad, el cargo pertinente y el empleo vigente
+  siguen siendo obligatorios.
+- **Estados:** se conservan el original y `verified`, `provider_verified`, `published_professional`,
+  `accept_all`, `unknown`, `invalid` o `manual_confirmed`. `provider_verified` es el
+  `verified` de Apollo sin fecha propia: sin `channel_policy_v2` se trata como `unknown`.
+  `accept_all` y `unknown` necesitan otro respaldo utilizable. `invalid` bloquea el canal hasta resolverse
   mediante una observación posterior del proveedor; no lo borra una confirmación manual.
 - **Teléfono:** número laboral directo o extensión nominal con país y formato
   comprobados. El formato no garantiza que atienda. No se infiere WhatsApp desde un móvil.
