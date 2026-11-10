@@ -214,6 +214,62 @@ Antes de conciliar se guardó una copia de la base en `data/backups/`.
 - Aunque Extract hubiera devuelto texto, una página no corporativa sin fecha publicada habría dejado
   a la persona en `undated_source` (revisión humana), no en `corporate_evidence`.
 
+## Lote real de la T30
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-09 (America/Bogota): ejecución de 21:04 a 21:05 |
+| Cuentas | Las de T24: Apollo Free (`apollo-eafit`), `tavily-cuenta-2` y Haiku prepagado (`anthropic-equipo-prepago`) |
+| Ejecución | Desde la interfaz Django local, campaña nueva `47b4d12a` con `discovery_policy_v2` (T26 y T27) y `channel_policy_v2` (T28): Colombia y México, `fintech_software` y `cpg_loyalty`, sin palabras clave, máximo 5 empresas. Antes se copió la base en `data/backups/prospecting-2026-11-09-antes-t30.sqlite3` |
+| Autorización | Responsable del cupo, en el chat del 2026-11-09: Tavily `search` ≤ 60 y `extract` ≤ 40 créditos, Haiku ≤ USD 0,15, Apollo `people_search` 0 y `people_enrichment` ≤ 20 créditos |
+
+| Operación | Llamadas | Créditos reservados | Créditos informados | Costo |
+|---|---:|---:|---:|---|
+| Tavily Search | 17 | 17 | 17 | USD 0 (crédito gratuito) |
+| Tavily Extract | 19 | 19 | 8 | USD 0 (crédito gratuito) |
+| Haiku `messages` | 3 | — | — | USD 0,0071850 reservado, USD 0,0032574 conciliado |
+| Apollo People Search | 0 | — | — | — |
+| Apollo People Enrichment | 0 | — | — | — |
+
+Ninguna llamada falló ni superó su tope. Ninguna empresa llegó a la etapa de contactos, así que Apollo
+no se llamó.
+
+**Resultados.** Se investigaron 10 empresas: las 5 seleccionadas y las 5 reservas de T27. De ellas, 3
+confirmaron identidad (T24: 1 de 5). Las reservas funcionaron como se esperaba: 5 empresas caídas por
+identidad cedieron su plaza (`discovery:replaced_by:`) y otras 2 quedaron con
+`discovery:reserve_exhausted`, sin promover dos veces ninguna reserva. Paradas por identidad:
+`country_unconfirmed` 4 y `name_unconfirmed` 3. Las 3 empresas confirmadas no llegaron a contactos:
+dos cerraron en `insufficient_evidence` y una quedó en `assessed` con `no_target_roles` («No hay un caso
+de uso respaldado para seleccionar cargos»), que deja la campaña en `partial`. Resultado comercial:
+0 personas pertinentes y 0 listas; el costo por persona lista no es calculable (denominador cero).
+
+Por primera vez se conservaron los fallos de Tavily Extract (T29): 6 URL de la investigación de empresas
+con el motivo literal `Failed to fetch url`.
+
+### Conciliación
+
+- **Haiku**: las 3 llamadas se conciliaron con el costo estimado de los tokens (USD 0,0032574), sin
+  captura de la consola, porque el responsable lo aceptó el 2026-11-09, como en T11, T17 y T24. El
+  comprobante está en `data/conciliaciones/anthropic-2026-11-09-t30.json`.
+- **Tavily: pendiente.** El panel pasó de 50 a 73 créditos usados (lectura del responsable, repetida
+  tras el lote), un salto de 23. Las 36 respuestas informaron 25 créditos (17 de búsqueda y 8 de
+  extracción) y no hay otro uso de la cuenta fuera del ledger. No se puede atribuir la diferencia de
+  2 créditos a solicitudes concretas, y el ledger no admite conciliar una fila con un crédito distinto
+  del informado por su respuesta. Las filas quedan sin conciliar con ese motivo; los créditos
+  informados ya se descuentan del cupo.
+- **Apollo**: sin consumo en este lote.
+
+### Observaciones y limitaciones
+
+- La mejora de identidad (de 1 a 3 confirmadas) no se tradujo en personas: el freno pasó a la calidad
+  de las candidatas. Tavily devolvió sobre todo proveedores globales sin presencia comprobada en
+  Colombia o México (`payhawk.com`, `abbyy.com`, `xtract.app`), sitios ajenos al perfil
+  (`enterprise.com`, `eventbrite.com`, `idbinvest.org`), un medio de noticias (`dcnewsnow.com`) y un
+  dominio de Perú (`netwoo.pe`), que entró como reserva porque no quedaban candidatas locales.
+- T28 no se pudo medir: ninguna persona llegó a evaluarse con `channel_policy_v2`.
+- Es una muestra pequeña y de un solo lote: no permite atribuir con confianza cuánto aportó cada
+  cambio frente a la variación de los resultados de Tavily entre lotes.
+
 ## Tavily
 
 | Campo | Valor observado |
