@@ -18,6 +18,7 @@ from prospecting.models import (
     Contract,
     Count,
     CountryCode,
+    DiscoveryPolicy,
     Evidence,
     IcpEnterpriseConfig,
     IcpReferenceCompany,
@@ -282,6 +283,28 @@ def _candidate_priority_key(candidate: Candidate) -> tuple[int, int, int, int, i
     )
 
 
+NON_BUSINESS_SITE = "non_business_site"
+
+
+def policy_discard_reason(host: str, policy: DiscoveryPolicy) -> str | None:
+    """Motivo local de descarte de `discovery_policy_v2`; None si el host puede ser la empresa.
+
+    Portales, directorios y bolsas de empleo listados y subdominios de contenido (`blog.`…) son
+    dominios no empresariales (Business-rules.md, «Identidad y exclusiones»).
+    """
+    if any(within_domain(host, domain) for domain in policy.non_business_domains):
+        return NON_BUSINESS_SITE
+    if host.count(".") > 1 and host.split(".")[0] in policy.content_subdomains:
+        return NON_BUSINESS_SITE
+    return None
+
+
+def is_foreign_country_domain(host: str, policy: DiscoveryPolicy, countries: list[CountryCode]) -> bool:
+    """Sufijo de país ajeno a la campaña (`.es`, `.com.pe`). No excluye: solo pospone en la selección."""
+    suffix = host.rsplit(".", 1)[-1]
+    return len(suffix) == 2 and suffix not in policy.generic_country_suffixes and suffix.upper() not in countries
+
+
 def group_candidates(hits: list[SearchHit], raw_limit: int) -> tuple[list[Candidate], int]:
     """Acota los resultados brutos en rondas por posición y agrupa por host exacto."""
     ordered = sorted(hits, key=lambda hit: (hit.rank, hit.query_index))
@@ -303,9 +326,14 @@ def select_candidates(candidates: list[Candidate], campaign: Campaign) -> tuple[
     for candidate in candidates:
         first = candidate.hits[0].query
         queues.setdefault((first.country, first.segment), []).append(candidate)
+    policy = campaign.config_snapshot.discovery_policy
     for combo, queue in queues.items():
-        if queue and any(item.hits[0].query.template_version != LEGACY_TEMPLATE_VERSION for item in queue):
-            queue.sort(key=_candidate_priority_key)
+        signals = any(item.hits[0].query.template_version != LEGACY_TEMPLATE_VERSION for item in queue)
+        if queue and (signals or policy is not None):
+            # Con `discovery_policy_v2`, un dominio de otro país va detrás de los locales (orden estable).
+            queue.sort(key=lambda item: (
+                (is_foreign_country_domain(item.host, policy, campaign.countries),) if policy is not None else ()
+            ) + (_candidate_priority_key(item) if signals else ()))
     available = {combo: len(queue) for combo, queue in queues.items()}
     target = campaign.limits.discovery.target_per_country_segment
     selected: list[Candidate] = []
@@ -435,15 +463,31 @@ RESEARCH_TERMS = {
 }
 
 
-def initial_urls(company: Company, evidence: list[Evidence], limit: int) -> list[str]:
-    """Páginas propias que el buscador ya localizó y, si queda cupo, la portada con el host observado."""
+_IDENTITY_PATH = re.compile(r"nosotros|quienes-somos|quien-somos|acerca|about|empresa|contacto|contact", re.I)
+
+
+def initial_urls(company: Company, evidence: list[Evidence], limit: int, *, home_first: bool = False) -> list[str]:
+    """Páginas propias que el buscador ya localizó y, si queda cupo, la portada con el host observado.
+
+    Con `home_first` (`discovery_policy_v2`), la portada y las páginas de «nosotros» o «contacto»
+    van primero: son las que nombran a la empresa y su país.
+    """
     if company.domain is None or limit <= 0:
         return []
     own = [str(item.url) for item in evidence if is_search_hit(item) and item.url is not None
            and url_host(str(item.url)) is not None and within_domain(url_host(str(item.url)), company.domain)]
     first = urlsplit(own[0]) if own else None
     home = f"{first.scheme}://{first.netloc}/" if first else f"https://{company.domain}/"
+    if home_first:
+        about = [url for url in own if _IDENTITY_PATH.search(urlsplit(url).path)]
+        return list(dict.fromkeys([home, *about, *own]))[:limit]
     return list(dict.fromkeys([*own, home]))[:limit]
+
+
+def identity_extract_query(company: Company, campaign: Campaign) -> str:
+    """Consulta de reordenación de `discovery_policy_v2`: nombre y país primero, luego las señales."""
+    countries = [COUNTRIES[country][0] for country in campaign.countries if country in COUNTRIES]
+    return clip("; ".join([company.name, "quiénes somos", "contacto", *countries, extract_query(campaign)]), 400)
 
 
 def expansion_query(company: Company, campaign: Campaign) -> str:

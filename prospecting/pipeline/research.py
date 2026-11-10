@@ -7,7 +7,7 @@ from pydantic import Field
 
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
-from prospecting.discovery import expansion_query, extract_query
+from prospecting.discovery import expansion_query, extract_query, identity_extract_query
 from prospecting.models import BusinessStatus, Contract, Money, Text, utc_now
 from prospecting.pipeline.calls import call_free_credit, grant_for, was_sent
 from prospecting.providers import ProviderClient, ProviderError
@@ -64,7 +64,9 @@ def extract_company_pages(db: Database, budget: Budget, client: ProviderClient,
     }
     if not requested:
         return ExtractReport(**report, stop_reason="page_limit" if valid else "no_valid_urls")
-    request = extract_request(requested, extract_query(campaign), account_ref)
+    query = (extract_query(campaign) if campaign.config_snapshot.discovery_policy is None
+             else identity_extract_query(company, campaign))
+    request = extract_request(requested, query, account_ref)
     attempts = run_item.attempts | {"tavily_extract": run_item.attempts.get("tavily_extract", 0) + 1}
     pages = run_item.consumed_limits.model_copy(update={
         "pages": run_item.consumed_limits.pages + len(requested),

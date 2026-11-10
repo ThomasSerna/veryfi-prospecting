@@ -9,7 +9,7 @@ from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import (
     CombinationReport, PlannedQuery, build_company, build_hit_evidence, build_search_queries, group_candidates,
-    select_candidates,
+    policy_discard_reason, select_candidates,
 )
 from prospecting.identity import (
     ExclusionList, ExclusionMatch, ExclusionStatus, IdentityDecision, assess_identity, exclusion_evidence,
@@ -114,7 +114,13 @@ def run_discovery(db: Database, budget: Budget, client: ProviderClient, campaign
             ))
             continue
         query_hits, query_discarded = parse_search(query, index, result.data, usage.request_id, utc_now())
-        hits.extend(query_hits)
+        policy = campaign.config_snapshot.discovery_policy
+        for hit in query_hits:
+            reason = None if policy is None else policy_discard_reason(hit.host, policy)
+            if reason is None:
+                hits.append(hit)
+            else:
+                query_discarded[reason] = query_discarded.get(reason, 0) + 1
         for reason, count in query_discarded.items():
             discarded[reason] = discarded.get(reason, 0) + count
         outcomes.append(QueryOutcome(

@@ -262,6 +262,19 @@
     "searches_per_person": 1,
     "people_per_extraction": 3
   },
+  "discovery_policy": {
+    "version": "discovery_policy_v2",
+    "validation_status": "pending",
+    "source_reference": "Issue T26 (#30); paradas por identidad observadas en los lotes reales de T17 y T24",
+    "source_date": "2026-11-09",
+    "non_business_domains": [
+      "softwaredoit.es", "gestiopolis.com", "tecoloco.com", "computrabajo.com.co", "computrabajo.com.mx",
+      "elempleo.com", "occ.com.mx", "paginasamarillas.com.co", "seccionamarilla.com.mx",
+      "mercadolibre.com.co", "mercadolibre.com.mx", "slideshare.net", "scribd.com", "issuu.com"
+    ],
+    "content_subdomains": ["blog", "blogs", "noticias", "news", "revista", "prensa"],
+    "generic_country_suffixes": ["co", "io", "ai", "me", "tv", "ly", "fm", "to", "gg", "sh", "so", "cc", "ws", "la"]
+  },
   "role_taxonomy": {
     "version": "role_taxonomy_v1",
     "source_date": "2026-11-06",

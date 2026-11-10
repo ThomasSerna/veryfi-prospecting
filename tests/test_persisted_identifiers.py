@@ -240,6 +240,15 @@ def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
     assert REJECTED_KEY == "contacts:apollo_rejected:"
 
 
+def test_discovery_policy_version_and_discard_reasons_are_fixed(role_config, config):
+    """T26: la versión identifica el filtro guardado en cada instantánea; los motivos aparecen en el informe."""
+    from prospecting.discovery import NON_BUSINESS_SITE
+
+    assert role_config.discovery_policy.version == "discovery_policy_v2"
+    assert config.discovery_policy is None
+    assert NON_BUSINESS_SITE == "non_business_site"
+
+
 def test_people_policy_version_is_fixed(role_config):
     """La versión del objetivo de personas (T16) identifica la regla de parada guardada en cada instantánea."""
     assert role_config.people_policy.version == "people_policy_v1"

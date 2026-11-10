@@ -569,6 +569,65 @@ def test_initial_urls_prefer_observed_own_pages_and_keep_the_observed_host(make_
     assert initial_urls(company, [hit], 1) == ["https://www.empresa-uno.example/producto"]
 
 
+def test_initial_urls_put_home_and_about_pages_first_with_discovery_policy(make_company):
+    """T26: con tres páginas propias, la portada ya no queda fuera del tope de páginas iniciales."""
+    company, facts = make_company(domain="empresa-uno.example")
+    hit = facts[0].model_copy(update={
+        "claim": f"{SEARCH_HIT_CLAIM} en el puesto 1.", "url": "https://www.empresa-uno.example/producto",
+        "provider": "tavily", "source_type": "secondary"})
+    pages = [hit.model_copy(update={"id": uuid4(), "url": f"https://www.empresa-uno.example/{path}"})
+             for path in ("producto", "precios", "blog/nota", "quienes-somos")]
+    assert initial_urls(company, pages, 3) == [
+        "https://www.empresa-uno.example/producto", "https://www.empresa-uno.example/precios",
+        "https://www.empresa-uno.example/blog/nota"]
+    assert initial_urls(company, pages, 3, home_first=True) == [
+        "https://www.empresa-uno.example/", "https://www.empresa-uno.example/quienes-somos",
+        "https://www.empresa-uno.example/producto"]
+    assert initial_urls(company, [], 3, home_first=True) == ["https://empresa-uno.example/"]
+
+
+def test_discovery_policy_filters_hits_locally_without_changing_the_search_payload(tavily, config, role_config):
+    """T26: el filtro actúa tras la búsqueda; el payload enviado a Tavily es idéntico con o sin política."""
+    def search(payload):
+        hosts = ("nueva-uno.example", "softwaredoit.es", "sesamehr.es", "blog.cool-tabs.com")
+        return fixed_search(payload) | {"results": [
+            {"url": f"https://{host}/producto", "title": f"Producto | {host}", "content": "Sintético.", "score": 0.5}
+            for host in hosts]}
+
+    payloads = []
+    for policy in (None, role_config.discovery_policy):
+        case = tavily.setup(config_snapshot=config.model_copy(update={"discovery_policy": policy}))
+        case.search, start = search, len(case.calls)
+        report = discover(case)
+        payloads.append([payload for _, payload in case.calls[start:]])
+        hosts = {case.db.get_company(item).domain for item in report.selected_company_ids}
+        if policy is None:
+            assert "softwaredoit.es" in hosts and "non_business_site" not in report.discarded
+        else:
+            assert hosts == {"nueva-uno.example", "sesamehr.es"}
+            assert report.discarded["non_business_site"] == 2 * len(payloads[-1])
+    assert payloads[0] == payloads[1]
+
+
+def test_initial_extract_uses_identity_query_with_discovery_policy(tavily, config, role_config, make_company):
+    """T26: la extracción inicial pide fragmentos con el nombre y el país; sin política, la consulta histórica."""
+    from prospecting.discovery import extract_query, identity_extract_query
+
+    for policy in (None, role_config.discovery_policy):
+        case = tavily.setup(config_snapshot=config.model_copy(update={"discovery_policy": policy}))
+        case.search = fixed_search
+        report = discover(case)
+        company_id = company_by_domain(case, report.selected_company_ids, "nueva-uno.example")
+        start = len(case.calls)
+        extract(case, company_id, ["https://nueva-uno.example/producto"])
+        [(operation, payload)] = case.calls[start:]
+        company = case.db.get_company(company_id)
+        expected = extract_query(case.campaign) if policy is None else identity_extract_query(company, case.campaign)
+        assert operation == "extract" and payload["query"] == expected
+        if policy is not None:
+            assert payload["query"].startswith(f"{company.name}; quiénes somos; contacto; Colombia")
+
+
 def expansion_search(domain, paths=("facturas", "clientes", "precios")):
     """Discovery con resultados fijos; la búsqueda restringida al dominio devuelve páginas propias y una ajena."""
     def search(payload):

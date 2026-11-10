@@ -814,7 +814,9 @@ class _Run:
             fresh = {str(item.url) for item in evidence if item.url is not None and item.kind == "observed"
                      and not is_search_evidence(item)
                      and now - timedelta(days=limits.cache.web_days) <= item.retrieved_at <= now}
-            urls = [url for url in initial_urls(company, evidence, len(evidence) + 1) if url not in fresh]
+            home_first = self.campaign.config_snapshot.discovery_policy is not None
+            urls = [url for url in initial_urls(company, evidence, len(evidence) + 1, home_first=home_first)
+                    if url not in fresh]
             report = self.timed(company_id, lambda: extract_company_pages(
                 self.db, self.budget, self.client, self.campaign.id, company_id, urls[:limits.effort["initial"].pages],
                 account_ref=self.tavily_account_ref, deadline=self.company_deadline(company_id, ("initial",)),

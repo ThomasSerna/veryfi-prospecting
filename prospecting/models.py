@@ -291,6 +291,21 @@ class EmploymentCorroboration(Contract):
     people_per_extraction: Annotated[StrictInt, Field(ge=1, le=3)]
 
 
+class DiscoveryPolicy(Contract):
+    """Filtro local de candidatas y lectura orientada a la identidad (T26); propuesta pendiente de validación.
+
+    Se aplica después de la búsqueda: no cambia el payload enviado a Tavily ni sus huellas.
+    """
+
+    version: Literal["discovery_policy_v2"]
+    validation_status: Literal["pending", "validated"]
+    source_reference: Text
+    source_date: date
+    non_business_domains: Annotated[list[Annotated[str, Field(min_length=3, max_length=100)]], Field(min_length=1)]
+    content_subdomains: Annotated[list[Annotated[str, Field(min_length=2, max_length=30)]], Field(min_length=1)]
+    generic_country_suffixes: list[Annotated[str, Field(min_length=2, max_length=2)]]
+
+
 class CriterionDefinition(Contract):
     name: Text
     weight: Annotated[StrictInt, Field(gt=0, le=100)]
@@ -532,6 +547,7 @@ class VeryfiConfig(Contract):
     people_policy: PeoplePolicy | None = None
     contact_match: ContactMatchConfig | None = None
     employment_corroboration: EmploymentCorroboration | None = None
+    discovery_policy: DiscoveryPolicy | None = None
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:

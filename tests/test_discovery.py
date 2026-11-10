@@ -145,6 +145,55 @@ def test_software_directories_are_not_candidates(url):
     assert discarded == {"non_business_domain": 1}
 
 
+@pytest.mark.parametrize(("host", "reason"), [
+    ("softwaredoit.es", "non_business_site"),
+    ("gestiopolis.com", "non_business_site"),
+    ("www.tecoloco.com", "non_business_site"),
+    ("blog.cool-tabs.com", "non_business_site"),
+    ("sesamehr.es", None),
+    ("empresa-sintetica.com.co", None),
+    ("blog.com", None),
+])
+def test_discovery_policy_discards_portals_and_content_subdomains(role_config, host, reason):
+    """Casos tomados de las paradas por identidad de los lotes reales de T17 y T24 (dominios públicos)."""
+    from prospecting.discovery import policy_discard_reason
+
+    assert policy_discard_reason(host, role_config.discovery_policy) == reason
+
+
+@pytest.mark.parametrize(("host", "countries", "foreign"), [
+    ("sesamehr.es", ["CO", "MX"], True),
+    ("alicorp.com.pe", ["CO"], True),
+    ("empresa-sintetica.com.mx", ["CO"], True),
+    ("empresa-sintetica.com.mx", ["MX"], False),
+    ("empresa-sintetica.com.co", ["CO"], False),
+    ("empresa-sintetica.co", ["MX"], False),
+    ("empresa-sintetica.io", ["CO"], False),
+    ("empresa-sintetica.com", ["CO"], False),
+])
+def test_foreign_country_domains_are_detected_but_not_discarded(role_config, host, countries, foreign):
+    from prospecting.discovery import is_foreign_country_domain, policy_discard_reason
+
+    assert is_foreign_country_domain(host, role_config.discovery_policy, countries) is foreign
+    assert policy_discard_reason(host, role_config.discovery_policy) is None
+
+
+def test_discovery_policy_postpones_foreign_domains_without_excluding_them(make_campaign, config, role_config):
+    """Business-rules.md: un ccTLD extranjero no excluye; con la política solo ocupa plaza si faltan locales."""
+    hits = hits_for(planned(), 0, ("https://sesamehr.es/", "Sesame"), ("https://local-uno.example/", "Uno"),
+                    ("https://alicorp.com.pe/", "Alicorp"), ("https://local-dos.com.co/", "Dos"))
+    candidates, _ = group_candidates(hits, 60)
+    without = make_campaign(max_companies=2)
+    with_policy = make_campaign(max_companies=2, config_snapshot=config.model_copy(
+        update={"discovery_policy": role_config.discovery_policy}))
+    assert [item.host for item in select_candidates(candidates, without)[0]] == ["sesamehr.es", "local-uno.example"]
+    assert [item.host for item in select_candidates(candidates, with_policy)[0]] == [
+        "local-uno.example", "local-dos.com.co"]
+    everything = make_campaign(max_companies=4, config_snapshot=with_policy.config_snapshot)
+    assert [item.host for item in select_candidates(candidates, everything)[0]][2:] == [
+        "sesamehr.es", "alicorp.com.pe"]
+
+
 def test_same_host_groups_but_subdomains_stay_separate():
     hits = hits_for(
         planned(), 0,
