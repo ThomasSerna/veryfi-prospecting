@@ -35,7 +35,7 @@ from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignStatus, Channel, ChannelType, Company, Contact, Contract, Count,
     Evidence, Money, Priority, RunItem, RunStage, Text, UsageStatus, UtcDatetime, utc_now,
 )
-from prospecting.pipeline.calls import grant_for, require_apollo_access, seconds_left
+from prospecting.pipeline.calls import ExtractFailure, extract_failures, grant_for, require_apollo_access, seconds_left
 from prospecting.pipeline.contacts import (
     EMPLOYMENT_PENDING_KEY, EMPLOYMENT_REQUEST_KEY, EMPLOYMENT_SEARCH_KEY, REJECTED_KEY, employment_corroboration,
     find_contacts,
@@ -453,6 +453,8 @@ class CorroborationSummary(Contract):
 
     campaign_id: UUID
     policy_version: Text | None
+    # T29: URLs que Tavily Extract no pudo leer en la etapa de contactos (claves guardadas en `attempts`).
+    extract_failures: Count = 0
     people_searched: Count
     people_corroborated: Count
     people_pending_limit: Count
@@ -490,6 +492,8 @@ def employment_corroboration_summary(db_path: Path, campaign_id: UUID) -> Corrob
     policy = view.campaign.config_snapshot.employment_corroboration
     return CorroborationSummary(
         campaign_id=campaign_id, policy_version=None if policy is None else policy.version,
+        extract_failures=sum(failure.stage == "contacts" for result in view.companies
+                             for failure in extract_failures(result.run_item.attempts)),
         people_searched=sum(key.startswith(EMPLOYMENT_SEARCH_KEY) for key in attempts),
         people_corroborated=corroborated,
         people_pending_limit=pending.count("employment_search_limit"),

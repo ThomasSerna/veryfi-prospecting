@@ -368,6 +368,38 @@ def test_summary_and_command_measure_conversion_and_cost_without_personal_data(c
     assert "Personas buscadas: 2; corroboradas: 1" in report and "Persona Sintética" not in report
 
 
+def test_extract_failures_in_contacts_are_saved_shown_and_counted(ui_paths, client, contact_case, role_config, tmp_path):
+    """T29: el motivo de Tavily Extract sobrevive a la ejecución; no crea evidencia ni se duplica al reanudar."""
+    from django.core.management import call_command
+    from django.test import override_settings
+    from prospecting.pipeline import employment_corroboration_summary, extract_failures
+
+    case = scenario(contact_case, role_config, ["Head of Product"])
+    case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
+                                              f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
+    case.replies["extract"] = lambda payload: {
+        "results": [], "failed_results": [{"url": item, "error": "Fallo sintético de lectura"} for item in payload["urls"]],
+        "usage": {"credits": 1}}
+    before = len(case.db.list_evidence(case.company.id))
+    case.find(**case.public)
+    failures = extract_failures(case.db.get_run_item(case.campaign.id, case.company.id).attempts)
+    assert failures and {(item.stage, item.reason) for item in failures} == {("contacts", "Fallo sintético de lectura")}
+    failed = {failure.url for failure in failures}
+    assert [item for item in case.db.list_evidence(case.company.id)[before:]
+            if str(item.url) in failed and item.source_type == "primary"] == []
+    case.find(**case.public)
+    again = extract_failures(case.db.get_run_item(case.campaign.id, case.company.id).attempts)
+    assert again == failures
+    summary = employment_corroboration_summary(tmp_path / "synthetic.sqlite3", case.campaign.id)
+    assert summary.extract_failures == len(failures)
+    out = StringIO()
+    with override_settings(PROSPECTING_DB_PATH=tmp_path / "synthetic.sqlite3"):
+        call_command("corroboration_report", "--campaign", str(case.campaign.id), stdout=out)
+    assert f"URLs que Tavily Extract no pudo leer en contactos: {len(failures)}." in out.getvalue()
+    page = text(client.get(url("company", case.campaign.id, case.company.id)))
+    assert f"Páginas que Tavily Extract no pudo leer ({len(failures)})" in page and "Fallo sintético de lectura" in page
+
+
 def test_summary_without_corroborations_leaves_the_cost_undefined(contact_case, role_config, tmp_path):
     from prospecting.pipeline import employment_corroboration_summary
 

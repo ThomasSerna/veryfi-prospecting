@@ -9,7 +9,7 @@ from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import expansion_query, extract_query, identity_extract_query
 from prospecting.models import BusinessStatus, Contract, Money, Text, utc_now
-from prospecting.pipeline.calls import call_free_credit, grant_for, was_sent
+from prospecting.pipeline.calls import call_free_credit, extract_failure_attempts, grant_for, was_sent
 from prospecting.providers import ProviderClient, ProviderError
 from prospecting.providers.tavily import (
     EXTRACT_OPERATION, PROVIDER, SEARCH_CREDITS, SEARCH_OPERATION, TavilyExtractResponse, TavilySearchResponse,
@@ -95,7 +95,7 @@ def extract_company_pages(db: Database, budget: Budget, client: ProviderClient,
         for item in evidence:
             db.save_evidence(item)
         db.save_run_item(run_item.model_copy(update={
-            "attempts": attempts, "consumed_limits": pages,
+            "attempts": attempts | extract_failure_attempts("research", failures), "consumed_limits": pages,
             "error_message": None, "error_stage": None, "updated_at": utc_now(),
         }))
     return ExtractReport(**report | {
@@ -225,7 +225,8 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
     if pending is not None:
         return pending
     evidence, failures = parse_extract(company, urls, done[1].data, done[0].request_id, utc_now())
-    _checkpoint(db, campaign_id, company_id, attempts={EXPANSION_PAGES_KEY: len(urls)},
+    _checkpoint(db, campaign_id, company_id,
+                attempts={EXPANSION_PAGES_KEY: len(urls)} | extract_failure_attempts("research", failures),
                 consumed={"pages": len(urls)}, facts=evidence)
     return ResearchReport(**base, **report | {"evidence_ids": report["evidence_ids"] + [item.id for item in evidence]},
                           status="researched", requested_urls=urls,

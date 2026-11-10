@@ -365,6 +365,31 @@ def test_extract_failed_urls_create_no_evidence(tavily):
     assert report.evidence_ids == []
     assert [(item.url, item.reason) for item in report.failed_urls] == [(url, "Fallo sintético")]
     assert case.db.list_usage(company_id=company_id)[0].credits == Decimal(0)
+    # T29: el motivo literal queda guardado en la empresa, sin crear evidencia.
+    from prospecting.pipeline import extract_failures
+
+    attempts = case.db.get_run_item(case.campaign.id, company_id).attempts
+    assert attempts[f"research:extract_failed:{url} Fallo sintético"] == 1
+    assert [(item.stage, item.url, item.reason) for item in extract_failures(attempts)] == [
+        ("research", url, "Fallo sintético")]
+    assert case.db.list_evidence(company_id) == [item for item in case.db.list_evidence(company_id)
+                                                  if item.url is None or str(item.url) != url]
+
+
+def test_extract_failure_keys_round_trip_and_do_not_duplicate():
+    """T29: una misma URL y motivo producen una sola clave; una URL con espacios nunca se guarda."""
+    from prospecting.pipeline import extract_failures
+    from prospecting.pipeline.calls import extract_failure_attempts
+
+    failures = [("https://uno.example/a", "Tiempo agotado"), ("https://uno.example/a", "Tiempo agotado"),
+                ("https://uno.example/b", ""), ("https://uno.example/c d", "No se guarda")]
+    attempts = extract_failure_attempts("contacts", failures)
+    assert attempts == {"contacts:extract_failed:https://uno.example/a Tiempo agotado": 1,
+                        "contacts:extract_failed:https://uno.example/b Fallo sin detalle del proveedor.": 1}
+    attempts |= extract_failure_attempts("contacts", failures[:1]) | {"tavily_extract": 2}
+    assert [(item.stage, item.url, item.reason) for item in extract_failures(attempts)] == [
+        ("contacts", "https://uno.example/a", "Tiempo agotado"),
+        ("contacts", "https://uno.example/b", "Fallo sin detalle del proveedor.")]
 
 
 # Identidad, duplicados y exclusiones (T04), con listas y respuestas exclusivamente sintéticas.

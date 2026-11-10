@@ -258,6 +258,13 @@ def test_channel_policy_version_and_status_are_fixed(role_config, config):
     assert config.defaults.freshness.channel_policy is None
 
 
+def test_extract_failure_keys_are_fixed():
+    """T29: la ficha y el informe leen los fallos guardados con estos prefijos."""
+    from prospecting.pipeline.calls import EXTRACT_FAILED_KEYS
+
+    assert EXTRACT_FAILED_KEYS == {"research": "research:extract_failed:", "contacts": "contacts:extract_failed:"}
+
+
 def test_people_policy_version_is_fixed(role_config):
     """La versión del objetivo de personas (T16) identifica la regla de parada guardada en cada instantánea."""
     assert role_config.people_policy.version == "people_policy_v1"

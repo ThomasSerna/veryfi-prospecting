@@ -2,6 +2,7 @@
 
 from django import template
 
+from prospecting.pipeline import extract_failures
 from prospecting.sources import validate_public_url
 from core.presentation import (
     campaign_short_title, campaign_title, criterion_label, criterion_tone, employment_corroboration,
@@ -27,6 +28,7 @@ register.filter("enrichment_rejection", enrichment_rejection)
 register.filter("employment_corroboration", employment_corroboration)
 register.filter("people_summary", people_summary)
 register.filter("people_counts", people_counts)
+register.filter("extract_failures", lambda run_item: extract_failures(run_item.attempts))
 
 
 @register.filter

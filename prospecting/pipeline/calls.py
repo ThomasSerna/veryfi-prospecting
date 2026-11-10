@@ -3,15 +3,48 @@
 from decimal import Decimal
 import os
 import time
+from typing import Literal
 from uuid import UUID
 
 from prospecting.budget import Budget, BudgetError, Observation, RequestLimit, SpendingAuthorization
 from prospecting.haiku import MODEL_ID
-from prospecting.models import Campaign, TokenUsage, Usage, UsageStatus
+from prospecting.models import Campaign, Contract, Text, TokenUsage, Usage, UsageStatus
 from prospecting.providers.apollo import ApolloAccess
 from prospecting.providers import (
     CLAUDE_OPERATION, CLAUDE_PROVIDER, ProviderClient, ProviderRequest, input_token_bound, reservation_cost,
 )
+
+
+# T29: fallos de Tavily Extract en `RunItem.attempts`, como `<prefijo><url> <motivo recortado>` con valor 1.
+# Una URL validada no contiene espacios; reanudar escribe la misma clave y no duplica el registro.
+EXTRACT_FAILED_KEYS = {"research": "research:extract_failed:", "contacts": "contacts:extract_failed:"}
+ExtractStage = Literal["research", "contacts"]
+
+
+class ExtractFailure(Contract):
+    """URL que Tavily Extract no pudo leer, con su motivo literal; no es evidencia ni prueba nada."""
+
+    stage: ExtractStage
+    url: Text
+    reason: Text
+
+
+def extract_failure_attempts(stage: ExtractStage, failures: list[tuple[str, str]]) -> dict[str, int]:
+    """Claves de los fallos; `parse_extract` ya entrega el motivo recortado a 200 caracteres y sin controles."""
+    prefix = EXTRACT_FAILED_KEYS[stage]
+    return {f"{prefix}{url.strip()} {reason.strip() or 'Fallo sin detalle del proveedor.'}": 1
+            for url, reason in failures if url.strip() and " " not in url.strip()}
+
+
+def extract_failures(attempts: dict[str, int]) -> list[ExtractFailure]:
+    """Fallos guardados de una empresa, en el orden en que se registraron."""
+    found = []
+    for key in attempts:
+        for stage, prefix in EXTRACT_FAILED_KEYS.items():
+            if key.startswith(prefix) and " " in key[len(prefix):]:
+                url, reason = key[len(prefix):].split(" ", 1)
+                found.append(ExtractFailure(stage=stage, url=url, reason=reason))
+    return found
 
 
 def require_apollo_access(campaign: Campaign, access: ApolloAccess | None, budget: Budget) -> None:

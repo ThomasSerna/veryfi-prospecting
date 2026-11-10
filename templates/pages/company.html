@@ -268,6 +268,19 @@
         <h3>Sin evidencia registrada</h3>
       </div>
       {% endif %}
+      {% with failures=result.run_item|extract_failures %}
+      {% if failures %}
+      <details class="extract-failures">
+        <summary>Páginas que Tavily Extract no pudo leer ({{ failures|length }})</summary>
+        <p class="cell-note">No son evidencia: el motivo es el que informó el proveedor.</p>
+        <ul>
+          {% for failure in failures %}
+          <li><span>{% if failure.stage == 'contacts' %}Contactos{% else %}Investigación{% endif %}</span> · <code>{{ failure.url }}</code> · {{ failure.reason }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      {% endwith %}
     </section>
   </div>
   <aside class="company-aside" aria-label="Mejor match y revisión de ventas">

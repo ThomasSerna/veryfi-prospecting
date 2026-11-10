@@ -21,7 +21,9 @@ from prospecting.models import (
     BusinessStatus, ChannelStatus, ChannelType, Contact, Contract, Evidence, IdentityStatus, Priority,
     RunItem, RunStage, Text, UsageStatus, utc_now,
 )
-from prospecting.pipeline.calls import grant_for, observed_credits, require_apollo_access, reserve_claude, reserve_credits, seconds_left
+from prospecting.pipeline.calls import (
+    extract_failure_attempts, grant_for, observed_credits, require_apollo_access, reserve_claude, reserve_credits, seconds_left,
+)
 from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeClient, ProviderClient, ProviderError
 from prospecting.providers.apollo import (
     ApolloAccess, ApolloSearchResponse, ApolloEnrichmentResponse, classify_apollo_error,
@@ -684,6 +686,7 @@ class _ContactStage:
             def extracted(data, request_id):
                 facts, failures = parse_extract(company, urls, data, request_id, utc_now())
                 self.warnings.extend(f"Tavily Extract: {reason}" for _, reason in failures)
+                self.parsed_attempts |= extract_failure_attempts("contacts", failures)
                 return [], facts
             self.perform(request, TavilyExtractResponse, credits=extract_credits(len(urls)),
                          count_key=EXTRACT_KEY, cap=effort.pages,
@@ -845,6 +848,7 @@ class _ContactStage:
         def parse(data, request_id):
             fragments, failures = parse_extract(company, urls, data, request_id, utc_now())
             self.warnings.extend(f"Tavily Extract: {reason}" for _, reason in failures)
+            self.parsed_attempts |= extract_failure_attempts("contacts", failures)
             # Los fragmentos se marcan en el mismo checkpoint que los guarda: Haiku solo leerá estos.
             self.parsed_attempts |= {f"{EMPLOYMENT_FRAGMENT_KEY}{item.id}": 1 for item in fragments}
             return [], fragments
