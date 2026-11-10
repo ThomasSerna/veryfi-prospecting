@@ -184,17 +184,17 @@ Como responsable comercial, quiero que una empresa que no supera la confirmació
 
 **Alcance**
 
-- Con `discovery_policy_v2`, conservar hasta `max_companies` candidatas de reserva con la misma prioridad de selección y persistirlas como candidatas en espera, con una migración de esquema como la de `profile_matches`.
-- Cuando una empresa termina en `name_unconfirmed`, `country_unconfirmed`, `identity_unverified` o `domain_unknown`, promover la siguiente reserva de su combinación país/segmento.
-- Reservar gasto antes de cada llamada de la reserva promovida (solo en `prospecting/pipeline/calls.py`) y respetar los topes de búsqueda y Extract de la campaña.
-- Añadir el motivo de parada `reserve_exhausted`, visible en la interfaz.
+- Con `discovery_policy_v2`, continuar la misma selección más allá de `max_companies` y guardar hasta `max_companies` candidatas de reserva, sin las cuentas con revisión de exclusión pendiente, en una tabla nueva `discovery_reserves` (esquema v3, con migración aditiva y transaccional desde v1 y v2).
+- Cuando una empresa termina en `name_unconfirmed`, `country_unconfirmed`, `identity_unverified` o `domain_unknown` tras la ampliación, promover la siguiente reserva en el orden de selección; la reserva repite el análisis inicial y la calificación antes de contactos.
+- La promoción no llama a proveedores; las llamadas de la reserva reservan gasto antes de llamar (solo en `prospecting/pipeline/calls.py`) y respetan los topes de búsqueda y Extract, como las de cualquier empresa.
+- La empresa caída conserva su resultado y deja de ocupar plaza. Se marca con `discovery:replaced_by:<company_id>` o, sin reservas, con `discovery:reserve_exhausted`; la ficha lo explica.
 - Documentar en `docs/discovery.md`, `docs/campaign.md` y `docs/persistence.md`.
 
 **Criterios de aceptación**
 
 - Una empresa caída por identidad se reemplaza por la reserva siguiente sin superar el presupuesto.
-- Reanudar tras una interrupción no promueve dos veces la misma reserva.
-- Con las reservas agotadas, la campaña termina con `reserve_exhausted`.
+- Reanudar tras una interrupción no promueve dos veces la misma reserva ni reemplaza dos veces la misma empresa.
+- Con las reservas agotadas, la empresa caída queda marcada con `discovery:reserve_exhausted` y la ficha lo muestra.
 - Las campañas sin v2 no cambian; pruebas sin red y prueba de la migración del esquema.
 - Los identificadores persistidos nuevos se documentan en `docs/persistence.md` y se fijan en `tests/test_persisted_identifiers.py`.
 
