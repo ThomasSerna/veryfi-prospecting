@@ -296,8 +296,8 @@ def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_c
     assert list(csv.DictReader(StringIO(export_csv(view).decode("utf-8-sig")))) == []
     shown = SimpleNamespace(path=path, tmp_path=tmp_path, campaign=case.campaign)
     html = page(shown, "webapp:company", company_id=case.company.id)
-    assert "Objetivo 3 · 4 candidatas · 3 pertinentes · 0 listas" in html
+    assert "Objetivo 3 · 4 candidatas" not in html
     assert ">Candidata<" in html and ">Pertinente<" in html and ">Lista<" not in html
     assert "Apollo no confirmó una coincidencia de identidad alta." in html
     assert "Se alcanzó el objetivo de personas pertinentes." in html
-    assert "3 pertinentes · 0 listas" in page(shown, "webapp:campaign")
+    assert "3 pertinentes · 0 listas" not in page(shown, "webapp:campaign")
