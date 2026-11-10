@@ -227,7 +227,7 @@
     "evidence_expansions_per_company": 1,
     "active_seconds": 2700,
     "cache": {"web_days": 30, "contact_days": 30},
-    "freshness": {"email_days": 30, "employment_days": 365},
+    "freshness": {"email_days": 30, "employment_days": 365, "channel_policy": "channel_policy_v2"},
     "employee_ranges": {
       "small": {"employee_min": 0, "employee_max": 49},
       "medium": {"employee_min": 50, "employee_max": 249},

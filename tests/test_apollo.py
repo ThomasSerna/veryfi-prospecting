@@ -160,7 +160,7 @@ def test_enrichment_resolves_identity_without_fabricating_verification_or_employ
     assert len(contact.channels) == 1
     email = contact.channels[0]
     assert email.value == "persona-sintetica@example.com"
-    assert email.normalized_status == "unknown"
+    assert email.normalized_status == "provider_verified"
     assert email.provider_status == "verified"
     assert email.verified_at is None
     assert email.professional and email.direct

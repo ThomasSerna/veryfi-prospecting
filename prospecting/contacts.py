@@ -706,6 +706,12 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
             if _fresh(channel.verified_at, limits.freshness.email_days, now) and any(
                 item.kind == "observed" and channel.value in (item.claim + " " + (item.excerpt or "")) for item in structured):
                 return True
+        # T28: sin fecha de verificación propia, el plazo cuenta desde la consulta a Apollo.
+        if (channel.normalized_status == ChannelStatus.PROVIDER_VERIFIED and limits.freshness.channel_policy is not None
+                and _fresh(channel.retrieved_at, limits.freshness.email_days, now) and any(
+                    item.provider == "apollo" and item.kind == "observed" and
+                    channel.value in (item.claim + " " + (item.excerpt or "")) for item in structured)):
+            return True
         published = _valid_refs(channel.published_evidence_ids, contact, evidence)
         return any(item.source_type == "primary" and item.kind == "observed" and
                    nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value)

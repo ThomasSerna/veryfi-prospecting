@@ -222,7 +222,7 @@ def test_partial_candidate_reaches_enrichment_without_becoming_ready(contact_cas
     assert [item[0] for item in case.calls] == ["people_search", "people_search", "people_enrichment"]
     [contact] = case.db.list_contacts(case.company.id)
     assert contact.name == "Persona Sintética Uno" and contact.name_complete is True
-    assert contact.current_employment is None and contact.channels[0].normalized_status == "unknown"
+    assert contact.current_employment is None and contact.channels[0].normalized_status == "provider_verified"
     assert contact.channels[0].provider_status == "verified" and contact.channels[0].verified_at is None
     assert report.business_status == "qualified_no_contact"
     run = case.db.get_run_item(case.campaign.id, case.company.id)
@@ -260,7 +260,7 @@ def test_enrichment_precedes_public_nominal_job_and_channel_evidence(contact_cas
     queries = [item[1]["query"] for item in case.calls if item[0] == "search"]
     assert queries[0].startswith('"Persona Sintética Uno"') and all("U***" not in item for item in queries)
     [contact] = case.db.list_contacts(case.company.id)
-    assert contact.current_employment is True and contact.channels[0].normalized_status == "unknown"
+    assert contact.current_employment is True and contact.channels[0].normalized_status == "provider_verified"
     assert contact.channels[0].published_evidence_ids and len(case.model_calls) == 1
     assert sum(key.startswith("contacts:person:") for key in case.db.get_run_item(case.campaign.id, case.company.id).attempts) == 1
     # T18: la página corporativa extraída con Tavily, y no Apollo, justifica el empleo; no se envía nada.

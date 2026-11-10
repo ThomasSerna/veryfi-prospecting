@@ -108,8 +108,8 @@ def test_current_directory_without_the_person_no_longer_blocks_the_targeted_sear
     case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
                                               f"Persona Sintética Uno es Head of Product de {case.company.name}.")}
     report = case.find(**case.public)
-    # El correo de Apollo sin fecha de verificación sigue pendiente: corroborar el empleo no confirma el canal.
-    assert report.status == "checked" and report.business_status == "needs_channel_confirmation"
+    # T28: con el empleo corroborado y channel_policy_v2, el correo verificado por Apollo deja lista a la persona.
+    assert report.status == "checked" and report.business_status == "ready_preferred"
     assert targeted(case) == [f'"Persona Sintética Uno" "{case.company.name}" Head of Product']
     # El directorio vigente sigue omitiendo las consultas genéricas; la extracción general ya leyó el directorio.
     assert [operation for operation, _, _ in case.calls][-2:] == ["search", "extract"]

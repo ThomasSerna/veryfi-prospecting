@@ -25,6 +25,7 @@ LABELS = {
     "insufficient_evidence": "Evidencia insuficiente", "low_fit": "Encaje bajo", "excluded": "Excluida",
     "accepted": "Aceptado", "rejected": "Rechazado", "pending": "Pendiente",
     "verified": "Verificado", "published_professional": "Publicado profesionalmente",
+    "provider_verified": "Verificado por Apollo (sin fecha de verificación propia)",
     "accept_all": "Dominio acepta cualquier correo", "unknown": "Desconocido", "invalid": "Inválido",
     "manual_confirmed": "Confirmado manualmente", "email": "Correo", "phone": "Teléfono",
     "whatsapp": "WhatsApp", "linkedin": "LinkedIn", "other": "Otro canal",

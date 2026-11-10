@@ -278,7 +278,10 @@ def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_c
     from prospecting.pipeline import read_campaign
     from test_contact_match_view import page
 
-    case = multi(contact_case, role_config, ["Head of Product", "Engineering Manager", "Product Manager", "Solutions Architect"],
+    # Sin channel_policy_v2 (T28), el correo de Apollo no avanza a la etapa de canal utilizable.
+    freshness = role_config.defaults.freshness.model_copy(update={"channel_policy": None})
+    v1 = role_config.model_copy(update={"defaults": role_config.defaults.model_copy(update={"freshness": freshness})})
+    case = multi(contact_case, v1, ["Head of Product", "Engineering Manager", "Product Manager", "Solutions Architect"],
                  enriched={0: {"confidence": "low"}})
     case.find()
     path = tmp_path / "synthetic.sqlite3"

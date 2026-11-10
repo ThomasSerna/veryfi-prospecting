@@ -97,7 +97,7 @@ def ready(case, contact, facts):
 def test_apollo_email_without_corporate_evidence_is_only_a_provider_claim(case):
     contact, facts = apollo_person(case)
     assert contact.current_employment is None
-    assert contact.channels[0].normalized_status == "unknown" and contact.channels[0].verified_at is None
+    assert contact.channels[0].normalized_status == "provider_verified" and contact.channels[0].verified_at is None
     result = status(case, contact, facts)
     assert (result.state, result.origin, result.reason, result.review_required) == (
         "provider_claim", "apollo", "provider_claim_only", False)
@@ -105,6 +105,28 @@ def test_apollo_email_without_corporate_evidence_is_only_a_provider_claim(case):
     assert result.evidence_ids == [enrichment.id]
     assert not validate_contact(contact, case.company, case.assessment, facts, case.limits, NOW)
     assert ready(case, contact, facts) == "qualified_no_contact"
+
+
+def test_channel_policy_v2_accepts_apollo_verified_email_for_thirty_days_from_the_query(case):
+    """T28: sin fecha de verificación propia, el correo de Apollo sirve 30 días desde la consulta y solo con v2."""
+    from prospecting.contacts import channel_is_usable
+
+    contact, facts = apollo_person(case)
+    [email] = contact.channels
+    assert email.normalized_status == "provider_verified" and email.verified_at is None and email.retrieved_at == NOW
+    freshness = case.limits.freshness.model_copy(update={"channel_policy": "channel_policy_v2"})
+    v2 = case.limits.model_copy(update={"freshness": freshness})
+
+    def usable(channel, limits, now):
+        return channel_is_usable(channel, contact, facts, limits, now, case.company)
+
+    assert not usable(email, case.limits, NOW)
+    assert usable(email, v2, NOW) and usable(email, v2, NOW + timedelta(days=30))
+    assert not usable(email, v2, NOW + timedelta(days=31))
+    for status in ("unknown", "accept_all", "invalid"):
+        assert not usable(email.model_copy(update={"normalized_status": status}), v2, NOW)
+    # El canal no basta: el empleo solo declarado por Apollo sigue impidiendo «listo».
+    assert derive_readiness(case.assessment, [contact], facts, v2, NOW, case.company) == "qualified_no_contact"
 
 
 @pytest.mark.parametrize("refreshed", [NOW, NOW - timedelta(days=400)])

@@ -249,6 +249,15 @@ def test_discovery_policy_version_and_discard_reasons_are_fixed(role_config, con
     assert NON_BUSINESS_SITE == "non_business_site"
 
 
+def test_channel_policy_version_and_status_are_fixed(role_config, config):
+    """T28: el estado se guarda en el JSON de canales y la versión en `limits.freshness` de cada instantánea."""
+    from prospecting.models import ChannelStatus
+
+    assert ChannelStatus.PROVIDER_VERIFIED == "provider_verified"
+    assert role_config.defaults.freshness.channel_policy == "channel_policy_v2"
+    assert config.defaults.freshness.channel_policy is None
+
+
 def test_people_policy_version_is_fixed(role_config):
     """La versión del objetivo de personas (T16) identifica la regla de parada guardada en cada instantánea."""
     assert role_config.people_policy.version == "people_policy_v1"

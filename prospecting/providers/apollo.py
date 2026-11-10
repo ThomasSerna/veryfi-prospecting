@@ -303,15 +303,16 @@ def parse_enrichment(contact: Contact, company: Company, data: ApolloEnrichmentR
                      f"{person.email}; estado={person.email_status}; fecha de verificación no informada.")
         evidence.append(fact)
         status = {"invalid": ChannelStatus.INVALID, "bounced": ChannelStatus.INVALID,
-                  "catch_all": ChannelStatus.ACCEPT_ALL, "catch-all": ChannelStatus.ACCEPT_ALL}.get(
-                      person.email_status, ChannelStatus.UNKNOWN)
+                  "catch_all": ChannelStatus.ACCEPT_ALL, "catch-all": ChannelStatus.ACCEPT_ALL,
+                  "verified": ChannelStatus.PROVIDER_VERIFIED}.get(person.email_status, ChannelStatus.UNKNOWN)
         try:
             professional = professional_email(person.email, company.domain)
             channels.append(Channel(contact_id=contact.id, type="email", value=person.email, evidence_ids=[fact.id],
                                     provider_status=person.email_status or None, normalized_status=status,
                                     retrieved_at=retrieved_at, professional=professional,
                                     direct=professional and complete,
-                                    warnings=["Apollo no informa la fecha de verificación del correo; queda pendiente."]))
+                                    warnings=["Apollo no informa la fecha de verificación del correo; sin "
+                                              "channel_policy_v2 queda pendiente."]))
         except ValueError:
             pass
     if person.linkedin_url and validate_public_url(person.linkedin_url):

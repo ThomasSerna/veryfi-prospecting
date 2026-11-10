@@ -54,6 +54,7 @@ def config():
     raw.pop("people_policy")
     raw.pop("employment_corroboration")
     raw.pop("discovery_policy")
+    raw["defaults"]["freshness"].pop("channel_policy")
     for level, people in (("medium", 1), ("high", 3)):
         raw["defaults"]["effort"][level] |= {"people": people, "enrichments_per_provider": people}
         for name in ("employment_queries", "employment_pages"):

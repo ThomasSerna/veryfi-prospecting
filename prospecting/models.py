@@ -157,6 +157,8 @@ class ChannelType(StrEnum):
 
 class ChannelStatus(StrEnum):
     VERIFIED = "verified"
+    # Apollo informa `email_status=verified` sin fecha de verificación propia (T28).
+    PROVIDER_VERIFIED = "provider_verified"
     PUBLISHED_PROFESSIONAL = "published_professional"
     ACCEPT_ALL = "accept_all"
     UNKNOWN = "unknown"
@@ -395,6 +397,9 @@ class CacheLimits(Contract):
 class FreshnessLimits(Contract):
     email_days: Count
     employment_days: Count
+    # T28: con `channel_policy_v2`, un correo `provider_verified` de Apollo sirve `email_days` desde la
+    # consulta. Ausente o None (instantáneas anteriores): el correo de Apollo sigue pendiente.
+    channel_policy: Literal["channel_policy_v2"] | None = None
 
 
 class EmployeeRange(Contract):
