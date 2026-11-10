@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22 y T25 cerrados el 2026-11-09, y T23 y T26 a T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
+- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22, T25 y T26 a T29 cerrados el 2026-11-09, y T23, T30 y T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -35,10 +35,10 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T23 | [#28](https://github.com/ThomasSerna/veryfi-prospecting/issues/28) | [SPIKE no funcional] Evaluar Snov.io frente a Apollo con una muestra real pareada | Abierto | P2 | Spike técnico/no funcional | T22, T12, T16, T17, T18 y antecedentes técnicos de T21 |
 | T24 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Cerrado 2026-11-08 | P1 | Revisión humana/backend e interfaz | T18 |
 | T25 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Cerrado 2026-11-09 | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
-| T26 | [#30](https://github.com/ThomasSerna/veryfi-prospecting/issues/30) | Filtrar sitios no empresariales y orientar la confirmación de identidad | Abierto | P0 | Discovery/backend | ninguna (T13 como antecedente) |
-| T27 | [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31) | Reservar y reemplazar las empresas que no confirman su identidad | Abierto | P0 | Discovery/pipeline | T26 |
-| T28 | [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32) | Aceptar correos verificados por Apollo con una política de canal versionada | Abierto | P0 | Reglas de negocio/contactos | T18 |
-| T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Abierto | P2 | Persistencia/observabilidad | T25 |
+| T26 | [#30](https://github.com/ThomasSerna/veryfi-prospecting/issues/30) | Filtrar sitios no empresariales y orientar la confirmación de identidad | Cerrado 2026-11-09 | P0 | Discovery/backend | ninguna (T13 como antecedente) |
+| T27 | [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31) | Reservar y reemplazar las empresas que no confirman su identidad | Cerrado 2026-11-09 | P0 | Discovery/pipeline | T26 |
+| T28 | [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32) | Aceptar correos verificados por Apollo con una política de canal versionada | Cerrado 2026-11-09 | P0 | Reglas de negocio/contactos | T18 |
+| T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Cerrado 2026-11-09 | P2 | Persistencia/observabilidad | T25 |
 | T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Abierto | P1 | QA/evaluación | T26, T27 y T28 |
 | T31 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | [SPIKE no funcional] Evaluar fechas citadas en páginas no corporativas para corroborar el empleo | Abierto | P3 | Spike técnico/no funcional | T29 y T30 |
 
@@ -48,15 +48,11 @@ Las prioridades y los tipos solo existen en los issues T12 a T31. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T22, T24 y T25 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T22 y T24 a T29 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Lista para construir | T26 (P0) | Los lotes reales de T17 y T24 perdieron 4 de 5 empresas por identidad sin confirmar |
-| Lista para construir | T28 (P0) | Texto de la regla aprobado el 2026-11-09; paralela a T26 y T27 |
-| Lista para construir | T29 (P2) | Independiente; conserva el diagnóstico de los fallos de Extract |
-| Tras T26 | T27 (P0) | Reemplaza las empresas que T26 aún no logre confirmar |
-| Tras T26, T27 y T28 | T30 (P1) | Requiere autorización de gasto de cada proveedor |
+| Lista; falta autorización de gasto | T30 (P1) | T26, T27 y T28 están cerradas; requiere autorización de cada proveedor, operación y tope |
 | Tras T29 y T30 | T31 (P3) | Mide sobre los resultados persistidos del lote |
 | Preparación técnica lista; evaluación pendiente | T23 (P2) | Fuera del plan actual; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
 
@@ -80,10 +76,10 @@ flowchart LR
     T23["T23 Evaluación real pareada"]:::pending
     T24["T24 Confirmación manual del empleo (cerrada)"]:::closed
     T25["T25 Corroboración con Tavily (cerrada)"]:::closed
-    T26["T26 Filtro de sitios e identidad"]:::open
-    T27["T27 Reserva y reemplazo"]:::open
-    T28["T28 channel_policy_v2"]:::open
-    T29["T29 Fallos de Extract persistidos"]:::open
+    T26["T26 Filtro de sitios e identidad (cerrada)"]:::closed
+    T27["T27 Reserva y reemplazo (cerrada)"]:::closed
+    T28["T28 channel_policy_v2 (cerrada)"]:::closed
+    T29["T29 Fallos de Extract persistidos (cerrada)"]:::closed
     T30["T30 Lote real de validación"]:::pending
     T31["T31 Fechas de páginas no corporativas"]:::pending
     T12 --> T13
@@ -123,20 +119,20 @@ flowchart LR
     classDef pending fill:#e2e3e5,stroke:#6c757d
 ```
 
-Verde: cerrada. Amarillo: abierta y lista para construir. Gris: pendiente de muestra, acceso, autorización o de tareas previas. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
+Verde: cerrada. Amarillo: abierta y lista para construir (sin tareas en este momento). Gris: pendiente de muestra, acceso, autorización o de tareas previas. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
 
 ## Copia del backlog
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
 
-### Conversión de lotes reales (T26 a T31 abiertas)
+### Conversión de lotes reales (T26 a T29 cerradas; T30 y T31 abiertas)
 
 Los lotes reales de T09, T11, T17 y T24 terminaron con 0 personas listas. Estas tareas atacan los dos frenos observados (empresas perdidas por identidad y correos de Apollo sin fecha de verificación) y conservan el diagnóstico.
 
 #### T26 · Filtrar sitios no empresariales y orientar la confirmación de identidad
 
 - **Issue:** [#30](https://github.com/ThomasSerna/veryfi-prospecting/issues/30)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P0
 - **Dependencias:** ninguna (T13 como antecedente)
 - **Tipo:** Discovery/backend
@@ -169,7 +165,7 @@ En los lotes reales de T17 y T24, 4 de cada 5 empresas se detuvieron por `name_u
 #### T27 · Reservar y reemplazar las empresas que no confirman su identidad
 
 - **Issue:** [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P0
 - **Dependencias:** T26
 - **Tipo:** Discovery/pipeline
@@ -201,7 +197,7 @@ Como responsable comercial, quiero que una empresa que no supera la confirmació
 #### T28 · Aceptar correos verificados por Apollo con una política de canal versionada
 
 - **Issue:** [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P0
 - **Dependencias:** T18
 - **Tipo:** Reglas de negocio/contactos
@@ -234,7 +230,7 @@ La regla exige una verificación del correo de hasta 30 días («Frescura» en `
 #### T29 · Persistir los motivos de fallo de Tavily Extract
 
 - **Issue:** [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P2
 - **Dependencias:** T25
 - **Tipo:** Persistencia/observabilidad
