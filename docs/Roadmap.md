@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 25 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22 y T25 cerrados el 2026-11-09 y T23 abierto. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
+- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22 y T25 cerrados el 2026-11-09, y T23 y T26 a T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -35,8 +35,14 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T23 | [#28](https://github.com/ThomasSerna/veryfi-prospecting/issues/28) | [SPIKE no funcional] Evaluar Snov.io frente a Apollo con una muestra real pareada | Abierto | P2 | Spike técnico/no funcional | T22, T12, T16, T17, T18 y antecedentes técnicos de T21 |
 | T24 | [#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24) | Permitir que ventas confirme manualmente el empleo vigente de una persona | Cerrado 2026-11-08 | P1 | Revisión humana/backend e interfaz | T18 |
 | T25 | [#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25) | Corroborar con Tavily el empleo de personas de Apollo sin evidencia corporativa | Cerrado 2026-11-09 | P1 | Pipeline/backend | T18, T16 (política de esfuerzo) |
+| T26 | [#30](https://github.com/ThomasSerna/veryfi-prospecting/issues/30) | Filtrar sitios no empresariales y orientar la confirmación de identidad | Abierto | P0 | Discovery/backend | ninguna (T13 como antecedente) |
+| T27 | [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31) | Reservar y reemplazar empresas que no confirman identidad | Abierto | P0 | Discovery/pipeline | T26 |
+| T28 | [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32) | Política channel_policy_v2: aceptar correos verificados por Apollo | Abierto | P0 | Reglas de negocio/contactos | T18; aprobación previa de la regla |
+| T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Abierto | P2 | Persistencia/observabilidad | T25 |
+| T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Abierto | P1 | QA/evaluación | T26, T27 y T28 |
+| T31 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | [SPIKE no funcional] Evaluar fechas citadas en páginas no corporativas para corroborar empleo | Abierto | P3 | Spike técnico/no funcional | T29 y T30 |
 
-Las prioridades y los tipos solo existen en los issues T12 a T25. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
+Las prioridades y los tipos solo existen en los issues T12 a T31. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
 
 **Identificadores históricos:** la confirmación manual de empleo es T24 ([#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24)), llamada T23 cuando se implementó; la corroboración dirigida es T25 ([#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25)), llamada T24 cuando se implementó. Las referencias históricas en documentos, código, enlaces y configuraciones conservan esos nombres originales. La nueva T23 es la evaluación Snov frente a Apollo ([#28](https://github.com/ThomasSerna/veryfi-prospecting/issues/28)).
 
@@ -46,9 +52,15 @@ Derivado de las dependencias y prioridades del tracker. Con T12 a T22, T24 y T25
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Preparación técnica lista; evaluación pendiente | T23 (P2) | T22 está cerrada; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
+| Lista para construir | T26 (P0) | Los lotes reales de T17 y T24 perdieron 4 de 5 empresas por identidad sin confirmar |
+| Lista tras aprobar la regla | T28 (P0) | Cambia `docs/Business-rules.md`; el texto se aprueba antes del código. Paralela a T26 y T27 |
+| Lista para construir | T29 (P2) | Independiente; conserva el diagnóstico de los fallos de Extract |
+| Tras T26 | T27 (P0) | Reemplaza las empresas que T26 aún no logre confirmar |
+| Tras T26, T27 y T28 | T30 (P1) | Requiere autorización de gasto de cada proveedor |
+| Tras T29 y T30 | T31 (P3) | Mide sobre los resultados persistidos del lote |
+| Preparación técnica lista; evaluación pendiente | T23 (P2) | Fuera del plan actual; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
 
-T23 es la única tarea abierta. El cierre técnico de T21 no acredita una línea base real pareada para T23.
+El cierre técnico de T21 no acredita una línea base real pareada para T23.
 
 ## Dependencias entre tareas
 
@@ -68,6 +80,12 @@ flowchart LR
     T23["T23 Evaluación real pareada"]:::pending
     T24["T24 Confirmación manual del empleo (cerrada)"]:::closed
     T25["T25 Corroboración con Tavily (cerrada)"]:::closed
+    T26["T26 Filtro de sitios e identidad"]:::open
+    T27["T27 Reserva y reemplazo"]:::open
+    T28["T28 channel_policy_v2"]:::open
+    T29["T29 Fallos de Extract persistidos"]:::open
+    T30["T30 Lote real de validación"]:::pending
+    T31["T31 Fechas de páginas no corporativas"]:::pending
     T12 --> T13
     T12 --> T17
     T13 --> T14
@@ -91,15 +109,220 @@ flowchart LR
     T18 --> T24
     T18 --> T25
     T16 --> T25
+    T13 -.-> T26
+    T26 --> T27
+    T18 --> T28
+    T25 --> T29
+    T26 --> T30
+    T27 --> T30
+    T28 --> T30
+    T29 --> T31
+    T30 --> T31
     classDef closed fill:#d4edda,stroke:#2e7d32
+    classDef open fill:#fff3cd,stroke:#b8860b
     classDef pending fill:#e2e3e5,stroke:#6c757d
 ```
 
-Verde: cerrada. Gris: pendiente de muestra, acceso y autorización. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
+Verde: cerrada. Amarillo: abierta y lista para construir. Gris: pendiente de muestra, acceso, autorización o de tareas previas. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
 
 ## Copia del backlog
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
+
+### Conversión de lotes reales (T26 a T31 abiertas)
+
+Los lotes reales de T09, T11, T17 y T24 terminaron con 0 personas listas. Estas tareas atacan los dos frenos observados (empresas perdidas por identidad y correos de Apollo sin fecha de verificación) y conservan el diagnóstico.
+
+#### T26 · Filtrar sitios no empresariales y orientar la confirmación de identidad
+
+- **Issue:** [#30](https://github.com/ThomasSerna/veryfi-prospecting/issues/30)
+- **Estado:** Abierto
+- **Prioridad:** P0
+- **Dependencias:** ninguna (T13 como antecedente)
+- **Tipo:** Discovery/backend
+
+**Historia de usuario**
+
+Como responsable comercial, quiero que el descubrimiento descarte portales, blogs y medios, y que la confirmación de identidad lea las páginas que nombran a la empresa, para que más cuentas lleguen a la etapa de contactos.
+
+**Contexto**
+
+En los lotes reales de T17 y T24, 4 de cada 5 empresas se detuvieron por `name_unconfirmed` o `country_unconfirmed` antes de buscar contactos.
+- El único filtro de sitios no empresariales es una tupla fija (`prospecting/sources.py`: redes sociales, Wikipedia, directorios de software). Noticias, blogs y portales pasan como empresas.
+- `initial_urls` (`prospecting/discovery.py`) pone la portada al final, detrás del tope de 3 páginas.
+- Tavily Extract usa `extract_query(campaign)`, orientada a señales de producto. Los fragmentos no incluyen el nombre legal ni el país.
+
+**Alcance**
+
+- Política versionada `discovery_policy_v2` en `VeryfiConfig`. Sin ella, la conducta y las huellas actuales no cambian.
+- Archivo versionado `config/non_business_sites.json` con:
+  - dominios de medios, portales y marketplaces;
+  - patrones de ruta y título (`/blog/`, `/noticias/`, «top 10», «mejores»…).
+- El filtro se aplica localmente al agrupar candidatas, con el motivo `non_business_site`. No se modifica `NON_BUSINESS_DOMAINS`, que forma parte del payload persistido.
+- Con v2, `initial_urls` prioriza la portada y, si aparecen, `/nosotros` y `/contacto`, dentro del mismo tope.
+- Con v2, la extracción de identidad usa una consulta propia: nombre inferido, país y «nosotros/contacto».
+- Documentar en `docs/discovery.md` y fijar los identificadores nuevos en `docs/persistence.md`.
+
+**Criterios de aceptación**
+
+- Un portal, un blog y una noticia sintéticos no se convierten en candidatas; cada descarte queda con su motivo.
+- Con v2, la portada entra en las páginas iniciales aunque haya 3 o más resultados del dominio.
+- Una campaña sin v2 conserva exactamente sus consultas, payloads y huellas (`tests/test_persisted_identifiers.py`).
+- Pruebas sin red; sin proveedores nuevos ni llamadas de pago adicionales.
+
+#### T27 · Reservar y reemplazar empresas que no confirman identidad
+
+- **Issue:** [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31)
+- **Estado:** Abierto
+- **Prioridad:** P0
+- **Dependencias:** T26
+- **Tipo:** Discovery/pipeline
+
+**Historia de usuario**
+
+Como responsable comercial, quiero que una empresa que no supera la confirmación de identidad sea sustituida por la siguiente candidata, para que cada campaña termine con el número de cuentas pedido cuando el presupuesto lo permite.
+
+**Contexto**
+
+`select_candidates` (`prospecting/discovery.py`) toma exactamente `max_companies`. Las candidatas restantes solo existen en el informe en memoria. Cuando una empresa cae por identidad, nada la reemplaza y el descubrimiento no se repite.
+
+**Alcance**
+
+- Con `discovery_policy_v2`, conservar hasta `max_companies` candidatas de reserva con la misma prioridad. Se persisten como candidatas en espera, con una migración de esquema como la de `profile_matches`.
+- Cuando una empresa termina en `name_unconfirmed`, `country_unconfirmed`, `identity_unverified` o `domain_unknown`, promover la siguiente reserva.
+- Cada promoción reserva gasto antes de llamar (solo en `prospecting/pipeline/calls.py`) y respeta los topes de búsqueda y Extract.
+- Nuevo motivo de parada `reserve_exhausted`, visible en la interfaz.
+- Documentar en `docs/discovery.md`, `docs/campaign.md` y `docs/persistence.md`.
+
+**Criterios de aceptación**
+
+- Una empresa caída por identidad se reemplaza por la reserva siguiente, sin superar el presupuesto.
+- Reanudar tras una interrupción no promueve dos veces la misma reserva.
+- Con las reservas agotadas, la campaña termina con `reserve_exhausted`.
+- Las campañas sin v2 no cambian. Pruebas sin red y prueba de la migración del esquema.
+
+#### T28 · Política channel_policy_v2: aceptar correos verificados por Apollo
+
+- **Issue:** [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32)
+- **Estado:** Abierto
+- **Prioridad:** P0
+- **Dependencias:** T18; aprobación previa de la regla
+- **Tipo:** Reglas de negocio/contactos
+
+**Historia de usuario**
+
+Como responsable comercial, quiero que un correo profesional que Apollo informa como verificado pueda dejar lista a una persona con empleo vigente comprobado, para no depender siempre de una confirmación manual del canal.
+
+**Contexto**
+
+La regla exige una verificación del correo de hasta 30 días (`docs/Business-rules.md`, frescura). Apollo informa `email_status`, pero no la fecha de verificación:
+- El adaptador (`prospecting/providers/apollo.py`) convierte `verified` en `unknown`.
+- Por eso `channel_is_usable` (`prospecting/contacts.py`) nunca acepta el correo.
+- Así, aun con el empleo corroborado, la persona queda en «necesita confirmar canal».
+
+**Requisito previo**
+
+Aprobar explícitamente el texto que cambia `docs/Business-rules.md` y `docs/contacts.md` antes de implementar.
+
+**Alcance**
+
+- Política versionada `channel_policy_v2`. Con ella, un correo nominal del dominio confirmado con `email_status=verified` de Apollo es utilizable si la consulta tiene 30 días o menos.
+- Nuevo estado normalizado `provider_verified`, distinto de `verified` (que exige `verified_at`). Se conserva `provider_status`.
+- Etiqueta en la interfaz y el CSV: «Verificado por Apollo (sin fecha de verificación propia)».
+- `catch_all`, `unknown` e `invalid` mantienen su conducta. La identidad, el cargo y el empleo vigente siguen siendo obligatorios.
+- Fijar los identificadores nuevos en `docs/persistence.md`.
+
+**Criterios de aceptación**
+
+- Sin v2, el correo de Apollo sigue pendiente, como hoy.
+- Con v2, un correo verificado consultado hace 30 días o menos queda utilizable; con más de 30 días, queda vencido.
+- `invalid` sigue bloqueando el canal, y una confirmación manual no lo borra.
+- Pruebas sin red; sin envío de mensajes.
+
+#### T29 · Persistir los motivos de fallo de Tavily Extract
+
+- **Issue:** [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33)
+- **Estado:** Abierto
+- **Prioridad:** P2
+- **Dependencias:** T25
+- **Tipo:** Persistencia/observabilidad
+
+**Historia de usuario**
+
+Como equipo técnico, queremos conservar el motivo por el que Tavily Extract no devolvió contenido de una URL, para diagnosticar después por qué no se corroboró una empresa o una persona.
+
+**Contexto**
+
+En el lote real de T24, la extracción de 3 URL no devolvió texto. El motivo literal solo quedó en los avisos de la ejecución (`prospecting/pipeline/contacts.py`), que el pipeline descarta. La investigación de empresas (`prospecting/pipeline/research.py`) tampoco persiste sus `failed_urls`.
+
+**Alcance**
+
+- Guardar cada fallo en `RunItem.attempts`, sin cambios de esquema:
+  - claves `contacts:extract_failed:<hash de URL>` y `research:extract_failed:<hash de URL>`;
+  - valor con la URL y el motivo recortado.
+- Mostrar los fallos en la ficha de la empresa y su conteo en `manage.py corroboration_report`.
+- Documentar y fijar las claves en `docs/persistence.md` y `tests/test_persisted_identifiers.py`.
+
+**Criterios de aceptación**
+
+- Un fallo sintético de Extract queda persistido, visible en la ficha y contado en el informe.
+- Un fallo no crea evidencia.
+- Reanudar no duplica el registro.
+
+#### T30 · Validar con un lote real las políticas nuevas de descubrimiento y canal
+
+- **Issue:** [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34)
+- **Estado:** Abierto
+- **Prioridad:** P1
+- **Dependencias:** T26, T27 y T28
+- **Tipo:** QA/evaluación
+
+**Historia de usuario**
+
+Como responsable comercial, quiero un lote real pequeño con las políticas nuevas de descubrimiento y canal, para medir si el pipeline deja personas listas con datos reales.
+
+**Alcance**
+
+- Lote equivalente al de T24: Colombia y México, `fintech_software` y `cpg_loyalty`, máximo 5 empresas, con `discovery_policy_v2` y `channel_policy_v2`.
+- Autorización explícita del responsable de cada cupo (proveedor, operación y tope) en la sesión, y copia de la base antes de ejecutar.
+- Medir:
+  - empresas que confirman identidad (antes, 1 de 5);
+  - reservas usadas;
+  - personas pertinentes;
+  - personas listas;
+  - costo por persona lista.
+- Conciliar Tavily, Apollo y Haiku como en T24 y registrar el resultado en `docs/provider-check.md`.
+
+**Criterios de aceptación**
+
+- Resultados reales separados de los simulados, con numeradores, denominadores, fechas y costos.
+- Toda solicitud conciliada o con su motivo pendiente.
+- Contactos reales solo en `data/`, fuera de Git.
+
+#### T31 · [SPIKE no funcional] Evaluar fechas citadas en páginas no corporativas para corroborar empleo
+
+- **Issue:** [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35)
+- **Estado:** Abierto
+- **Prioridad:** P3
+- **Dependencias:** T29 y T30
+- **Tipo:** Spike técnico/no funcional
+
+**Historia de usuario no funcional**
+
+Como equipo técnico, queremos saber cuántas páginas no corporativas sin fecha contienen una fecha citada utilizable, para decidir si vale la pena extraerla y reducir las revisiones humanas por `undated_source`.
+
+**Contexto**
+
+`employment_freshness` (`prospecting/contacts.py`) marca como `undated` toda página no corporativa sin fecha. Tavily (`topic=general`) no devuelve fecha de publicación, y Haiku ya admite fechas citadas (`quoted_date`).
+
+**Alcance**
+
+- Con los resultados de T30 y los fallos persistidos de T29, contar cuántas fuentes `undated_source` traen una fecha citada atribuible.
+- Recomendar si conviene implementar la extracción. Cualquier cambio a las reglas de vigencia requiere una decisión y una historia aparte.
+
+**Criterios de aceptación**
+
+- Informe con muestra, denominadores y limitaciones; sin cambios de reglas ni de código de producción.
 
 ### Enterprise sobre Apollo (T13 a T21 cerradas)
 
