@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22, T25 y T26 a T29 cerrados el 2026-11-09, y T23, T30 y T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
+- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22, T25 y T26 a T30 cerrados el 2026-11-09, y T23 y T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -39,7 +39,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T27 | [#31](https://github.com/ThomasSerna/veryfi-prospecting/issues/31) | Reservar y reemplazar las empresas que no confirman su identidad | Cerrado 2026-11-09 | P0 | Discovery/pipeline | T26 |
 | T28 | [#32](https://github.com/ThomasSerna/veryfi-prospecting/issues/32) | Aceptar correos verificados por Apollo con una política de canal versionada | Cerrado 2026-11-09 | P0 | Reglas de negocio/contactos | T18 |
 | T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Cerrado 2026-11-09 | P2 | Persistencia/observabilidad | T25 |
-| T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Abierto | P1 | QA/evaluación | T26, T27 y T28 |
+| T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Cerrado 2026-11-09 | P1 | QA/evaluación | T26, T27 y T28 |
 | T31 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | [SPIKE no funcional] Evaluar fechas citadas en páginas no corporativas para corroborar el empleo | Abierto | P3 | Spike técnico/no funcional | T29 y T30 |
 
 Las prioridades y los tipos solo existen en los issues T12 a T31. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
@@ -48,12 +48,11 @@ Las prioridades y los tipos solo existen en los issues T12 a T31. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T22 y T24 a T29 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T12 a T22 y T24 a T30 cerradas:
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Lista; falta autorización de gasto | T30 (P1) | T26, T27 y T28 están cerradas; requiere autorización de cada proveedor, operación y tope |
-| Tras T29 y T30 | T31 (P3) | Mide sobre los resultados persistidos del lote |
+| Lista para construir | T31 (P3) | T29 y T30 están cerradas; el lote de T30 no dejó fuentes `undated_source` que medir (ninguna persona llegó a contactos) |
 | Preparación técnica lista; evaluación pendiente | T23 (P2) | Fuera del plan actual; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
 
 El cierre técnico de T21 no acredita una línea base real pareada para T23.
@@ -80,7 +79,7 @@ flowchart LR
     T27["T27 Reserva y reemplazo (cerrada)"]:::closed
     T28["T28 channel_policy_v2 (cerrada)"]:::closed
     T29["T29 Fallos de Extract persistidos (cerrada)"]:::closed
-    T30["T30 Lote real de validación"]:::pending
+    T30["T30 Lote real de validación (cerrada)"]:::closed
     T31["T31 Fechas de páginas no corporativas"]:::pending
     T12 --> T13
     T12 --> T17
@@ -125,7 +124,7 @@ Verde: cerrada. Amarillo: abierta y lista para construir (sin tareas en este mom
 
 Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
 
-### Conversión de lotes reales (T26 a T29 cerradas; T30 y T31 abiertas)
+### Conversión de lotes reales (T26 a T30 cerradas; T31 abierta)
 
 Los lotes reales de T09, T11, T17 y T24 terminaron con 0 personas listas. Estas tareas atacan los dos frenos observados (empresas perdidas por identidad y correos de Apollo sin fecha de verificación) y conservan el diagnóstico.
 
@@ -259,7 +258,7 @@ En el lote real de T24, la extracción de 3 URL no devolvió texto. El motivo li
 #### T30 · Validar con un lote real las políticas nuevas de descubrimiento y canal
 
 - **Issue:** [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-09
 - **Prioridad:** P1
 - **Dependencias:** T26, T27 y T28
 - **Tipo:** QA/evaluación
