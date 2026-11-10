@@ -244,11 +244,11 @@ def test_apollo_v1_ids_references_and_attempt_keys_are_fixed(config):
 
 def test_discovery_policy_version_and_discard_reasons_are_fixed(role_config, config):
     """T26: la versión identifica el filtro guardado en cada instantánea; los motivos aparecen en el informe."""
-    from prospecting.discovery import NON_BUSINESS_SITE
+    from prospecting.discovery import COMPETITOR_VENDOR, NON_BUSINESS_SITE
 
     assert role_config.discovery_policy.version == "discovery_policy_v2"
     assert config.discovery_policy is None
-    assert NON_BUSINESS_SITE == "non_business_site"
+    assert (NON_BUSINESS_SITE, COMPETITOR_VENDOR) == ("non_business_site", "competitor_vendor")
 
 
 def test_channel_policy_version_and_status_are_fixed(role_config, config):

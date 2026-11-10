@@ -306,6 +306,12 @@ class DiscoveryPolicy(Contract):
     non_business_domains: Annotated[list[Annotated[str, Field(min_length=3, max_length=100)]], Field(min_length=1)]
     content_subdomains: Annotated[list[Annotated[str, Field(min_length=2, max_length=30)]], Field(min_length=1)]
     generic_country_suffixes: list[Annotated[str, Field(min_length=2, max_length=2)]]
+    # Lote de T30: ausentes en instantáneas anteriores, sin efecto. Medios por el nombre del dominio,
+    # proveedores de OCR/IDP que compiten con Veryfi y lugares que dan señal local a un resultado.
+    media_domain_markers: list[Annotated[str, Field(min_length=4, max_length=30)]] = Field(default_factory=list)
+    competitor_domains: list[Annotated[str, Field(min_length=3, max_length=100)]] = Field(default_factory=list)
+    local_markers: dict[CountryCode, list[Annotated[str, Field(min_length=3, max_length=60)]]] = Field(
+        default_factory=dict)
 
 
 class CriterionDefinition(Contract):

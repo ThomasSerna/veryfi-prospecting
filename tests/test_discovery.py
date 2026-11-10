@@ -150,6 +150,16 @@ def test_software_directories_are_not_candidates(url):
     ("gestiopolis.com", "non_business_site"),
     ("www.tecoloco.com", "non_business_site"),
     ("blog.cool-tabs.com", "non_business_site"),
+    # Lote real de T30: medios, eventos, un organismo multilateral y un competidor de OCR.
+    ("dcnewsnow.com", "non_business_site"),
+    ("mundoejecutivocdmx.com", "non_business_site"),
+    ("www.eventbrite.com", "non_business_site"),
+    ("idbinvest.org", "non_business_site"),
+    ("revistasintetica.com.co", "non_business_site"),
+    ("abbyy.com", "competitor_vendor"),
+    ("www.abbyy.com", "competitor_vendor"),
+    ("xtract.app", None),
+    ("payhawk.com", None),
     ("sesamehr.es", None),
     ("empresa-sintetica.com.co", None),
     ("blog.com", None),
@@ -178,6 +188,25 @@ def test_foreign_country_domains_are_detected_but_not_discarded(role_config, hos
     assert policy_discard_reason(host, role_config.discovery_policy) is None
 
 
+def test_discovery_policy_selects_candidates_with_a_local_signal_first(make_campaign, config, role_config):
+    """Lote de T30: un proveedor global sin señal de Colombia ya no ocupa la plaza de una empresa local."""
+    from prospecting.discovery import has_local_signal
+
+    hits = hits_for(planned(), 0, ("https://payhawk-sintetica.com/", "Control de gastos para negocios internacionales"),
+                    ("https://local-uno.example/", "Gestión de gastos para empresas en Bogotá"),
+                    ("https://local-dos.com.co/", "Facturas electrónicas"))
+    candidates, _ = group_candidates(hits, 60)
+    policy = role_config.discovery_policy
+    assert [has_local_signal(item, policy) for item in candidates] == [False, True, True]
+    with_policy = make_campaign(max_companies=2, config_snapshot=config.model_copy(update={"discovery_policy": policy}))
+    assert {item.host for item in select_candidates(candidates, with_policy)[0]} == {
+        "local-uno.example", "local-dos.com.co"}
+    # Una instantánea v2 anterior, sin `local_markers`, no aplica la señal local: el proveedor global entra.
+    older = policy.model_copy(update={"local_markers": {}, "media_domain_markers": [], "competitor_domains": []})
+    previous = make_campaign(max_companies=2, config_snapshot=config.model_copy(update={"discovery_policy": older}))
+    assert "payhawk-sintetica.com" in {item.host for item in select_candidates(candidates, previous)[0]}
+
+
 def test_discovery_policy_postpones_foreign_domains_without_excluding_them(make_campaign, config, role_config):
     """Business-rules.md: un ccTLD extranjero no excluye; con la política solo ocupa plaza si faltan locales."""
     hits = hits_for(planned(), 0, ("https://sesamehr.es/", "Sesame"), ("https://local-uno.example/", "Uno"),
@@ -187,8 +216,9 @@ def test_discovery_policy_postpones_foreign_domains_without_excluding_them(make_
     with_policy = make_campaign(max_companies=2, config_snapshot=config.model_copy(
         update={"discovery_policy": role_config.discovery_policy}))
     assert [item.host for item in select_candidates(candidates, without)[0]] == ["sesamehr.es", "local-uno.example"]
+    # `local-dos.com.co` tiene ccTLD de Colombia (señal local) y pasa delante de `local-uno.example`.
     assert [item.host for item in select_candidates(candidates, with_policy)[0]] == [
-        "local-uno.example", "local-dos.com.co"]
+        "local-dos.com.co", "local-uno.example"]
     everything = make_campaign(max_companies=4, config_snapshot=with_policy.config_snapshot)
     assert [item.host for item in select_candidates(candidates, everything)[0]][2:] == [
         "sesamehr.es", "alicorp.com.pe"]

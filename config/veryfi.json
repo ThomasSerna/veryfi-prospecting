@@ -270,10 +270,23 @@
     "non_business_domains": [
       "softwaredoit.es", "gestiopolis.com", "tecoloco.com", "computrabajo.com.co", "computrabajo.com.mx",
       "elempleo.com", "occ.com.mx", "paginasamarillas.com.co", "seccionamarilla.com.mx",
-      "mercadolibre.com.co", "mercadolibre.com.mx", "slideshare.net", "scribd.com", "issuu.com"
+      "mercadolibre.com.co", "mercadolibre.com.mx", "slideshare.net", "scribd.com", "issuu.com",
+      "eventbrite.com", "eventbrite.com.mx", "eventbrite.co", "netwoo.pe", "idbinvest.org", "iadb.org",
+      "mundoejecutivo.com.mx", "mundoejecutivocdmx.com", "expansion.mx", "elfinanciero.com.mx",
+      "eleconomista.com.mx", "forbes.com.mx", "forbes.co", "larepublica.co", "portafolio.co",
+      "valoraanalitik.com", "semana.com", "eltiempo.com", "bloomberglinea.com", "infobae.com"
     ],
     "content_subdomains": ["blog", "blogs", "noticias", "news", "revista", "prensa"],
-    "generic_country_suffixes": ["co", "io", "ai", "me", "tv", "ly", "fm", "to", "gg", "sh", "so", "cc", "ws", "la"]
+    "generic_country_suffixes": ["co", "io", "ai", "me", "tv", "ly", "fm", "to", "gg", "sh", "so", "cc", "ws", "la"],
+    "media_domain_markers": ["news", "noticias", "revista", "magazine", "periodico", "diario"],
+    "competitor_domains": [
+      "abbyy.com", "rossum.ai", "nanonets.com", "mindee.com", "klippa.com", "docsumo.com", "hypatos.ai",
+      "base64.ai", "taggun.io", "tabscanner.com", "affinda.com", "ocrolus.com"
+    ],
+    "local_markers": {
+      "CO": ["Colombia", "Bogotá", "Medellín", "Cali", "Barranquilla", "Bucaramanga"],
+      "MX": ["México", "Mexico", "CDMX", "Monterrey", "Guadalajara", "Querétaro"]
+    }
   },
   "role_taxonomy": {
     "version": "role_taxonomy_v1",

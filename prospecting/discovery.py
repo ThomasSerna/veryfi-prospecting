@@ -284,19 +284,38 @@ def _candidate_priority_key(candidate: Candidate) -> tuple[int, int, int, int, i
 
 
 NON_BUSINESS_SITE = "non_business_site"
+COMPETITOR_VENDOR = "competitor_vendor"
 
 
 def policy_discard_reason(host: str, policy: DiscoveryPolicy) -> str | None:
     """Motivo local de descarte de `discovery_policy_v2`; None si el host puede ser la empresa.
 
-    Portales, directorios y bolsas de empleo listados y subdominios de contenido (`blog.`…) son
-    dominios no empresariales (Business-rules.md, «Identidad y exclusiones»).
+    Portales, directorios, bolsas de empleo, eventos, medios listados o con nombre de medio
+    (`news`, `noticias`…) y subdominios de contenido (`blog.`…) son dominios no empresariales
+    (Business-rules.md, «Identidad y exclusiones»). Un proveedor de OCR/IDP que compite con Veryfi
+    no es un prospecto.
     """
+    if any(within_domain(host, domain) for domain in policy.competitor_domains):
+        return COMPETITOR_VENDOR
     if any(within_domain(host, domain) for domain in policy.non_business_domains):
         return NON_BUSINESS_SITE
     if host.count(".") > 1 and host.split(".")[0] in policy.content_subdomains:
         return NON_BUSINESS_SITE
+    if any(marker in label for label in host.split(".")[:-1] for marker in policy.media_domain_markers):
+        return NON_BUSINESS_SITE
     return None
+
+
+def has_local_signal(candidate: Candidate, policy: DiscoveryPolicy) -> bool:
+    """El resultado sugiere operación en el país de su consulta: ccTLD local o lugar en título o fragmento.
+
+    Es solo una señal para ordenar la selección; nunca confirma el país (eso lo hace la identidad).
+    """
+    country = candidate.hits[0].query.country
+    if candidate.host.rsplit(".", 1)[-1].upper() == country:
+        return True
+    text = plain(" ".join(f"{hit.title or ''} {hit.snippet or ''}" for hit in candidate.hits))
+    return any(re.search(rf"\b{re.escape(plain(place))}\b", text) for place in policy.local_markers.get(country, []))
 
 
 def is_foreign_country_domain(host: str, policy: DiscoveryPolicy, countries: list[CountryCode]) -> bool:
@@ -330,9 +349,11 @@ def select_candidates(candidates: list[Candidate], campaign: Campaign) -> tuple[
     for combo, queue in queues.items():
         signals = any(item.hits[0].query.template_version != LEGACY_TEMPLATE_VERSION for item in queue)
         if queue and (signals or policy is not None):
-            # Con `discovery_policy_v2`, un dominio de otro país va detrás de los locales (orden estable).
+            # Con `discovery_policy_v2`, un dominio de otro país va detrás de los locales y, con
+            # `local_markers`, una candidata sin señal local va detrás de las que la tienen (orden estable).
             queue.sort(key=lambda item: (
-                (is_foreign_country_domain(item.host, policy, campaign.countries),) if policy is not None else ()
+                (is_foreign_country_domain(item.host, policy, campaign.countries),
+                 bool(policy.local_markers) and not has_local_signal(item, policy)) if policy is not None else ()
             ) + (_candidate_priority_key(item) if signals else ()))
     available = {combo: len(queue) for combo, queue in queues.items()}
     target = campaign.limits.discovery.target_per_country_segment
