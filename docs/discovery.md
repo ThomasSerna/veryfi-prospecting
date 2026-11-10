@@ -43,6 +43,15 @@ aplican, después de la búsqueda y sin cambiar el payload enviado a Tavily ni s
 - **Descarte `non_business_site`:** hosts de `non_business_domains` (portales de contenido,
   directorios, bolsas de empleo, marketplaces) y subdominios de contenido (`blog.`, `noticias.`…)
   no se convierten en candidatas. El conteo aparece en `DiscoveryReport.discarded`.
+- **Medios, eventos y competidores (tras el lote de T30):** también es `non_business_site` un host
+  cuyo nombre contiene un marcador de medio (`media_domain_markers`: `news`, `noticias`, `revista`…);
+  la lista incluye medios de negocios, plataformas de eventos y organismos multilaterales observados.
+  Un proveedor de OCR/IDP que compite con Veryfi (`competitor_domains`) se descarta con
+  `competitor_vendor`.
+- **Señal local (tras el lote de T30):** con `local_markers`, en la selección van primero las
+  candidatas cuyo resultado sugiere operación en el país de su consulta: ccTLD de ese país o un lugar
+  suyo (Colombia, Bogotá, CDMX, Monterrey…) en el título o el fragmento. Es solo un orden: no excluye
+  ni confirma el país, que sigue dependiendo de la identidad. Las demás quedan como reservas.
 - **Dominios de otro país:** un sufijo de país ajeno a la campaña (`.es`, `.com.pe`) no se
   excluye, porque un ccTLD extranjero solo añade una advertencia ([Business-rules.md](Business-rules.md#identidad-y-exclusiones)).
   En la selección va detrás de las candidatas locales de su combinación, así que solo ocupa

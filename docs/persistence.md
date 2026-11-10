@@ -191,7 +191,9 @@ y las instantáneas de las pruebas del pipeline los fijan:
   `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=3`.
   `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro
   local, con la portada al final y la consulta de Extract histórica); su motivo de descarte en el
-  informe de descubrimiento es `non_business_site`. `channel_policy_v2` vive en
+  informe de descubrimiento es `non_business_site` y, para competidores de OCR/IDP, `competitor_vendor`.
+  `media_domain_markers`, `competitor_domains` y `local_markers` son opcionales: ausentes en las
+  instantáneas v2 anteriores, que conservan su conducta. `channel_policy_v2` vive en
   `limits.freshness.channel_policy` (ausente o `null`: el correo de Apollo queda pendiente) y el
   estado de canal `provider_verified`, en el JSON de canales, marca el `verified` de Apollo sin
   fecha de verificación propia.
