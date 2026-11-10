@@ -207,7 +207,7 @@ No es necesario crear una tabla por cada clase. Opción concreta: tablas `campai
 
 ### Esquema SQLite
 
-`prospecting.db.Database` crea `data/prospecting.sqlite3` solo cuando la ruta no existe y activa `PRAGMA foreign_keys=ON`. La versión actual del esquema es `user_version=2`. Al abrir una base v1 compatible, la migración aditiva transaccional agrega `assessments.profile_matches` como JSON vacío para evaluaciones antiguas; conserva resultados, checkpoints, evidencia y consumo. Si falla la validación o migración, devuelve un error sin recrear tablas ni borrar datos. Las columnas JSON se validan con `json_valid`; el dinero y los créditos se guardan como texto decimal exacto. No hay funciones de borrado ni migraciones de Django.
+`prospecting.db.Database` crea `data/prospecting.sqlite3` solo cuando la ruta no existe y activa `PRAGMA foreign_keys=ON`. La versión actual del esquema es `user_version=3`. Al abrir una base v1 o v2 compatible, la migración aditiva transaccional agrega `assessments.profile_matches` como JSON vacío para evaluaciones antiguas (v2) y la tabla vacía `discovery_reserves` para las candidatas de reserva del descubrimiento (v3, T27); conserva resultados, checkpoints, evidencia y consumo. Si falla la validación o migración, devuelve un error sin recrear tablas ni borrar datos. Las columnas JSON se validan con `json_valid`; el dinero y los créditos se guardan como texto decimal exacto. No hay funciones de borrado ni migraciones de Django.
 
 ```mermaid
 erDiagram
