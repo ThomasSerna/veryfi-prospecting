@@ -94,6 +94,12 @@ el proceso. Las APIs anteriores desde Python se conservan.
    amplía la evidencia una sola vez (`research_company`) y se recalifica. No se amplía
    cuando la identidad espera revisión humana (`exclusion_review` o `duplicate_review`).
    `excluded`, `low_fit` e `insufficient_evidence` tras la ampliación cierran la empresa.
+   Con `discovery_policy_v2` (T27), cada empresa cerrada por identidad (`name_unconfirmed`,
+   `country_unconfirmed`, `identity_unverified` o `domain_unknown`) cede su plaza a la siguiente
+   reserva del descubrimiento, que repite el análisis inicial y la calificación. La promoción no
+   llama a proveedores; las llamadas de la reserva reservan gasto como las de cualquier empresa.
+   Sin reservas, la empresa caída queda marcada con `discovery:reserve_exhausted` y la ficha lo
+   explica.
 4. **Contactos**: primero las empresas `high` y después las `medium`
    ([Personas y canales](contacts.md)). En `rubric_v1`, cada prioridad se ordena por encaje
    descendente. En `rubric_v2`, dentro de cada prioridad precede la necesidad documental `1`

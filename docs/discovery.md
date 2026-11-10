@@ -56,6 +56,12 @@ aplican, después de la búsqueda y sin cambiar el payload enviado a Tavily ni s
 Las listas son propuestas pendientes de validación, tomadas de las paradas por identidad de
 los lotes reales de T17 y T24.
 
+**Reservas (T27):** con la política, el descubrimiento continúa la misma selección más allá de
+`max_companies` y guarda hasta `max_companies` candidatas de reserva en `discovery_reserves`,
+sin las cuentas con revisión de exclusión pendiente. `DiscoveryReport.reserves` informa cuántas
+se guardaron. Cuando una empresa termina por identidad, la orquestación promueve la siguiente
+reserva en el orden de selección ([Orden de trabajo](campaign.md#orden-de-trabajo)).
+
 Límites actuales frente a IDEA §7.1: las consultas son siempre de plantilla, porque
 Haiku no reformula consultas aunque falten resultados. El informe con las
 combinaciones que no alcanzaron la meta (`DiscoveryReport.combinations`) y los

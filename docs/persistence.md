@@ -142,9 +142,10 @@ y sigue descontándose de los cupos al reiniciar. La sesión firmada de Django s
 guarda el borrador de la campaña en preparación (`draft_id`); los filtros viajan en
 la URL.
 
-La base se crea únicamente cuando la ruta no existe. Una base v1 compatible se
-migra transaccionalmente a v2 al abrirla: añade la columna JSON `profile_matches`
-a `assessments` con `[]` para registros históricos. Reabrir una base compatible
+La base se crea únicamente cuando la ruta no existe. Una base v1 o v2 compatible se
+migra transaccionalmente a v3 al abrirla: v2 añade la columna JSON `profile_matches`
+a `assessments` con `[]` para registros históricos, y v3 (T27) añade la tabla
+`discovery_reserves` vacía. Reabrir una base compatible
 conserva checkpoints y uso; un esquema incompatible, incompleto o corrupto genera
 un error, sin recrear tablas. Una migración fallida se revierte. No hay funciones de
 borrado. Conserva la base y sus archivos auxiliares al cerrar la aplicación;
@@ -187,7 +188,7 @@ y las instantáneas de las pruebas del pipeline los fijan:
   `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
   `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
   `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`, `people_policy_v1`,
-  `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=2`.
+  `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=3`.
   `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro
   local, con la portada al final y la consulta de Extract histórica); su motivo de descarte en el
   informe de descubrimiento es `non_business_site`. `channel_policy_v2` vive en
@@ -251,6 +252,14 @@ identificadores sin reescribir el ledger anterior:
   procesada con `contacts:haiku_rejected:<código>` y la etapa sigue. Un rechazo guardado
   antes como parada pendiente (motivo igual a un código de `HAIKU_REJECTION_CODES` y llamada
   de Haiku con éxito) se marca así al reanudar, sin volver a llamar.
+- Reservas del descubrimiento (T27): tabla `discovery_reserves` con `campaign_id`, `position`
+  (orden de selección), `host`, `candidate` (la candidata seleccionada, en JSON), y al usarse
+  `company_id`, `replaces_company_id` y `promoted_at`. Cada reserva y cada empresa reemplazada
+  se usan una sola vez (`UNIQUE`). Una empresa reemplazada conserva su `RunItem`, pero no cuenta
+  para `max_companies`. Claves de `RunItem.attempts` de la empresa caída:
+  `discovery:replaced_by:<company_id>` y `discovery:reserve_exhausted`. Las paradas que se
+  reemplazan son `name_unconfirmed`, `country_unconfirmed`, `identity_unverified` y
+  `domain_unknown`.
 - Fallos de Tavily Extract (T29): claves de `RunItem.attempts` con valor 1,
   `research:extract_failed:<url> <motivo>` (investigación y ampliación) y
   `contacts:extract_failed:<url> <motivo>` (extracciones de contactos). La URL validada no tiene
