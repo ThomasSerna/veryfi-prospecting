@@ -90,7 +90,7 @@ components:
 Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
 investigación y revisar empresas, personas y evidencia. El inicio destaca la
 campaña activa o, si no existe, la última guardada. Sus indicadores resumen
-revisión y contacto listo; el presupuesto se consulta en cada campaña.
+revisión y contacto listo. Los topes se revisan al autorizar la investigación.
 
 La dirección oscura usa la paleta de Veryfi: navy, marfil, verde Veryfi y
 turquesa, con Sky, Gold y Magenta para la información y los estados. El marco compartido, el inicio, el historial, la campaña y la ficha
@@ -150,11 +150,12 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 
 - La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
   campaña. Su botón queda alineado con el logotipo y Prospecting en la barra
-  superior. Cada campaña muestra su presupuesto.
+  superior.
 - El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
   subtítulo ni nota explicativa. El inicio muestra el avance y dos indicadores
   de igual tamaño, Sin revisar y Con contacto listo, de la campaña destacada;
   el historial está en una vista independiente. Las cifras no suman campañas.
+  En escritorio, el panel de avance ocupa más ancho que los indicadores laterales.
   Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel destacado
   tiene 32 px de relleno interior en escritorio y 24 px en móvil.
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
@@ -162,13 +163,13 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 - La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
   investigadas, Sin revisar, Contacto listo y Aceptadas, y una barra apilada de
   prioridades con su leyenda enlazada a filtros. Debajo, la tabla con búsqueda y
-  filtros en una sola barra, y el presupuesto. El progreso usa las empresas
+  filtros en una sola barra. El progreso usa las empresas
   encontradas como denominador; durante el descubrimiento, si todavía no hay
   empresas, no inventa un porcentaje. El botón Descargar del encabezado despliega
   las opciones para empresas listas o todas las empresas.
-- La ficha presenta identidad y estados en el encabezado, conserva las pestañas
-  Resumen, Contactos y Evidencia, las fuentes enlazadas y, a la derecha, el mejor
-  match y la revisión de ventas. Volver a la campaña y, cuando corresponda,
+- La ficha presenta identidad y estados en el encabezado, las pestañas Resumen y
+  Contactos, y, a la derecha, el mejor match y la revisión de ventas. Las fuentes
+  quedan en un desplegable secundario. Volver a la campaña y, cuando corresponda,
   Anterior y Siguiente están encima del encabezado y preservan los filtros.
   Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
 
@@ -184,8 +185,7 @@ el cursor con puntero fino y el halo del botón principal. Los paneles de trabaj
 
 Paneles con bordes sutiles y radios de 12–16 px (`md` y `lg`). Controles con 8 px
 (`sm`) y campos o etiquetas con 6 px (`xs`). Búsqueda, filtros, contadores y
-etiquetas de mercado o producto usan forma de píldora; las fuentes, 13 px para
-seguir legibles si su texto ocupa dos líneas.
+etiquetas de mercado o producto usan forma de píldora.
 
 ## Components
 
@@ -211,8 +211,7 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
   señalar, dominio, encaje con barra, prioridad con barras de señal (3, 2 o 1),
   disponibilidad, revisión con icono (círculo, marca o cruz) y cantidad de
   contactos. Toda la fila abre la ficha; el nombre es el único enlace.
-- **Presupuesto:** libro de cuatro importes con el disponible destacado y las
-  cuentas en un desplegable.
+- **Autorización:** antes de investigar se revisan las operaciones y sus topes.
 
 ### Ficha
 
@@ -222,14 +221,13 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
   pastilla sigue al puntero; el panel entra desde el lado de la pestaña elegida.
   Siguen el patrón de teclado de pestañas (flechas, Inicio y Fin) y el panel
   recibe el foco con Tab.
-- **Encaje:** cifra grande con barra graduada en cuartos, cobertura, explicación y
-  productos. Cada criterio muestra una bola de Harvey (llena, media, vacía o
-  punteada) junto a su etiqueta textual.
-- **Contactos:** persona con match en barra, etapa en cinco pasos más su etiqueta,
-  y canales como filas con icono, estado y copia; Directo y Utilizable se marcan
-  con iconos y conservan su texto para lectores de pantalla.
-- **Evidencia:** número de fuente como referencia citable; al llegar desde una
-  píldora, la fuente se ilumina un instante.
+- **Encaje:** cifra grande con barra graduada en cuartos, explicación y productos.
+  El desplegable «Ver criterios de encaje» reúne la cobertura y los criterios, cada
+  uno con una bola de Harvey junto a su etiqueta textual.
+- **Contactos:** cada persona presenta nombre, cargo, estado, match y canales con
+  su estado y acción de copia. Los detalles y las confirmaciones se consultan bajo demanda.
+- **Evidencia:** «Fuentes y detalles de investigación» reúne las fuentes y fechas en
+  un desplegable secundario, fuera de las pestañas.
 - **Lateral:** mejor match y revisión fijos al desplazarse. La decisión es un
   control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se desliza a la
   opción elegida.

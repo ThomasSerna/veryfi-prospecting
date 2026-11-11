@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-09 (America/Bogota). Instantánea de los 31 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 cerrado el 2026-11-05, T15, T16, T18 y T20 cerrados el 2026-11-07, T17, T19, T21 y T24 cerrados el 2026-11-08, T22, T25 y T26 a T30 cerrados el 2026-11-09, y T23 y T31 abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26) y [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) son PR, no tareas.
+- **Fecha de corte:** 2026-11-11 (America/Bogota). Instantánea de 32 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 el 2026-11-05, T15 el 2026-11-06, T16, T18 y T20 el 2026-11-07, T17, T19, T21 y T24 el 2026-11-08, T22, T25 y T26 a T30 el 2026-11-09; T23, T31 y T32 siguen abiertos. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26), [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) y [#29](https://github.com/ThomasSerna/veryfi-prospecting/pull/29) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -12,9 +12,9 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 |---|---|---|---|---|---|---|
 | T01 | [#1](https://github.com/ThomasSerna/veryfi-prospecting/issues/1) | Definir contratos mínimos, SQLite y configuración de catálogo/rúbrica | Cerrado 2026-10-11 | — | — | ninguna |
 | T02 | [#2](https://github.com/ThomasSerna/veryfi-prospecting/issues/2) | Implementar reserva/conciliación de presupuesto y cliente de proveedores | Cerrado 2026-10-11 | — | — | T01 |
-| T03 | [#3](https://github.com/ThomasSerna/veryfi-prospecting/issues/3) | Integrar descubrimiento y extracción con Tavily | Cerrado 2026-10-12 | — | — | T01 y T02 |
-| T04 | [#4](https://github.com/ThomasSerna/veryfi-prospecting/issues/4) | Resolver entidades, duplicados y lista de exclusiones | Cerrado 2026-10-12 | — | — | T03 |
-| T05 | [#5](https://github.com/ThomasSerna/veryfi-prospecting/issues/5) | Implementar investigación con Haiku y calificación determinista | Cerrado 2026-10-12 | — | — | T01, T02, T03 y T04 |
+| T03 | [#3](https://github.com/ThomasSerna/veryfi-prospecting/issues/3) | Integrar descubrimiento y extracción con Tavily | Cerrado 2026-10-11 | — | — | T01 y T02 |
+| T04 | [#4](https://github.com/ThomasSerna/veryfi-prospecting/issues/4) | Resolver entidades, duplicados y lista de exclusiones | Cerrado 2026-10-11 | — | — | T03 |
+| T05 | [#5](https://github.com/ThomasSerna/veryfi-prospecting/issues/5) | Implementar investigación con Haiku y calificación determinista | Cerrado 2026-10-11 | — | — | T01, T02, T03 y T04 |
 | T06 | [#6](https://github.com/ThomasSerna/veryfi-prospecting/issues/6) | Implementar búsqueda de personas y canal directo con la ruta habilitada | Cerrado 2026-10-12 | — | — | T02 y T05 |
 | T07 | [#7](https://github.com/ThomasSerna/veryfi-prospecting/issues/7) | Orquestar etapas, límites de esfuerzo, parada y recuperación | Cerrado 2026-10-12 | — | — | T02, T03, T04, T05 y T06 |
 | T08 | [#8](https://github.com/ThomasSerna/veryfi-prospecting/issues/8) | Construir UI, revisión humana y CSV | Cerrado 2026-10-12 | — | — | Contratos de T01; integración funcional con T07 |
@@ -24,7 +24,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T12 | [#13](https://github.com/ThomasSerna/veryfi-prospecting/issues/13) | Migrar completamente la búsqueda y enriquecimiento de personas de Hunter a Apollo | Cerrado 2026-11-01 | P0 crítica | Migración de proveedor/backend | ninguna |
 | T13 | [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14) | Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes | Cerrado 2026-11-01 | P0 | Discovery/backend | T12 (migración a Apollo) |
 | T14 | [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15) | Diseñar y evaluar rubric_v2 que priorice cuentas enterprise | Cerrado 2026-11-05 | P0 | Scoring/backend | T12, T13 |
-| T15 | [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16) | Configurar cargos de referencia de Veryfi para búsqueda en Apollo | Cerrado 2026-11-07 | P0 | Reglas de negocio/búsqueda | T12, T13 |
+| T15 | [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16) | Configurar cargos de referencia de Veryfi para búsqueda en Apollo | Cerrado 2026-11-06 | P0 | Reglas de negocio/búsqueda | T12, T13 |
 | T16 | [#17](https://github.com/ThomasSerna/veryfi-prospecting/issues/17) | Buscar múltiples personas relevantes por cuenta usando Apollo | Cerrado 2026-11-07 | P0 | Pipeline/backend | T12, T15, T18 |
 | T17 | [#18](https://github.com/ThomasSerna/veryfi-prospecting/issues/18) | Validar costos, acceso, confiabilidad y limpieza de la migración a Apollo | Cerrado 2026-11-08 | P0 | QA/operación de proveedor único | T12 |
 | T18 | [#19](https://github.com/ThomasSerna/veryfi-prospecting/issues/19) | Verificar empleo vigente y canales profesionales de contactos Apollo | Cerrado 2026-11-07 | P0 | Calidad de datos/backend | T12, T15 |
@@ -41,8 +41,9 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Cerrado 2026-11-09 | P2 | Persistencia/observabilidad | T25 |
 | T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Cerrado 2026-11-09 | P1 | QA/evaluación | T26, T27 y T28 |
 | T31 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | [SPIKE no funcional] Evaluar fechas citadas en páginas no corporativas para corroborar el empleo | Abierto | P3 | Spike técnico/no funcional | T29 y T30 |
+| T32 | [#36](https://github.com/ThomasSerna/veryfi-prospecting/issues/36) | Reducir la carga de texto y advertencias en la ficha de empresa | Abierto | P1 | UX/UI | ninguna (T08 y T20 como antecedentes) |
 
-Las prioridades y los tipos solo existen en los issues T12 a T31. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
+Las prioridades y los tipos solo existen en los issues T12 a T32. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
 
 **Identificadores históricos:** la confirmación manual de empleo es T24 ([#24](https://github.com/ThomasSerna/veryfi-prospecting/issues/24)), llamada T23 cuando se implementó; la corroboración dirigida es T25 ([#25](https://github.com/ThomasSerna/veryfi-prospecting/issues/25)), llamada T24 cuando se implementó. Las referencias históricas en documentos, código, enlaces y configuraciones conservan esos nombres originales. La nueva T23 es la evaluación Snov frente a Apollo ([#28](https://github.com/ThomasSerna/veryfi-prospecting/issues/28)).
 
@@ -52,7 +53,8 @@ Derivado de las dependencias y prioridades del tracker. Con T12 a T22 y T24 a T3
 
 | Situación | Tareas | Motivo |
 |---|---|---|
-| Lista para construir | T31 (P3) | T29 y T30 están cerradas; el lote de T30 no dejó fuentes `undated_source` que medir (ninguna persona llegó a contactos) |
+| Cambios locales para revisar | T32 (P1) | Sin dependencias; hay cambios relacionados en `feature/better-ui-layout` y el issue sigue abierto |
+| Evaluación pendiente | T31 (P3) | T29 y T30 están cerradas; el lote de T30 no dejó fuentes `undated_source` que medir (ninguna persona llegó a contactos) |
 | Preparación técnica lista; evaluación pendiente | T23 (P2) | Fuera del plan actual; faltan la muestra real, el acceso, los precios y la autorización de cada proveedor |
 
 El cierre técnico de T21 no acredita una línea base real pareada para T23.
@@ -81,6 +83,7 @@ flowchart LR
     T29["T29 Fallos de Extract persistidos (cerrada)"]:::closed
     T30["T30 Lote real de validación (cerrada)"]:::closed
     T31["T31 Fechas de páginas no corporativas"]:::pending
+    T32["T32 Legibilidad de ficha de empresa"]:::open
     T12 --> T13
     T12 --> T17
     T13 --> T14
@@ -118,11 +121,45 @@ flowchart LR
     classDef pending fill:#e2e3e5,stroke:#6c757d
 ```
 
-Verde: cerrada. Amarillo: abierta y lista para construir (sin tareas en este momento). Gris: pendiente de muestra, acceso, autorización o de tareas previas. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
+Verde: cerrada. Amarillo: abierta sin dependencias pendientes. Gris: pendiente de muestra, acceso, autorización o de tareas previas. La línea punteada marca una dependencia parcial (T20 usa los escenarios de T13 y T21 incluye T19 solo si aplica). T23 depende de T12, T16, T17 y T18, ya cerradas; se omiten las aristas transitivas. T21 aporta antecedentes técnicos, no una línea base real pareada.
 
 ## Copia del backlog
 
-Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Cada issue conserva su texto; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
+Agrupación de lectura derivada de las prioridades y dependencias; el tracker no define fases. Se copia el texto de T12 a T32 y se resumen T01 a T11; las casillas de los criterios de aceptación se muestran como viñetas y su estado vive en el issue.
+
+### Legibilidad de la ficha (T32 abierta)
+
+#### T32 · Reducir la carga de texto y advertencias en la ficha de empresa
+
+- **Issue:** [#36](https://github.com/ThomasSerna/veryfi-prospecting/issues/36)
+- **Estado:** Abierto
+- **Prioridad:** P1
+- **Dependencias:** ninguna (T08 y T20 como antecedentes)
+- **Tipo:** UX/UI
+
+**Historia de usuario**
+
+Como integrante del equipo de ventas, quiero una ficha de empresa con información y avisos claros y jerarquizados, para revisar rápidamente la cuenta y sus contactos sin que el exceso de texto dificulte la lectura.
+
+**Contexto**
+
+La ficha reúne resumen, contactos y evidencia. Las justificaciones, estados y avisos de empresa, empleo y canal pueden aparecer simultáneamente y recargar la lectura. T08 construyó la interfaz y T20 evaluó alternativas de presentación.
+
+**Alcance**
+
+- Reorganizar y simplificar los textos de la ficha, priorizando la información necesaria para comprender el estado de la cuenta, los contactos y la siguiente acción de revisión.
+- Mostrar información secundaria, justificaciones y detalles extensos bajo demanda, conservando el acceso a las fuentes, fechas y procedencia.
+- Revisar y agrupar avisos repetidos o informativos cuando correspondan al mismo contexto; reservar el énfasis de advertencia para situaciones relevantes que requieran atención. Conservar visibles los bloqueos y estados necesarios para tomar decisiones.
+- Mantener consultables el motivo y la etapa de errores, incluido el mensaje literal del proveedor; no alterar reglas de negocio, disponibilidad, validaciones ni persistencia.
+
+**Criterios de aceptación**
+
+- La ficha presenta con jerarquía clara el estado de la empresa, su calificación, los contactos y las acciones de revisión; los textos y etiquetas son breves y comprensibles.
+- Los detalles secundarios se pueden consultar sin perder justificaciones, evidencia, fuentes, fechas ni procedencia; los enlaces a fuentes siguen funcionando.
+- En escenarios con varios avisos no se repite el mismo mensaje para el mismo contexto; los avisos se muestran donde son pertinentes y distinguen información, advertencia y error.
+- Una empresa detenida o con error muestra el bloqueo y la etapa correspondiente; el mensaje literal del fallo sigue accesible. Los estados pendientes, contradictorios y no verificados de empleo y canal siguen identificables sin presentarlos como verificados.
+- La navegación y los detalles funcionan con teclado, sus estados son comprensibles para tecnologías de asistencia y la ficha sigue siendo legible en escritorio y móvil.
+- Se verifican sin red y con datos sintéticos los escenarios de empresa detenida, error, contacto pendiente y canal con advertencias, así como la revisión y el acceso a evidencia. Se mantiene el escape del contenido externo.
 
 ### Conversión de lotes reales (T26 a T30 cerradas; T31 abierta)
 
@@ -320,7 +357,7 @@ Como equipo técnico, queremos saber cuántas páginas no corporativas sin fecha
 #### T13 · Calibrar ICP enterprise y enriquecer el descubrimiento de cuentas grandes
 
 - **Issue:** [#14](https://github.com/ThomasSerna/veryfi-prospecting/issues/14)
-- **Estado:** Cerrado
+- **Estado:** Cerrado 2026-11-01
 - **Prioridad:** P0
 - **Dependencias:** T12 (migración a Apollo)
 - **Tipo:** Discovery/backend
@@ -348,7 +385,7 @@ Como responsable comercial de Veryfi, quiero descubrir y clasificar empresas gra
 #### T14 · Diseñar y evaluar rubric_v2 que priorice cuentas enterprise
 
 - **Issue:** [#15](https://github.com/ThomasSerna/veryfi-prospecting/issues/15)
-- **Estado:** Cerrado
+- **Estado:** Cerrado 2026-11-05
 - **Prioridad:** P0
 - **Dependencias:** T12, T13
 - **Tipo:** Scoring/backend
@@ -376,7 +413,7 @@ Como ejecutivo de ventas, quiero una calificación explicable que priorice empre
 #### T15 · Configurar cargos de referencia de Veryfi para búsqueda en Apollo
 
 - **Issue:** [#16](https://github.com/ThomasSerna/veryfi-prospecting/issues/16)
-- **Estado:** Cerrado 2026-11-07
+- **Estado:** Cerrado 2026-11-06
 - **Prioridad:** P0
 - **Dependencias:** T12, T13
 - **Tipo:** Reglas de negocio/búsqueda
@@ -774,11 +811,11 @@ Resumen de cada issue: su historia de usuario, dependencias y cierre. Los criter
   **Como** desarrollador que integra el sistema, **quiero** disponer de contratos de datos validados, persistencia local y configuraciones versionadas, **para** que todas las etapas compartan información consistente y puedan recuperar sus resultados sin perder trazabilidad.
 - **T02 · Implementar reserva/conciliación de presupuesto y cliente de proveedores** ([#2](https://github.com/ThomasSerna/veryfi-prospecting/issues/2), cerrado 2026-10-11). Depende de: T01.
   **Como** responsable del presupuesto de investigación, **quiero** autorizar y controlar cada llamada a proveedores, con reservas y conciliación de consumo, **para** evitar gastos o uso de créditos fuera de los topes aprobados.
-- **T03 · Integrar descubrimiento y extracción con Tavily** ([#3](https://github.com/ThomasSerna/veryfi-prospecting/issues/3), cerrado 2026-10-12). Depende de: T01 y T02.
+- **T03 · Integrar descubrimiento y extracción con Tavily** ([#3](https://github.com/ThomasSerna/veryfi-prospecting/issues/3), cerrado 2026-10-11). Depende de: T01 y T02.
   **Como** analista comercial de Veryfi, **quiero** descubrir empresas desde los países y segmentos que seleccione, con evidencias consultables, **para** generar un universo inicial de prospectos sin introducir manualmente una lista de compañías.
-- **T04 · Resolver entidades, duplicados y lista de exclusiones** ([#4](https://github.com/ThomasSerna/veryfi-prospecting/issues/4), cerrado 2026-10-12). Depende de: T03.
+- **T04 · Resolver entidades, duplicados y lista de exclusiones** ([#4](https://github.com/ThomasSerna/veryfi-prospecting/issues/4), cerrado 2026-10-11). Depende de: T03.
   **Como** analista que prepara una lista de cuentas para ventas, **quiero** identificar correctamente cada empresa y retirar duplicados o cuentas expresamente excluidas, **para** evitar propuestas a entidades equivocadas y no gastar recursos investigando cuentas que no corresponden.
-- **T05 · Implementar investigación con Haiku y calificación determinista** ([#5](https://github.com/ThomasSerna/veryfi-prospecting/issues/5), cerrado 2026-10-12). Depende de: T01, T02, T03 y T04.
+- **T05 · Implementar investigación con Haiku y calificación determinista** ([#5](https://github.com/ThomasSerna/veryfi-prospecting/issues/5), cerrado 2026-10-11). Depende de: T01, T02, T03 y T04.
   **Como** representante de ventas que prioriza prospectos, **quiero** obtener un encaje comercial explicable sustentado en fuentes y capacidades reales de Veryfi, **para** invertir el esfuerzo en empresas pertinentes sin confundir una puntuación con probabilidad de compra.
 - **T06 · Implementar búsqueda de personas y canal directo con la ruta habilitada** ([#6](https://github.com/ThomasSerna/veryfi-prospecting/issues/6), cerrado 2026-10-12). Depende de: T02 y T05.
   **Como** ejecutivo de ventas de Veryfi, **quiero** identificar personas pertinentes dentro de una empresa priorizada y un canal profesional utilizable, **para** tener prospectos accionables que el equipo comercial pueda revisar y contactar por su cuenta.

@@ -2,7 +2,7 @@
 
 Prototipo académico local para investigar posibles clientes de Veryfi en
 Latinoamérica. La interfaz local de Django permite configurar y ejecutar campañas,
-consultar progreso, evidencia y presupuesto, revisar empresas, confirmar canales
+consultar progreso y evidencia, revisar empresas, confirmar canales
 alternativos existentes y descargar CSV seguro. Reutiliza SQLite y el pipeline de
 descubrimiento con Tavily, calificación determinista con Claude Haiku y búsqueda de
 personas con Apollo y evidencia pública. La aplicación no envía mensajes ni contacta

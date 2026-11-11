@@ -7,13 +7,4 @@
     {% if channel.extension %}<li data-state="info">Ext.: <strong>{{ channel.extension }}</strong></li>{% endif %}
   </ul>
   {% if channel.manual_confirmation_reason %}<p class="quiet-note">Notas: {{ channel.manual_confirmation_reason }}</p>{% endif %}
-  {% if channel.evidence_ids %}
-  <div class="evidence-references">
-    {% for evidence_id in channel.evidence_ids %}
-      {% with pill=evidence_items|evidence_item:evidence_id %}
-        <a href="#source-{{ evidence_id }}" class="source-pill" data-evidence-link {% if pill %}title="{{ pill.title }}"{% endif %}>{% if pill %}{{ pill.label }}{% else %}Fuente #{{ forloop.counter }}{% endif %}</a>
-      {% endwith %}
-    {% endfor %}
-  </div>
-  {% endif %}
 </div>

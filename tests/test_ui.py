@@ -276,7 +276,9 @@ def test_human_review_saves_reason_and_survives_new_browser(ui_results, client):
 def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_action(ui_results, client):
     case = ui_results
     path = url("confirm_channel", case.campaign.id, case.companies[0].id)
-    assert client.post(path, confirmation(case)).status_code == 400
+    rejected = client.post(path, confirmation(case))
+    assert rejected.status_code == 400
+    assert re.search(r'<details class="channel-checks"[^>]*\bopen\b', text(rejected))
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
     assert client.post(path, confirmation(case, confirmed="on")).status_code == 302
@@ -313,10 +315,13 @@ def test_company_detail_flags_employment_inferred_from_hunter(ui_results, client
     # T16: la persona de Hunter tiene canal utilizable, pero sin evidencia del puesto no figura como lista.
     assert "Pertinente con canal" in shown and ">Lista<" not in shown
     assert "Inferida del historial de Hunter; no prueba el puesto" in shown
-    assert "Inferido del historial de Hunter; sin evidencia del puesto" in shown
+    assert "Empleo declarado; sin comprobar" in shown
     assert "Requiere revisión humana" in shown
     assert "Vigente según evidencia del puesto" in shown
-    assert "Vigente según fuente corporativa o pública" in shown
+    result = next(item for item in read_campaign(case.paths.db, case.campaign.id).companies
+                  if item.company.id == case.companies[0].id)
+    historical = next(person for person in result.contacts if person.contact.id == contact.id)
+    assert historical.employment.state == "provider_claim" and not historical.eligible
 
 
 def test_company_detail_explains_stale_employment_and_disables_confirmation(ui_results, client):
@@ -450,27 +455,28 @@ def test_demo_notice_and_csv_name_appear_only_in_demo_mode(ui_results, client, t
 
 
 @pytest.mark.parametrize("status", [None, "pending", "validated"])
-def test_exclusion_list_warning_appears_only_until_the_list_is_validated(ui_results, client, status):
+def test_campaign_omits_global_exclusion_list_notice(ui_results, client, status):
     if status is not None:
         checked = ExclusionList(version="synthetic-v1", validation_status=status, source_reference="Lista sintética",
                                 observed_at=utc_now(), entries=[])
         ui_results.paths.exclusions.write_text(checked.model_dump_json(), encoding="utf-8")
     response = client.get(url("campaign", ui_results.campaign.id))
     assert response.status_code == 200
-    assert ("La lista de exclusiones necesita confirmación." in text(response)) is (status != "validated")
+    assert "La lista de exclusiones necesita confirmación." not in text(response)
 
 
-def test_budget_reservation_is_not_added_again_to_pending(ui_results, client):
+def test_campaign_omits_budget_without_changing_its_accounting(ui_results, client):
     with Database(ui_results.paths.db) as db:
         db.save_usage(Usage(campaign_id=ui_results.campaign.id, provider="anthropic", operation="messages",
                             account_ref="cuenta-sintetica", funding_source="prepaid", request_fingerprint="b" * 64,
                             reserved_cost_usd="0.02", reserved_credits="0", status="reserved"))
     response = client.get(url("campaign", ui_results.campaign.id))
     assert response.status_code == 200
-    assert "USD 0.02" in text(response)
-    assert "USD 0.04" not in text(response)
+    assert 'id="budget-title"' not in text(response)
+    assert 'data-live-section="budget"' not in text(response)
+    assert "USD 0.02" not in text(response)
     view = read_campaign(ui_results.paths.db, ui_results.campaign.id)
-    assert view.budget.campaign.reserved == view.budget.campaign.pending
+    assert view.budget.campaign.reserved == view.budget.campaign.pending == Decimal("0.02")
 
 
 def test_hostile_external_text_is_escaped_and_private_source_is_not_a_link(
@@ -529,6 +535,7 @@ def test_results_prioritize_fit_and_stop_reasons_explain_the_next_action(ui_resu
     ("preferred_channel_found", "info", "canal preferido"),
     ("people_limit", "info", "máximo de personas"),
     ("people_target_reached", "info", "objetivo de personas pertinentes"),
+    ("contact_plan_exhausted", "detail", "contactos agotada"),
     ("enrichment_limit", "warning", "tope de enriquecimientos"),
     ("excluded_account", "info", "lista de exclusiones"),
     (f"duplicate_of:{uuid4()}", "info", "duplicado confirmado"),
@@ -544,8 +551,13 @@ def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reas
         db.save_run_item(item.model_copy(update={"stop_reason": reason}))
     shown = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     notice = re.search(r'<div class="notice notice-(\w+)"><strong>([^<]*)</strong></div>', shown)
-    assert notice is not None and notice[1] == tone and expected in notice[2]
-    assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
+    if tone == "warning":
+        assert notice is not None and notice[1] == tone and expected in notice[2]
+        assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
+    else:
+        assert notice is None
+    evidence = re.search(r'<details id="evidence"[^>]*>(.*?)</details>', shown, re.S)
+    assert evidence is not None and expected in evidence[1]
 
 
 @pytest.mark.parametrize("reason, expected", [
@@ -743,7 +755,7 @@ def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_st
     assert compact["html"] == ""
 
 
-def test_company_criteria_and_sources_use_semantic_labels_and_contextual_pills(ui_results, client, make_assessment):
+def test_company_criteria_keep_semantics_and_move_sources_to_secondary_details(ui_results, client, make_assessment):
     case = ui_results
     company = case.companies[0]
     with Database(case.paths.db) as db:
@@ -766,10 +778,35 @@ def test_company_criteria_and_sources_use_semantic_labels_and_contextual_pills(u
     assert "Señal parcial" in page
     assert "Incompatible" in page
     assert "Sin evidencia" in page
-    assert "Fuente original · example.com #1" in page
-    assert "Fuente original · synthetic-co.example #" in page
+    tabs = re.search(r'<nav class="tabs"[^>]*>(.*?)</nav>', page, re.S)
+    assert tabs is not None
+    links = Links()
+    links.feed(tabs[1])
+    assert links.urls == ["#summary", "#contacts"]
+    evidence = re.search(r'<details\b[^>]*\bid="evidence"[^>]*>', page)
+    assert evidence is not None and not re.search(r'\bopen\b', evidence[0])
+    assert page.index('id="contacts"') < evidence.start()
+    for panel_id in ("summary", "contacts"):
+        panel = re.search(fr'<section id="{panel_id}"[^>]*>(.*?)</section>', page, re.S)
+        assert panel is not None
+        assert "source-pill" not in panel[1] and "data-evidence-link" not in panel[1]
+    assert "Datos de la empresa" not in page
+    assert f'id="source-{source_id}"' in page
     assert 'class="company-nav-bar"' not in page
     assert 'aria-label="Navegación secuencial de empresas"' in page
+
+
+def test_contacts_show_channel_availability_and_copy_before_optional_checks(ui_results, client):
+    case = ui_results
+    page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)[1]
+    checks = re.search(r'<details class="channel-checks"[^>]*>', contacts)
+    assert checks is not None and not re.search(r'\bopen\b', checks[0])
+    assert "No utilizable" in contacts[:checks.start()]
+    assert f'data-copy-channel="{case.contact.channels[0].value}"' in contacts[:checks.start()]
+    assert "Comprobaciones del canal" in contacts and "Estado:" in contacts[checks.end():]
+    review = re.search(r'<details class="contact-checks"[^>]*>', contacts)
+    assert review is not None and not re.search(r'\bopen\b', review[0])
 
 
 def test_each_entity_mismatch_condition_has_its_own_explanation():
@@ -819,6 +856,8 @@ def test_employment_confirmation_form_appears_only_for_confirmable_people(ui_emp
     assert "Confirmar empleo vigente" in page
     assert f'action="{url("confirm_employment", ui_employment.campaign.id, ui_employment.company.id)}"' in page
     assert "sin enviar mensajes, llamar ni enviar invitaciones" in page
+    contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)
+    assert contacts is not None and "Apollo" not in contacts[1]
     # La persona del directorio, sin enriquecimiento de Apollo, no admite la confirmación manual del empleo.
     other = text(client.get(url("company", ui_results.campaign.id, ui_results.companies[0].id)))
     assert "Confirmar empleo vigente" not in other
@@ -832,6 +871,7 @@ def test_employment_confirmation_requires_checkbox_reason_and_url(ui_employment,
     case = ui_employment
     response = client.post(url("confirm_employment", case.campaign.id, case.company.id), employment(case, **fields))
     assert response.status_code == 400 and "Confirmar empleo vigente" in text(response)
+    assert re.search(r'<details class="contact-checks"[^>]*\bopen\b', text(response))
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
 

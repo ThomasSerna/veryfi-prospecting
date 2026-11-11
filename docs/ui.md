@@ -24,9 +24,10 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
 subtítulo ni nota explicativa. El inicio muestra la campaña activa o, si no la
-hay, la última guardada. El panel resume su avance y dos indicadores de igual tamaño
-cuentan las empresas sin revisar y con contacto listo; no suma resultados de campañas
-distintas. Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel
+hay, la última guardada. El panel principal resume su avance y ocupa más ancho en
+escritorio; dos indicadores laterales cuentan las empresas sin revisar y con contacto
+listo. El inicio no suma resultados de campañas distintas. Los paneles se separan
+24 px en escritorio y 16 px en móvil; el panel
 destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Si no existen
 campañas, se ofrece preparar la primera.
 
@@ -40,7 +41,7 @@ El avance dibuja un segmento por empresa encontrada y enciende los terminados;
 sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
 permanece en el documento para lectores de pantalla. Durante una investigación,
 el inicio vuelve a leer su propia página cada dos segundos y actualiza en su
-sitio avance, cifras, estado, navegación y presupuesto, sin recargar ni repetir
+sitio avance, cifras, estado y navegación, sin recargar ni repetir
 la entrada; al terminar muestra el estado final y habilita la revisión. Con
 movimiento reducido, el contenido aparece en su estado final y los cambios solo
 se funden.
@@ -54,8 +55,7 @@ Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foc
 sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
 contiene el botón y la marca Veryfi Prospecting. En la ficha, Volver a la campaña
 y, cuando corresponda, Anterior y Siguiente están encima del encabezado y preservan
-los filtros. El presupuesto se consulta en la sección Presupuesto de cada campaña.
-Un importe desconocido o pendiente conserva esa condición.
+los filtros.
 
 Las propuestas estáticas de [campaña](../static/prototypes/campaign.html) y
 [ficha](../static/prototypes/company.html) siguen disponibles en el servidor
@@ -71,8 +71,8 @@ cambios. Las vistas operativas ya aplican la nueva dirección.
    la propuesta `contact_match_v2`, sin tráfico. La versión y sus pesos no cambian al
    editar después el archivo local. Si la configuración v2 falta o no es válida, se
    informa el error y no se guarda la campaña nueva.
-2. Consulta el presupuesto y las cuentas comprobadas. Ejecutar requiere claves en el
-   entorno y un archivo válido `data/provider-access.json`.
+2. Revisa las operaciones y sus topes en la autorización. Ejecutar requiere claves en
+   el entorno y un archivo válido `data/provider-access.json`.
 3. El responsable autoriza explícitamente cada operación habilitada, con cuenta, tope
    económico y de créditos, responsable y referencia. La ejecución crea permisos
    nuevos dentro de una sesión de `Budget`; no recupera permisos guardados.
@@ -199,11 +199,11 @@ campos con los valores sintéticos del ejemplo: la configuración antigua no hab
 una ejecución nueva. Cambiar ese archivo no borra el ledger histórico de SQLite;
 conserva la base y sus archivos auxiliares.
 
-El presupuesto muestra consumo confirmado, estimado, reservado y disponible en formato
-comercial legible, además del desglose por cuenta. Una reserva incierta se conserva hasta conciliarla.
-El archivo de acceso no habilita operaciones adicionales ni altera límites del catálogo.
-La lista opcional de exclusiones está en `data/exclusions.json`: si falta o no está
-validada, la interfaz muestra su estado y no afirma que se aplicó una lista validada.
+La autorización muestra el disponible asociado a cada operación. Una reserva incierta se
+conserva hasta conciliarla. El archivo de acceso no habilita operaciones adicionales ni
+altera límites del catálogo. La lista opcional de exclusiones está en
+`data/exclusions.json`: si falta o no está validada, no se afirma que se aplicó una
+lista validada.
 
 ## Resultados y revisión
 
@@ -220,38 +220,30 @@ y compara cada sección en su sitio: las empresas nuevas
 entran en su fila, las que cambian de puesto se desplazan hasta él y las que
 cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
 lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
-empresa organiza Resumen,
-Contactos y Evidencia con píldoras de referencia cruzada que informan el origen o dominio y el
-número de fuente (`Fuente original · dominio.com #1`, `Apollo #2`), mostrando encaje,
-cobertura, criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
-`Sin evidencia`) junto a una bola de Harvey, caso de uso, contactos y motivos de
-detención sin jerga técnica (cada fallo de Apollo, el límite local de solicitudes y el bloqueo
-hasta conciliar tienen su propia explicación en `STOP_MESSAGES`, T17). Al seguir una píldora, la fuente citada se ilumina
-un instante. A la derecha se mantienen el mejor match y la revisión de ventas.
-Datos desconocidos se muestran separados de cero.
+empresa organiza el trabajo en Resumen y Contactos. El resumen muestra el encaje,
+su explicación y productos; «Ver criterios de encaje» reúne la cobertura y los
+criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
+`Sin evidencia`) junto a una bola de Harvey. «Fuentes y detalles de investigación»
+queda fuera de las pestañas y se abre bajo demanda para consultar las fuentes y sus
+fechas. A la derecha se mantienen el mejor match y la revisión de ventas. Datos
+desconocidos se muestran separados de cero.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
 prioridad, necesidad documental `1` y score descendente, con desempate estable.
 La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
-La pestaña Contactos lista a todas las personas encontradas, con su porcentaje de match,
-su desglose, sus datos pendientes y la marca de las descartadas por regla. En v2, las
-personas no descartadas y la pertinencia preceden al porcentaje en el orden. Cada persona
-muestra su etapa (Candidata, Identidad verificada, Pertinente, Pertinente con canal
-o Lista), la función de su cargo y, si Apollo no la confirmó al enriquecerla, el motivo.
+La pestaña Contactos lista a las personas encontradas con nombre, cargo, etapa y match.
+Cada canal identificado indica si es utilizable y ofrece copiarlo; «Comprobaciones del
+canal» contiene su estado y la confirmación cuando corresponde. «Revisar contacto» reúne
+los detalles de empleo y match. Se conservan las señales de descarte y contradicción.
+En v2, las personas no descartadas y la pertinencia preceden al porcentaje en el orden.
 Las campañas nuevas usan el match v2 de su instantánea; las anteriores sin ella usan v1.
 El match ordena la revisión y la prioridad de enriquecimiento, mientras «listo» sigue
-dependiendo de las reglas de persona y canal. Si falta una configuración v1 válida para
-una campaña histórica, o el archivo declara otra versión, la ficha lo avisa y muestra a
-las personas sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
-
-Cada persona muestra la vigencia de su empleo ([Vigencia del empleo](contacts.md#vigencia-del-empleo-t18)):
-el estado (vigente según fuente corporativa o pública, declarado por Apollo, inferido del
-historial de Hunter, contradicho o sin comprobar), el motivo en lenguaje comercial, las
-fuentes que lo sustentan y la marca «Requiere revisión humana» en los casos ambiguos.
-Si la persona no está descartada por regla y su empleo no está comprobado, el aviso
-aparece sobre su tarjeta. Un correo de Apollo nunca se presenta como empleo confirmado.
+dependiendo de las reglas de persona y canal. Si no hay configuración válida, las
+personas se muestran sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
+La [vigencia del empleo](contacts.md#vigencia-del-empleo-t18) distingue lo comprobado
+de lo pendiente o contradictorio; un correo no confirma por sí solo el empleo.
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
 son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
@@ -278,15 +270,13 @@ pide:
 - con un cambio de cargo, cuál de los cargos ya citados es el vigente.
 
 Un dato inválido devuelve la ficha con el error y sin cambios; un cargo no citado o una
-persona ajena se rechazan. Al confirmar, el aviso de la tarjeta y la fila «Vigencia del
-empleo» muestran «Confirmado manualmente por ventas» con la fecha, el vencimiento, el motivo
-y el enlace a la fuente. La identidad guardada sigue indicando sus contradicciones. El
-formulario se bloquea durante una ejecución y no existe en campañas históricas.
+persona ajena se rechazan. La confirmación conserva fecha, vencimiento, motivo y fuente,
+consultables en «Fuentes y detalles de investigación»; la identidad guardada sigue
+indicando sus contradicciones. El formulario se bloquea durante una ejecución y no
+existe en campañas históricas.
 
-La tarjeta de cada persona también explica el resultado de la búsqueda dirigida del empleo
-(T24, [Corroboración dirigida del empleo](contacts.md#corroboración-dirigida-del-empleo-t24)):
-fuente pública que lo corroboró, búsqueda sin corroboración, cupo de búsquedas agotado o
-hechos citados que no superaron la validación. Sin búsqueda ni pendiente, no aparece.
+Los detalles de empleo incluyen el resultado de la búsqueda dirigida cuando existe
+(T24, [Corroboración dirigida del empleo](contacts.md#corroboración-dirigida-del-empleo-t24)).
 
 ## Exportación CSV
 
