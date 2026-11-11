@@ -12,7 +12,7 @@
 .home-history-link svg { width: 16px; height: 16px; }
 .home-live-notice { margin-bottom: 18px; }
 
-.home-bento { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 24px; }
+.home-bento { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 24px; }
 
 /* Panel destacado: estado, mercado y un segmento por empresa encontrada. */
 .home-feature { display: flex; flex-direction: column; min-width: 0; padding: 32px; border-color: var(--line); background: linear-gradient(180deg, var(--surface-top), var(--surface) 58%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%); }
@@ -465,10 +465,10 @@ a.sequence-link:active { transform: scale(.96); }
 .company-page .tab-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* Resumen: la cifra de encaje manda; la explicación y los criterios la sostienen. */
-.scorecard { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 22px 34px; padding-bottom: 22px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.scorecard { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr); gap: 22px 24px; padding-bottom: 22px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
 .score-metrics { display: grid; align-content: start; gap: 20px; margin: 0; }
 .score-metric dt { color: var(--muted); font-size: .75rem; font-weight: 500; }
-.score-metric dd { display: flex; align-items: baseline; gap: 6px; margin: 6px 0 10px; color: var(--ink); font-size: 2.5rem; font-weight: 600; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.score-metric dd { display: flex; align-items: baseline; gap: 6px; margin: 6px 0 10px; color: var(--ink); font-size: 2.5rem; font-weight: 600; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .score-metric dd small { color: var(--muted); font-size: .875rem; font-weight: 500; letter-spacing: 0; }
 .score-metric-coverage dd { font-size: 1.5rem; letter-spacing: -.03em; }
 .score-meter { position: relative; display: block; height: 6px; overflow: hidden; border-radius: 3px; background: linear-gradient(90deg, transparent calc(25% - 1px), rgb(255 255 255 / 10%) 0 25%, transparent 0 calc(50% - 1px), rgb(255 255 255 / 10%) 0 50%, transparent 0 calc(75% - 1px), rgb(255 255 255 / 10%) 0 75%, transparent 0), var(--track); }
@@ -504,6 +504,19 @@ a.sequence-link:active { transform: scale(.96); }
 .company-page .contact-detail > header h3 { margin: 0 0 3px; font-size: 1.0625rem; }
 .company-page .contact-detail > header p { margin: 0; }
 .company-page .contact-detail > .notice { margin-top: 12px; }
+.criteria-details > summary, .contact-checks > summary, .channel-checks > summary, .evidence-disclosure > summary { min-height: 44px; color: var(--muted); font-size: .8125rem; font-weight: 500; }
+.criteria-coverage { margin: 12px 0 20px; }
+.criteria-coverage .score-metric { max-width: 240px; }
+.criteria-coverage .score-metric dd { font-size: 1.25rem; }
+.contact-checks { margin-top: 12px; }
+.contact-checks > summary, .channel-checks > summary { justify-content: flex-start; gap: 12px; }
+.contact-checks > .quiet-note { margin: 12px 0; }
+.contact-blocked { margin: 12px 0; color: var(--warning); }
+.evidence-disclosure { margin-top: 16px; }
+.evidence-disclosure > summary { justify-content: flex-start; gap: 12px; width: fit-content; }
+.evidence-content { margin-top: 12px; padding: 20px 24px; border-top: 1px solid var(--line); }
+.company-page .channel-checks { margin-left: 46px; }
+.company-page .channel-checks > summary { min-height: 36px; font-size: .75rem; }
 .match-score { gap: 8px; padding: 5px 10px; border-color: var(--line); border-radius: 999px; background: transparent; color: var(--muted); }
 .match-score strong { color: var(--ink); }
 .match-meter { display: inline-block; width: 38px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--track); }
@@ -516,7 +529,7 @@ a.sequence-link:active { transform: scale(.96); }
 .stage-ready i { background: var(--success); }
 .company-page .match-details { margin: 12px 0 0; }
 .channel-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
-.company-page .channel-detail { margin: 0; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--soft); }
+.company-page .channel-detail { margin: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
 .channel-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
 .channel-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgb(255 255 255 / 4%); color: var(--muted); }
 .channel-icon svg { width: 17px; height: 17px; }
@@ -547,7 +560,7 @@ a.sequence-link:active { transform: scale(.96); }
 .copy-channel-btn[data-copied='true'] .icon-copy { opacity: 0; transform: scale(.5) rotate(-20deg); }
 .copy-channel-btn[data-copied='true'] .icon-check { opacity: 1; transform: none; stroke-dashoffset: 0; transition: opacity 160ms ease, transform 320ms var(--ease-out-expo), stroke-dashoffset 420ms var(--ease-out-expo) 60ms; }
 
-/* Evidencia: el número de fuente es la referencia que citan las píldoras. */
+/* Fuentes secundarias, disponibles bajo demanda. */
 .evidence-list { margin: 0; padding: 0; list-style: none; }
 .company-page .evidence-detail { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; margin: 0 -12px; padding: 16px 12px; border: 0; border-top: 1px solid var(--line); border-radius: 12px; scroll-margin-top: 96px; }
 .company-page .evidence-detail:first-child { border-top: 0; }

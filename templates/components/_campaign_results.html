@@ -126,36 +126,3 @@
     {% endif %}
   </section>
 </div>
-<section class="surface budget-section" data-live-section="budget" aria-labelledby="budget-title">
-  <div class="budget-head">
-    <h2 id="budget-title">Presupuesto</h2>
-    {% if view.budget.reservation_overrun or view.budget.operating.unknown or view.budget.campaign.unknown %}
-    <div class="notice notice-warning"><strong>Consumo pendiente de conciliación.</strong></div>
-    {% endif %}
-  </div>
-  <dl class="budget-ledger">
-    <div class="budget-available"><dt>Disponible</dt><dd>{{ view.budget.campaign.available|money_summary }}</dd></div>
-    <div><dt>Confirmado</dt><dd>{{ view.budget.campaign.confirmed|money_summary }}</dd></div>
-    <div><dt>Estimado</dt><dd>{{ view.budget.campaign.estimated|money_summary }}</dd></div>
-    <div><dt>Reservado</dt><dd>{{ view.budget.campaign.reserved|money_summary }}</dd></div>
-  </dl>
-  <details class="budget-details">
-    <summary>Cuentas</summary>
-    {% for account in view.budget.accounts %}
-    <div class="account-detail">
-      <h3>{{ account.provider }} <span>{{ account.account_ref }}</span></h3>
-      <div class="table-scroll" tabindex="0" role="region" aria-label="Consumo de {{ account.provider }}">
-        <table class="data-table account-table">
-          <thead><tr><th>Consumo</th><th>Confirmado</th><th>Estimado</th><th>Reservado</th><th>Pendiente</th><th>Disponible</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Créditos</th><td>{{ account.credits.confirmed|default_if_none:'Desconocido' }}</td><td>{{ account.credits.estimated|default_if_none:'Desconocido' }}</td><td>{{ account.credits.reserved|default_if_none:'Desconocido' }}</td><td>{{ account.credits.pending|default_if_none:'Desconocido' }}</td><td>{{ account.credits.available|default_if_none:'Desconocido' }}</td></tr>
-            <tr><th scope="row">Costo USD</th><td>{{ account.cost.confirmed|money_summary }}</td><td>{{ account.cost.estimated|money_summary }}</td><td>{{ account.cost.reserved|money_summary }}</td><td>{{ account.cost.pending|money_summary }}</td><td>{{ account.cost.available|money_summary }}</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    {% empty %}
-    <p>Sin cuentas configuradas.</p>
-    {% endfor %}
-  </details>
-</section>

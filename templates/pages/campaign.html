@@ -28,18 +28,16 @@
     </div>
   </header>
   <div class="campaign-alerts">
-    {% if legacy_readonly %}<div class="notice notice-info">Campaña histórica: solo consulta y exportación. Prepara una campaña nueva para investigar con Apollo.</div>
-    {% elif apollo_blocked and campaign.status != 'completed' %}<div class="notice notice-warning"><strong>Apollo bloqueado.</strong> Comprueba correo laboral, permisos de Search/Enrichment, créditos y facturación antes de investigar.</div>{% endif %}
-    {% if view.exclusions_status != 'validated' %}
-    <div class="notice notice-warning"><strong>La lista de exclusiones necesita confirmación.</strong></div>
-    {% endif %}
+    {% if legacy_readonly %}<p class="quiet-note">Campaña histórica de consulta y exportación. Crea una campaña para investigar de nuevo.</p>
+    {% elif apollo_blocked and campaign.status != 'completed' %}<div class="notice notice-warning"><strong>La investigación no está habilitada.</strong> Revisa el acceso de búsqueda y los créditos antes de iniciar.</div>{% endif %}
   </div>
   <div id="execution-feedback" role="status" aria-live="polite">
-    {% if stop_reason %}
+    {% if stop_reason and stop_reason|stop_tone == 'warning' %}
     <div class="notice notice-warning">
       <strong>{{ stop_reason|stop_message }}</strong>
     </div>
     {% endif %}
+    {% if error_message %}<div class="notice notice-error" role="alert"><strong>No se pudo completar la investigación.</strong><p class="literal-detail">{{ error_message }}</p></div>{% endif %}
   </div>
   {% if not legacy_readonly and campaign.status == 'created' and not counts.total %}
     {% include 'components/_authorization_section.html' with promoted=True %}

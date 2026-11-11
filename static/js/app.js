@@ -242,10 +242,11 @@
       const hash = window.location.hash;
       const matching = panels.findIndex(panel => `#${panel.id}` === hash);
       if (matching >= 0) selectTab(matching, false, animate);
-      else if (hash.startsWith('#source-')) {
-        selectTab(panels.findIndex(panel => panel.id === 'evidence'));
-        const source = document.getElementById(hash.slice(1));
-        if (source) requestAnimationFrame(() => highlight(source));
+      else if (hash === '#evidence' || hash.startsWith('#source-')) {
+        const evidence = document.getElementById('evidence');
+        if (evidence) evidence.open = true;
+        const target = document.getElementById(hash.slice(1));
+        if (target) requestAnimationFrame(() => highlight(target));
       }
     }
     tabs.forEach((tab, index) => {
@@ -272,9 +273,6 @@
     const invalidPanel = panels.findIndex(panel => panel.querySelector('.field-errors, .errorlist'));
     if (invalidPanel >= 0) selectTab(invalidPanel);
     window.addEventListener('hashchange', () => revealHash());
-    tabsRoot.querySelectorAll('[data-evidence-link]').forEach(link => link.addEventListener('click', () => {
-      selectTab(panels.findIndex(panel => panel.id === 'evidence'));
-    }));
   }
 
   const campaignPage = document.getElementById('campaign-page');
