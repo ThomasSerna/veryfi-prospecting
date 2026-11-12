@@ -221,11 +221,10 @@ entran en su fila, las que cambian de puesto se desplazan hasta él y las que
 cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
 lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
 empresa organiza el trabajo en Resumen y Contactos. El resumen muestra el encaje,
-su explicación y productos; «Ver criterios de encaje» reúne la cobertura y los
-criterios con etiquetas semánticas (`Señal fuerte`, `Señal parcial`, `Incompatible`,
-`Sin evidencia`) junto a una bola de Harvey. «Fuentes y detalles de investigación»
-queda fuera de las pestañas y se abre bajo demanda para consultar las fuentes y sus
-fechas. A la derecha se mantienen el mejor match y la revisión de ventas. Datos
+su explicación, productos, cobertura y criterios con etiquetas semánticas
+(`Señal fuerte`, `Señal parcial`, `Incompatible`, `Sin evidencia`) junto a una bola de Harvey.
+«Fuentes» queda fuera de las pestañas y se abre bajo demanda para consultar las fuentes
+y sus fechas. A la derecha se mantienen el mejor match y la revisión de ventas. Datos
 desconocidos se muestran separados de cero.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
@@ -234,9 +233,13 @@ La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
 La pestaña Contactos lista a las personas encontradas con nombre, cargo, etapa y match.
+Dos indicadores muestran por separado las comprobaciones de empleo y canal; no
+sustituyen las demás reglas para que una persona aparezca como «Lista para contactar».
 Cada canal identificado indica si es utilizable y ofrece copiarlo; «Comprobaciones del
-canal» contiene su estado y la confirmación cuando corresponde. «Revisar contacto» reúne
-los detalles de empleo y match. Se conservan las señales de descarte y contradicción.
+canal» contiene su estado. Cuando corresponde, «Confirmar empleo vigente» y «Confirmar
+canal» llevan al formulario respectivo; con JavaScript lo abren y enfocan el primer
+campo habilitado. «Revisar contacto» reúne los detalles de empleo y match. Se conservan
+las señales de descarte y contradicción.
 En v2, las personas no descartadas y la pertinencia preceden al porcentaje en el orden.
 Las campañas nuevas usan el match v2 de su instantánea; las anteriores sin ella usan v1.
 El match ordena la revisión y la prioridad de enriquecimiento, mientras «listo» sigue
@@ -246,9 +249,9 @@ La [vigencia del empleo](contacts.md#vigencia-del-empleo-t18) distingue lo compr
 de lo pendiente o contradictorio; un correo no confirma por sí solo el empleo.
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
-son independientes. Guarda aceptado, rechazado o pendiente con notas y fecha; esto
-no recalifica ni cambia la rúbrica. La decisión se elige en un control de tres
-opciones y la confirmación aparece como aviso flotante que se retira solo; con
+son independientes. La revisión guarda para la empresa aceptado, rechazado o pendiente
+con notas y fecha; esto no recalifica ni cambia la rúbrica. La decisión se elige en un
+control de tres opciones y la confirmación aparece como aviso flotante que se retira solo; con
 movimiento reducido queda en la página. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
@@ -271,7 +274,7 @@ pide:
 
 Un dato inválido devuelve la ficha con el error y sin cambios; un cargo no citado o una
 persona ajena se rechazan. La confirmación conserva fecha, vencimiento, motivo y fuente,
-consultables en «Fuentes y detalles de investigación»; la identidad guardada sigue
+consultables en «Fuentes»; la identidad guardada sigue
 indicando sus contradicciones. El formulario se bloquea durante una ejecución y no
 existe en campañas históricas.
 
