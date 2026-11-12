@@ -221,16 +221,17 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
   pastilla sigue al puntero; el panel entra desde el lado de la pestaña elegida.
   Siguen el patrón de teclado de pestañas (flechas, Inicio y Fin) y el panel
   recibe el foco con Tab.
-- **Encaje:** cifra grande con barra graduada en cuartos, explicación y productos.
-  El desplegable «Ver criterios de encaje» reúne la cobertura y los criterios, cada
-  uno con una bola de Harvey junto a su etiqueta textual.
-- **Contactos:** cada persona presenta nombre, cargo, estado, match y canales con
-  su estado y acción de copia. Los detalles y las confirmaciones se consultan bajo demanda.
-- **Evidencia:** «Fuentes y detalles de investigación» reúne las fuentes y fechas en
-  un desplegable secundario, fuera de las pestañas.
-- **Lateral:** mejor match y revisión fijos al desplazarse. La decisión es un
-  control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se desliza a la
-  opción elegida.
+- **Encaje:** cifra grande con barra graduada en cuartos, explicación, productos,
+  cobertura y criterios visibles en el resumen. Cada criterio muestra una bola de
+  Harvey junto a su etiqueta textual.
+- **Contactos:** cada persona presenta nombre, cargo, estado y match, más las
+  comprobaciones de empleo y canal. Cuando corresponde, los accesos de confirmación
+  llevan directamente a sus formularios; los canales conservan su estado y copia.
+- **Evidencia:** el acceso discreto «Fuentes» reúne las fuentes y fechas en un
+  desplegable secundario, fuera de las pestañas.
+- **Lateral:** mejor match y revisión fijos al desplazarse. La decisión sobre la
+  empresa es un control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se
+  desliza a la opción elegida.
 
 ### Controles, avisos y datos
 
