@@ -278,7 +278,8 @@ def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_act
     path = url("confirm_channel", case.campaign.id, case.companies[0].id)
     rejected = client.post(path, confirmation(case))
     assert rejected.status_code == 400
-    assert re.search(r'<details class="channel-checks"[^>]*\bopen\b', text(rejected))
+    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>', text(rejected))
+    assert form is not None and re.search(r'\bopen\b', form[0])
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
     assert client.post(path, confirmation(case, confirmed="on")).status_code == 302
@@ -287,6 +288,9 @@ def test_manual_confirmation_requires_checkbox_and_persists_only_on_explicit_act
     assert result.business_status == "ready_alternative"
     assert result.contacts[0].usable_channels[0].manual_confirmed_at is not None
     assert result.run_item.review_status == "pending"
+    page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+    assert "Lista para contactar" in page
+    assert f'href="#channel-{case.contact.id}-0"' not in page
 
 
 def test_manual_confirmation_preserves_filters_and_company_sequence(ui_results, client):
@@ -379,6 +383,11 @@ def test_manual_confirmation_respects_current_exclusions_without_mutating_saved_
 def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results, client):
     case = ui_results
     with bridge._EXECUTION:
+        page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
+        action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}-0"[^>]*>', page)
+        assert action is not None and 'aria-disabled="true"' in action[0]
+        form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>(.*?)</details>', page, re.S)
+        assert form is not None and re.search(r'<fieldset\s+disabled\b', form[1])
         for name, fields in [
             ("review", {"status": "accepted", "reason": "Motivo sintético."}),
             ("confirm_channel", confirmation(case, confirmed="on")),
@@ -785,11 +794,14 @@ def test_company_criteria_keep_semantics_and_move_sources_to_secondary_details(u
     assert links.urls == ["#summary", "#contacts"]
     evidence = re.search(r'<details\b[^>]*\bid="evidence"[^>]*>', page)
     assert evidence is not None and not re.search(r'\bopen\b', evidence[0])
+    assert '<summary aria-label="Fuentes y detalles de investigación">Fuentes</summary>' in page
     assert page.index('id="contacts"') < evidence.start()
     for panel_id in ("summary", "contacts"):
         panel = re.search(fr'<section id="{panel_id}"[^>]*>(.*?)</section>', page, re.S)
         assert panel is not None
         assert "source-pill" not in panel[1] and "data-evidence-link" not in panel[1]
+        if panel_id == "summary":
+            assert '<ol class="criteria-list">' in panel[1] and "<details" not in panel[1]
     assert "Datos de la empresa" not in page
     assert f'id="source-{source_id}"' in page
     assert 'class="company-nav-bar"' not in page
@@ -805,8 +817,21 @@ def test_contacts_show_channel_availability_and_copy_before_optional_checks(ui_r
     assert "No utilizable" in contacts[:checks.start()]
     assert f'data-copy-channel="{case.contact.channels[0].value}"' in contacts[:checks.start()]
     assert "Comprobaciones del canal" in contacts and "Estado:" in contacts[checks.end():]
+    progress = re.search(r'<ol class="contact-progress"[^>]*>(.*?)</ol>', contacts, re.S)
+    assert progress is not None
+    checkpoints = [(state, " ".join(re.sub(r'<[^>]*>', '', content).split()))
+                   for state, content in re.findall(r'<li data-complete="(true|false)">(.*?)</li>', progress[1], re.S)]
+    assert checkpoints == [("true", "Empleo Confirmado"), ("false", "Canal Sin canal utilizable")]
+    action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}-0"[^>]*>', contacts)
+    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>', contacts)
+    assert action is not None and "data-confirmation-link" in action[0]
+    assert form is not None and "data-actionable" in form[0] and not re.search(r'\bopen\b', form[0])
+    diagnostics = re.search(r'<details class="channel-checks"[^>]*>(.*?)</details>', contacts, re.S)
+    assert "<form" not in diagnostics[1]
     review = re.search(r'<details class="contact-checks"[^>]*>', contacts)
     assert review is not None and not re.search(r'\bopen\b', review[0])
+    with Database(case.paths.db) as db:
+        assert db.get_contact(case.contact.id) == case.contact
 
 
 def test_each_entity_mismatch_condition_has_its_own_explanation():
@@ -858,6 +883,14 @@ def test_employment_confirmation_form_appears_only_for_confirmable_people(ui_emp
     assert "sin enviar mensajes, llamar ni enviar invitaciones" in page
     contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)
     assert contacts is not None and "Apollo" not in contacts[1]
+    action = re.search(fr'<a\b[^>]*\bhref="#employment-{ui_employment.contact.id}"[^>]*>', contacts[1])
+    form = re.search(fr'<details\b[^>]*\bid="employment-{ui_employment.contact.id}"[^>]*>', contacts[1])
+    assert action is not None and "data-confirmation-link" in action[0]
+    assert form is not None and "data-actionable" in form[0] and not re.search(r'\bopen\b', form[0])
+    diagnostics = re.search(r'<details class="contact-checks"[^>]*>(.*?)</details>', contacts[1], re.S)
+    assert "<form" not in diagnostics[1]
+    with Database(ui_employment.paths.db) as db:
+        assert db.get_contact(ui_employment.contact.id) == ui_employment.contact
     # La persona del directorio, sin enriquecimiento de Apollo, no admite la confirmación manual del empleo.
     other = text(client.get(url("company", ui_results.campaign.id, ui_results.companies[0].id)))
     assert "Confirmar empleo vigente" not in other
@@ -871,7 +904,8 @@ def test_employment_confirmation_requires_checkbox_reason_and_url(ui_employment,
     case = ui_employment
     response = client.post(url("confirm_employment", case.campaign.id, case.company.id), employment(case, **fields))
     assert response.status_code == 400 and "Confirmar empleo vigente" in text(response)
-    assert re.search(r'<details class="contact-checks"[^>]*\bopen\b', text(response))
+    form = re.search(fr'<details\b[^>]*\bid="employment-{case.contact.id}"[^>]*>', text(response))
+    assert form is not None and re.search(r'\bopen\b', form[0])
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
 

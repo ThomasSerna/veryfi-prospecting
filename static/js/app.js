@@ -238,6 +238,16 @@
         { backgroundColor: 'transparent', boxShadow: '0 0 0 1px transparent' },
       ], { duration: 1800, delay: reducedMotion.matches ? 0 : 280, easing: 'ease-out', fill: 'backwards' });
     }
+    function revealConfirmation(hash) {
+      const target = document.getElementById(hash.slice(1));
+      if (!target?.matches('details') || !tabsRoot.contains(target)
+          || body.dataset.running === 'true') return false;
+      selectTab(panels.findIndex(panel => panel.id === 'contacts'));
+      for (let detail = target; detail; detail = detail.parentElement?.closest('details')) detail.open = true;
+      target.scrollIntoView({ block: 'center' });
+      target.querySelector('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)')?.focus({ preventScroll: true });
+      return true;
+    }
     function revealHash(animate = true) {
       const hash = window.location.hash;
       const matching = panels.findIndex(panel => `#${panel.id}` === hash);
@@ -247,8 +257,36 @@
         if (evidence) evidence.open = true;
         const target = document.getElementById(hash.slice(1));
         if (target) requestAnimationFrame(() => highlight(target));
-      }
+      } else if (hash.startsWith('#employment-') || hash.startsWith('#channel-')) revealConfirmation(hash);
     }
+    function restoreConfirmationFocus(detail) {
+      tabsRoot.querySelector(`[data-confirmation-link][href="#${detail.id}"]:not([aria-disabled="true"])`)?.focus();
+    }
+    tabsRoot.addEventListener('toggle', event => {
+      const detail = event.target;
+      if (!detail.open && detail.matches?.('details[data-actionable]')
+          && detail.contains(document.activeElement)) restoreConfirmationFocus(detail);
+    }, true);
+    tabsRoot.addEventListener('click', event => {
+      if (event.defaultPrevented) return;
+      const close = event.target.closest?.('[data-close-confirmation]');
+      if (close) {
+        event.preventDefault();
+        const detail = close.closest('details[data-actionable]');
+        if (detail) {
+          detail.open = false;
+          restoreConfirmationFocus(detail);
+        }
+        return;
+      }
+      const link = event.target.closest?.('[data-confirmation-link]');
+      if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (link.getAttribute('aria-disabled') === 'true') return;
+      const hash = link.getAttribute('href');
+      if (revealConfirmation(hash)) window.history.replaceState(null, '', hash);
+    });
+    tabsRoot.dataset.confirmationsEnhanced = 'true';
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', event => {
         event.preventDefault();

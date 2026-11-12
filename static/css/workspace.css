@@ -504,16 +504,14 @@ a.sequence-link:active { transform: scale(.96); }
 .company-page .contact-detail > header h3 { margin: 0 0 3px; font-size: 1.0625rem; }
 .company-page .contact-detail > header p { margin: 0; }
 .company-page .contact-detail > .notice { margin-top: 12px; }
-.criteria-details > summary, .contact-checks > summary, .channel-checks > summary, .evidence-disclosure > summary { min-height: 44px; color: var(--muted); font-size: .8125rem; font-weight: 500; }
-.criteria-coverage { margin: 12px 0 20px; }
-.criteria-coverage .score-metric { max-width: 240px; }
-.criteria-coverage .score-metric dd { font-size: 1.25rem; }
+.contact-checks > summary, .channel-checks > summary { min-height: 44px; color: var(--muted); font-size: .8125rem; font-weight: 500; }
 .contact-checks { margin-top: 12px; }
 .contact-checks > summary, .channel-checks > summary { justify-content: flex-start; gap: 12px; }
 .contact-checks > .quiet-note { margin: 12px 0; }
 .contact-blocked { margin: 12px 0; color: var(--warning); }
-.evidence-disclosure { margin-top: 16px; }
-.evidence-disclosure > summary { justify-content: flex-start; gap: 12px; width: fit-content; }
+.evidence-disclosure { margin-top: 8px; }
+.evidence-disclosure > summary { justify-content: flex-start; gap: 8px; width: fit-content; min-height: 32px; padding: 4px 0; color: var(--muted); font-size: .75rem; font-weight: 400; }
+.evidence-disclosure > summary::after { width: 5px; height: 5px; }
 .evidence-content { margin-top: 12px; padding: 20px 24px; border-top: 1px solid var(--line); }
 .company-page .channel-checks { margin-left: 46px; }
 .company-page .channel-checks > summary { min-height: 36px; font-size: .75rem; }
@@ -549,6 +547,23 @@ a.sequence-link:active { transform: scale(.96); }
 .company-page .confirmation-details > summary, .company-page .match-details > summary, .company-page .contact-provenance > summary, .company-page .identity-details > summary { min-height: 40px; color: var(--muted); font-size: .8125rem; font-weight: 600; transition: color 160ms ease; }
 .company-page details > summary:hover { color: var(--ink); }
 .company-page .contact-provenance { margin-top: 8px; padding-top: 4px; border-top: 0; }
+
+/* La siguiente comprobación abre su formulario, sin ocultarlo en los diagnósticos. */
+.contact-progress { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 20px 0 16px; padding: 0; list-style: none; }
+.contact-progress li { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .8125rem; }
+.contact-progress svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--warning); }
+.contact-progress [data-complete='true'] svg { color: var(--success); }
+.contact-progress small { display: block; font-size: .75rem; }
+.contact-confirm-action { gap: 8px; margin: 0 0 8px; }
+.contact-confirm-action svg { width: 16px; height: 16px; }
+[data-confirmations-enhanced='true'] .confirmation-details[data-actionable]:not([open]) { display: none; }
+.company-page .confirmation-details[open] { margin: 12px 0 20px; padding: 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--soft); scroll-margin-top: 100px; }
+.company-page .confirmation-details[open] > summary { color: var(--ink); }
+[data-close-confirmation] { display: none; }
+[data-confirmations-enhanced='true'] [data-close-confirmation] { display: inline-flex; }
+.confirmation-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.confirmation-purpose { margin: 0 0 16px; color: var(--muted); font-size: .8125rem; }
+.company-page .review-panel > .review-scope { margin: -8px 0 16px; color: var(--muted); font-size: .75rem; }
 
 /* Copiar: el icono se convierte en marca, la etiqueta cambia y el cambio se anuncia. */
 .company-page .copy-channel-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px 0 9px; border-color: var(--line); border-radius: 999px; background: transparent; color: var(--ink); transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, transform 160ms var(--ease-out-quint); }
