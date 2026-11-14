@@ -233,12 +233,12 @@ def test_authorization_suggests_available_subcent_cost_without_rounding_up(ui_re
     assert suggested <= Decimal(available)
 
 
-def test_filters_and_company_detail_show_persisted_evidence(ui_results, client):
+def test_filters_and_company_detail_show_results_without_sources(ui_results, client):
     case = ui_results
     response = client.get(url("company", case.campaign.id, case.companies[0].id))
     assert response.status_code == 200
     assert "Caso de uso sintético CO" in text(response)
-    assert "Directorio profesional exclusivamente sintético" in text(response)
+    assert "Directorio profesional exclusivamente sintético" not in text(response)
     assert "Persona Sintética Uno" in text(response)
 
     response = client.get(url("campaign", case.campaign.id), {"countries": ["MX"]})
@@ -488,7 +488,7 @@ def test_campaign_omits_budget_without_changing_its_accounting(ui_results, clien
     assert view.budget.campaign.reserved == view.budget.campaign.pending == Decimal("0.02")
 
 
-def test_hostile_external_text_is_escaped_and_private_source_is_not_a_link(
+def test_hostile_external_text_is_escaped_and_sources_are_not_shown(
         ui_paths, client, make_campaign, make_company, make_assessment):
     hostile = "<script>alert(1)</script> **negrita** [enlace](javascript:alert(1))"
     now, contact_id = utc_now(), uuid4()
@@ -519,13 +519,14 @@ def test_hostile_external_text_is_escaped_and_private_source_is_not_a_link(
         db.save_contact(contact, evidence=[person])
     response = client.get(url("company", campaign.id, company.id))
     shown = text(response)
-    for expected in (company.name, page.claim, assessment.explanation, contact.name, contact.title,
+    for expected in (company.name, assessment.explanation, contact.name, contact.title,
                      contact.channels[0].value, item.error_message):
         assert escape(expected) in shown
     assert "<script>alert(1)</script>" not in shown
     links = Links()
     links.feed(shown)
-    assert "https://synthetic-hostile.example/equipo" in links.urls
+    assert escape(page.claim) not in shown
+    assert "https://synthetic-hostile.example/equipo" not in links.urls
     assert "http://127.0.0.1/panel" not in links.urls
     assert all(validate_public_url(value) == value for value in links.urls if value.startswith(("http:", "https:")))
     assert not any(value.startswith("javascript:") for value in links.urls)
@@ -565,8 +566,9 @@ def test_company_stop_reason_is_explained_with_its_tone(ui_results, client, reas
         assert ("quedó pendiente" in notice[2]) is (reason == "motivo_sintetico_desconocido")
     else:
         assert notice is None
-    evidence = re.search(r'<details id="evidence"[^>]*>(.*?)</details>', shown, re.S)
-    assert evidence is not None and expected in evidence[1]
+    assert 'id="evidence"' not in shown
+    with Database(case.paths.db) as db:
+        assert db.get_run_item(case.campaign.id, case.companies[0].id).stop_reason == reason
 
 
 @pytest.mark.parametrize("reason, expected", [
@@ -764,7 +766,7 @@ def test_ineligible_contact_explains_disabled_manual_confirmation_and_compact_st
     assert compact["html"] == ""
 
 
-def test_company_criteria_keep_semantics_and_move_sources_to_secondary_details(ui_results, client, make_assessment):
+def test_company_criteria_keep_semantics_without_sources_section(ui_results, client, make_assessment):
     case = ui_results
     company = case.companies[0]
     with Database(case.paths.db) as db:
@@ -792,10 +794,8 @@ def test_company_criteria_keep_semantics_and_move_sources_to_secondary_details(u
     links = Links()
     links.feed(tabs[1])
     assert links.urls == ["#summary", "#contacts"]
-    evidence = re.search(r'<details\b[^>]*\bid="evidence"[^>]*>', page)
-    assert evidence is not None and not re.search(r'\bopen\b', evidence[0])
-    assert '<summary aria-label="Fuentes y detalles de investigación">Fuentes</summary>' in page
-    assert page.index('id="contacts"') < evidence.start()
+    assert 'id="evidence"' not in page
+    assert '>Fuentes</summary>' not in page
     for panel_id in ("summary", "contacts"):
         panel = re.search(fr'<section id="{panel_id}"[^>]*>(.*?)</section>', page, re.S)
         assert panel is not None
@@ -803,13 +803,21 @@ def test_company_criteria_keep_semantics_and_move_sources_to_secondary_details(u
         if panel_id == "summary":
             assert '<ol class="criteria-list">' in panel[1] and "<details" not in panel[1]
     assert "Datos de la empresa" not in page
-    assert f'id="source-{source_id}"' in page
+    assert f'id="source-{source_id}"' not in page
+    with Database(case.paths.db) as db:
+        assert source_id in {fact.id for fact in db.list_evidence(company.id)}
+        assert db.get_contact(case.contact.id) == case.contact
     assert 'class="company-nav-bar"' not in page
     assert 'aria-label="Navegación secuencial de empresas"' in page
 
 
 def test_contacts_show_channel_availability_and_copy_before_optional_checks(ui_results, client):
     case = ui_results
+    warning = "Advertencia sintética: <canal sin verificar>."
+    channel = case.contact.channels[0].model_copy(update={"warnings": [warning]})
+    case.contact = case.contact.model_copy(update={"channels": [channel]})
+    with Database(case.paths.db) as db:
+        db.save_contact(case.contact)
     page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)[1]
     checks = re.search(r'<details class="channel-checks"[^>]*>', contacts)
@@ -828,6 +836,7 @@ def test_contacts_show_channel_availability_and_copy_before_optional_checks(ui_r
     assert form is not None and "data-actionable" in form[0] and not re.search(r'\bopen\b', form[0])
     diagnostics = re.search(r'<details class="channel-checks"[^>]*>(.*?)</details>', contacts, re.S)
     assert "<form" not in diagnostics[1]
+    assert escape(warning) in diagnostics[1] and warning not in diagnostics[1]
     review = re.search(r'<details class="contact-checks"[^>]*>', contacts)
     assert review is not None and not re.search(r'\bopen\b', review[0])
     with Database(case.paths.db) as db:
@@ -882,7 +891,9 @@ def test_employment_confirmation_form_appears_only_for_confirmable_people(ui_emp
     assert f'action="{url("confirm_employment", ui_employment.campaign.id, ui_employment.company.id)}"' in page
     assert "sin enviar mensajes, llamar ni enviar invitaciones" in page
     contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)
-    assert contacts is not None and "Apollo" not in contacts[1]
+    assert contacts is not None
+    for warning in ui_employment.contact.channels[0].warnings:
+        assert escape(warning) in contacts[1]
     action = re.search(fr'<a\b[^>]*\bhref="#employment-{ui_employment.contact.id}"[^>]*>', contacts[1])
     form = re.search(fr'<details\b[^>]*\bid="employment-{ui_employment.contact.id}"[^>]*>', contacts[1])
     assert action is not None and "data-confirmation-link" in action[0]
@@ -926,10 +937,11 @@ def test_employment_confirmation_shows_manual_origin_and_exports_it(ui_employmen
     assert response.status_code == 302 and response.url == f"{company_path}?saved=employment#contacts"
     page = text(client.get(response.url))
     assert "Empleo vigente confirmado manualmente." in page and "Confirmado manualmente por ventas" in page
-    assert "Directorio corporativo sintético revisado" in page and "Confirmar empleo vigente" not in page
+    assert "Confirmar empleo vigente" not in page
+    assert 'id="evidence"' not in page
     links = Links()
     links.feed(page)
-    assert "https://example.com/equipo-sintetico" in links.urls
+    assert "https://example.com/equipo-sintetico" not in links.urls
     [result] = read_campaign(case.paths.db, case.campaign.id).companies
     assert result.business_status == "ready_preferred" and result.contacts[0].eligible
     rows = list(csv.DictReader(StringIO(client.get(url("export", case.campaign.id)).content.decode("utf-8-sig"))))

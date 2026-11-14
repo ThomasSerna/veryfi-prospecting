@@ -223,8 +223,8 @@ lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
 empresa organiza el trabajo en Resumen y Contactos. El resumen muestra el encaje,
 su explicación, productos, cobertura y criterios con etiquetas semánticas
 (`Señal fuerte`, `Señal parcial`, `Incompatible`, `Sin evidencia`) junto a una bola de Harvey.
-«Fuentes» queda fuera de las pestañas y se abre bajo demanda para consultar las fuentes
-y sus fechas. A la derecha se mantienen el mejor match y la revisión de ventas. Datos
+A la derecha se mantienen el mejor match y la revisión de ventas. Si hay páginas que
+no se pudieron leer, su etapa, URL y motivo aparecen bajo las pestañas. Los datos
 desconocidos se muestran separados de cero.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
@@ -236,10 +236,10 @@ La pestaña Contactos lista a las personas encontradas con nombre, cargo, etapa 
 Dos indicadores muestran por separado las comprobaciones de empleo y canal; no
 sustituyen las demás reglas para que una persona aparezca como «Lista para contactar».
 Cada canal identificado indica si es utilizable y ofrece copiarlo; «Comprobaciones del
-canal» contiene su estado. Cuando corresponde, «Confirmar empleo vigente» y «Confirmar
-canal» llevan al formulario respectivo; con JavaScript lo abren y enfocan el primer
-campo habilitado. «Revisar contacto» reúne los detalles de empleo y match. Se conservan
-las señales de descarte y contradicción.
+canal» contiene su estado y advertencias. Cuando corresponde, «Confirmar empleo
+vigente» y «Confirmar canal» llevan al formulario respectivo; con JavaScript lo abren y
+enfocan el primer campo habilitado. «Revisar contacto» reúne los detalles de empleo y
+match. Se conservan las señales de descarte y contradicción.
 En v2, las personas no descartadas y la pertinencia preceden al porcentaje en el orden.
 Las campañas nuevas usan el match v2 de su instantánea; las anteriores sin ella usan v1.
 El match ordena la revisión y la prioridad de enriquecimiento, mientras «listo» sigue
@@ -273,10 +273,10 @@ pide:
 - con un cambio de cargo, cuál de los cargos ya citados es el vigente.
 
 Un dato inválido devuelve la ficha con el error y sin cambios; un cargo no citado o una
-persona ajena se rechazan. La confirmación conserva fecha, vencimiento, motivo y fuente,
-consultables en «Fuentes»; la identidad guardada sigue
-indicando sus contradicciones. El formulario se bloquea durante una ejecución y no
-existe en campañas históricas.
+persona ajena se rechazan. La confirmación conserva fecha, vencimiento, motivo y fuente;
+si está vigente, su fecha, motivo y fuente se incluyen en el CSV. La identidad guardada
+sigue indicando sus contradicciones. El formulario se bloquea durante una ejecución y
+no existe en campañas históricas.
 
 Los detalles de empleo incluyen el resultado de la búsqueda dirigida cuando existe
 (T24, [Corroboración dirigida del empleo](contacts.md#corroboración-dirigida-del-empleo-t24)).

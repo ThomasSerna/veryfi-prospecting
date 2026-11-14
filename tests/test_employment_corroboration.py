@@ -397,7 +397,8 @@ def test_extract_failures_in_contacts_are_saved_shown_and_counted(ui_paths, clie
         call_command("corroboration_report", "--campaign", str(case.campaign.id), stdout=out)
     assert f"URLs que Tavily Extract no pudo leer en contactos: {len(failures)}." in out.getvalue()
     page = text(client.get(url("company", case.campaign.id, case.company.id)))
-    assert f"Páginas que Tavily Extract no pudo leer ({len(failures)})" in page and "Fallo sintético de lectura" in page
+    assert f"Páginas que no se pudieron leer ({len(failures)})" in page and "Fallo sintético de lectura" in page
+    assert 'id="evidence"' not in page
 
 
 def test_summary_without_corroborations_leaves_the_cost_undefined(contact_case, role_config, tmp_path):

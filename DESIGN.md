@@ -168,9 +168,9 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
   empresas, no inventa un porcentaje. El botón Descargar del encabezado despliega
   las opciones para empresas listas o todas las empresas.
 - La ficha presenta identidad y estados en el encabezado, las pestañas Resumen y
-  Contactos, y, a la derecha, el mejor match y la revisión de ventas. Las fuentes
-  quedan en un desplegable secundario. Volver a la campaña y, cuando corresponda,
-  Anterior y Siguiente están encima del encabezado y preservan los filtros.
+  Contactos, y, a la derecha, el mejor match y la revisión de ventas. Volver a la
+  campaña y, cuando corresponda, Anterior y Siguiente están encima del encabezado y
+  preservan los filtros.
   Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
 
 ## Elevation & Depth
@@ -226,9 +226,10 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
   Harvey junto a su etiqueta textual.
 - **Contactos:** cada persona presenta nombre, cargo, estado y match, más las
   comprobaciones de empleo y canal. Cuando corresponde, los accesos de confirmación
-  llevan directamente a sus formularios; los canales conservan su estado y copia.
-- **Evidencia:** el acceso discreto «Fuentes» reúne las fuentes y fechas en un
-  desplegable secundario, fuera de las pestañas.
+  llevan directamente a sus formularios; los canales conservan su estado, advertencias
+  y copia. Las advertencias aparecen en «Comprobaciones del canal».
+- **Fallos de lectura:** cuando hay páginas que no se pudieron leer, su etapa, URL y
+  motivo aparecen bajo las pestañas.
 - **Lateral:** mejor match y revisión fijos al desplazarse. La decisión sobre la
   empresa es un control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se
   desliza a la opción elegida.

@@ -173,6 +173,7 @@
               <summary>Comprobaciones del canal</summary>
               <p class="quiet-note">Estado: {{ channel.normalized_status|label }}</p>
             {% include 'components/_channel_details.html' %}
+              {% for warning in channel.warnings %}<p class="quiet-note">{{ warning }}</p>{% endfor %}
             </details>
             {% for confirmation in confirmation_forms %}
               {% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
@@ -228,37 +229,6 @@
       </div>
       {% endfor %}
     </section>
-    <details id="evidence" class="evidence-disclosure">
-      <summary aria-label="Fuentes y detalles de investigación">Fuentes</summary>
-      <div class="evidence-content">
-      {% if result.run_item.stop_reason %}<p class="quiet-note">{{ result.run_item.stop_reason|stop_message }}</p>{% with note=result.run_item|reserve_note %}{% if note %}<p class="quiet-note">{{ note }}</p>{% endif %}{% endwith %}{% endif %}
-      {% for person in result.contacts %}{% if person.employment.basis == 'manual' %}<p>{{ person.contact.name }} · {% include 'components/_manual_employment.html' with employment=person.employment %}</p>{% endif %}{% endfor %}
-      {% for person in result.contacts %}{% for channel in person.contact.channels %}{% for warning in channel.warnings %}<p class="quiet-note">{{ person.contact.name }} · {{ channel.type|label }}: {{ warning }}</p>{% endfor %}{% endfor %}{% endfor %}
-      {% if result.evidence %}
-      <ol class="evidence-list">
-        {% for fact in result.evidence %}
-        <li id="source-{{ fact.id }}" class="evidence-detail">
-          <span class="evidence-index">#{{ forloop.counter }}</span>
-          <div class="evidence-body">
-            <div class="evidence-meta">
-              <span>{% if fact.source_type == 'provider' and fact.provider %}{{ fact.provider|capfirst }}{% else %}{{ fact.source_type|label }}{% endif %}</span>
-              <time datetime="{{ fact.retrieved_at|date:'Y-m-d' }}">{{ fact.retrieved_at|date:'d M Y' }}</time>
-            </div>
-            <h3>{{ fact.claim }}</h3>
-            {% if fact.excerpt %}<blockquote>{{ fact.excerpt }}</blockquote>{% endif %}
-            {% if fact.contradiction_ids %}<p class="notice notice-warning">Contradicciones registradas.</p>{% endif %}
-            {% with url=fact.url|public_url %}
-              {% if url %}<a href="{{ url }}" class="text-link evidence-open" target="_blank" rel="noopener noreferrer">Abrir fuente<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 4.5h6v6M19.5 4.5 11 13M18 14v4.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1H10"/></svg><span class="sr-only"> en otra pestaña</span></a>{% endif %}
-            {% endwith %}
-          </div>
-        </li>
-        {% endfor %}
-      </ol>
-      {% else %}
-      <div class="empty-state">
-        <h3>Sin evidencia registrada</h3>
-      </div>
-      {% endif %}
       {% with failures=result.run_item|extract_failures %}
       {% if failures %}
       <details class="extract-failures">
@@ -272,8 +242,6 @@
       </details>
       {% endif %}
       {% endwith %}
-      </div>
-    </details>
   </div>
   <aside class="company-aside" aria-label="Mejor match y revisión de ventas">
     {% with lead=result.contacts.0 %}
