@@ -166,6 +166,7 @@ class CompanyResult(Contract):
     evidence: list[Evidence]
     contacts: list[ContactResult]
     business_status: BusinessStatus | None
+    can_confirm_channels: StrictBool = False
     # Personas por etapa y objetivo de la política (T16); None sin evaluación.
     people: PeopleProgress | None = None
 
@@ -349,9 +350,9 @@ def prepare_campaign(db_path: Path, campaign: Campaign, *, contact_match_path: P
         existing = db.get_active_campaign() or db.get_campaign(campaign.id)
         if existing is not None:
             return existing
-        weights = load_contact_match(contact_match_path if contact_match_path is not None else _CONFIG_DIR / "contact_match_v2.json")
-        if weights.version != "contact_match_v2":
-            raise ValueError("Las campañas nuevas requieren contact_match_v2.")
+        weights = load_contact_match(contact_match_path if contact_match_path is not None else _CONFIG_DIR / "contact_match_v3.json")
+        if weights.version != "contact_match_v3":
+            raise ValueError("Las campañas nuevas requieren contact_match_v3.")
         snapshot = campaign.config_snapshot.model_copy(update={"contact_match": weights})
         return db.save_campaign(campaign.model_copy(update={"status": CampaignStatus.CREATED, "config_snapshot": snapshot}))
 
@@ -368,7 +369,8 @@ def _contact_match_config(campaign: Campaign) -> ContactMatchConfig | None:
 
 
 def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[AccountAllowance] | None = None,
-                  exclusions_path: Path | None = None) -> CampaignView:
+                  exclusions_path: Path | None = None,
+                  contact_match_config: ContactMatchConfig | None = None) -> CampaignView:
     """Lectura para la UI/CSV; recalcula persona, canales, disponibilidad y match con la fecha actual.
 
     Devuelve todas las personas guardadas de cada empresa, ordenadas por match.
@@ -378,7 +380,7 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
         campaign = db.get_campaign(campaign_id)
         if campaign is None:
             raise ValueError("La campaña no existe.")
-        weights = _contact_match_config(campaign)
+        weights = contact_match_config if contact_match_config is not None else _contact_match_config(campaign)
         budget = Budget(db, campaign.config_snapshot.defaults.budget, account_allowances or []).snapshot(campaign_id)
         companies, now = [], utc_now()
         with db.transaction():
@@ -435,6 +437,9 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                     status = BusinessStatus.INSUFFICIENT_EVIDENCE
                 companies.append(CompanyResult(company=company, run_item=item, assessment=assessment,
                                                evidence=evidence, contacts=results, business_status=status,
+                                               can_confirm_channels=(campaign.config_snapshot.people_provider == "apollo"
+                                                                     and not excluded and match is None
+                                                                     and status != BusinessStatus.EXCLUDED),
                                                people=people))
         if campaign.rubric_version == "rubric_v2":
             companies.sort(key=lambda result: enterprise_sort_key(result.company, result.assessment))
@@ -609,13 +614,19 @@ def review_company(db_path: Path, campaign_id: UUID, company_id: UUID, *,
 
 def confirm_alternative_channel(db_path: Path, campaign_id: UUID, contact_id: UUID,
                                 channel_type: ChannelType, channel_value: str, *, reason: str,
-                                confirmed: bool) -> RunItem:
+                                confirmed: bool, exclusions_path: Path | None = None) -> RunItem:
     from prospecting.pipeline.contacts import confirm_alternative_channel as confirm_channel
 
     if not _EXECUTION.acquire(blocking=False):
         raise ValueError("La campaña está ejecutándose; espera antes de confirmar canales.")
     try:
         with _saved_database(db_path) as db:
+            campaign, contact = db.get_campaign(campaign_id), db.get_contact(contact_id)
+            if campaign is None or contact is None:
+                raise ValueError("El contacto no pertenece a la campaña.")
+            exclusions = None if exclusions_path is None else load_exclusions(exclusions_path)
+            if _exclusion_match(db.get_company(contact.company_id), campaign, exclusions) is not None:
+                raise ValueError("La empresa tiene una exclusión confirmada o pendiente de revisión.")
             return confirm_channel(db, campaign_id, contact_id, channel_type, channel_value,
                                    reason=reason, confirmed=confirmed)
     finally:

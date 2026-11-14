@@ -25,6 +25,7 @@ CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "contact_match.js
 CONFIG_FINGERPRINTS = {
     "contact_match_v1": "dd990a111908273b12a82a916a8174962377367aa41c9dc7aa6f0f31407b6d7e",
     "contact_match_v2": "c68ed6877f566d289330f0397e4cd05044200b2bce547f59181e40a1c94463ee",
+    "contact_match_v3": "86b14e557f9fbcf6b3688ebe189daa011f5fb1813fadaefe500e5923f1331448",
 }
 
 
@@ -36,6 +37,11 @@ def weights():
 @pytest.fixture
 def v2_weights():
     return load_contact_match(CONFIG_PATH.with_name("contact_match_v2.json"))
+
+
+@pytest.fixture
+def v3_weights():
+    return load_contact_match(CONFIG_PATH.with_name("contact_match_v3.json"))
 
 
 @pytest.fixture
@@ -244,7 +250,7 @@ def test_v2_bilingual_equivalent_titles_keep_the_same_priority(ready, v2_weights
 def test_v2_rejects_unknown_versions_reused_version_and_missing_source(v2_weights, change):
     data = v2_weights.model_dump(mode="json")
     if change == "unknown_version":
-        data["version"] = "contact_match_v3"
+        data["version"] = "contact_match_v9"
     elif change == "changed_points":
         data["components"]["role"]["levels"]["profile_role"] = 29
     elif change == "empty_source":
@@ -286,7 +292,8 @@ def test_v2_expired_employment_loses_points_without_mutating_inputs(ready, v2_we
 
 
 @pytest.mark.parametrize("conflict", ["ended", "departure", "cited_departure", "title_changed", "own_source", "reverse_source"])
-def test_v2_blocks_all_employment_contradictions_and_preserves_v1(ready, weights, v2_weights, conflict):
+@pytest.mark.parametrize("version", ["contact_match_v2", "contact_match_v3"])
+def test_current_match_blocks_all_employment_contradictions_and_preserves_v1(ready, weights, conflict, version):
     company, campaign, _, contact, evidence = ready
     source = evidence[0]
     if conflict == "ended":
@@ -306,10 +313,47 @@ def test_v2_blocks_all_employment_contradictions_and_preserves_v1(ready, weights
     status = employment_status(contact, company, evidence, campaign.limits, NOW)
     assert status.state == "contradicted"
     expected = "employment_ended" if conflict in ("ended", "departure", "cited_departure") else "employment_contradicted"
-    result = match_of(ready, v2_weights, contact, evidence)
+    current_weights = load_contact_match(CONFIG_PATH.with_name(f"{version}.json"))
+    result = match_of(ready, current_weights, contact, evidence)
     assert result.blocked_reason == expected and levels(result)["employment"] == ("contradicted", 0, False)
     historical = match_of(ready, weights, contact, evidence)
     assert historical.blocked_reason == ("employment_ended" if conflict in ("ended", "departure") else None)
+
+
+def test_v3_reduces_unconfirmed_employment_and_channel_weight_without_making_person_ready(ready, v3_weights):
+    company, campaign, assessment, contact, evidence = ready
+    digest = hashlib.sha256(json.dumps(v3_weights.model_dump(mode="json")["components"], sort_keys=True).encode()).hexdigest()
+    assert CONFIG_FINGERPRINTS[v3_weights.version] == digest
+    assert match_of(ready, v3_weights).score == 100
+    assert levels(match_of(ready, v3_weights)) == {
+        "role": ("selected_role", 55, False), "channel": ("preferred_usable", 10, False),
+        "identity": ("confirmed_complete", 25, False), "employment": ("corporate_evidence", 10, False)}
+    person = contact.model_copy(update={"employment_evidence_ids": []})
+    assert match_of(ready, v3_weights, person).score == 90
+    assert not validate_contact(person, company, assessment, evidence, campaign.limits, NOW)
+    assert derive_readiness(assessment, [person], evidence, campaign.limits, NOW, company) == "qualified_no_contact"
+    unconfirmed = person.channels[0].model_copy(update={"normalized_status": "unknown", "verified_at": None})
+    assert match_of(ready, v3_weights, person.model_copy(update={"channels": [unconfirmed]})).score == 84
+    assert match_of(ready, v3_weights, person.model_copy(update={"channels": []})).score == 80
+
+
+def test_v3_keeps_partial_identity_and_profile_role_scores(ready, v3_weights):
+    contact, facts = retitled(ready, "Head of Product")
+    contact = contact.model_copy(update={"identity_status": "pending"})
+    result = match_of(ready, v3_weights, contact, facts)
+    assert levels(result)["role"] == ("profile_role", 39, False)
+    assert levels(result)["identity"] == ("complete_pending", 13, False)
+
+
+@pytest.mark.parametrize("change", ["changed_points", "validated"])
+def test_v3_cannot_be_reweighted_or_marked_commercially_validated(v3_weights, change):
+    data = v3_weights.model_dump(mode="json")
+    if change == "changed_points":
+        data["components"]["role"]["levels"]["profile_role"] = 40
+    else:
+        data["validation_status"] = "validated"
+    with pytest.raises(ValidationError):
+        ContactMatchConfig.model_validate(data)
 
 
 def test_v2_puts_relevant_role_before_high_scoring_irrelevant_seniority(ready, v2_weights):

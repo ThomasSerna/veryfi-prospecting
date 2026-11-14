@@ -11,7 +11,7 @@ from pydantic import Field, HttpUrl, TypeAdapter
 from prospecting.budget import Budget, BudgetError, Observation, SpendingAuthorization, unconsumed_failure
 from prospecting.contact_extraction import build_contacts_request, parse_contacts_output
 from prospecting.contacts import (
-    ContactError, apply_campaign_roles, apply_target_roles, channel_is_usable, contact_context, contact_match, derive_readiness,
+    ContactError, apply_campaign_roles, apply_target_roles, channel_can_be_confirmed, channel_is_usable, contact_context, contact_match, derive_readiness,
     employment_confirmation_titles, employment_status, manual_employment_evidence, matched_role_family,
     merge_contact, names_person_at_company, needs_employment_corroboration, people_progress, people_target,
     person_function, role_families, role_position, rank_contact_matches, target_roles, validate_contact,
@@ -53,12 +53,10 @@ class ContactReport(Contract):
 def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUID,
                                 channel_type: ChannelType, channel_value: str, *, reason: str,
                                 confirmed: bool) -> RunItem:
-    """Registra acceso profesional nominal comprobado manualmente, sin enviar nada."""
+    """Registra una comprobación manual del canal, independiente del empleo y sin tráfico."""
     if confirmed is not True:
-        raise ValueError("La confirmación requiere una declaración explícita de acceso directo profesional sin envío.")
+        raise ValueError("La confirmación requiere una acción explícita.")
     channel_type = ChannelType(channel_type)
-    if channel_type not in (ChannelType.LINKEDIN, ChannelType.OTHER):
-        raise ValueError("Solo se pueden confirmar manualmente canales alternativos existentes.")
     reason = TypeAdapter(Text).validate_python(reason)
     channel_value = TypeAdapter(Text).validate_python(channel_value)
     with db.transaction():
@@ -74,36 +72,38 @@ def confirm_alternative_channel(db: Database, campaign_id: UUID, contact_id: UUI
         if contact.id not in {item.id for item in people}:
             raise ValueError("El contacto no pertenece al flujo Apollo de esta campaña.")
         now = utc_now()
-        stored_contact = contact
         roles = None if assessment is None else target_roles(company, assessment, campaign, evidence=evidence)
-        if assessment is not None:
-            contact = apply_campaign_roles(contact, company, assessment, campaign, evidence, now)
-        if (assessment is None or assessment.campaign_id != campaign_id or run.business_status == BusinessStatus.EXCLUDED
-                or not validate_contact(contact, company, assessment, evidence, campaign.limits, now, roles, campaign=campaign)):
-            raise ValueError("La persona necesita identidad, cargo y empleo pertinente vigentes antes de confirmar un canal.")
+        if (run.business_status == BusinessStatus.EXCLUDED or assessment is not None and
+                (assessment.campaign_id != campaign_id or assessment.priority == Priority.EXCLUDED)):
+            raise ValueError("La empresa está excluida o su evaluación pertenece a otra campaña.")
         channel = next((item for item in contact.channels
                         if (item.type, item.value) == (channel_type, channel_value)), None)
         if channel is None:
             raise ValueError("El canal debe existir y pertenecer a esta persona.")
         if channel.normalized_status == ChannelStatus.INVALID:
             raise ValueError("La confirmación manual no elimina una verificación negativa.")
+        if not channel_can_be_confirmed(channel, contact, evidence, now):
+            raise ValueError("El canal conserva evidencia contradictoria, ajena o con fecha futura; no se puede confirmar.")
         fact = Evidence(company_id=company.id, contact_id=contact.id, kind="observed", source_type="manual",
                         provider="manual_review", external_reference=f"manual-channel:{campaign_id}:{contact.id}:{now.isoformat()}",
-                        retrieved_at=now, claim=f"Acceso directo profesional nominal a {contact.name} por {channel.type}: {channel.value}.",
-                        excerpt=f"Confirmado manualmente sin enviar mensajes ni notificaciones. Motivo: {reason}")
-        updated_channel = channel.model_copy(update={
-            "normalized_status": ChannelStatus.MANUAL_CONFIRMED, "manual_confirmed_at": now,
-            "manual_confirmation_reason": reason, "professional": True, "direct": True,
+                        retrieved_at=now, claim=f"Canal {channel.type}: {channel.value} confirmado manualmente para {contact.name or contact.id}.",
+                        excerpt=f"Notas de comprobación: {reason}")
+        changes = {
+            "manual_confirmed_at": now, "manual_confirmation_reason": reason,
             "evidence_ids": channel.evidence_ids + [fact.id],
-        })
-        updated = Contact.model_validate(stored_contact.model_copy(update={"channels": [
+        }
+        alternative = channel_type in (ChannelType.LINKEDIN, ChannelType.OTHER)
+        if alternative:
+            changes.update(normalized_status=ChannelStatus.MANUAL_CONFIRMED, professional=True, direct=True)
+        updated_channel = channel.model_copy(update=changes)
+        updated = Contact.model_validate(contact.model_copy(update={"channels": [
             updated_channel if item == channel else item for item in contact.channels]}))
-        if not channel_is_usable(updated_channel, updated, evidence + [fact], campaign.limits, now, company):
+        if alternative and not channel_is_usable(updated_channel, updated, evidence + [fact], campaign.limits, now, company):
             raise ValueError("El canal conserva evidencia contradictoria o con fecha futura; no se puede confirmar.")
         db.save_contact(updated, evidence=[fact])
         people, evidence = contact_context(campaign, db.list_contacts(company.id), db.list_evidence(company.id))
-        readiness = derive_readiness(assessment, people, evidence,
-                                     campaign.limits, now, company, roles, campaign=campaign)
+        readiness = run.business_status if assessment is None else derive_readiness(
+            assessment, people, evidence, campaign.limits, now, company, roles, campaign=campaign)
         return db.save_run_item(run.model_copy(update={"business_status": readiness, "updated_at": now}))
 
 
@@ -304,7 +304,7 @@ class _ContactStage:
 
     def ranked_people(self):
         config = self.campaign.config_snapshot.contact_match
-        if config is not None and config.version == "contact_match_v2":
+        if config is not None and config.version in ("contact_match_v2", "contact_match_v3"):
             people, facts, now = self.people(), self.facts(), utc_now()
             matches = [(person, contact_match(person, self.company, self.assessment, facts, self.campaign.limits,
                                               now, self.roles, config, campaign=self.campaign),
@@ -499,9 +499,9 @@ class _ContactStage:
         return not self.run.attempts.get(f"{PROCESSED_KEY}{fingerprint}", 0)
 
     def match_blocked(self, contact, facts) -> bool:
-        """V2 no gasta en identidad, empleo o alcance contradichos; los pendientes siguen investigables."""
+        """V2/v3 no gastan en identidad, empleo o alcance contradichos; los pendientes siguen investigables."""
         config = self.campaign.config_snapshot.contact_match
-        return config is not None and config.version == "contact_match_v2" and contact_match(
+        return config is not None and config.version in ("contact_match_v2", "contact_match_v3") and contact_match(
             contact, self.company, self.assessment, facts, self.campaign.limits, utc_now(), self.roles,
             config, campaign=self.campaign).blocked_reason is not None
 

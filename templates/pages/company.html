@@ -108,51 +108,9 @@
           </div>
           <div class="contact-badges">
             {% if person.match %}<span class="match-score{% if person.match.blocked_reason %} match-blocked{% endif %}"><span class="match-meter" aria-hidden="true"><span style="--value: {{ person.match.score }}"></span></span><strong>{{ person.match.score }} %</strong> de match</span>{% endif %}
-            <span class="person-stage"><span class="status {% if person.stage == 'ready' %}status-accepted{% else %}status-pending{% endif %}">{% if person.stage == 'ready' %}Lista para contactar{% else %}{{ person.stage|person_stage_label }}{% endif %}</span></span>
           </div>
         </header>
 {% if person.match.blocked_reason %}<p class="contact-blocked">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</p>{% elif person.employment.state == 'contradicted' %}<p class="contact-blocked">El empleo de esta persona tiene contradicciones pendientes.</p>{% endif %}
-        <ol class="contact-progress" aria-label="Comprobaciones del contacto">
-          <li data-complete="{% if person.employment.state == 'corporate_evidence' %}true{% else %}false{% endif %}">
-            <svg viewBox="0 0 24 24" aria-hidden="true">{% if person.employment.state == 'corporate_evidence' %}<circle cx="12" cy="12" r="9"/><path d="m7.5 12 3 3 6-6"/>{% else %}<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>{% endif %}</svg>
-            <span>Empleo <small>{% if person.employment.state == 'corporate_evidence' %}Confirmado{% elif person.employment.state == 'contradicted' %}Con contradicciones{% else %}Sin confirmar{% endif %}</small></span>
-          </li>
-          <li data-complete="{% if person.usable_channels %}true{% else %}false{% endif %}">
-            <svg viewBox="0 0 24 24" aria-hidden="true">{% if person.usable_channels %}<circle cx="12" cy="12" r="9"/><path d="m7.5 12 3 3 6-6"/>{% else %}<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>{% endif %}</svg>
-            <span>Canal <small>{% if person.usable_channels %}Disponible{% else %}Sin canal utilizable{% endif %}</small></span>
-          </li>
-        </ol>
-        {% for item in employment_forms %}{% if item.person.contact.id == person.contact.id %}
-        <a class="button button-small button-secondary contact-confirm-action" href="#employment-{{ person.contact.id }}" data-confirmation-link data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Confirmar empleo vigente<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
-        {% endif %}{% endfor %}
-        {% for item in employment_forms %}
-          {% if item.person.contact.id == person.contact.id %}
-          <details class="confirmation-details" id="employment-{{ person.contact.id }}" data-actionable {% if item.form.errors %}open{% endif %}>
-            <summary>Confirmar empleo vigente</summary>
-            <p class="confirmation-purpose">Registra el puesto que comprobaste en una fuente.</p>
-            <form method="post" action="{% url 'webapp:confirm_employment' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
-              {% for hidden in item.form.hidden_fields %}{{ hidden }}{% endfor %}
-              <fieldset {% if is_executing %}disabled{% endif %}>
-                {% if item.form.non_field_errors %}<div class="notice notice-error">{{ item.form.non_field_errors }}</div>{% endif %}
-                {% if person.employment_titles|length > 1 %}
-                <fieldset class="employment-title-field">
-                  <legend>{{ item.form.title.label }}</legend>
-                  {% for choice in item.form.title %}<label class="employment-title-option" for="{{ choice.id_for_label }}">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
-                  {% if item.form.title.errors %}<div class="field-errors" role="alert">{% for error in item.form.title.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
-                </fieldset>
-                {% else %}
-                <p class="quiet-note">Cargo vigente: {{ person.employment_titles.0 }}</p>
-                {% endif %}
-                {% include 'components/_field.html' with field=item.form.source_url %}
-                {% include 'components/_field.html' with field=item.form.reason %}
-                <div class="consent-field">{{ item.form.confirmed }}{{ item.form.confirmed.label_tag }}{{ item.form.confirmed.errors }}</div>
-                <p class="quiet-note">La confirmación vence a los {{ campaign.limits.cache.contact_days }} días y una fuente posterior que la contradiga la anula.</p>
-                <div class="confirmation-actions"><button class="button button-small button-primary" type="submit" data-idle-only>Confirmar empleo</button><button class="button button-small button-quiet" type="button" data-close-confirmation>Cancelar</button></div>
-              </fieldset>
-            </form>
-          </details>
-          {% endif %}
-        {% endfor %}
         <ul class="channel-list">
           {% for channel in person.contact.channels %}
           {% with channel_index=forloop.counter0 %}
@@ -163,32 +121,28 @@
                 <span class="channel-type">{{ channel.type|label }}</span>
                 <p class="channel-value">{{ channel.value }}</p>
               </div>
-              <span class="status {% if channel in person.usable_channels %}status-accepted{% else %}status-pending{% endif %}">{% if channel in person.usable_channels %}Utilizable{% else %}No utilizable{% endif %}</span>
               <button type="button" class="copy-channel-btn" data-copy-channel="{{ channel.value }}" aria-label="Copiar canal {{ channel.type|label }}"><span class="copy-icons" aria-hidden="true"><svg class="icon-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg><svg class="icon-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" pathLength="1"/></svg></span><span data-copy-label>Copiar</span></button>
             </div>
-            {% for confirmation in confirmation_forms %}{% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value and person.eligible and channel not in person.usable_channels %}
+            {% for confirmation in confirmation_forms %}{% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
             <a class="button button-small button-secondary contact-confirm-action" href="#channel-{{ person.contact.id }}-{{ channel_index }}" data-confirmation-link data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Confirmar canal<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             {% endif %}{% endfor %}
+            {% if channel.manual_confirmed_at %}<p class="quiet-note">Comprobación registrada: {{ channel.manual_confirmed_at|date:"d/m/Y H:i" }}. {{ channel.manual_confirmation_reason }}</p>{% endif %}
             <details class="channel-checks">
               <summary>Comprobaciones del canal</summary>
               <p class="quiet-note">Estado: {{ channel.normalized_status|label }}</p>
-            {% include 'components/_channel_details.html' %}
+              {% if channel.phone_country %}<p class="quiet-note">País: {{ channel.phone_country }}{% if channel.extension %} · Extensión: {{ channel.extension }}{% endif %}</p>{% endif %}
               {% for warning in channel.warnings %}<p class="quiet-note">{{ warning }}</p>{% endfor %}
             </details>
             {% for confirmation in confirmation_forms %}
               {% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
-              <details class="confirmation-details" id="channel-{{ person.contact.id }}-{{ channel_index }}" {% if person.eligible and channel not in person.usable_channels %}data-actionable{% endif %} {% if confirmation.form.errors %}open{% endif %}>
+              <details class="confirmation-details" id="channel-{{ person.contact.id }}-{{ channel_index }}" data-actionable {% if confirmation.form.errors %}open{% endif %}>
                 <summary>Confirmar canal</summary>
-                <p class="confirmation-purpose">Confirma que este canal pertenece a la persona y permite contacto directo, sin enviarle nada.</p>
-                {% if not person.eligible %}
-                <div class="notice notice-warning"><p>{{ person|ineligible_reason }}</p></div>
-                {% endif %}
+                <p class="confirmation-purpose">Registra lo que comprobaste sobre este canal.</p>
                 <form method="post" action="{% url 'webapp:confirm_channel' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
                   {% for hidden in confirmation.form.hidden_fields %}{{ hidden }}{% endfor %}
-                  <fieldset {% if is_executing or not person.eligible %}disabled{% endif %}>
+                  <fieldset {% if is_executing %}disabled{% endif %}>
                     {% include 'components/_field.html' with field=confirmation.form.reason %}
-                    <div class="consent-field">{{ confirmation.form.confirmed }}{{ confirmation.form.confirmed.label_tag }}{{ confirmation.form.confirmed.errors }}</div>
-                    <div class="confirmation-actions"><button class="button button-small button-primary" type="submit" data-idle-only>Confirmar</button>{% if person.eligible and channel not in person.usable_channels %}<button class="button button-small button-quiet" type="button" data-close-confirmation>Cancelar</button>{% endif %}</div>
+                    <div class="confirmation-actions"><button class="button button-small button-primary" type="submit" data-idle-only>Confirmar</button><button class="button button-small button-quiet" type="button" data-close-confirmation>Cancelar</button></div>
                   </fieldset>
                 </form>
               </details>
@@ -200,12 +154,6 @@
           <li class="quiet-note">Sin canales identificados.</li>
           {% endfor %}
         </ul>
-        <details class="contact-checks">
-          <summary>Revisar contacto</summary>
-        {% if person.enrichment_rejected %}<p class="quiet-note">No se pudieron confirmar los datos de esta persona. Queda como candidata.</p>{% endif %}
-        {% if person.employment_corroboration %}<p class="quiet-note">{{ person.employment_corroboration|employment_corroboration }}</p>{% endif %}
-        {% if person.employment.state != 'corporate_evidence' %}<p class="quiet-note"><strong>{% if person.employment.state == 'provider_claim' %}Empleo declarado; sin comprobar{% else %}{{ person.employment|employment_label }}{% endif %}.</strong> {{ person.employment|employment_reason }}{% if person.employment.review_required %} <span class="pending-tag">Requiere revisión humana</span>{% endif %}</p>
-        {% elif person.employment.basis == 'manual' %}<p class="quiet-note">{{ person.employment|employment_label }}.</p>{% endif %}
         {% if person.match %}
         <details class="match-details">
           <summary>Desglose de match</summary>
@@ -220,8 +168,6 @@
           </dl>
         </details>
         {% endif %}
-
-        </details>
       </article>
       {% empty %}
       <div class="empty-state">
@@ -257,7 +203,6 @@
       </div>
       <div class="lead-facts">
         <span class="lead-match"><span class="match-meter" aria-hidden="true"><span style="--value: {{ lead.match.score }}"></span></span>{{ lead.match.score }} %</span>
-        <span class="person-stage"><span class="stage-steps stage-{{ lead.stage }}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="status {% if lead.stage == 'ready' %}status-accepted{% else %}status-pending{% endif %}">{{ lead.stage|person_stage_label }}</span></span>
       </div>
     </section>
     {% endif %}

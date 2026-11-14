@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from pydantic import ValidationError
 
-from prospecting.models import VeryfiConfig
+from prospecting.models import ContactMatchConfig, VeryfiConfig
 from prospecting.pipeline import (
     confirm_alternative_channel, confirm_current_employment, finish_campaign, list_saved_campaigns,
     load_provider_access, prepare_campaign, read_campaign, review_company,
@@ -51,7 +51,9 @@ def _base():
             access_error = execution.error_message(error)
     active = next((item for item in campaigns if item.status in ("running", "paused_budget")), None)
     return {"campaigns": list(reversed(campaigns)), "active_campaign": active,
-            "access": access, "access_error": access_error, "nav_active": "campaign_history"}
+            "access": access, "access_error": access_error, "nav_active": "campaign_history",
+            "contact_match_config": ContactMatchConfig.model_validate_json(
+                (Path(settings.BASE_DIR) / "config" / "contact_match_v3.json").read_text(encoding="utf-8")) if campaigns else None}
 
 
 def _error_response(request, error, status=400):
@@ -79,7 +81,7 @@ def _campaign_view(campaign_id, base):
     if not any(item.id == campaign_id for item in base["campaigns"]):
         raise Http404("La campaña no existe.")
     return read_campaign(db_path, campaign_id, account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                         exclusions_path=exclusions_path)
+                         exclusions_path=exclusions_path, contact_match_config=base["contact_match_config"])
 
 
 def _global_busy(base):
@@ -181,8 +183,7 @@ def _campaign_context(request, campaign_id):
     return context
 
 
-def _company_context(request, campaign_id, company_id, *, review_form=None, confirmation_form=None,
-                     employment_form=None):
+def _company_context(request, campaign_id, company_id, *, review_form=None, confirmation_form=None):
     context = _campaign_context(request, campaign_id)
     result = next((item for item in context["view"].companies if item.company.id == company_id), None)
     if result is None:
@@ -195,31 +196,21 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
     prev_company = sequence[idx - 1].company if idx > 0 else None
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
     forms = []
-    for person in ([] if context["legacy_readonly"] else result.contacts):
+    for person in (result.contacts if result.can_confirm_channels else []):
         for channel_index, channel in enumerate(person.contact.channels):
-            if channel.type not in ("linkedin", "other") or channel.normalized_status == "invalid":
+            if channel.normalized_status == "invalid":
                 continue
-            form = ConfirmationForm(initial={"contact_id": person.contact.id, "channel_type": channel.type, "channel_value": channel.value})
+            form = ConfirmationForm(initial={"contact_id": person.contact.id, "channel_type": channel.type,
+                                             "channel_value": channel.value, "reason": channel.manual_confirmation_reason or ""})
             if (confirmation_form is not None and str(person.contact.id) == request.POST.get("contact_id")
                     and channel.type == request.POST.get("channel_type") and channel.value == request.POST.get("channel_value")):
                 form = confirmation_form
             form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
             forms.append({"person": person, "channel": channel, "form": form})
-    # Confirmación manual del empleo (T23): solo para las personas que la lectura declara confirmables.
-    employment_forms = []
-    for person in ([] if context["legacy_readonly"] else result.contacts):
-        if not person.employment_titles:
-            continue
-        form = EmploymentConfirmationForm(initial={"contact_id": person.contact.id, "title": person.employment_titles[0]},
-                                          titles=person.employment_titles)
-        if employment_form is not None and str(person.contact.id) == request.POST.get("contact_id"):
-            form = employment_form
-        form.auto_id = f"employment_{person.contact.id}_%s"
-        employment_forms.append({"person": person, "form": form})
     evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
-                   confirmation_forms=forms, employment_forms=employment_forms, nav_active="campaign_history",
+                   confirmation_forms=forms, nav_active="campaign_history",
                    prev_company=prev_company, next_company=next_company,
                    sequence_position=idx + 1, sequence_total=len(sequence),
                    evidence_items=evidence_items)
@@ -397,10 +388,11 @@ def confirm_channel(request, campaign_id, company_id):
         person = next((person for person in context["result"].contacts if person.contact.id == contact_id), None)
         if person is None:
             raise Http404("La persona no pertenece a esta empresa.")
-        if not person.eligible:
-            raise ValueError("La persona no es elegible según la evidencia y las exclusiones actuales.")
+        if not context["result"].can_confirm_channels:
+            raise ValueError("La empresa no admite confirmaciones con las exclusiones actuales.")
         confirm_alternative_channel(_paths()[0], campaign_id, contact_id, form.cleaned_data["channel_type"],
-                                    form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=form.cleaned_data["confirmed"])
+                                    form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=True,
+                                    exclusions_path=_paths()[2])
     query = context["filter_query"]
     suffix = f"?{query}&saved=channel" if query else "?saved=channel"
     return redirect(f"{reverse('webapp:company', kwargs={'campaign_id': campaign_id, 'company_id': company_id})}{suffix}#contacts")
@@ -424,8 +416,7 @@ def confirm_employment(request, campaign_id, company_id):
             raise ValueError("La persona no admite la confirmación manual del empleo con la evidencia y las exclusiones actuales.")
         form = EmploymentConfirmationForm(request.POST, titles=person.employment_titles)
         if not form.is_valid():
-            return render(request, "pages/company.html",
-                          _company_context(request, campaign_id, company_id, employment_form=form), status=400)
+            return _error_response(request, ValueError("Revisa los campos de la confirmación del empleo."), 400)
         confirm_current_employment(_paths()[0], campaign_id, contact_id, title=form.cleaned_data["title"],
                                    source_url=form.cleaned_data["source_url"], reason=form.cleaned_data["reason"],
                                    confirmed=form.cleaned_data["confirmed"])
@@ -446,7 +437,7 @@ def export(request, campaign_id):
         _require_idle(view)
         content = download_csv(_paths()[0], campaign_id, include_all=mode == "all",
                                account_allowances=None if base["access"] is None else base["access"].account_allowances,
-                               exclusions_path=_paths()[2])
+                               exclusions_path=_paths()[2], contact_match_config=base["contact_match_config"])
     response = HttpResponse(content, content_type="text/csv; charset=utf-8")
     prefix = "demo-sintetica-" if settings.PROSPECTING_DEMO else ""
     name = "resultados" if mode == "all" else "prospectos-listos"

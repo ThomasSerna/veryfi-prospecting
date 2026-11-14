@@ -685,6 +685,15 @@ def names_person_at_company(fact: Evidence, contact: Contact, company: Company) 
         company.name, company.entity_name, *(company.aliases or []), company.domain) if value)
 
 
+def channel_can_be_confirmed(channel: Channel, contact: Contact, evidence: list[Evidence], now: datetime) -> bool:
+    """Permite registrar una comprobación sin acreditar identidad, empleo ni utilidad del canal."""
+    facts = _valid_refs(channel.evidence_ids, contact, evidence)
+    return (channel.contact_id == contact.id and channel.normalized_status != ChannelStatus.INVALID
+            and channel.retrieved_at <= now and bool(facts) and all(item.retrieved_at <= now for item in facts)
+            and not any(item.company_id == contact.company_id and set(channel.evidence_ids).intersection(item.contradiction_ids)
+                        for item in evidence))
+
+
 def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidence],
                       limits: CampaignLimits, now: datetime, company: Company) -> bool:
     if (channel.contact_id != contact.id or contact.company_id != company.id or
@@ -725,6 +734,9 @@ def channel_is_usable(channel: Channel, contact: Contact, evidence: list[Evidenc
     if channel.type == ChannelType.PHONE:
         return channel.phone_country == phone_country_of(channel.value) and phone_country_of(channel.value) is not None and any(
             item.kind == "observed" and channel.value in (item.excerpt or item.claim) and
+            # Las notas de revisión no renuevan la comprobación del teléfono.
+            not (item.source_type == "manual" and item.provider == "manual_review" and
+                 (item.external_reference or "").startswith("manual-channel:")) and
             (item in structured or
              nominal_channel_association(item.excerpt or item.claim, contact.name or "", channel.value, channel.extension)) and
             _fresh(item.retrieved_at, limits.cache.contact_days, now) for item in facts)
@@ -925,8 +937,8 @@ def contact_match(contact: Contact, company: Company, assessment: Assessment, ev
     scoped = bool(contact.geographic_scope and _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence))
     blocked = ("identity_contradicted" if contact.identity_status == IdentityStatus.CONTRADICTED
                else "employment_ended" if (_employment_contradicted(contact, evidence) or
-                                            config.version == "contact_match_v2" and status.reason == "employment_ended")
-               else "employment_contradicted" if config.version == "contact_match_v2" and status.state == "contradicted"
+                                            config.version != "contact_match_v1" and status.reason == "employment_ended")
+               else "employment_contradicted" if config.version != "contact_match_v1" and status.state == "contradicted"
                else "scope_mismatch" if scoped and not _scope_covers(contact.geographic_scope, company) else None)
     return ContactMatch(version=config.version, score=sum(item.points for item in components),
                         components=components, blocked_reason=blocked)

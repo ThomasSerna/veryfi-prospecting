@@ -337,12 +337,23 @@ def test_read_and_csv_report_the_targeted_search_result(contact_case, role_confi
     assert {row["contact_name"]: row["employment_corroboration"] for row in rows}["Persona Sintética Uno"] == "corroborated"
 
 
-def test_company_page_explains_the_targeted_search_result(ui_paths, client, contact_case, role_config):
+def test_company_page_deemphasizes_corroboration_but_preserves_its_result_in_csv(ui_paths, client, contact_case, role_config):
+    from core.presentation import export_csv
+    from prospecting.pipeline import read_campaign
+
     # `ui_paths` va primero: retira las claves del entorno antes de que el caso fije las sintéticas.
     case = scenario(contact_case, role_config, ["Head of Product"])
     case.find(**case.public)
-    page = text(client.get(url("company", case.campaign.id, case.company.id)))
-    assert "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona" in page
+    response = client.get(url("company", case.campaign.id, case.company.id))
+    assert response.status_code == 200
+    page = text(response)
+    assert "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona" not in page
+    assert "Desglose de match" in page and "Revisar contacto" not in page
+    view = read_campaign(ui_paths.db, case.campaign.id)
+    [result] = [item for item in view.companies if item.company.id == case.company.id]
+    assert result.contacts[0].employment_corroboration == "searched_not_corroborated"
+    [row] = csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig")))
+    assert row["employment_corroboration"] == "searched_not_corroborated" and row["contact_ready"] == "False"
 
 
 def test_summary_and_command_measure_conversion_and_cost_without_personal_data(contact_case, role_config, tmp_path):

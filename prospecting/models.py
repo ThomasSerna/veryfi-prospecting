@@ -509,6 +509,7 @@ Points = Annotated[StrictInt, Field(ge=0, le=100)]
 CONTACT_MATCH_FINGERPRINTS = {
     "contact_match_v1": "dd990a111908273b12a82a916a8174962377367aa41c9dc7aa6f0f31407b6d7e",
     "contact_match_v2": "c68ed6877f566d289330f0397e4cd05044200b2bce547f59181e40a1c94463ee",
+    "contact_match_v3": "86b14e557f9fbcf6b3688ebe189daa011f5fb1813fadaefe500e5923f1331448",
 }
 
 
@@ -520,15 +521,15 @@ class MatchComponentConfig(Contract):
 class ContactMatchConfig(Contract):
     """La versión fija niveles, puntos y algoritmo; nunca se reinterpretan pesos históricos."""
 
-    version: Literal["contact_match_v1", "contact_match_v2"]
+    version: Literal["contact_match_v1", "contact_match_v2", "contact_match_v3"]
     validation_status: Literal["proposed", "validated"]
     source_reference: Text
     components: dict[MatchComponentName, MatchComponentConfig]
 
     @model_validator(mode="after")
     def validate_points(self) -> Self:
-        if self.version == "contact_match_v2" and self.validation_status != "proposed":
-            raise ValueError("contact_match_v2 sigue siendo una propuesta sin validación comercial.")
+        if self.version != "contact_match_v1" and self.validation_status != "proposed":
+            raise ValueError(f"{self.version} sigue siendo una propuesta sin validación comercial.")
         levels = MATCH_LEVELS if self.version == "contact_match_v1" else MATCH_LEVELS_V2
         if set(self.components) != set(levels):
             raise ValueError("El match necesita los componentes role, channel, identity y employment.")

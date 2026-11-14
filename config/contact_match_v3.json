@@ -1,0 +1,11 @@
+{
+  "version": "contact_match_v3",
+  "validation_status": "proposed",
+  "source_reference": "Reponderación interna aprobada el 14 de noviembre de 2026; pendiente de validación comercial con Veryfi",
+  "components": {
+    "role": {"weight": 55, "levels": {"selected_role": 55, "profile_role": 39, "outside_profile": 0, "unknown": 0}},
+    "channel": {"weight": 10, "levels": {"preferred_usable": 10, "alternative_usable": 7, "preferred_unconfirmed": 4, "alternative_unconfirmed": 3, "none": 0}},
+    "identity": {"weight": 25, "levels": {"confirmed_complete": 25, "complete_pending": 13, "incomplete": 0}},
+    "employment": {"weight": 10, "levels": {"corporate_evidence": 10, "provider_claim": 0, "contradicted": 0, "unknown": 0}}
+  }
+}

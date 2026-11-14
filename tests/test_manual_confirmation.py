@@ -8,6 +8,7 @@ import pytest
 
 from prospecting.contacts import channel_is_usable, derive_readiness
 from prospecting.db import Database
+from prospecting.identity import ExclusionList
 from prospecting.models import Channel, ChannelStatus, ChannelType, Contact, Evidence, IdentityStatus, RunItem, utc_now
 from prospecting.pipeline.contacts import confirm_alternative_channel
 
@@ -119,7 +120,7 @@ def test_confirmation_needs_nonempty_text_reason(manual_case, reason):
 
 
 @pytest.mark.parametrize("channel_type", ["email", "phone", "whatsapp", "unsupported"])
-def test_preferred_or_unknown_channels_cannot_be_manually_confirmed(manual_case, channel_type):
+def test_confirmation_rejects_unknown_types_or_channels_not_owned_by_person(manual_case, channel_type):
     with pytest.raises(ValueError):
         confirm(manual_case, channel_type=channel_type)
     assert manual_case.db.get_contact(manual_case.contact.id) == manual_case.contact
@@ -156,21 +157,24 @@ def test_invalid_alternative_channel_cannot_lose_negative_state(manual_case):
 def test_manual_access_cannot_replace_professional_identity_or_employment(manual_case, changes):
     case = manual_case
     saved = case.db.save_contact(case.contact.model_copy(update=changes))
-    with pytest.raises(ValueError, match="vigentes"):
-        confirm(case)
-    assert case.db.get_contact(case.contact.id) == saved
-    assert case.db.get_run_item(case.campaign.id, case.company.id) == case.run
+    result = confirm(case)
+    updated = case.db.get_contact(case.contact.id)
+    assert updated.model_dump(exclude={"channels"}) == saved.model_dump(exclude={"channels"})
+    assert updated.channels[0].manual_confirmed_at is not None
+    assert result.business_status not in ("ready_alternative", "ready_preferred")
 
 
 @pytest.mark.parametrize("age", ["stale", "future"])
-def test_stale_or_future_employment_blocks_manual_confirmation(manual_case, age):
+def test_stale_or_future_employment_does_not_block_channel_notes(manual_case, age):
     case = manual_case
     days = -(case.campaign.limits.freshness.employment_days + 1) if age == "stale" else 1
     source = case.source.model_copy(update={"id": uuid4(), "published_at": utc_now() + timedelta(days=days)})
     saved = case.db.save_contact(case.contact.model_copy(update={"employment_evidence_ids": [source.id]}), evidence=[source])
-    with pytest.raises(ValueError, match="vigentes"):
-        confirm(case)
-    assert case.db.get_contact(case.contact.id) == saved
+    result = confirm(case)
+    updated = case.db.get_contact(case.contact.id)
+    assert updated.employment_evidence_ids == saved.employment_evidence_ids
+    assert updated.channels[0].manual_confirmed_at is not None
+    assert result.business_status not in ("ready_alternative", "ready_preferred")
 
 
 @pytest.mark.parametrize("contradictory", [False, True])
@@ -181,8 +185,7 @@ def test_channel_sources_with_future_date_or_contradiction_block_confirmation(ma
     channel = case.channel.model_copy(update={"evidence_ids": [source.id]})
     saved = case.db.save_contact(case.contact.model_copy(update={"channels": [channel, case.contact.channels[1]]}), evidence=[source])
     before = case.db.list_evidence(case.company.id)
-    # Una fuente que contradice la del puesto deja el empleo contradicho (T18) y bloquea antes de revisar el canal.
-    with pytest.raises(ValueError, match="vigentes" if contradictory else "contradictoria"):
+    with pytest.raises(ValueError, match="contradictoria"):
         confirm(case)
     assert case.db.get_contact(case.contact.id) == saved and case.db.list_evidence(case.company.id) == before
 
@@ -225,13 +228,110 @@ def test_other_ready_contact_keeps_preferred_status(manual_case):
     assert confirm(case).business_status == "ready_preferred"
 
 
-def test_campaign_without_assessment_cannot_confirm_channel(manual_case, make_campaign):
+def test_campaign_without_assessment_saves_notes_without_changing_status(manual_case, make_campaign):
     case = manual_case
     other_campaign = make_campaign()
     case.db.save_campaign(other_campaign)
-    case.db.save_run_item(RunItem(campaign_id=other_campaign.id, company_id=case.company.id))
-    with pytest.raises(ValueError, match="vigentes"):
-        confirm_alternative_channel(case.db, other_campaign.id, case.contact.id, case.channel.type,
-                                    case.channel.value, reason="Confirmación sintética.", confirmed=True)
+    previous = case.db.save_run_item(RunItem(campaign_id=other_campaign.id, company_id=case.company.id))
+    result = confirm_alternative_channel(case.db, other_campaign.id, case.contact.id, case.channel.type,
+                                         case.channel.value, reason="Confirmación sintética.", confirmed=True)
+    assert result.business_status == previous.business_status
+    assert case.db.get_contact(case.contact.id).channels[0].manual_confirmed_at is not None
+    assert case.db.get_run_item(case.campaign.id, case.company.id) == case.run
+
+
+@pytest.mark.parametrize("channel_type,value,extra", [
+    ("email", "comprobacion-sintetica@example.com", {"normalized_status": "verified", "verified_at": utc_now()}),
+    ("phone", "+573001234567", {"phone_country": "CO"}),
+    ("whatsapp", "+573001234567", {}),
+])
+def test_preferred_confirmation_preserves_provider_status_and_verification_dates(manual_case, channel_type, value, extra):
+    case = manual_case
+    provider = case.source.model_copy(update={
+        "id": uuid4(), "source_type": "provider", "provider": "apollo",
+        "external_reference": "apollo_v1:comprobacion-sintetica#enrichment",
+        "claim": f"Canal profesional sintético de {case.contact.name}: {value}.",
+    })
+    channel = Channel(contact_id=case.contact.id, type=channel_type, value=value,
+                      evidence_ids=[provider.id], retrieved_at=provider.retrieved_at,
+                      provider_status="Estado sintético del proveedor", professional=True, direct=True, **extra)
+    previous = case.db.save_contact(case.contact.model_copy(update={"channels": [channel, case.contact.channels[1]]}),
+                                    evidence=[provider])
+    usable = channel_is_usable(channel, previous, case.db.list_evidence(case.company.id),
+                               case.campaign.limits, utc_now(), case.company)
+    confirm(case, channel_type=channel_type, channel_value=value)
+    updated = case.db.get_contact(case.contact.id).channels[0]
+    assert updated.normalized_status == channel.normalized_status
+    assert updated.provider_status == channel.provider_status
+    assert updated.retrieved_at == channel.retrieved_at and updated.verified_at == channel.verified_at
+    assert updated.professional == channel.professional and updated.direct == channel.direct
+    assert updated.manual_confirmed_at is not None and updated.manual_confirmation_reason
+    assert channel_is_usable(updated, case.db.get_contact(case.contact.id), case.db.list_evidence(case.company.id),
+                              case.campaign.limits, utc_now(), case.company) == usable
+    assert case.db.list_usage(campaign_id=case.campaign.id) == []
+
+
+def test_confirmation_does_not_erase_negative_email_verification(manual_case):
+    case = manual_case
+    invalid = case.contact.channels[1]
+    before = case.db.list_evidence(case.company.id)
+    with pytest.raises(ValueError, match="negativa"):
+        confirm(case, channel_type=invalid.type, channel_value=invalid.value)
+    assert case.db.get_contact(case.contact.id) == case.contact
+    assert case.db.list_evidence(case.company.id) == before
+
+
+def test_phone_notes_do_not_refresh_expired_provider_evidence(manual_case):
+    case = manual_case
+    old = utc_now() - timedelta(days=case.campaign.limits.cache.contact_days + 1)
+    value = "+573001234567"
+    provider = case.source.model_copy(update={
+        "id": uuid4(), "source_type": "provider", "provider": "apollo", "retrieved_at": old,
+        "external_reference": "apollo_v1:telefono-sintetico#enrichment",
+        "claim": f"Teléfono profesional sintético de {case.contact.name}: {value}.",
+    })
+    phone = Channel(contact_id=case.contact.id, type="phone", value=value, phone_country="CO",
+                    evidence_ids=[provider.id], retrieved_at=old, professional=True, direct=True)
+    case.db.save_contact(case.contact.model_copy(update={"channels": [phone, case.contact.channels[1]]}),
+                         evidence=[provider])
+    result = confirm(case, channel_type=phone.type, channel_value=phone.value,
+                     reason=f"Comprobación sintética de {case.contact.name}, teléfono {value}.")
+    updated_contact = case.db.get_contact(case.contact.id)
+    updated = updated_contact.channels[0]
+    assert updated.manual_confirmed_at is not None
+    assert set(phone.evidence_ids) < set(updated.evidence_ids) and updated.retrieved_at == old
+    assert not channel_is_usable(updated, updated_contact, case.db.list_evidence(case.company.id),
+                                  case.campaign.limits, utc_now(), case.company)
+    assert result.business_status == "needs_channel_confirmation"
+
+
+def test_later_evidence_contradicting_channel_blocks_confirmation(manual_case):
+    case = manual_case
+    contradicting = case.source.model_copy(update={"id": uuid4(), "contradiction_ids": [case.source.id]})
+    case.db.save_evidence(contradicting)
+    with pytest.raises(ValueError, match="contradictoria"):
+        confirm(case)
+    assert case.db.get_contact(case.contact.id) == case.contact
+
+
+@pytest.mark.parametrize("confirmed_domain", [True, False])
+def test_public_confirmation_rechecks_dynamic_exclusions_without_writes(manual_case, tmp_path, confirmed_domain):
+    from prospecting.pipeline import confirm_alternative_channel as public_confirm
+
+    case = manual_case
+    exclusions = ExclusionList.model_validate({
+        "version": "exclusiones-sinteticas-v1", "validation_status": "validated",
+        "source_reference": "Lista sintética posterior a la investigación", "observed_at": utc_now(),
+        "entries": [{"id": "entrada-sintetica", "name": case.company.name,
+                     "domains": [case.company.domain if confirmed_domain else "otra-empresa.example"],
+                     "scope": "entity", "reason": "current_customer", "source_reference": "Exclusión sintética"}],
+    })
+    path = tmp_path / "exclusiones-sinteticas.json"
+    path.write_text(exclusions.model_dump_json(), encoding="utf-8")
+    before = case.db.list_evidence(case.company.id)
+    with pytest.raises(ValueError, match="exclusión"):
+        public_confirm(case.path, case.campaign.id, case.contact.id, case.channel.type, case.channel.value,
+                       reason="Comprobación sintética.", confirmed=True, exclusions_path=path)
     assert case.db.get_contact(case.contact.id) == case.contact
     assert case.db.get_run_item(case.campaign.id, case.company.id) == case.run
+    assert case.db.list_evidence(case.company.id) == before

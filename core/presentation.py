@@ -505,9 +505,11 @@ def export_csv(view: CampaignView, *, include_all: bool = False) -> bytes:
     return output.getvalue().encode("utf-8-sig")
 
 
-def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None):
+def download_csv(db_path, campaign_id, *, include_all=False, account_allowances=None, exclusions_path=None,
+                 contact_match_config=None):
     """Consulta al descargar con una conexión nueva, sin reutilizar una pantalla anterior."""
-    current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path)
+    current = read_campaign(db_path, campaign_id, account_allowances=account_allowances, exclusions_path=exclusions_path,
+                            contact_match_config=contact_match_config)
     if current.is_executing:
         raise ValueError("La campaña está ejecutándose; espera antes de exportar.")
     return export_csv(current, include_all=include_all)

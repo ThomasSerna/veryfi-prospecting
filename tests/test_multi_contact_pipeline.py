@@ -1,10 +1,12 @@
 """Varias personas pertinentes por cuenta con Apollo (T16); personas, correos y respuestas exclusivamente sintéticos."""
 
+from pathlib import Path
+
 import pytest
 
 from prospecting.budget import SpendingAuthorization
-from prospecting.contacts import contact_context, people_progress
-from prospecting.models import BusinessStatus, Campaign, utc_now
+from prospecting.contacts import contact_context, load_contact_match, people_progress
+from prospecting.models import BusinessStatus, Campaign, Evidence, IdentityStatus, utc_now
 from prospecting.pipeline import contacts as stage_module
 from prospecting.providers.apollo import person_id
 from test_contact_pipeline import contact_case, enable_role_taxonomy
@@ -12,6 +14,12 @@ from test_contact_pipeline import contact_case, enable_role_taxonomy
 ORDINALS = ("Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis", "Siete")
 PRODUCT = ("Head of Product", "Product Manager", "Director of Product", "Senior Product Manager", "Group Product Manager")
 ENGINEERING = ("Engineering Manager", "Solutions Architect", "Director of Engineering")
+
+
+@pytest.fixture(params=["contact_match_v2", "contact_match_v3"])
+def match_config(role_config, request):
+    weights = load_contact_match(Path(__file__).resolve().parents[1] / "config" / f"{request.param}.json")
+    return role_config.model_copy(update={"contact_match": weights})
 
 
 def multi(case, role_config, titles, *, priority="high", enriched=None):
@@ -172,6 +180,62 @@ def test_another_function_is_tried_before_stopping_with_a_single_function(contac
     assert report.stop_reason == "people_target_reached" and progress(case).function_ids == ["engineering", "product"]
 
 
+def test_versioned_match_prioritizes_selected_role_over_a_complete_pending_identity(contact_case, match_config):
+    """El match supera el orden legado por nombre completo y se aplica antes de reservar enrichment."""
+    case = multi(contact_case, match_config, ["Head of Product", "Product Manager"])
+    grants = [grant for grant in case.grants if grant.operation == "people_search"]
+    assert case.find(authorizations=grants).stop_reason == "authorization_required"
+    facts = case.db.list_evidence(case.company.id)
+    person = next(person for person in case.db.list_contacts(case.company.id)
+                  if person_id(person, facts) == "persona-sintetica-0")
+    name = Evidence(company_id=case.company.id, contact_id=person.id, kind="observed", source_type="primary",
+                    url=f"https://{case.company.domain}/equipo", retrieved_at=utc_now(),
+                    claim="Nombre completo sintético: Persona Sintética Uno.")
+    person = person.model_copy(update={"name": "Persona Sintética Uno", "name_complete": True,
+                                      "provenance": person.provenance | {"name": person.provenance["name"] + [name.id]}})
+    case.db.save_contact(person, evidence=[name])
+    assert case.find().status == "checked"
+    assert enriched_ids(case) == ["persona-sintetica-1", "persona-sintetica-0"]
+
+
+@pytest.mark.parametrize("condition", ["identity", "employment", "scope", "pending"])
+def test_versioned_match_prevents_enrichment_spending_on_contradictions_but_not_pending_data(
+        contact_case, match_config, condition):
+    case = multi(contact_case, match_config, ["Product Manager"])
+    grants = [grant for grant in case.grants if grant.operation == "people_search"]
+    assert case.find(authorizations=grants).stop_reason == "authorization_required"
+    [person] = case.db.list_contacts(case.company.id)
+    sources = []
+    if condition == "identity":
+        person = person.model_copy(update={"identity_status": IdentityStatus.CONTRADICTED})
+    elif condition == "employment":
+        previous = Evidence(company_id=case.company.id, contact_id=person.id, kind="observed", source_type="primary",
+                            url=f"https://{case.company.domain}/equipo", retrieved_at=utc_now(),
+                            claim="Relación laboral sintética citada antes de la contradicción.")
+        case.db.save_evidence(previous)
+        source = Evidence(company_id=case.company.id, contact_id=person.id, kind="observed", source_type="primary",
+                          url=f"https://{case.company.domain}/equipo", retrieved_at=utc_now(),
+                          claim="Relación laboral sintética con evidencia contradictoria.", contradiction_ids=[previous.id])
+        sources.append(source)
+        person = person.model_copy(update={"employment_evidence_ids": [previous.id]})
+    elif condition == "scope":
+        source = Evidence(company_id=case.company.id, contact_id=person.id, kind="observed", source_type="primary",
+                          url=f"https://{case.company.domain}/equipo", retrieved_at=utc_now(),
+                          claim="Alcance geográfico sintético: México.")
+        sources.append(source)
+        person = person.model_copy(update={"geographic_scope": "México",
+                                          "provenance": person.provenance | {"geographic_scope": [source.id]}})
+    case.db.save_contact(person, evidence=sources)
+    report = case.find()
+    assert report.status == "checked"
+    expected = ["persona-sintetica-0"] if condition == "pending" else []
+    assert enriched_ids(case) == expected
+    usage = case.db.list_usage(campaign_id=case.campaign.id, provider="apollo")
+    assert len([row for row in usage if row.operation == "people_enrichment"]) == len(expected)
+    run = case.db.get_run_item(case.campaign.id, case.company.id)
+    assert run.consumed_limits.enrichments == len(expected)
+
+
 def test_medium_priority_targets_two_people(contact_case, role_config):
     case = multi(contact_case, role_config, ["Head of Product", "Engineering Manager", "Product Manager", "Solutions Architect"],
                  priority="medium")
@@ -269,7 +333,7 @@ def test_enrichment_reconciled_without_consumption_is_retried_exactly_once(conta
 
 
 def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_case, role_config, tmp_path):
-    """La ficha, la tabla y el CSV separan candidatas, pertinentes y listas, con objetivo y rechazo por persona."""
+    """El contrato y el CSV conservan las etapas; la ficha prioriza el match de todas las personas."""
     import csv
     from io import StringIO
     from types import SimpleNamespace
@@ -300,7 +364,8 @@ def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_c
     shown = SimpleNamespace(path=path, tmp_path=tmp_path, campaign=case.campaign)
     html = page(shown, "webapp:company", company_id=case.company.id)
     assert "Objetivo 3 · 4 candidatas" not in html
-    assert ">Candidata<" in html and ">Pertinente<" in html and ">Lista<" not in html
-    assert "Apollo no confirmó una coincidencia de identidad alta." in html
-    assert "Se alcanzó el objetivo de personas pertinentes." in html
+    assert ">Candidata<" not in html and ">Pertinente<" not in html and ">Lista<" not in html
+    assert html.count("Desglose de match") == 4 and html.count("de match</span>") == 4
+    assert "Revisar contacto" not in html and "Requiere revisión humana" not in html
+    assert "Se alcanzó el objetivo de personas pertinentes." not in html
     assert "3 pertinentes · 0 listas" not in page(shown, "webapp:campaign")

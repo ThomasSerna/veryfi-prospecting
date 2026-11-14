@@ -107,7 +107,7 @@ def page(people, name, match_path=MATCH_PATH, **kwargs):
 def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(people):
     html = page(people, "webapp:company", company_id=people.company.id)
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
-    assert "100 %</strong> de match" in html and "25 %</strong> de match" in html
+    assert "100 %</strong> de match" in html and "35 %</strong> de match" in html
     assert "Descartada por regla: su identidad tiene contradicciones" in html
     assert html.count("Desglose de match") == 3 and "Cargo fuera de los perfiles" in html
     assert "El porcentaje de match no está disponible" not in html
@@ -115,13 +115,28 @@ def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(pe
     assert label("CO") in html and label("fintech_software") in html
 
 
-def test_company_page_warns_when_weights_are_invalid(people, monkeypatch):
+def test_company_page_uses_v3_even_if_historical_weight_file_is_broken(people, monkeypatch):
     broken = people.tmp_path / "contact_match.json"
     broken.write_text('{"version": "contact_match_v9"}', encoding="utf-8")
     monkeypatch.setattr(bridge, "_CONFIG_DIR", people.tmp_path)
     html = page(people, "webapp:company", broken, company_id=people.company.id)
-    assert "El porcentaje de match no está disponible" in html and "de match</span>" not in html
+    assert "100 %</strong> de match" in html and "35 %</strong> de match" in html
+    assert "El porcentaje de match no está disponible" not in html
     assert all(name in html for name in (READY, SALES, CONTRADICTED))
+
+
+def test_company_page_does_not_invent_match_if_current_rubric_is_invalid(people):
+    current_config = people.tmp_path / "config"
+    current_config.mkdir()
+    (current_config / "contact_match_v3.json").write_text('{"version": "contact_match_v9"}', encoding="utf-8")
+    with override_settings(BASE_DIR=people.tmp_path, PROSPECTING_DB_PATH=people.path,
+                           PROSPECTING_ACCESS_PATH=people.tmp_path / "missing-access.json",
+                           PROSPECTING_EXCLUSIONS_PATH=people.tmp_path / "missing-exclusions.json"):
+        response = Client(SERVER_NAME="localhost").get(reverse(
+            "webapp:company", kwargs={"campaign_id": people.campaign.id, "company_id": people.company.id}))
+    assert response.status_code == 503 and "100 %" not in response.content.decode("utf-8")
+    with Database(people.path) as db:
+        assert db.get_campaign(people.campaign.id).config_snapshot == people.campaign.config_snapshot
 
 
 @pytest.mark.parametrize("people", ["completed", "researched"], indirect=True)
@@ -163,18 +178,23 @@ def test_csv_rows_follow_match_order_and_leave_missing_match_empty(people):
     assert len(plain) == 3 and all(row["contact_match"] == row["contact_match_detail"] == "" for row in plain)
 
 
-def test_csv_download_uses_the_configured_weights(people):
+def test_csv_download_uses_v3_without_rewriting_historical_snapshot(people):
     with override_settings(PROSPECTING_DB_PATH=people.path, PROSPECTING_ACCESS_PATH=people.tmp_path / "missing-access.json",
                            PROSPECTING_EXCLUSIONS_PATH=people.tmp_path / "missing-exclusions.json",
                            PROSPECTING_CONTACT_MATCH_PATH=MATCH_PATH):
         response = Client(SERVER_NAME="localhost").get(
             reverse("webapp:export", kwargs={"campaign_id": people.campaign.id}), {"mode": "all"})
     assert response.status_code == 200
-    assert [row["contact_match"] for row in csv_rows(response.content)] == ["100", "25", "68"]
+    rows = csv_rows(response.content)
+    assert [row["contact_match"] for row in rows] == ["100", "35", "78"]
+    assert {row["contact_match_version"] for row in rows} == {"contact_match_v3"}
+    assert read_campaign(people.path, people.campaign.id).contact_match_version == "contact_match_v1"
+    with Database(people.path) as db:
+        assert db.get_campaign(people.campaign.id).config_snapshot == people.campaign.config_snapshot
 
 
 @pytest.mark.parametrize("people", ["v2"], indirect=True)
-def test_v2_snapshot_drives_view_html_and_csv_despite_a_broken_external_path(people):
+def test_v2_snapshot_drives_audit_while_ui_uses_v3(people):
     view = read_campaign(people.path, people.campaign.id)
     assert view.contact_match_version == "contact_match_v2"
     assert [(person.contact.name, person.match.score) for person in view.companies[0].contacts] == [
@@ -187,7 +207,7 @@ def test_v2_snapshot_drives_view_html_and_csv_despite_a_broken_external_path(peo
     assert "people-summary" not in contacts[1] and "3 candidatas" not in contacts[1]
     assert "Objetivo " not in contacts[1] and "Funciones:" not in contacts[1]
     assert contacts[1].count("Desglose de match") == 3
-    assert "100 %</strong> de match" in contacts[1] and "40 %</strong> de match" in contacts[1]
+    assert "100 %</strong> de match" in contacts[1] and "35 %</strong> de match" in contacts[1]
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert 'id="lead-title">Mejor match' in html
     assert "Ver contactos" not in html
