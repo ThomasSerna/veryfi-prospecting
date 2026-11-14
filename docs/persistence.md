@@ -15,7 +15,7 @@ config = VeryfiConfig.model_validate_json(
     Path("config/veryfi.json").read_text(encoding="utf-8")
 )
 config = config.model_copy(update={
-    "contact_match": load_contact_match(Path("config/contact_match_v2.json")),
+    "contact_match": load_contact_match(Path("config/contact_match_v3.json")),
 })
 campaign = Campaign(
     countries=["CO"],
@@ -45,7 +45,7 @@ aparece una contradicción, la evaluación histórica se conserva y la pertinenc
 recalcula con la evidencia disponible para la campaña.
 
 La preparación de campañas nuevas incorpora la configuración validada de
-`contact_match_v2` en `config_snapshot.contact_match`. El ejemplo de bajo nivel la
+`contact_match_v3` en `config_snapshot.contact_match`. El ejemplo de bajo nivel la
 incorpora explícitamente antes de guardar; `Database.save_campaign` no la añade.
 La instantánea conserva pesos y versión, aunque después cambie el archivo de
 configuración. El campo es opcional para leer campañas anteriores sin reescribirlas ni
@@ -116,11 +116,14 @@ interfaz se recalcula al consultar y al pulsar la descarga, con una conexión nu
 puede diferir del checkpoint si un canal o una fuente caducó. Una descarga no
 reutiliza resultados precalculados ni se permite durante ejecución.
 
-Confirmar un canal alternativo existente guarda una nueva `Evidence` con
-`source_type="manual"`, la fecha y el motivo de confirmación del canal, y el `business_status`
-recalculado del `RunItem` en una sola transacción. Si falla una escritura, se revierte
-todo. Se conservan las fuentes, advertencias y verificaciones negativas; la
-confirmación no demuestra identidad ni empleo por sí sola.
+Confirmar un canal existente guarda una nueva `Evidence` con `source_type="manual"`,
+la fecha y las notas de comprobación. Si existe evaluación, también recalcula el
+`business_status` del `RunItem`; de lo contrario conserva el estado guardado. Las
+escrituras comparten una transacción. Se conservan las fuentes, advertencias y
+verificaciones negativas; la confirmación no demuestra identidad ni empleo por sí sola.
+Correo, teléfono y WhatsApp conservan su estado normalizado y fechas del proveedor;
+LinkedIn y otros mantienen su confirmación manual. Las reglas de canal utilizable y de
+listo se aplican independientemente de que se hayan anotado las comprobaciones.
 
 Confirmar manualmente el empleo (T23) guarda en una sola transacción:
 
@@ -207,9 +210,9 @@ identificadores sin reescribir el ledger anterior:
 
 - `people_provider="apollo"` en la instantánea de las campañas nuevas; el campo
   ausente identifica campañas históricas.
-- `contact_match_v2` en `config_snapshot.contact_match` identifica los pesos y el
-  algoritmo de match de las campañas nuevas; un campo ausente o `null` selecciona la
-  lectura histórica `contact_match_v1`.
+- `contact_match_v3` en `config_snapshot.contact_match` identifica los pesos y el
+  algoritmo de match de las campañas nuevas. `contact_match_v2` conserva la rúbrica
+  anterior; un campo ausente o `null` selecciona la lectura histórica `contact_match_v1`.
 - Claves `contacts:apollo_search` y `contacts:apollo_enrichments` para los intentos
   de búsqueda y enriquecimiento; las claves compartidas mantienen su significado.
 - Clave `contacts:apollo_rejected:<código>:<contact_id>` (T16) para una persona que
@@ -277,7 +280,9 @@ formato `apollo_reconciliation_v1` ([budget-providers.md](budget-providers.md#co
 
 El porcentaje de match de contactos no se guarda en SQLite: se recalcula al leer con
 la versión y los pesos de la instantánea, o con `config/contact_match.json` para las
-campañas anteriores sin instantánea de match ([Personas y canales](contacts.md#porcentaje-de-match)).
+campañas anteriores sin instantánea de match. La interfaz y sus CSV pasan v3 de forma
+explícita para mostrar también esa versión en campañas anteriores, sin cambiar lo
+guardado ni la versión que usa su investigación ([Personas y canales](contacts.md#porcentaje-de-match)).
 Las mismas entradas y fecha reproducen el resultado de cada versión; la evidencia y su
 vigencia se vuelven a comprobar en la fecha de consulta. Los resultados y configuraciones
 externas que no se guardaron en campañas anteriores no se pueden reconstruir con certeza.

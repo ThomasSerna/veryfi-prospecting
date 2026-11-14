@@ -55,7 +55,7 @@ un cargo claramente fuera del perfil resulta `relevant_function=False` y uno
 ambiguo sin respaldo de función queda `None`. Ninguno es elegible. El cupo de personas
 (`contacts:person:`) solo lo ocupa quien supera `validate_contact` al investigarla,
 así un candidato poco pertinente hallado primero no desplaza a uno idóneo hallado
-después. En campañas con `contact_match_v2`, la pertinencia y el match ordenan los
+después. En campañas con `contact_match_v2` o `contact_match_v3`, la pertinencia y el match ordenan los
 candidatos; solo a igualdad de ambas se alternan funciones. Se excluyen del
 enriquecimiento las personas descartadas por identidad, empleo o alcance, pero las
 que tienen datos pendientes siguen siendo investigables. Las búsquedas nominales en
@@ -144,7 +144,7 @@ lugar de dejar la empresa pendiente. Después de esa extracción, la etapa:
    `provider_claim_only`, `title_unconfirmed`, `undated_source` o `stale_source`
    (`needs_employment_corroboration`), en el orden de pertinencia y diversidad de T16.
    Exige nombre completo sin `*`, cargo, función pertinente y ningún descarte de
-   `contact_match_v2`. Un directorio vigente que no las nombra ya no lo impide, y quien
+   la rúbrica de match guardada. Un directorio vigente que no las nombra ya no lo impide, y quien
    ya tiene `corporate_evidence` no se busca.
 2. Busca a cada una con `"nombre" "empresa" cargo` (1 crédito). Con el cupo de la empresa
    agotado, la persona queda pendiente con `employment_search_limit`, sin buscarla. Un
@@ -317,9 +317,10 @@ Desde T24, una búsqueda dirigida por persona completa esa vía
 
 ### Confirmación manual del empleo (T23)
 
-Ventas puede confirmar desde la ficha el empleo vigente de una persona, sin enviar mensajes,
-llamadas ni invitaciones. `employment_confirmation_titles` decide a quién se le ofrece y con
-qué cargos: personas de Apollo enriquecidas, con nombre completo sin `*` y sin
+La ficha ya no ofrece esta acción, pero la API `confirm_current_employment` y las
+confirmaciones guardadas siguen disponibles. `employment_confirmation_titles` determina
+qué personas y cargos admite la API, sin enviar mensajes, llamadas ni invitaciones:
+personas de Apollo enriquecidas, con nombre completo sin `*` y sin
 `current_employment=False`, en `provider_claim` de Apollo (se confirma el cargo actual) o en
 `title_changed` (se elige uno de los cargos ya citados en sus fuentes de título, de Apollo o
 de la extracción pública). Quedan fuera `employment_ended`, `contradicted_source`, `unknown`,
@@ -404,6 +405,26 @@ utilizable; `ready_alternative`, un canal alternativo confirmado. Un canal pendi
 produce `needs_channel_confirmation`; al agotarse el esfuerzo sin persona/canal
 utilizable, `qualified_no_contact`. Los fallos técnicos se registran aparte.
 
+### Confirmación manual de un canal
+
+La ficha permite registrar una comprobación con notas obligatorias y fecha para un
+canal existente de cualquier contacto de la campaña Apollo, sin exigir que su identidad,
+cargo o empleo estén confirmados. El envío del formulario confirma la acción; no hay
+casilla adicional. La operación rechaza canales inválidos, contactos ajenos, exclusiones
+confirmadas o ambiguas, evidencia del canal contradictoria o futura y campañas
+históricas, y se bloquea durante la ejecución.
+
+La API pública conserva el nombre `confirm_alternative_channel` y admite todos los
+tipos de canal. Recibe `reason` y `confirmed=True`; `exclusions_path` permite volver a
+comprobar las exclusiones vigentes. `CompanyResult.can_confirm_channels` informa si la
+empresa admite esta acción sin depender de la elegibilidad de cada persona.
+
+La comprobación conserva la evidencia del canal y no acredita la identidad ni el empleo.
+En correo, teléfono y WhatsApp se conservan el estado y las fechas del proveedor y
+se aplican las reglas anteriores de canal utilizable. LinkedIn y otros canales mantienen
+la confirmación manual como posible respaldo de acceso directo. En todos los casos,
+«listo» sigue requiriendo una persona elegible y un canal utilizable.
+
 ## Porcentaje de match
 
 `read_campaign` devuelve a todas las personas guardadas de cada empresa, también a las
@@ -411,49 +432,48 @@ que no superan `validate_contact`, con un match determinístico de 0 a 100. El c
 no usa red ni IA y no convierte a una persona en elegible o lista. Ordena la revisión y
 ayuda a priorizar el enriquecimiento, pero no es una probabilidad de respuesta ni de compra.
 
-Cada persona suma cuatro componentes. Las campañas nuevas guardan la propuesta
-`contact_match_v2`, pendiente de validación comercial con Veryfi. Las campañas anteriores
-sin instantánea de match usan `contact_match_v1`, propuesta del equipo del 15 de octubre:
+Cada persona suma cuatro componentes. Las campañas nuevas guardan `contact_match_v3`,
+pendiente de validación comercial con Veryfi. Las campañas anteriores conservan v2 o,
+si no tienen instantánea de match, usan v1 en la lectura histórica:
 
-| Componente | `contact_match_v1` | `contact_match_v2` |
-|---|---|---|
-| Cargo | Elegido en la calificación, 50; otro de los perfiles respaldados, 35; fuera de perfil o desconocido, 0 | Elegido, 40; otro respaldado, 28; fuera de perfil o desconocido, 0 |
-| Canal | Preferido utilizable, 25; alternativo confirmado, 18; preferido sin comprobar, 10; alternativo sin confirmar, 7; ninguno, 0 | Preferido utilizable, 20; alternativo confirmado, 14; preferido sin comprobar, 8; alternativo sin confirmar, 6; ninguno, 0 |
-| Identidad | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 | Los mismos niveles y puntos que v1 |
-| Vigencia del empleo | Evidencia del puesto, 10; inferencia histórica de Hunter, 6; sin comprobar, 0 | `corporate_evidence`, 25; `provider_claim`, `contradicted` o `unknown`, 0 |
+| Componente | `contact_match_v1` | `contact_match_v2` | `contact_match_v3` |
+|---|---|---|---|
+| Cargo | Elegido en la calificación, 50; otro de los perfiles respaldados, 35; fuera de perfil o desconocido, 0 | Elegido, 40; otro respaldado, 28; fuera de perfil o desconocido, 0 | Elegido, 55; otro respaldado, 39; fuera de perfil o desconocido, 0 |
+| Canal | Preferido utilizable, 25; alternativo confirmado, 18; preferido sin comprobar, 10; alternativo sin confirmar, 7; ninguno, 0 | Preferido utilizable, 20; alternativo confirmado, 14; preferido sin comprobar, 8; alternativo sin confirmar, 6; ninguno, 0 | Preferido utilizable, 10; alternativo confirmado, 7; preferido sin comprobar, 4; alternativo sin confirmar, 3; ninguno, 0 |
+| Identidad | Nombre completo e identidad confirmada, 15; nombre completo sin confirmar, 8; nombre incompleto, 0 | Los mismos niveles y puntos que v1 | Confirmada y completa, 25; completa sin confirmar, 13; incompleta, 0 |
+| Vigencia del empleo | Evidencia del puesto, 10; inferencia histórica de Hunter, 6; sin comprobar, 0 | `corporate_evidence`, 25; `provider_claim`, `contradicted` o `unknown`, 0 | `corporate_evidence`, 10; `provider_claim`, `contradicted` o `unknown`, 0 |
 
 El canal preferido es correo, teléfono o WhatsApp; el alternativo es LinkedIn u otro
-canal directo. Un canal `invalid` o marcado como no profesional no suma. En v2,
+canal directo. Un canal `invalid` o marcado como no profesional no suma. En v2 y v3,
 `provider_claim` y `unknown` se muestran pendientes: la afirmación de un proveedor
 no prueba empleo vigente. `contradicted` descarta a la persona. En v1 se conserva la
 interpretación histórica: `corporate_evidence` corresponde a evidencia del puesto y
 `provider_claim` de Hunter a `hunter_signal`; las afirmaciones de Apollo quedan sin
-comprobar. El proveedor no añade puntos en v2.
+comprobar. El proveedor no añade puntos en v2 ni en v3.
 
-Ambas versiones llevan al final a las personas con identidad contradictoria, salida o
-empleo no vigente, o alcance respaldado incompatible con la empresa; v2 también descarta
-las demás contradicciones del empleo. El desglose no se oculta. V1 ordena por descarte,
-puntaje descendente, elegibilidad, posición del cargo, nombre e id. V2 ordena primero por
-descarte y pertinencia del cargo, después por puntaje descendente; a igualdad de pertinencia
-y puntaje alterna funciones y desempata por elegibilidad, cargo, nombre e id. El orden no
-depende del orden de guardado.
+Las versiones llevan al final a las personas con identidad contradictoria, salida o
+empleo no vigente, o alcance respaldado incompatible con la empresa; v2 y v3 también
+descartan las demás contradicciones del empleo. El desglose está disponible en la ficha.
+V1 ordena por descarte, puntaje descendente, elegibilidad, posición del cargo, nombre e id.
+V2 y v3 ordenan primero por descarte y pertinencia del cargo, después por puntaje
+descendente; a igualdad de pertinencia y puntaje alternan funciones; el desempate sigue
+por elegibilidad, cargo, nombre e id. El orden no depende del orden de guardado.
 
-La ficha muestra el porcentaje, su desglose y la versión; la tabla de la campaña, el
-número de personas y el mejor match no descartado. El CSV añade `contact_match`,
-`contact_match_version`, `contact_match_blocked` y `contact_match_detail`. La ficha y
-el CSV también muestran la función que la taxonomía asocia al cargo con fuente y las
-funciones representadas entre las personas pertinentes; esto no acredita empleo ni
-autoridad de compra.
+La ficha muestra el porcentaje y su desglose; la tabla de la campaña, el número de
+personas y el mejor match no descartado. El CSV añade `contact_match`,
+`contact_match_version`, `contact_match_blocked` y `contact_match_detail`, además de
+la función asociada al cargo y las funciones representadas entre las personas
+pertinentes. Estas funciones no acreditan empleo ni autoridad de compra.
 
 ### Configurar los pesos
 
-`config/contact_match_v2.json` contiene la propuesta para campañas nuevas;
-`config/contact_match.json` conserva v1 para las anteriores. La preparación valida el
-archivo v2 y guarda su configuración en la instantánea de la campaña. Para usar otro
-archivo v2, indica su ruta en `PROSPECTING_CONTACT_MATCH_PATH` antes de preparar la
-campaña. Esa variable no modifica las campañas ya guardadas ni sus exportaciones.
-Si el archivo v2 falta, es inválido o contiene otra versión, no se guarda la campaña
-nueva y se informa el error.
+`config/contact_match_v3.json` contiene la configuración para campañas nuevas;
+`config/contact_match_v2.json` y `config/contact_match.json` conservan v2 y v1. La
+preparación valida v3 y guarda su configuración en la instantánea. Para usar otro
+archivo v3, indica su ruta en `PROSPECTING_CONTACT_MATCH_PATH` antes de preparar la
+campaña. La interfaz usa el archivo v3 canónico para presentar los resultados. Si el
+archivo de preparación falta, es inválido o contiene otra versión, no se guarda la
+campaña nueva y se informa el error.
 
 Cada versión fija sus componentes, niveles y puntos mediante una huella validada: no
 se pueden cambiar los pesos conservando el mismo nombre de versión. Los cuatro pesos
@@ -463,9 +483,16 @@ su implementación explícita; no basta con editar el JSON.
 
 El match se recalcula sin llamadas ni gasto con la evidencia y fecha de consulta actuales.
 Las mismas entradas y fecha producen el mismo resultado, pero una fuente que caduca o
-una contradicción nueva puede cambiarlo. Para campañas anteriores, si el archivo v1 falta,
-no es válido o declara otra versión, se muestran las personas sin porcentaje, la ficha
-avisa y las columnas de match del CSV quedan vacías; no se inventan pesos.
+una contradicción nueva puede cambiarlo. La interfaz y sus CSV usan v3 también para
+campañas anteriores, sin reescribir su instantánea. Las lecturas de auditoría sin una
+configuración explícita utilizan la versión guardada; si no hay instantánea, usan v1.
+`read_campaign` acepta `contact_match_config` como sustitución opcional para una
+lectura; `download_csv` propaga la misma opción a la consulta de descarga.
+La investigación de una campaña anterior conserva su versión, por lo que su orden puede
+ser distinto del mostrado con v3. Si el archivo v3 canónico de la interfaz falta o es
+inválido, la lectura devuelve un error 503, sin inventar porcentajes. En una lectura
+histórica sin instantánea, si el archivo v1 falta o es inválido, las personas se devuelven
+sin match.
 
 Las pruebas sin red usan credenciales y datos declarados sintéticos; no demuestran
 cobertura, acceso ni consumo de Apollo. Las llamadas históricas a Hunter de T07, T09

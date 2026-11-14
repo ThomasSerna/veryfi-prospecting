@@ -68,8 +68,8 @@ cambios. Las vistas operativas ya aplican la nueva dirección.
 1. En Mercado y Alcance, selecciona países, segmentos, palabras clave opcionales y
    un máximo de 1–20 empresas. Revisa los criterios y topes en Resumen.
    Crear la campaña guarda los criterios y la instantánea de configuración, incluida
-   la propuesta `contact_match_v2`, sin tráfico. La versión y sus pesos no cambian al
-   editar después el archivo local. Si la configuración v2 falta o no es válida, se
+   la propuesta `contact_match_v3`, sin tráfico. La versión y sus pesos no cambian al
+   editar después el archivo local. Si la configuración v3 falta o no es válida, se
    informa el error y no se guarda la campaña nueva.
 2. Revisa las operaciones y sus topes en la autorización. Ejecutar requiere claves en
    el entorno y un archivo válido `data/provider-access.json`.
@@ -232,19 +232,16 @@ prioridad, necesidad documental `1` y score descendente, con desempate estable.
 La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
-La pestaña Contactos lista a las personas encontradas con nombre, cargo, etapa y match.
-Dos indicadores muestran por separado las comprobaciones de empleo y canal; no
-sustituyen las demás reglas para que una persona aparezca como «Lista para contactar».
-Cada canal identificado indica si es utilizable y ofrece copiarlo; «Comprobaciones del
-canal» contiene su estado y advertencias. Cuando corresponde, «Confirmar empleo
-vigente» y «Confirmar canal» llevan al formulario respectivo; con JavaScript lo abren y
-enfocan el primer campo habilitado. «Revisar contacto» reúne los detalles de empleo y
-match. Se conservan las señales de descarte y contradicción.
-En v2, las personas no descartadas y la pertinencia preceden al porcentaje en el orden.
-Las campañas nuevas usan el match v2 de su instantánea; las anteriores sin ella usan v1.
-El match ordena la revisión y la prioridad de enriquecimiento, mientras «listo» sigue
-dependiendo de las reglas de persona y canal. Si no hay configuración válida, las
-personas se muestran sin porcentaje ([Porcentaje de match](contacts.md#porcentaje-de-match)).
+La pestaña Contactos lista a las personas encontradas con nombre, cargo y match. Cada
+canal identificado muestra su tipo y valor, y ofrece copiarlo. «Comprobaciones del canal»
+contiene su estado y advertencias; «Confirmar canal» abre el formulario correspondiente.
+El desglose de match está disponible directamente y se conservan las señales de descarte
+y contradicción.
+En la lectura con v3, las personas no descartadas y la pertinencia preceden al porcentaje.
+La ficha, los listados y el CSV muestran v3 también para campañas anteriores, sin
+reescribir su instantánea. La investigación conserva la versión de su campaña; el orden
+histórico puede diferir del mostrado. El match no sustituye las reglas de «listo»
+([Porcentaje de match](contacts.md#porcentaje-de-match)).
 La [vigencia del empleo](contacts.md#vigencia-del-empleo-t18) distingue lo comprobado
 de lo pendiente o contradictorio; un correo no confirma por sí solo el empleo.
 
@@ -255,31 +252,15 @@ control de tres opciones y la confirmación aparece como aviso flotante que se r
 movimiento reducido queda en la página. Las correcciones están disponibles cuando la
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
-La confirmación manual solo permite canales `linkedin` u `other` existentes de una
-persona con identidad, cargo y empleo pertinentes vigentes; si falta la evidencia del
-puesto, el formulario queda deshabilitado y explica el motivo. Declara canal directo
-comprobado y añade notas de verificación. El pipeline guarda evidencia
-manual, fecha y disponibilidad recalculada en una sola transacción. Una URL de perfil
-por sí sola no basta; la confirmación tampoco elimina una verificación negativa.
+La confirmación manual admite cualquier tipo de canal existente, aunque la persona aún
+no tenga identidad, cargo o empleo confirmados. El formulario pide notas de comprobación
+y guarda su fecha, sin casilla adicional. La confirmación respeta las exclusiones y no
+elimina una verificación negativa; está bloqueada durante la ejecución y en campañas
+históricas. La comprobación de correo, teléfono o WhatsApp conserva la validación del
+proveedor. LinkedIn y otros canales conservan la confirmación manual existente.
 
-«Confirmar empleo vigente» (T23) aparece en la tarjeta de las personas que la lectura declara
-confirmables, es decir, las que tienen `employment_titles`
-([Confirmación manual del empleo](contacts.md#confirmación-manual-del-empleo-t23)). El formulario
-pide:
-
-- la URL de la fuente consultada;
-- el motivo;
-- la casilla «Comprobé el empleo vigente en esa fuente sin enviar mensajes, llamar ni enviar invitaciones»;
-- con un cambio de cargo, cuál de los cargos ya citados es el vigente.
-
-Un dato inválido devuelve la ficha con el error y sin cambios; un cargo no citado o una
-persona ajena se rechazan. La confirmación conserva fecha, vencimiento, motivo y fuente;
-si está vigente, su fecha, motivo y fuente se incluyen en el CSV. La identidad guardada
-sigue indicando sus contradicciones. El formulario se bloquea durante una ejecución y
-no existe en campañas históricas.
-
-Los detalles de empleo incluyen el resultado de la búsqueda dirigida cuando existe
-(T24, [Corroboración dirigida del empleo](contacts.md#corroboración-dirigida-del-empleo-t24)).
+La ficha no ofrece confirmar el empleo por separado. La API y las confirmaciones de
+empleo ya guardadas se conservan ([Confirmación manual del empleo](contacts.md#confirmación-manual-del-empleo-t23)).
 
 ## Exportación CSV
 
@@ -324,8 +305,8 @@ y su exportación se generó sobre esos datos ([Evaluación de la T09](evaluatio
 Ninguno produjo una persona lista, así que la revisión humana y la confirmación manual de
 canales solo se han verificado con datos sintéticos. La confirmación manual del empleo (T23)
 se verificó con pruebas sin red y en el navegador local sobre una base temporal
-exclusivamente sintética; no se ha usado con personas reales. El aviso y la columna de la
-corroboración dirigida (T24) se verificaron con pruebas sin red.
+exclusivamente sintética; no se ha usado con personas reales. El resultado y la columna
+de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 
 ## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 

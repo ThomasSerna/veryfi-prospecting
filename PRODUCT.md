@@ -14,7 +14,7 @@ el caso de uso y decide qué empresas y personas investigar o contactar fuera de
 ## Product Purpose
 
 Descubrir empresas desde criterios de mercado, calificarlas con evidencia
-y encontrar personas pertinentes con canales directos comprobados.
+y encontrar personas pertinentes y sus canales profesionales.
 El encaje es una rúbrica explicable, no una probabilidad de compra.
 
 ## Operating Context

@@ -83,10 +83,11 @@ Reiniciar la aplicación conserva el consumo y exige permisos nuevos; no renueva
 La [guía de la interfaz](docs/ui.md) explica el archivo y el flujo completo.
 
 Al preparar una campaña nueva, la aplicación guarda una instantánea de la propuesta
-`contact_match_v2` de `config/contact_match_v2.json`. La variable
-`PROSPECTING_CONTACT_MATCH_PATH` permite indicar otro JSON v2 antes de crearla; no
-modifica campañas ya guardadas ni sus exportaciones. Las campañas anteriores sin
-instantánea de match usan la configuración histórica `contact_match_v1`.
+`contact_match_v3` de `config/contact_match_v3.json`. La variable
+`PROSPECTING_CONTACT_MATCH_PATH` permite indicar otro JSON v3 antes de crearla, sin
+modificar campañas guardadas. La interfaz y sus CSV muestran v3 también para campañas
+anteriores; su investigación y las lecturas históricas conservan la configuración
+original, o `contact_match_v1` si no hay instantánea de match.
 
 ### Configurar Apollo
 

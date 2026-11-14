@@ -224,10 +224,9 @@ animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons
 - **Encaje:** cifra grande con barra graduada en cuartos, explicación, productos,
   cobertura y criterios visibles en el resumen. Cada criterio muestra una bola de
   Harvey junto a su etiqueta textual.
-- **Contactos:** cada persona presenta nombre, cargo, estado y match, más las
-  comprobaciones de empleo y canal. Cuando corresponde, los accesos de confirmación
-  llevan directamente a sus formularios; los canales conservan su estado, advertencias
-  y copia. Las advertencias aparecen en «Comprobaciones del canal».
+- **Contactos:** cada persona presenta nombre, cargo y match, con acceso directo a su
+  desglose. Los canales muestran tipo, valor y copia; «Confirmar canal» registra notas
+  de comprobación y «Comprobaciones del canal» conserva estado y advertencias.
 - **Fallos de lectura:** cuando hay páginas que no se pudieron leer, su etapa, URL y
   motivo aparecen bajo las pestañas.
 - **Lateral:** mejor match y revisión fijos al desplazarse. La decisión sobre la

@@ -1,9 +1,9 @@
 # Referencias enterprise de Veryfi y diseño de rúbricas (empresas y personas)
 
-Documento de referencia para las tareas **T13** (calibración de ICP enterprise), **T14** (`rubric_v2` para empresas grandes), **T15** (taxonomía de cargos en Apollo) y **T19** (`contact_match_v2` para priorización de personas). Sintetiza la información de los tres documentos comerciales facilitados por Veryfi y establece cómo se conectan con el registro incremental de perfiles reales en `data/veryfi-reference-profiles.md`.
+Documento de referencia para las tareas **T13** (calibración de ICP enterprise), **T14** (`rubric_v2` para empresas grandes), **T15** (taxonomía de cargos en Apollo) y **T19** (`contact_match_v2` para priorización de personas), y la revisión posterior `contact_match_v3`. Sintetiza la información de los tres documentos comerciales facilitados por Veryfi y establece cómo se conectan con el registro incremental de perfiles reales en `data/veryfi-reference-profiles.md`.
 
 > **Estado de validación (`AGENTS.md`, `Business-rules.md` y `Roadmap.md`):**
-> Los materiales comerciales citados combinan distintos periodos (2022–2026). Los niveles de cliente, las rúbricas y la taxonomía derivada son **hipótesis de trabajo**, no criterios comerciales ratificados por Veryfi. `rubric_v2` está aprobada para evaluación académica y su activación depende del [resultado offline](Business-rules.md#candidata-enterprise-rubric_v2); v1 sigue como opción predeterminada mientras tanto. `contact_match_v2` sigue siendo una propuesta separada de T19.
+> Los materiales comerciales citados combinan distintos periodos (2022–2026). Los niveles de cliente, las rúbricas y la taxonomía derivada son **hipótesis de trabajo**, no criterios comerciales ratificados por Veryfi. `rubric_v2` está aprobada para evaluación académica y su activación depende del [resultado offline](Business-rules.md#candidata-enterprise-rubric_v2); v1 sigue como opción predeterminada mientras tanto. `contact_match_v3` es la rúbrica de personas para campañas nuevas; las versiones anteriores se conservan.
 
 ---
 
@@ -110,7 +110,7 @@ Para cumplir los criterios de aceptación de **T14**:
 
 ---
 
-## 5. Descripción de la rúbrica para la clasificación de personas (`contact_match_v2` y T15)
+## 5. Descripción de la rúbrica para la clasificación de personas (`contact_match` y T15)
 
 ### 5.1. Roles del ICP Enterprise según Veryfi (`How Veryfi Sells`, págs. 6, 9 y 18)
 
@@ -127,17 +127,23 @@ Los documentos de Veryfi distinguen tres funciones en la decisión de compra y s
 > - **Compras (`Procurement`)** interviene en la etapa contractual de cuentas Enterprise, pero para abrir la oportunidad (*Outbound SDR / Hunter*, pág. 6) tienen prioridad los **Champions de Producto, Ingeniería, Marketing/Loyalty, Insights o AP/Operaciones** que sufren el problema documental.
 > - Un título ejecutivo genérico (ej. *VP* o *Director* de un área ajena como Legal, RR. HH. general o Ventas institucionales) **no** debe dominar el ranking solo por su jerarquía (*seniority*).
 
-### 5.2. Pesos propuestos en `contact_match_v2` (hipótesis T19)
+### 5.2. Versiones y pesos del match de personas
 
-Frente a `contact_match_v1` (Cargo 50, Canal 25, Identidad 15, Empleo 10), la transición a cuentas enterprise con múltiples candidatos de Apollo requiere dar mayor peso a la **vigencia comprobada del empleo** para evitar contactar personas que ya cambiaron de puesto o de empresa:
+La hipótesis T19 (`contact_match_v2`) dio más peso a la vigencia laboral para el
+trabajo con candidatos de Apollo. La revisión `contact_match_v3` prioriza cargo e
+identidad, y limita a 10 puntos por componente el efecto de no corroborar empleo o canal.
 
-| Componente | Peso en `contact_match_v1` | Peso propuesto en `contact_match_v2` (T19) | Criterio de evaluación |
-|---|---:|---:|---|
-| **Pertinencia del cargo (`role`)** | 50 | **40** | Nivel máximo si el cargo y departamento coinciden con los cargos prioritarios elegidos para el caso de uso de la empresa (`selected_role`); intermedio si pertenece al catálogo del segmento (`profile_role`, p. ej. otro rol complementario NT/T/EB del mismo vertical); `0` si la función está fuera del perfil (`outside_profile`, aunque tenga alto *seniority*) o está sin fuente (`unknown`). |
-| **Vigencia del empleo (`employment`)** | 10 | **25** | Nivel máximo con evidencia corporativa o pública fechada vigente (`corporate_evidence` / `evidence`); nivel intermedio solo para señales históricas o declaradas sujetas a confirmación según T18; `0` si no está verificado (`unverified`). Si el empleo terminó (`employment_ended`), la persona queda bloqueada y pasa al final. |
-| **Calidad del canal (`channel`)** | 25 | **20** | Nivel máximo con canal preferido utilizable (correo corporativo del dominio confirmado y verificado, teléfono directo o WhatsApp profesional anunciado); intermedio con canal alternativo confirmado (ej. LinkedIn con mensajería confirmada por ventas); menor para canales pendientes de confirmación; `0` sin canal o inválido. |
-| **Identidad (`identity`)** | 15 | **15** | Nivel máximo con nombre completo e identidad confirmada en la entidad; intermedio con nombre completo pendiente de contraste; `0` si Apollo Search devolvió apellido ofuscado (`last_name_obfuscated`) aún no enriquecido. |
-| **Total** | **100** | **100** | El puntaje ordena la revisión para ventas; **no convierte en `listo` un contacto sin canal o sin empleo verificado**. |
+| Componente | v1 | v2 (T19) | v3 | Criterio de evaluación |
+|---|---:|---:|---:|---|
+| **Cargo (`role`)** | 50 | 40 | **55** | Cargo elegido para el caso de uso, otro cargo respaldado del perfil, o fuera de perfil/desconocido. |
+| **Canal (`channel`)** | 25 | 20 | **10** | Canal preferido utilizable, alternativo utilizable, preferido pendiente, alternativo pendiente o ninguno. |
+| **Identidad (`identity`)** | 15 | 15 | **25** | Identidad completa confirmada, completa pendiente o incompleta. |
+| **Empleo (`employment`)** | 10 | 25 | **10** | Evidencia vigente corroborada o información pendiente/contradicha. Una contradicción comprobada sigue bloqueando a la persona. |
+| **Total** | **100** | **100** | **100** | El puntaje no convierte por sí solo a la persona en `listo`. |
+
+Los puntos de cada nivel y las reglas históricas están en
+[Porcentaje de match](contacts.md#porcentaje-de-match). La falta de corroboración
+no se convierte en una afirmación de empleo vigente.
 
 ### 5.3. Uso de los perfiles reales de ejemplo enviados por Veryfi
 
@@ -148,4 +154,4 @@ Los perfiles reales de LinkedIn compartidos por Veryfi como ejemplos para perfec
 Cada vez que Veryfi envíe más enlaces de perfiles:
 1. Se añaden a `data/veryfi-reference-profiles.md` (que actualmente contiene los primeros 3 perfiles recibidos el `2026-11-01`).
 2. De cada perfil se identifican manualmente: **segmento de la empresa**, **cargo exacto (ES/EN)**, **departamento**, **nivel de jerarquía (*seniority*)** y **rol en la compra (`business_champion`, `technical_champion` o `economic_buyer`)**.
-3. Esos patrones (sin nombres propios ni URLs personales) se incorporan al catálogo de `config/veryfi.json` (T15) y a los casos de prueba de `contact_match_v2` (T19) para asegurar que perfiles equivalentes reciban la máxima puntuación de pertinencia de cargo.
+3. Esos patrones (sin nombres propios ni URLs personales) se incorporan al catálogo de `config/veryfi.json` (T15) y a los casos de prueba de `contact_match` para asegurar que perfiles equivalentes reciban la máxima puntuación de pertinencia de cargo.
