@@ -47,11 +47,13 @@ def test_campaign_taxonomy_is_isolated_in_view_html_and_csv(tmp_path):
     assert row["contact_match_version"] == "contact_match_v2"
     case = SimpleNamespace(path=path, campaign=other, tmp_path=tmp_path)
     html = page(case, "webapp:company", company_id=original.company.id)
-    assert person.contact.name in html and "Cargo pendiente" in html
-    assert "<dt>Función pertinente</dt><dd>Pendiente</dd>" in html
+    assert person.contact.name in html and person.contact.title in html
+    assert "45 %</strong> de match" in html
+    assert "Desglose de match" not in html and "match-breakdown" not in html
     original_case = SimpleNamespace(path=path, campaign=campaign, tmp_path=tmp_path)
     original_html = page(original_case, "webapp:company", company_id=original.company.id)
-    assert "<dt>Función pertinente</dt><dd>Sí</dd>" in original_html
-    assert "<dt>Función pertinente</dt><dd>Pendiente</dd>" not in original_html
+    assert person.contact.name in original_html and "100 %</strong> de match" in original_html
+    assert "Cargo pendiente" not in original_html
+    assert "Desglose de match" not in original_html and "match-breakdown" not in original_html
     with Database(path) as database:
         assert database.get_contact(person.contact.id) == stored
