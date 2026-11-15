@@ -20,7 +20,12 @@ from prospecting.text import clip
 
 PROMPT_VERSION = "haiku_assessment_v3"
 ENTERPRISE_PROMPT_VERSION = "haiku_assessment_v4"
-PROFILE_PROMPT_VERSION = "haiku_assessment_v5"
+PROFILE_PROMPT_VERSION = "haiku_assessment_v6"
+SALES_WORDING = """Escribe el resumen, las justificaciones y los datos pendientes en español cotidiano para ventas.
+Empieza por la empresa, su producto o lo que hacen sus clientes. Usa verbos concretos y frases cortas.
+Si algo sigue abierto, di qué falta saber («Falta confirmar si…»). Distingue lo posible de lo confirmado.
+Evita fórmulas como «la evidencia indica», «la fuente no muestra» o «encaje plausible».
+Usa términos técnicos cuando aclaren qué producto de Veryfi serviría y para qué. Conserva nombres y cifras."""
 SEARCH_RESULT_CLAIM = ("La página apareció en una búsqueda web; el extracto es el resumen del buscador "
                        "y no confirma hechos de la empresa.")
 CLAIM_CHARS = 300
@@ -320,13 +325,14 @@ Escala enterprise (haiku_assessment_v4):
                     for profile in campaign.config_snapshot.profiles if profile.segment in campaign.segments]
         system += """
 
-Perfiles respaldados (haiku_assessment_v5):
+Perfiles respaldados:
 - profile_matches contiene únicamente perfiles cuyo caso de uso está demostrado en la evidencia de esta empresa.
 - Cada perfil necesita citations con evidence_id y quote literal del fragmento o claim suministrado.
   No basta la industria, un producto compartido, un cargo sugerido ni el resumen de un buscador.
 - No cites fuentes contradictorias, inferencias ni hechos de personas. Sin respaldo devuelve [].
 - Las familias de cargos son hipótesis pendientes de validación comercial; no acreditan autoridad de compra.
 Perfiles permitidos: """ + prompt_json(profiles)
+        system += f"\n\nRedacción de la ficha ({PROFILE_PROMPT_VERSION}):\n{SALES_WORDING}"
     return system
 
 
