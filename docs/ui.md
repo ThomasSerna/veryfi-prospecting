@@ -232,11 +232,13 @@ prioridad, necesidad documental `1` y score descendente, con desempate estable.
 La exportación mantiene ese orden. Las campañas con `rubric_v1` conservan su
 orden anterior; la candidata v2 sigue pendiente de su evaluación académica.
 
-La pestaña Contactos lista a las personas encontradas con nombre, cargo y match. Cada
-canal identificado muestra su tipo y valor, y ofrece copiarlo. «Comprobaciones del canal»
-contiene su estado y advertencias; «Confirmar canal» abre el formulario correspondiente.
-El desglose de match está disponible directamente y se conservan las señales de descarte
-y contradicción.
+La pestaña Contactos lista a las personas encontradas con nombre, cargo y match, con
+separación entre ellas. Cada canal identificado muestra su tipo y valor, ofrece copiarlo
+y conserva visibles la fecha y las notas de una comprobación anterior.
+Cuando la acción está disponible, un botón «Confirmar canal» por persona abre un panel
+para seleccionar el canal y registrar la comprobación. Se conservan las señales de
+descarte y contradicción.
+El desglose del match permanece en el CSV.
 En la lectura con v3, las personas no descartadas y la pertinencia preceden al porcentaje.
 La ficha, los listados y el CSV muestran v3 también para campañas anteriores, sin
 reescribir su instantánea. La investigación conserva la versión de su campaña; el orden
@@ -253,8 +255,9 @@ movimiento reducido queda en la página. Las correcciones están disponibles cua
 campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
 
 La confirmación manual admite cualquier tipo de canal existente, aunque la persona aún
-no tenga identidad, cargo o empleo confirmados. El formulario pide notas de comprobación
-y guarda su fecha, sin casilla adicional. La confirmación respeta las exclusiones y no
+no tenga identidad, cargo o empleo confirmados. En el panel se elige uno de sus canales
+que no esté marcado como inválido y se escriben notas de comprobación obligatorias;
+se guarda la fecha, sin casilla adicional. La confirmación respeta las exclusiones y no
 elimina una verificación negativa; está bloqueada durante la ejecución y en campañas
 históricas. La comprobación de correo, teléfono o WhatsApp conserva la validación del
 proveedor. LinkedIn y otros canales conservan la confirmación manual existente.

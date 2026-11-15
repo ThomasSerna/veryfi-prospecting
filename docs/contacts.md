@@ -407,10 +407,10 @@ utilizable, `qualified_no_contact`. Los fallos técnicos se registran aparte.
 
 ### Confirmación manual de un canal
 
-La ficha permite registrar una comprobación con notas obligatorias y fecha para un
-canal existente de cualquier contacto de la campaña Apollo, sin exigir que su identidad,
-cargo o empleo estén confirmados. El envío del formulario confirma la acción; no hay
-casilla adicional. La operación rechaza canales inválidos, contactos ajenos, exclusiones
+La ficha ofrece un único panel de confirmación por persona para elegir un canal existente
+que no esté marcado como inválido y registrar notas obligatorias y fecha, sin exigir que
+su identidad, cargo o empleo estén confirmados. El envío del formulario confirma la
+acción; no hay casilla adicional. La operación rechaza canales inválidos, contactos ajenos, exclusiones
 confirmadas o ambiguas, evidencia del canal contradictoria o futura y campañas
 históricas, y se bloquea durante la ejecución.
 
@@ -445,7 +445,7 @@ si no tienen instantánea de match, usan v1 en la lectura histórica:
 
 El canal preferido es correo, teléfono o WhatsApp; el alternativo es LinkedIn u otro
 canal directo. Un canal `invalid` o marcado como no profesional no suma. En v2 y v3,
-`provider_claim` y `unknown` se muestran pendientes: la afirmación de un proveedor
+`provider_claim` y `unknown` quedan pendientes: la afirmación de un proveedor
 no prueba empleo vigente. `contradicted` descarta a la persona. En v1 se conserva la
 interpretación histórica: `corporate_evidence` corresponde a evidencia del puesto y
 `provider_claim` de Hunter a `hunter_signal`; las afirmaciones de Apollo quedan sin
@@ -453,13 +453,13 @@ comprobar. El proveedor no añade puntos en v2 ni en v3.
 
 Las versiones llevan al final a las personas con identidad contradictoria, salida o
 empleo no vigente, o alcance respaldado incompatible con la empresa; v2 y v3 también
-descartan las demás contradicciones del empleo. El desglose está disponible en la ficha.
+descartan las demás contradicciones del empleo. El desglose está disponible en el CSV.
 V1 ordena por descarte, puntaje descendente, elegibilidad, posición del cargo, nombre e id.
 V2 y v3 ordenan primero por descarte y pertinencia del cargo, después por puntaje
 descendente; a igualdad de pertinencia y puntaje alternan funciones; el desempate sigue
 por elegibilidad, cargo, nombre e id. El orden no depende del orden de guardado.
 
-La ficha muestra el porcentaje y su desglose; la tabla de la campaña, el número de
+La ficha muestra el porcentaje; la tabla de la campaña, el número de
 personas y el mejor match no descartado. El CSV añade `contact_match`,
 `contact_match_version`, `contact_match_blocked` y `contact_match_detail`, además de
 la función asociada al cargo y las funciones representadas entre las personas
