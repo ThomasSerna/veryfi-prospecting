@@ -348,7 +348,7 @@ def test_company_page_deemphasizes_corroboration_but_preserves_its_result_in_csv
     assert response.status_code == 200
     page = text(response)
     assert "Búsqueda dirigida sin corroboración: ninguna fuente vigente nombra a la persona" not in page
-    assert "Desglose de match" in page and "Revisar contacto" not in page
+    assert "Desglose de match" not in page and "Revisar contacto" not in page
     view = read_campaign(ui_paths.db, case.campaign.id)
     [result] = [item for item in view.companies if item.company.id == case.company.id]
     assert result.contacts[0].employment_corroboration == "searched_not_corroborated"

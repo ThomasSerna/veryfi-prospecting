@@ -61,8 +61,9 @@ def prepare(client, **fields):
 
 
 def confirmation(case, **fields):
-    return {"contact_id": str(case.contact.id), "channel_type": "linkedin",
-            "channel_value": case.contact.channels[0].value,
+    channel_type = fields.pop("channel_type", case.contact.channels[0].type)
+    channel_value = fields.pop("channel_value", case.contact.channels[0].value)
+    return {"contact_id": str(case.contact.id), "channel": f"{channel_type}:{channel_value}",
             "reason": "Mensajería profesional nominal comprobada sin enviar nada.", **fields}
 
 
@@ -280,7 +281,7 @@ def test_manual_confirmation_requires_notes_without_checkbox_and_persists_only_o
     assert "Canal directo comprobado" not in page and 'name="confirmed"' not in page
     rejected = client.post(path, confirmation(case, reason=""))
     assert rejected.status_code == 400
-    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>', text(rejected))
+    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}"[^>]*>', text(rejected))
     assert form is not None and re.search(r'\bopen\b', form[0])
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
@@ -292,7 +293,7 @@ def test_manual_confirmation_requires_notes_without_checkbox_and_persists_only_o
     assert result.run_item.review_status == "pending"
     page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     assert "Comprobación registrada:" in page and confirmation(case)["reason"] in page
-    assert f'href="#channel-{case.contact.id}-0"' in page
+    assert f'href="#channel-{case.contact.id}"' in page
 
 
 def test_manual_confirmation_preserves_filters_and_company_sequence(ui_results, client):
@@ -327,7 +328,7 @@ def test_all_existing_channel_types_accept_notes_without_checkbox(ui_results, cl
         db.save_contact(case.contact)
     company_path = url("company", case.campaign.id, case.companies[0].id)
     page = text(client.get(company_path))
-    assert f'href="#channel-{case.contact.id}-0"' in page
+    assert f'href="#channel-{case.contact.id}"' in page
     response = client.post(url("confirm_channel", case.campaign.id, case.companies[0].id),
                            confirmation(case, channel_type=channel_type, channel_value=value))
     assert response.status_code == 302
@@ -339,6 +340,51 @@ def test_all_existing_channel_types_accept_notes_without_checkbox(ui_results, cl
         assert saved.normalized_status == channel.normalized_status and saved.provider_status == channel.provider_status
     shown = text(client.get(company_path))
     assert "Comprobación registrada:" in shown and saved.manual_confirmation_reason in shown
+
+
+def test_one_panel_per_person_confirms_only_the_selected_channel_and_rejects_foreign_options(ui_results, client):
+    case = ui_results
+    common = {"contact_id": case.contact.id, "evidence_ids": case.contact.channels[0].evidence_ids,
+              "retrieved_at": case.now}
+    phone = Channel(type="phone", value="+573001234567", phone_country="CO", **common)
+    whatsapp = Channel(type="whatsapp", value=phone.value, **common)
+    invalid = Channel(type="email", value="invalido@synthetic-co.example", normalized_status="invalid", **common)
+    case.contact = case.contact.model_copy(update={"channels": [case.contact.channels[0], phone, whatsapp, invalid]})
+    with Database(case.paths.db) as db:
+        db.save_contact(case.contact)
+        source = next(item for item in db.list_evidence(case.companies[0].id) if item.contact_id == case.contact.id)
+        other_id = uuid4()
+        other_source = source.model_copy(update={"id": uuid4(), "contact_id": other_id,
+            "external_reference": f"apollo_public_v1:synthetic:{other_id}", "claim": "Persona Sintética Dos, CTO."})
+        other_channel = Channel(contact_id=other_id, type="other", value="https://synthetic-co.example/otra-persona",
+                                evidence_ids=[other_source.id], retrieved_at=case.now)
+        other = Contact(id=other_id, company_id=case.companies[0].id, name="Persona Sintética Dos", title="CTO",
+                        provenance={field: [other_source.id] for field in ("name", "title")}, channels=[other_channel])
+        db.save_contact(other, evidence=[other_source])
+    path = url("company", case.campaign.id, case.companies[0].id)
+    page = text(client.get(path))
+    assert page.count("data-confirmation-link") == page.count('class="confirmation-details"') == 2
+    panel = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}"[^>]*>(.*?)</details>', page, re.S)[1]
+    assert panel.count('<select ') == 1 and panel.count('type="submit"') == 1
+    assert f'phone:{phone.value}' in panel and f'whatsapp:{whatsapp.value}' in panel
+    assert invalid.value not in panel and other_channel.value not in panel
+    confirm_path = url("confirm_channel", case.campaign.id, case.companies[0].id)
+    hostile = "Comprobación sintética: <script>alert('notas')</script>"
+    assert client.post(confirm_path, confirmation(case, channel=f"whatsapp:{whatsapp.value}", reason=hostile)).status_code == 302
+    with Database(case.paths.db) as db:
+        saved = db.get_contact(case.contact.id)
+        assert [item.type for item in saved.channels if item.manual_confirmed_at] == ["whatsapp"]
+        assert db.get_contact(other.id) == other
+    shown = text(client.get(path))
+    assert escape(hostile) in shown and hostile not in shown
+    assert f'<textarea name="reason"' in shown and f'>{escape(hostile)}</textarea>' not in shown
+    for value in (f"email:{invalid.value}", f"other:{other_channel.value}"):
+        response = client.post(confirm_path, confirmation(case, channel=value))
+        assert response.status_code == 400
+        with Database(case.paths.db) as db:
+            assert db.get_contact(case.contact.id) == saved and db.get_contact(other.id) == other
+    assert client.post(confirm_path, confirmation(case, contact_id=str(other.id))).status_code == 400
+    assert client.post(confirm_path, confirmation(case, contact_id=str(uuid4()))).status_code == 404
 
 
 @pytest.mark.parametrize("ui_results", ["legacy"], indirect=True)
@@ -372,7 +418,7 @@ def test_company_detail_allows_channel_confirmation_despite_stale_employment(ui_
     assert person.employment.evidence_ids == [old.id]
     page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     assert "La fuente del puesto está vencida." not in page
-    assert f'href="#channel-{case.contact.id}-0"' in page
+    assert f'href="#channel-{case.contact.id}"' in page
     assert client.post(url("confirm_channel", case.campaign.id, case.companies[0].id), confirmation(case)).status_code == 302
     [person] = next(item for item in read_campaign(case.paths.db, case.campaign.id).companies
                     if item.company.id == case.companies[0].id).contacts
@@ -418,9 +464,9 @@ def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results
     case = ui_results
     with bridge._EXECUTION:
         page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
-        action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}-0"[^>]*>', page)
+        action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}"[^>]*>', page)
         assert action is not None and 'aria-disabled="true"' in action[0]
-        form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>(.*?)</details>', page, re.S)
+        form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}"[^>]*>(.*?)</details>', page, re.S)
         assert form is not None and re.search(r'<fieldset\s+disabled\b', form[1])
         for name, fields in [
             ("review", {"status": "accepted", "reason": "Motivo sintético."}),
@@ -796,7 +842,7 @@ def test_employment_contradiction_remains_visible_without_disabling_channel_note
         db.save_contact(case.contact.model_copy(update={"current_employment": False}))
     page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     assert "Descartada por regla: una fuente indica que ya no ocupa el puesto." in page
-    assert f'href="#channel-{case.contact.id}-0"' in page
+    assert f'href="#channel-{case.contact.id}"' in page
     assert "No disponible para confirmación manual" not in page
     compact = client.get(url("status", case.campaign.id), {"compact": "1"}).json()
     assert compact["html"] == ""
@@ -847,7 +893,7 @@ def test_company_criteria_keep_semantics_without_sources_section(ui_results, cli
     assert 'aria-label="Navegación secuencial de empresas"' in page
 
 
-def test_contacts_prioritize_copy_and_match_with_optional_channel_checks(ui_results, client):
+def test_contacts_show_one_confirmation_panel_without_match_or_channel_checks(ui_results, client):
     case = ui_results
     warning = "Advertencia sintética: <canal sin verificar>."
     channel = case.contact.channels[0].model_copy(update={"warnings": [warning]})
@@ -856,22 +902,20 @@ def test_contacts_prioritize_copy_and_match_with_optional_channel_checks(ui_resu
         db.save_contact(case.contact)
     page = text(client.get(url("company", case.campaign.id, case.companies[0].id)))
     contacts = re.search(r'<section id="contacts"[^>]*>(.*?)</section>', page, re.S)[1]
-    checks = re.search(r'<details class="channel-checks"[^>]*>', contacts)
-    assert checks is not None and not re.search(r'\bopen\b', checks[0])
     assert "No utilizable" not in contacts and "Utilizable" not in contacts
-    assert f'data-copy-channel="{case.contact.channels[0].value}"' in contacts[:checks.start()]
-    assert "Comprobaciones del canal" in contacts and "Estado:" in contacts[checks.end():]
+    assert f'data-copy-channel="{case.contact.channels[0].value}"' in contacts
+    assert "Comprobaciones del canal" not in contacts and "channel-checks" not in contacts
     assert "contact-progress" not in contacts and "person-stage" not in contacts
     assert "Confirmar empleo vigente" not in contacts and "Canal directo comprobado" not in contacts
-    action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}-0"[^>]*>', contacts)
-    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}-0"[^>]*>', contacts)
+    action = re.search(fr'<a\b[^>]*\bhref="#channel-{case.contact.id}"[^>]*>', contacts)
+    form = re.search(fr'<details\b[^>]*\bid="channel-{case.contact.id}"[^>]*>', contacts)
     assert action is not None and "data-confirmation-link" in action[0]
     assert form is not None and "data-actionable" in form[0] and not re.search(r'\bopen\b', form[0])
-    diagnostics = re.search(r'<details class="channel-checks"[^>]*>(.*?)</details>', contacts, re.S)
-    assert "<form" not in diagnostics[1]
-    assert escape(warning) in diagnostics[1] and warning not in diagnostics[1]
+    assert contacts.count("data-confirmation-link") == 1 and contacts.count('class="confirmation-details"') == 1
+    assert 'name="channel"' in contacts and 'name="reason"' in contacts
+    assert warning not in contacts and escape(warning) not in contacts
     assert "Revisar contacto" not in contacts and "contact-checks" not in contacts
-    assert "Desglose de match" in contacts
+    assert "Desglose de match" not in contacts and "match-breakdown" not in contacts
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
 
@@ -924,9 +968,7 @@ def test_employment_confirmation_is_removed_from_company_ui(ui_employment, clien
     assert "Confirmar empleo vigente" not in page
     assert f'action="{url("confirm_employment", case.campaign.id, case.company.id)}"' not in page
     assert f'href="#employment-{case.contact.id}"' not in page
-    assert "Confirmar canal" in page and "Desglose de match" in page
-    for warning in case.contact.channels[0].warnings:
-        assert escape(warning) in page
+    assert "Confirmar canal" in page and "Desglose de match" not in page
     with Database(case.paths.db) as db:
         assert db.get_contact(case.contact.id) == case.contact
 

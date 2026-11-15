@@ -365,7 +365,7 @@ def test_view_csv_and_pages_distinguish_candidates_pertinent_and_ready(contact_c
     html = page(shown, "webapp:company", company_id=case.company.id)
     assert "Objetivo 3 · 4 candidatas" not in html
     assert ">Candidata<" not in html and ">Pertinente<" not in html and ">Lista<" not in html
-    assert html.count("Desglose de match") == 4 and html.count("de match</span>") == 4
+    assert "Desglose de match" not in html and html.count("de match</span>") == 4
     assert "Revisar contacto" not in html and "Requiere revisión humana" not in html
     assert "Se alcanzó el objetivo de personas pertinentes." not in html
     assert "3 pertinentes · 0 listas" not in page(shown, "webapp:campaign")

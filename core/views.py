@@ -197,16 +197,15 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
     forms = []
     for person in (result.contacts if result.can_confirm_channels else []):
-        for channel_index, channel in enumerate(person.contact.channels):
-            if channel.normalized_status == "invalid":
-                continue
-            form = ConfirmationForm(initial={"contact_id": person.contact.id, "channel_type": channel.type,
-                                             "channel_value": channel.value, "reason": channel.manual_confirmation_reason or ""})
-            if (confirmation_form is not None and str(person.contact.id) == request.POST.get("contact_id")
-                    and channel.type == request.POST.get("channel_type") and channel.value == request.POST.get("channel_value")):
-                form = confirmation_form
-            form.auto_id = f"confirm_{person.contact.id}_{channel_index}_%s"
-            forms.append({"person": person, "channel": channel, "form": form})
+        channels = [channel for channel in person.contact.channels if channel.normalized_status != "invalid"]
+        if not channels:
+            continue
+        form = ConfirmationForm(channels=channels, initial={"contact_id": person.contact.id,
+                                "channel": f"{channels[0].type}:{channels[0].value}"})
+        if confirmation_form is not None and str(person.contact.id) == request.POST.get("contact_id"):
+            form = confirmation_form
+        form.auto_id = f"confirm_{person.contact.id}_%s"
+        forms.append({"person": person, "form": form})
     evidence_items = {fact.id: evidence_pill(fact, index) for index, fact in enumerate(result.evidence, start=1)}
     context.update(result=result, review_form=review_form or ReviewForm(initial={"status": result.run_item.review_status,
                                                                               "reason": result.run_item.review_reason or ""}),
@@ -378,18 +377,22 @@ def review(request, campaign_id, company_id):
 @require_POST
 @_handled
 def confirm_channel(request, campaign_id, company_id):
-    form = ConfirmationForm(request.POST)
-    if not form.is_valid():
-        return render(request, "pages/company.html", _company_context(request, campaign_id, company_id, confirmation_form=form), status=400)
     with execution.idle_action():
         context = _company_context(request, campaign_id, company_id)
         _require_idle(context["view"])
-        contact_id = form.cleaned_data["contact_id"]
+        try:
+            contact_id = UUID(request.POST.get("contact_id", ""))
+        except (ValueError, TypeError):
+            return _error_response(request, ValueError("Selecciona una persona de esta empresa."), 400)
         person = next((person for person in context["result"].contacts if person.contact.id == contact_id), None)
         if person is None:
             raise Http404("La persona no pertenece a esta empresa.")
         if not context["result"].can_confirm_channels:
             raise ValueError("La empresa no admite confirmaciones con las exclusiones actuales.")
+        form = ConfirmationForm(request.POST, channels=person.contact.channels)
+        if not form.is_valid():
+            return render(request, "pages/company.html",
+                          _company_context(request, campaign_id, company_id, confirmation_form=form), status=400)
         confirm_alternative_channel(_paths()[0], campaign_id, contact_id, form.cleaned_data["channel_type"],
                                     form.cleaned_data["channel_value"], reason=form.cleaned_data["reason"], confirmed=True,
                                     exclusions_path=_paths()[2])

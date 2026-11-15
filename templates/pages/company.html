@@ -113,7 +113,6 @@
 {% if person.match.blocked_reason %}<p class="contact-blocked">Descartada por regla: {{ person.match.blocked_reason|match_label }}.</p>{% elif person.employment.state == 'contradicted' %}<p class="contact-blocked">El empleo de esta persona tiene contradicciones pendientes.</p>{% endif %}
         <ul class="channel-list">
           {% for channel in person.contact.channels %}
-          {% with channel_index=forloop.counter0 %}
           <li class="channel-detail">
             <div class="channel-main">
               <span class="channel-icon" aria-hidden="true">{% if channel.type == 'email' %}<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5"/></svg>{% elif channel.type == 'phone' %}<svg viewBox="0 0 24 24"><path d="M6.6 3.8 9 3.5l1.6 4.2-2 1.4a10.5 10.5 0 0 0 6.3 6.3l1.4-2 4.2 1.6-.3 2.4a2 2 0 0 1-2.2 1.7A15.4 15.4 0 0 1 4.9 6a2 2 0 0 1 1.7-2.2Z"/></svg>{% elif channel.type == 'whatsapp' %}<svg viewBox="0 0 24 24"><path d="M4.5 19.5 5.6 16A8 8 0 1 1 8.4 18.6Z"/><path d="M9.5 9.5c.5 2.2 2.3 4 4.5 4.5"/></svg>{% elif channel.type == 'linkedin' %}<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 10.5V16M8 7.6v.4M11.5 16v-5.5M11.5 13c0-1.5 1-2.5 2.4-2.5s2.1 1 2.1 2.5V16"/></svg>{% else %}<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>{% endif %}</span>
@@ -123,51 +122,29 @@
               </div>
               <button type="button" class="copy-channel-btn" data-copy-channel="{{ channel.value }}" aria-label="Copiar canal {{ channel.type|label }}"><span class="copy-icons" aria-hidden="true"><svg class="icon-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg><svg class="icon-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" pathLength="1"/></svg></span><span data-copy-label>Copiar</span></button>
             </div>
-            {% for confirmation in confirmation_forms %}{% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
-            <a class="button button-small button-secondary contact-confirm-action" href="#channel-{{ person.contact.id }}-{{ channel_index }}" data-confirmation-link data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Confirmar canal<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
-            {% endif %}{% endfor %}
             {% if channel.manual_confirmed_at %}<p class="quiet-note">Comprobación registrada: {{ channel.manual_confirmed_at|date:"d/m/Y H:i" }}. {{ channel.manual_confirmation_reason }}</p>{% endif %}
-            <details class="channel-checks">
-              <summary>Comprobaciones del canal</summary>
-              <p class="quiet-note">Estado: {{ channel.normalized_status|label }}</p>
-              {% if channel.phone_country %}<p class="quiet-note">País: {{ channel.phone_country }}{% if channel.extension %} · Extensión: {{ channel.extension }}{% endif %}</p>{% endif %}
-              {% for warning in channel.warnings %}<p class="quiet-note">{{ warning }}</p>{% endfor %}
-            </details>
-            {% for confirmation in confirmation_forms %}
-              {% if confirmation.person.contact.id == person.contact.id and confirmation.channel.type == channel.type and confirmation.channel.value == channel.value %}
-              <details class="confirmation-details" id="channel-{{ person.contact.id }}-{{ channel_index }}" data-actionable {% if confirmation.form.errors %}open{% endif %}>
-                <summary>Confirmar canal</summary>
-                <p class="confirmation-purpose">Registra lo que comprobaste sobre este canal.</p>
-                <form method="post" action="{% url 'webapp:confirm_channel' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
-                  {% for hidden in confirmation.form.hidden_fields %}{{ hidden }}{% endfor %}
-                  <fieldset {% if is_executing %}disabled{% endif %}>
-                    {% include 'components/_field.html' with field=confirmation.form.reason %}
-                    <div class="confirmation-actions"><button class="button button-small button-primary" type="submit" data-idle-only>Confirmar</button><button class="button button-small button-quiet" type="button" data-close-confirmation>Cancelar</button></div>
-                  </fieldset>
-                </form>
-              </details>
-              {% endif %}
-            {% endfor %}
           </li>
-          {% endwith %}
           {% empty %}
           <li class="quiet-note">Sin canales identificados.</li>
           {% endfor %}
         </ul>
-        {% if person.match %}
-        <details class="match-details">
-          <summary>Desglose de match</summary>
-          <dl class="match-breakdown">
-            {% for item in person.match.components %}
-            <div>
-              <dt>{{ item.name|match_label }}</dt>
-              <dd>{{ item|match_label }}{% if item.pending %} <span class="pending-tag">Pendiente</span>{% endif %}</dd>
-              <dd class="numeric">{{ item.points }} / {{ item.weight }}</dd>
-            </div>
-            {% endfor %}
-          </dl>
+        {% for confirmation in confirmation_forms %}
+        {% if confirmation.person.contact.id == person.contact.id %}
+        <a class="button button-small button-secondary contact-confirm-action" href="#channel-{{ person.contact.id }}" data-confirmation-link data-idle-only {% if is_executing %}aria-disabled="true" tabindex="-1"{% endif %}>Confirmar canal<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+        <details class="confirmation-details" id="channel-{{ person.contact.id }}" data-actionable {% if confirmation.form.errors %}open{% endif %}>
+          <summary>Confirmar canal</summary>
+          <p class="confirmation-purpose">Elige el canal y registra lo que comprobaste.</p>
+          <form method="post" action="{% url 'webapp:confirm_channel' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
+            {% for hidden in confirmation.form.hidden_fields %}{{ hidden }}{% endfor %}
+            <fieldset {% if is_executing %}disabled{% endif %}>
+              {% include 'components/_field.html' with field=confirmation.form.channel %}
+              {% include 'components/_field.html' with field=confirmation.form.reason %}
+              <div class="confirmation-actions"><button class="button button-small button-primary" type="submit" data-idle-only>Confirmar</button><button class="button button-small button-quiet" type="button" data-close-confirmation>Cancelar</button></div>
+            </fieldset>
+          </form>
         </details>
         {% endif %}
+        {% endfor %}
       </article>
       {% empty %}
       <div class="empty-state">

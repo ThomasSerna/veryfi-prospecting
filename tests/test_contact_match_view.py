@@ -104,12 +104,12 @@ def page(people, name, match_path=MATCH_PATH, **kwargs):
     return response.content.decode("utf-8")
 
 
-def test_company_page_lists_people_by_match_with_breakdown_and_blocked_reason(people):
+def test_company_page_lists_people_by_match_without_breakdown_and_keeps_blocked_reason(people):
     html = page(people, "webapp:company", company_id=people.company.id)
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert "100 %</strong> de match" in html and "35 %</strong> de match" in html
     assert "Descartada por regla: su identidad tiene contradicciones" in html
-    assert html.count("Desglose de match") == 3 and "Cargo fuera de los perfiles" in html
+    assert "Desglose de match" not in html and "match-breakdown" not in html
     assert "El porcentaje de match no está disponible" not in html
     assert "Cobertura de evidencia" in html
     assert label("CO") in html and label("fintech_software") in html
@@ -206,7 +206,7 @@ def test_v2_snapshot_drives_audit_while_ui_uses_v3(people):
     assert contacts is not None
     assert "people-summary" not in contacts[1] and "3 candidatas" not in contacts[1]
     assert "Objetivo " not in contacts[1] and "Funciones:" not in contacts[1]
-    assert contacts[1].count("Desglose de match") == 3
+    assert "Desglose de match" not in contacts[1]
     assert "100 %</strong> de match" in contacts[1] and "35 %</strong> de match" in contacts[1]
     assert html.index(READY) < html.index(SALES) < html.index(CONTRADICTED)
     assert 'id="lead-title">Mejor match' in html

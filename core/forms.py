@@ -6,7 +6,7 @@ from django import forms
 from django.core.validators import URLValidator
 from pydantic import ValidationError
 
-from prospecting.models import Campaign, CampaignFilters, ChannelType
+from prospecting.models import Campaign, CampaignFilters
 from prospecting.pipeline import AuthorizationInput, provider_operations
 from core.presentation import label
 
@@ -85,9 +85,19 @@ class ReviewForm(forms.Form):
 
 class ConfirmationForm(forms.Form):
     contact_id = forms.UUIDField(widget=forms.HiddenInput)
-    channel_type = forms.ChoiceField(choices=[(value, label(value)) for value in ChannelType], widget=forms.HiddenInput)
-    channel_value = forms.CharField(max_length=2048, widget=forms.HiddenInput)
+    channel = forms.ChoiceField(label="Canal")
     reason = forms.CharField(label="Notas de comprobación", max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, channels=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["channel"].choices = [(f"{item.type}:{item.value}", f"{label(item.type)}: {item.value}")
+                                          for item in channels if item.normalized_status != "invalid"]
+
+    def clean(self):
+        cleaned = super().clean()
+        if "channel" in cleaned:
+            cleaned["channel_type"], _, cleaned["channel_value"] = cleaned["channel"].partition(":")
+        return cleaned
 
 
 class EmploymentConfirmationForm(forms.Form):
