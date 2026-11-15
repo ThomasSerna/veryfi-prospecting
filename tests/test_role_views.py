@@ -48,10 +48,11 @@ def test_campaign_taxonomy_is_isolated_in_view_html_and_csv(tmp_path):
     case = SimpleNamespace(path=path, campaign=other, tmp_path=tmp_path)
     html = page(case, "webapp:company", company_id=original.company.id)
     assert person.contact.name in html and "Cargo pendiente" in html
-    assert "<dt>Función pertinente</dt><dd>Pendiente</dd>" in html
+    pending_role = '<dd>Cargo pendiente <span class="pending-tag">Pendiente</span></dd>'
+    assert pending_role in html and "0 / 55" in html
     original_case = SimpleNamespace(path=path, campaign=campaign, tmp_path=tmp_path)
     original_html = page(original_case, "webapp:company", company_id=original.company.id)
-    assert "<dt>Función pertinente</dt><dd>Sí</dd>" in original_html
-    assert "<dt>Función pertinente</dt><dd>Pendiente</dd>" not in original_html
+    assert "<dd>Cargo elegido en la calificación</dd>" in original_html and "55 / 55" in original_html
+    assert pending_role not in original_html
     with Database(path) as database:
         assert database.get_contact(person.contact.id) == stored

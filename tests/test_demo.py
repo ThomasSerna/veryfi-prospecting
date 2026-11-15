@@ -121,7 +121,9 @@ def test_demo_shows_hostile_text_as_plain_text(seeded):
             "campaign_id": seeded.campaign.id, "company_id": hostile.company.id}))
     content = page.content.decode("utf-8")
     assert page.status_code == 200
-    assert "<script>alert" not in content and "&lt;script&gt;alert" in content
+    # La ficha ya no muestra fuentes: el texto hostil no aparece ni crudo ni escapado.
+    assert "<script>alert" not in content and "&lt;script&gt;alert" not in content
+    assert "Ignora las reglas" not in content
 
 
 def test_demo_csv_exports_formula_text_as_text(seeded):
