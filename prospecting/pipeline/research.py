@@ -7,14 +7,14 @@ from pydantic import Field
 
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
-from prospecting.discovery import expansion_query, extract_query, identity_extract_query
+from prospecting.discovery import expansion_query, extract_query, identity_extract_query, open_expansion_query
 from prospecting.models import BusinessStatus, Contract, Money, Text, utc_now
 from prospecting.pipeline.calls import call_free_credit, extract_failure_attempts, grant_for, was_sent
 from prospecting.providers import ProviderClient, ProviderError
 from prospecting.providers.tavily import (
     EXTRACT_OPERATION, PROVIDER, SEARCH_CREDITS, SEARCH_OPERATION, TavilyExtractResponse, TavilySearchResponse,
     classify_tavily_error, company_search_evidence, company_search_request, extract_credits, extract_request,
-    parse_extract,
+    open_company_search_request, parse_extract,
 )
 from prospecting.sources import is_non_business, is_search_evidence, is_search_hit, url_host, within_domain
 
@@ -196,12 +196,19 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
         report["request_ids"].append(usage.request_id)
         return (usage, result), None
 
-    if db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_QUERIES_KEY, 0) < effort.web_queries:
-        request = company_search_request(company, expansion_query(company, campaign), account_ref)
+    # Primera búsqueda: el propio dominio. Segunda, si el nivel la permite: la web abierta, donde suelen estar
+    # las promociones y programas de una marca.
+    searches = [
+        lambda: (company_search_request(company, expansion_query(company, campaign), account_ref), False),
+        lambda: (open_company_search_request(open_expansion_query(company, campaign), account_ref), True),
+    ]
+    while (sent := db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_QUERIES_KEY, 0)) < min(
+            effort.web_queries, len(searches)):
+        request, open_web = searches[sent]()
         done, pending = call(request, TavilySearchResponse, SEARCH_CREDITS, SEARCH_OPERATION)
         if pending is not None:
             return pending
-        facts = company_search_evidence(company, done[1].data, done[0].request_id, utc_now())
+        facts = company_search_evidence(company, done[1].data, done[0].request_id, utc_now(), open_web=open_web)
         _checkpoint(db, campaign_id, company_id, attempts={EXPANSION_QUERIES_KEY: 1},
                     consumed={"web_queries": 1}, facts=facts)
         report["evidence_ids"] += [item.id for item in facts]
@@ -214,9 +221,13 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
                   key=lambda item: (-item.retrieved_at.timestamp(), _rank(item), str(item.url)))
     urls = list(dict.fromkeys(
         str(item.url) for item in hits if str(item.url) not in read and url_host(str(item.url)) is not None
-        and within_domain(url_host(str(item.url)), company.domain)))
-    left = effort.pages - db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_PAGES_KEY, 0)
-    urls = urls[:max(0, left)]
+        and not is_non_business(url_host(str(item.url)))))
+    own = [url for url in urls if within_domain(url_host(url), company.domain)]
+    others = [url for url in urls if url not in own]
+    left = max(0, effort.pages - db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_PAGES_KEY, 0))
+    # Las páginas de terceros no desplazan del todo a las propias: cada grupo conserva al menos una plaza.
+    reserved = others[:max(0, left - 1)] if own else others[:left]
+    urls = (reserved + own + others[len(reserved):])[:left]
     if not urls:
         return ResearchReport(**base, **report, status="researched",
                               stop_reason="no_new_sources" if left > 0 else "page_limit")

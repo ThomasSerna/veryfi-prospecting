@@ -35,7 +35,7 @@ def test_v5_requires_cited_profiles_and_keeps_shared_products_separate(scenario,
     schema = payload["output_config"]["format"]["schema"]
     assert "profile_matches" in schema["required"]
     assert "expense_reimbursement" in payload["system"] and "payments_ap_erp" in payload["system"]
-    assert "haiku_assessment_v5" in payload["system"]
+    assert "haiku_assessment_v6" in payload["system"]
     parsed = parse_output(profile_output(case), "end_turn", campaign=case.campaign)
     result = validate_output(parsed, supplied, case.campaign, company=case.company)
     assert result["document_need"].value == 1

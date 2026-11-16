@@ -707,6 +707,38 @@ def test_expansion_searches_own_domain_once_and_extracts_new_own_pages(tavily):
     assert len(case.calls) == calls
 
 
+def test_expansion_also_searches_the_open_web_and_reads_third_party_pages_that_name_the_company(tavily, role_config):
+    case, company_id = expansion_case(tavily, config_snapshot=role_config)
+    own = expansion_search("nueva-uno.example", paths=("facturas",))
+
+    def search(payload):
+        if "include_domains" in payload or "country" in payload:
+            return own(payload)
+        return {"results": [
+            {"url": "https://promo-sintetica.example/bases", "title": "Promoción de Nueva Uno", "content": "Registra tu ticket."},
+            {"url": "https://ajena.example/nota", "title": "Otra empresa", "content": "No nombra a la empresa."},
+            {"url": "https://www.facebook.com/nuevauno", "title": "Nueva Uno", "content": "Nueva Uno en redes."},
+        ], "usage": {"credits": 1}, "request_id": "web-abierta-sintetica"}
+
+    case.search = search
+    calls = len(case.calls)
+    report = research(case, company_id)
+    assert [operation for operation, _ in case.calls[calls:]] == ["search", "search", "extract"]
+    restricted, open_web, extracted = (payload for _, payload in case.calls[calls:])
+    assert restricted["include_domains"] == ["nueva-uno.example"]
+    assert "include_domains" not in open_web and open_web["query"].startswith('"Nueva Uno" ')
+    # La página de terceros que nombra a la empresa se lee junto a la propia; la ajena y la red social, no.
+    assert extracted["urls"][0] == "https://promo-sintetica.example/bases"
+    assert "https://nueva-uno.example/facturas" in extracted["urls"]
+    assert not any("ajena.example" in url or "facebook.com" in url for url in extracted["urls"])
+    assert report.status == "researched"
+    third_party = [fact for fact in case.db.list_evidence(company_id)
+                   if "promo-sintetica.example" in str(fact.url) and not is_search_hit(fact)]
+    assert third_party and all(fact.source_type == "secondary" and fact.kind == "observed" for fact in third_party)
+    item = case.db.get_run_item(case.campaign.id, company_id)
+    assert item.attempts["research:web_queries"] == 2
+
+
 def test_expansion_extracts_the_unread_page_that_located_the_company(tavily):
     case = tavily.setup()
     case.search = fixed_search

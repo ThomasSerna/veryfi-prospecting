@@ -20,7 +20,7 @@ from prospecting.text import clip
 
 PROMPT_VERSION = "haiku_assessment_v3"
 ENTERPRISE_PROMPT_VERSION = "haiku_assessment_v4"
-PROFILE_PROMPT_VERSION = "haiku_assessment_v5"
+PROFILE_PROMPT_VERSION = "haiku_assessment_v6"
 SEARCH_RESULT_CLAIM = ("La página apareció en una búsqueda web; el extracto es el resumen del buscador "
                        "y no confirma hechos de la empresa.")
 CLAIM_CHARS = 300
@@ -320,7 +320,10 @@ Escala enterprise (haiku_assessment_v4):
                     for profile in campaign.config_snapshot.profiles if profile.segment in campaign.segments]
         system += """
 
-Perfiles respaldados (haiku_assessment_v5):
+Perfiles respaldados (haiku_assessment_v6):
+- La evidencia con source_type secondary viene de páginas de terceros (prensa, micrositios de promociones,
+  bases legales). Úsala solo si nombra a la empresa evaluada o a una de sus marcas; no la atribuyas a una
+  empresa homónima ni a un retailer que solo aparece como punto de venta.
 - profile_matches contiene únicamente perfiles cuyo caso de uso está demostrado en la evidencia de esta empresa.
 - Cada perfil necesita citations con evidence_id y quote literal del fragmento o claim suministrado.
   No basta la industria, un producto compartido, un cargo sugerido ni el resumen de un buscador.

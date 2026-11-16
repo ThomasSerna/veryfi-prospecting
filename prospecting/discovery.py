@@ -547,3 +547,22 @@ def expansion_query(company: Company, campaign: Campaign) -> str:
     segments = [segment for segment in campaign.segments if segment in (company.segments or campaign.segments)]
     countries = [COUNTRIES[country][0] for country in campaign.countries if country in COUNTRIES]
     return clip(" ".join([company.name, *(RESEARCH_TERMS[segment] for segment in segments), *countries]), 400)
+
+
+def open_expansion_query(company: Company, campaign: Campaign) -> str:
+    """Consulta de la ampliación en la web abierta: el nombre exacto de la empresa y las señales del segmento.
+
+    Las promociones y programas de una marca suelen vivir fuera de su dominio corporativo (micrositios,
+    bases legales, prensa); la búsqueda restringida al dominio no los encuentra.
+    """
+    segments = [segment for segment in campaign.segments if segment in (company.segments or campaign.segments)]
+    countries = [COUNTRIES[country][0] for country in campaign.countries
+                 if country in COUNTRIES and country in (company.operating_countries or campaign.countries)]
+    return clip(" ".join([f'"{company.name}"', *(RESEARCH_TERMS[segment] for segment in segments), *countries]), 400)
+
+
+def names_company(company: Company, text: str | None) -> bool:
+    """El texto nombra a la empresa (nombre, entidad o alias) como palabras completas."""
+    folded = f" {plain(text or '')} "
+    names = [plain(value) for value in (company.name, company.entity_name, *(company.aliases or [])) if value]
+    return any(len(name.replace(" ", "")) >= 3 and f" {name} " in folded for name in names)
