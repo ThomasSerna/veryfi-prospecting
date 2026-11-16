@@ -75,7 +75,7 @@ class CampaignForm(forms.Form):
                                         target_accounts=accounts),
                 # Con cuentas objetivo se investigan exactamente esas: el máximo es su número.
                 max_companies=len(accounts) or cleaned["max_companies"], config_snapshot=self.config,
-                rubric_version="rubric_v1",
+                rubric_version="rubric_v2",
             )
         except ValidationError:
             raise forms.ValidationError("Revisa los criterios, las cuentas objetivo (sin dominios repetidos y con "

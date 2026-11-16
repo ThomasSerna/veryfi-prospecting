@@ -80,7 +80,7 @@ def test_one_candidate_is_enriched_and_reported_below_target(contact_case, role_
     report = case.find()
     assert enriched_ids(case) == ["persona-sintetica-0"] and report.stop_reason == "contact_plan_exhausted"
     result = progress(case)
-    assert (result.candidates, result.relevant, result.ready, result.target) == (1, 1, 0, 3)
+    assert (result.candidates, result.relevant, result.ready, result.target) == (1, 1, 1, 3)
 
 
 def test_three_people_of_two_functions_reach_the_target(contact_case, role_config):

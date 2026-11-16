@@ -388,7 +388,12 @@ def validate_contact(contact: Contact, company: Company, assessment: Assessment,
     if contact.geographic_scope and (not _valid_refs(contact.provenance.get("geographic_scope", []), contact, evidence)
                                      or not _scope_covers(contact.geographic_scope, company)):
         return False
-    return employment_status(contact, company, evidence, limits, now).state == "corporate_evidence"
+    status = employment_status(contact, company, evidence, limits, now)
+    if status.state == "corporate_evidence":
+        return True
+    # `employment_policy_v2`: Apollo declara el empleo actual en un enriquecimiento vigente y nada lo contradice.
+    return (limits.freshness.employment_policy is not None and status.state == "provider_claim"
+            and status.origin == "apollo")
 
 
 def _scope_covers(scope: str, company: Company) -> bool:

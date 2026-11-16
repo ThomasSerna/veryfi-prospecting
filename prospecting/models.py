@@ -417,6 +417,10 @@ class FreshnessLimits(Contract):
     # T28: con `channel_policy_v2`, un correo `provider_verified` de Apollo sirve `email_days` desde la
     # consulta. Ausente o None (instantáneas anteriores): el correo de Apollo sigue pendiente.
     channel_policy: Literal["channel_policy_v2"] | None = None
+    # Con `employment_policy_v2`, el empleo actual que Apollo declara al enriquecer (coincidencia alta, misma
+    # organización y dominio) basta para dejar lista a la persona durante `cache.contact_days`; se muestra como
+    # declarado por Apollo. Una contradicción sigue bloqueando. Ausente: solo la evidencia del puesto habilita.
+    employment_policy: Literal["employment_policy_v2"] | None = None
 
 
 class EmployeeRange(Contract):

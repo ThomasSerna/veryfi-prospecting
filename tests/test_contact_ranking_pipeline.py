@@ -43,7 +43,8 @@ def test_v2_score_selects_enrichment_independently_of_search_order(contact_case,
         case.people.reverse()
     report = case.find()
     assert enriched_ids(case) == ["persona-sintetica-1", "persona-sintetica-0"]
-    assert report.status == "checked" and progress(case).relevant == 2 and progress(case).ready == 0
+    # `employment_policy_v2`: el empleo que Apollo declara al enriquecer deja lista a la persona con canal.
+    assert report.status == "checked" and progress(case).relevant == 2 and progress(case).ready == 2
     count, usage = len(case.calls), case.db.list_usage()
     assert case.find().status == "already_checked" and len(case.calls) == count
     assert case.db.list_usage() == usage

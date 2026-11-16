@@ -267,3 +267,22 @@ def test_hunter_history_is_invisible_to_an_apollo_campaign(case, make_hunter_con
     selected, kept = contact_context(case.campaign, [contact], facts)
     assert selected == [] and not any(item.provider == "hunter" for item in kept)
     assert status(case, contact, kept).state == "unknown"
+
+
+def test_employment_policy_v2_makes_a_current_apollo_claim_ready_unless_contradicted_or_expired(case):
+    contact, facts = apollo_person(case)
+    limits = case.limits
+    policy = limits.model_copy(update={"freshness": limits.freshness.model_copy(update={
+        "channel_policy": "channel_policy_v2", "employment_policy": "employment_policy_v2"})})
+    args = (contact, case.company, case.assessment, facts)
+    assert employment_status(contact, case.company, facts, policy, NOW).state == "provider_claim"
+    # Sin la política, solo la evidencia del puesto habilita; con ella, basta la afirmación vigente de Apollo.
+    assert not validate_contact(*args, limits, NOW, [TITLE])
+    assert validate_contact(*args, policy, NOW, [TITLE])
+    assert derive_readiness(case.assessment, [contact], facts, policy, NOW, case.company, [TITLE]) == "ready_preferred"
+    expired = NOW + timedelta(days=policy.cache.contact_days + 1)
+    assert not validate_contact(*args, policy, expired, [TITLE])
+    departure = page(case, f"{NAME} dejó la empresa.", contact_id=contact.id)
+    assert not validate_contact(contact, case.company, case.assessment, facts + [departure], policy, NOW, [TITLE])
+    assert derive_readiness(case.assessment, [contact], facts + [departure], policy, NOW, case.company,
+                            [TITLE]) != "ready_preferred"

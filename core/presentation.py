@@ -86,7 +86,7 @@ EMPLOYMENT_LABELS = {
     "corporate_evidence": "Vigente según fuente corporativa o pública",
     # T23: ventas comprobó el puesto en la fuente que cita; vence según `cache.contact_days`.
     "corporate_evidence:manual": "Confirmado manualmente por ventas",
-    "provider_claim:apollo": "Declarado por Apollo; sin evidencia del puesto",
+    "provider_claim:apollo": "Declarado por Apollo; confírmalo antes de contactar",
     "provider_claim:hunter": "Inferido del historial de Hunter; sin evidencia del puesto",
     "contradicted": "Contradicho por una fuente",
     "unknown": "Sin comprobar",

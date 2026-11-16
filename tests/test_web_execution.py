@@ -206,7 +206,7 @@ def test_approved_execution_uses_new_budget_session_and_displays_saved_results(
         db.save_campaign(run.campaign.model_copy(update={"status": CampaignStatus.RUNNING}))
         db.save_company(company, evidence=evidence)
         item = db.save_run_item(RunItem(campaign_id=campaign_id, company_id=company.id, stage="completed"))
-        assessment = make_assessment(campaign_id, company.id, priority="low")
+        assessment = make_assessment(campaign_id, company.id, priority="low", rubric_version=run.campaign.rubric_version)
         db.save_assessment(assessment)
         db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id,
                                                "business_status": BusinessStatus.LOW_FIT}))

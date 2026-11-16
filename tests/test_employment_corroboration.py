@@ -210,7 +210,9 @@ def test_resume_does_not_repeat_the_targeted_search_extract_or_haiku(contact_cas
 
 def test_targeted_search_without_results_keeps_the_provider_claim(contact_case, role_config):
     case = scenario(contact_case, role_config, ["Head of Product"])
-    assert case.find(**case.public).business_status == "qualified_no_contact"
+    # Sin corroboración pública la persona sigue lista por `employment_policy_v2`, como declarada por Apollo.
+    assert case.find(**case.public).business_status == "ready_preferred"
+    assert person(case, "Persona Sintética Uno")[1].state == "provider_claim"
     assert len(targeted(case)) == 1 and "extract" not in [operation for operation, _, _ in case.calls][-1:]
     contact, status = person(case, "Persona Sintética Uno")
     assert (status.state, status.reason) == ("provider_claim", "provider_claim_only")
@@ -275,7 +277,7 @@ def test_secondary_page_without_date_stays_pending_for_review(contact_case, role
     case.hits = {"Persona Sintética Uno": hit(case, "Persona Sintética Uno",
                                               f"Persona Sintética Uno es Head of Product de {case.company.name}.",
                                               url="https://prensa-sintetica.example/nota")}
-    assert case.find(**case.public).business_status == "qualified_no_contact"
+    assert case.find(**case.public).business_status == "ready_preferred"
     _, status = person(case, "Persona Sintética Uno")
     assert (status.state, status.reason, status.review_required) == ("provider_claim", "undated_source", True)
 
@@ -353,7 +355,8 @@ def test_company_page_deemphasizes_corroboration_but_preserves_its_result_in_csv
     [result] = [item for item in view.companies if item.company.id == case.company.id]
     assert result.contacts[0].employment_corroboration == "searched_not_corroborated"
     [row] = csv.DictReader(StringIO(export_csv(view, include_all=True).decode("utf-8-sig")))
-    assert row["employment_corroboration"] == "searched_not_corroborated" and row["contact_ready"] == "False"
+    assert row["employment_corroboration"] == "searched_not_corroborated" and row["contact_ready"] == "True"
+    assert row["employment_status"] == "provider_claim"
 
 
 def test_summary_and_command_measure_conversion_and_cost_without_personal_data(contact_case, role_config, tmp_path):
