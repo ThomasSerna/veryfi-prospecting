@@ -409,6 +409,9 @@ def validate_snapshot(snapshot, case, label):
                                 all_evidence=[fact for fact in facts if fact.retrieved_at <= assessment.created_at])
             except QualificationError as error:
                 raise ValueError("Los perfiles o citas de la evaluación no corresponden al caso congelado.") from error
+            # La validación descarta los perfiles sin respaldo: uno guardado que ya no lo supera invalida el caso.
+            if len(saved_output.profile_matches) != len(assessment.profile_matches):
+                raise ValueError("Los perfiles o citas de la evaluación no corresponden al caso congelado.")
         cited = {ref for criterion in assessment.criteria.values() for ref in criterion.evidence_ids}
         if snapshot.selected_evidence_ids is not None and not cited <= set(snapshot.selected_evidence_ids):
             raise ValueError("La evaluación cita evidencia que no se envió.")

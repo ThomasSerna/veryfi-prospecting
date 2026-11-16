@@ -72,14 +72,15 @@ def test_v5_rejects_profiles_outside_company_and_campaign(scenario, role_config,
     ({"contradiction_ids": [uuid4()]}, None, "contradicted_profile"),
 ])
 def test_v5_rejects_unbacked_profile_citations(scenario, role_config, source_changes, quote, reason):
+    """El perfil sin respaldo (`reason`) se descarta sin perder la evaluación: sin perfil no se buscan personas."""
     case = with_taxonomy(scenario, role_config)
     source = case.primary.model_copy(update=source_changes)
     parsed = parse_output(profile_output(case, citations=[{
         "evidence_id": str(source.id), "quote": quote or source.excerpt,
     }]), "end_turn", campaign=case.campaign)
-    with pytest.raises(QualificationError) as error:
-        validate_output(parsed, [source], case.campaign, company=case.company)
-    assert error.value.code == reason
+    assert len(parsed.profile_matches) == 1
+    validate_output(parsed, [source], case.campaign, company=case.company)
+    assert parsed.profile_matches == []
 
 
 def test_v5_rejects_unknown_search_and_inbound_contradictions(scenario, role_config):
@@ -87,22 +88,23 @@ def test_v5_rejects_unknown_search_and_inbound_contradictions(scenario, role_con
     parsed = parse_output(profile_output(case, citations=[{
         "evidence_id": str(uuid4()), "quote": case.primary.excerpt,
     }]), "end_turn", campaign=case.campaign)
-    with pytest.raises(QualificationError) as error:
-        validate_output(parsed, [case.primary], case.campaign, company=case.company)
-    assert error.value.code == "unknown_evidence"
+    validate_output(parsed, [case.primary], case.campaign, company=case.company)
+    assert parsed.profile_matches == []
     hit = search_hit(case)
     parsed = parse_output(profile_output(case, citations=[{
         "evidence_id": str(hit.id), "quote": hit.excerpt,
     }]), "end_turn", campaign=case.campaign)
-    with pytest.raises(QualificationError) as error:
-        validate_output(parsed, [case.primary, hit], case.campaign, company=case.company)
-    assert error.value.code == "unsupported_profile"
+    validate_output(parsed, [case.primary, hit], case.campaign, company=case.company)
+    assert parsed.profile_matches == []
     conflict = case.primary.model_copy(update={"id": uuid4(), "contradiction_ids": [case.primary.id]})
     parsed = parse_output(profile_output(case), "end_turn", campaign=case.campaign)
-    with pytest.raises(QualificationError) as error:
-        validate_output(parsed, [case.primary], case.campaign, company=case.company,
-                        all_evidence=[case.primary, conflict])
-    assert error.value.code == "contradicted_profile"
+    validate_output(parsed, [case.primary], case.campaign, company=case.company,
+                    all_evidence=[case.primary, conflict])
+    assert parsed.profile_matches == []
+    # Un perfil con cita literal de evidencia observada de la empresa sí se conserva.
+    parsed = parse_output(profile_output(case), "end_turn", campaign=case.campaign)
+    validate_output(parsed, [case.primary], case.campaign, company=case.company)
+    assert len(parsed.profile_matches) == 1
 
 
 def test_v5_keeps_dense_evidence_inside_existing_token_budget(scenario, role_config):

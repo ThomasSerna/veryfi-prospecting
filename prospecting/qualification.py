@@ -456,19 +456,12 @@ def validate_output(output: HaikuAssessment, supplied: list[Evidence],
         conflicts = {reference for item in (all_evidence if all_evidence is not None else supplied)
                      if item.company_id == company.id for reference in item.contradiction_ids}
         conflicts.update(output.contradiction_evidence_ids)
-        for match in output.profile_matches:
-            for citation in match.citations:
-                source = by_id.get(citation.evidence_id)
-                if source is None:
-                    raise QualificationError("unknown_evidence", "Haiku citó evidencia de perfil que no se le suministró.")
-                if (source.company_id != company.id or source.contact_id is not None or source.kind != "observed"
-                        or source.source_type == "manual" or is_search_evidence(source)):
-                    raise QualificationError("unsupported_profile", "El perfil necesita evidencia observada de la empresa, no de personas o búsquedas.")
-                if source.contradiction_ids or source.id in conflicts:
-                    raise QualificationError("contradicted_profile", "El perfil cita evidencia con contradicciones pendientes.")
-                if not any(citation.quote in text for text in (clip(source.excerpt, EXCERPT_CHARS) or "",
-                                                               clip(source.claim, CLAIM_CHARS) or "")):
-                    raise QualificationError("unsupported_quote", "La cita del perfil no aparece literalmente en la evidencia suministrada.")
+        # Un perfil con una cita sin respaldo se descarta; los criterios, que citan su propia evidencia, se
+        # conservan. Antes una sola cita inválida dejaba pendiente toda la evaluación de la empresa (lote real
+        # del 2026-11-16) y, como la solicitud ya enviada no se repite, la empresa no volvía a evaluarse.
+        output.profile_matches = [match for match in output.profile_matches
+                                  if all(_citation_backed(citation, by_id, company, conflicts)
+                                         for citation in match.citations)]
     if any(item.value == 1 and item.evidence_ids
            and all(is_search_hit(by_id[evidence_id]) for evidence_id in item.evidence_ids)
            for item in output.criteria.values()):
@@ -484,6 +477,20 @@ def validate_output(output: HaikuAssessment, supplied: list[Evidence],
         }
     except ValueError:
         raise QualificationError("unsupported_value", "Un criterio conocido no cita evidencia.") from None
+
+
+def _citation_backed(citation, by_id: dict[UUID, Evidence], company: Company, conflicts: set[UUID]) -> bool:
+    """Cita literal de evidencia observada de la empresa: suministrada, sin contradicciones, ni de personas ni de búsquedas."""
+    source = by_id.get(citation.evidence_id)
+    if source is None:
+        return False
+    if (source.company_id != company.id or source.contact_id is not None or source.kind != "observed"
+            or source.source_type == "manual" or is_search_evidence(source)):
+        return False
+    if source.contradiction_ids or source.id in conflicts:
+        return False
+    return any(citation.quote in text for text in (clip(source.excerpt, EXCERPT_CHARS) or "",
+                                                   clip(source.claim, CLAIM_CHARS) or ""))
 
 
 def primary_support(criteria: dict[str, Criterion], evidence: list[Evidence]) -> bool:
