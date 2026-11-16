@@ -42,6 +42,11 @@
       {% include 'components/_field.html' with field=form.max_companies %}
       </div>
       </fieldset>
+      <fieldset class="preparation-section">
+      <legend>Cuentas objetivo</legend>
+      <p class="muted">Si ya sabes qué empresas quieres investigar, indícalas aquí.</p>
+      {% include 'components/_field.html' with field=form.target_accounts %}
+      </fieldset>
       <fieldset class="preparation-section preparation-summary">
       <legend>Resumen</legend>
       <dl class="preparation-preview">

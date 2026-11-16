@@ -184,6 +184,23 @@ def test_prepare_criteria_and_refresh_preserve_one_campaign(ui_paths, client):
         assert db.list_campaigns() == campaigns and db.list_usage() == []
 
 
+def test_prepare_with_target_accounts_saves_them_and_sets_the_maximum_to_their_number(ui_paths, client):
+    response = prepare(client, countries=["CO", "MX"], segments=["cpg_loyalty"], max_companies="20",
+                       target_accounts="consumo-sintetico.example, Consumo Sintético, MX\npagos-sinteticos.example")
+    assert response.status_code == 302
+    with Database(ui_paths.db) as db:
+        campaign = db.list_campaigns()[0]
+        assert campaign.max_companies == 2 and db.list_usage() == []
+        assert [(item.domain, item.name, item.countries) for item in campaign.filters.target_accounts] == [
+            ("consumo-sintetico.example", "Consumo Sintético", ["MX"]), ("pagos-sinteticos.example", None, [])]
+
+
+def test_invalid_target_account_names_its_line_without_creating_a_campaign(ui_paths, client):
+    response = prepare(client, target_accounts="valida.example\nno es un dominio")
+    assert response.status_code == 400 and "línea 2" in text(response)
+    assert not ui_paths.db.exists()
+
+
 @pytest.mark.parametrize("status", ["running", "paused_budget"])
 def test_unfinished_active_campaign_is_announced_and_blocks_preparing_another(ui_paths, client, make_campaign, status):
     active = make_campaign(status=status)

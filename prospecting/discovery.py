@@ -23,6 +23,7 @@ from prospecting.models import (
     IcpEnterpriseConfig,
     IcpReferenceCompany,
     Segment,
+    TargetAccount,
     Text,
     UtcDatetime,
 )
@@ -464,6 +465,36 @@ def build_company(candidate: Candidate) -> tuple[Company, list[Evidence]]:
         provenance={"name": [name_evidence.id], "domain": [item.id for item in hit_evidence]},
     )
     return company, [*hit_evidence, name_evidence]
+
+
+# Cuentas objetivo declaradas por el usuario. Identificadores persistidos (docs/persistence.md).
+TARGET_ACCOUNT_PROVIDER = "target_account"
+TARGET_ACCOUNT_REFERENCE = "target-account:"
+
+
+def is_target_account(item: Evidence) -> bool:
+    """Declaración manual de una cuenta objetivo; fija a quién investigar, no prueba su encaje."""
+    return (item.source_type == "manual" and item.provider == TARGET_ACCOUNT_PROVIDER
+            and (item.external_reference or "").startswith(TARGET_ACCOUNT_REFERENCE))
+
+
+def build_target_company(account: TargetAccount, campaign: Campaign) -> tuple[Company, list[Evidence]]:
+    """Empresa de una cuenta objetivo, respaldada por la declaración de quien prepara la campaña.
+
+    La identidad (`assess_identity`) toma de esa declaración el país y los segmentos de la campaña.
+    """
+    company_id = uuid4()
+    name = account.name or domain_label(account.domain).replace("-", " ").title()
+    declared = Evidence(
+        company_id=company_id, kind="observed", source_type="manual", provider=TARGET_ACCOUNT_PROVIDER,
+        external_reference=f"{TARGET_ACCOUNT_REFERENCE}{campaign.id}:{account.domain}",
+        retrieved_at=campaign.created_at,
+        claim=clip(f"Cuenta objetivo declarada al preparar la campaña: {name} ({account.domain}), "
+                   f"país {', '.join(account.countries or campaign.countries)}.", 600),
+    )
+    company = Company(id=company_id, name=name, domain=account.domain,
+                      provenance={"name": [declared.id], "domain": [declared.id]})
+    return company, [declared]
 
 
 def extract_query(campaign: Campaign) -> str:

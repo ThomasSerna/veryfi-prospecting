@@ -8,8 +8,8 @@ from pydantic import Field
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.discovery import (
-    Candidate, CombinationReport, PlannedQuery, build_company, build_hit_evidence, build_search_queries, group_candidates,
-    policy_discard_reason, select_candidates,
+    Candidate, CombinationReport, PlannedQuery, build_company, build_hit_evidence, build_search_queries,
+    build_target_company, group_candidates, policy_discard_reason, select_candidates,
 )
 from prospecting.identity import (
     ExclusionList, ExclusionMatch, ExclusionStatus, IdentityDecision, assess_identity, exclusion_evidence,
@@ -136,6 +136,45 @@ def _known_companies(db: Database) -> list[Company]:
     return list(companies.values())
 
 
+def _add_target_accounts(db: Database, campaign: Campaign, exclusions: ExclusionList | None) -> DiscoveryReport:
+    """Guarda las cuentas objetivo de la campaña como empresas, sin buscar en la web ni llamar a proveedores.
+
+    Una cuenta excluida por dominio no ocupa plaza. Una empresa ya confirmada con el mismo dominio se
+    reutiliza: en una cuenta objetivo el dominio declarado es la identidad.
+    """
+    known = {item.domain: item for item in _known_companies(db)
+             if item.identity_status == IdentityStatus.CONFIRMED and item.domain is not None}
+    excluded, company_ids, reused = [], [], []
+    with db.transaction():
+        for account in campaign.filters.target_accounts:
+            countries = account.countries or list(campaign.countries)
+            match = match_exclusion(account.domain, [account.name], countries, exclusions)
+            if match is not None and match.strength == "confirmed":
+                excluded.append(ExcludedCandidate(host=account.domain, exclusion=match))
+                continue
+            company, evidence = build_target_company(account, campaign)
+            existing = known.get(account.domain)
+            if existing is None:
+                db.save_company(company, evidence=evidence)
+                company_id = company.id
+            else:
+                company_id = existing.id
+                for fact in evidence:
+                    db.save_evidence(fact.model_copy(update={"company_id": company_id}))
+                reused.append(company_id)
+            if match is not None:
+                db.save_evidence(exclusion_evidence(company_id, match, exclusions))
+            db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company_id,
+                                     stop_reason=None if match is None else "exclusion_review"))
+            company_ids.append(company_id)
+    return DiscoveryReport(
+        campaign_id=campaign.id, queries=[], raw_hits=0, candidates=len(campaign.filters.target_accounts),
+        discarded={"excluded_account": len(excluded)} if excluded else {}, selected_company_ids=company_ids,
+        combinations=[], exclusions_status=exclusions_status(exclusions), excluded=excluded,
+        reused_company_ids=reused,
+    )
+
+
 def run_discovery(db: Database, budget: Budget, client: ProviderClient, campaign_id: UUID, *,
                   account_ref: str, authorization: SpendingAuthorization | None,
                   deadline: float | None = None,
@@ -147,8 +186,11 @@ def run_discovery(db: Database, budget: Budget, client: ProviderClient, campaign
     campaign = db.get_campaign(campaign_id)
     if campaign is None:
         raise ValueError("La campaña no existe.")
-    planned = build_search_queries(campaign)
+    accounts = campaign.filters.target_accounts
+    planned = [] if accounts else build_search_queries(campaign)
     status = exclusions_status(exclusions)
+    if accounts and not db.list_run_items(campaign_id):
+        return _add_target_accounts(db, campaign, exclusions)
     if db.list_run_items(campaign_id):
         return DiscoveryReport(
             campaign_id=campaign_id, raw_hits=0, candidates=0, discarded={},

@@ -593,8 +593,33 @@ class VeryfiConfig(Contract):
         return self
 
 
+class TargetAccount(Contract):
+    """Cuenta objetivo que el usuario declara al preparar la campaña: dominio, y opcionalmente nombre y país.
+
+    Es una declaración manual, no un hecho observado: confirma a quién investigar, no su encaje.
+    Sin países propios se toman los de la campaña.
+    """
+
+    domain: Text
+    name: Text | None = None
+    countries: Annotated[list[CountryCode], AfterValidator(_unique)] = Field(default_factory=list)
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str) -> str:
+        domain = _domain(value)
+        return domain[4:] if domain.startswith("www.") and domain.count(".") > 1 else domain
+
+
 class CampaignFilters(Contract):
     keywords: list[Text] = Field(default_factory=list)
+    # Con cuentas objetivo la campaña investiga exactamente esas empresas y no busca otras en la web.
+    target_accounts: Annotated[list[TargetAccount], Field(max_length=20)] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_accounts(self) -> Self:
+        _unique([account.domain for account in self.target_accounts])
+        return self
 
 
 def _validate_limit_reduction(limits: dict, defaults: dict) -> None:
@@ -631,6 +656,11 @@ class Campaign(Contract):
             raise ValueError("La campaña supera el máximo configurado de empresas.")
         if self.rubric_version not in self.config_snapshot.rubrics:
             raise ValueError("La rúbrica no existe en la configuración de campaña.")
+        accounts = self.filters.target_accounts
+        if len(accounts) > self.max_companies:
+            raise ValueError("Hay más cuentas objetivo que el máximo de empresas de la campaña.")
+        if any(not set(account.countries) <= set(self.countries) for account in accounts):
+            raise ValueError("Una cuenta objetivo declara un país ajeno a la campaña.")
         if self.limits is None:
             self.limits = CampaignLimits.model_validate({
                 name: getattr(defaults, name) for name in CampaignLimits.model_fields

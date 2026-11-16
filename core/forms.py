@@ -2,11 +2,12 @@
 
 from decimal import Decimal, ROUND_DOWN
 import os
+import re
 from django import forms
 from django.core.validators import URLValidator
 from pydantic import ValidationError
 
-from prospecting.models import Campaign, CampaignFilters
+from prospecting.models import Campaign, CampaignFilters, TargetAccount
 from prospecting.pipeline import AuthorizationInput, provider_operations
 from core.presentation import label
 
@@ -17,6 +18,22 @@ FUNDING_LABELS = {
 }
 
 
+def parse_target_accounts(text: str) -> list[TargetAccount]:
+    """Una cuenta por línea: `dominio, nombre, país`; acepta una URL pegada y conserva solo su host."""
+    accounts = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        parts = [part.strip() for part in line.split(",")]
+        if not any(parts):
+            continue
+        host = re.sub(r"^[a-z]+://", "", parts[0], flags=re.I).split("/")[0].split("?")[0]
+        try:
+            accounts.append(TargetAccount(domain=host, name=(parts[1] if len(parts) > 1 else "") or None,
+                                          countries=[part.upper() for part in parts[2:] if part]))
+        except ValidationError:
+            raise ValueError(f"Cuenta objetivo inválida en la línea {number}: usa dominio, nombre y país (CO o MX).") from None
+    return accounts
+
+
 class CampaignForm(forms.Form):
     draft_id = forms.UUIDField(widget=forms.HiddenInput)
     countries = forms.MultipleChoiceField(label="Países", widget=forms.CheckboxSelectMultiple)
@@ -24,6 +41,11 @@ class CampaignForm(forms.Form):
     keywords = forms.CharField(label="Palabras clave (opcional)", required=False, max_length=1000,
                               help_text="Separadas por comas.")
     max_companies = forms.IntegerField(label="Máximo de empresas", min_value=1, max_value=20)
+    target_accounts = forms.CharField(
+        label="Cuentas objetivo (opcional)", required=False, max_length=4000,
+        widget=forms.Textarea(attrs={"rows": 5, "placeholder": "empresa.com, Nombre de la empresa, MX"}),
+        help_text="Una por línea: dominio, nombre y país (CO o MX); el nombre y el país son opcionales. "
+                  "Con cuentas objetivo se investigan exactamente esas empresas, sin buscar otras en la web.")
 
     def __init__(self, *args, config, campaign_id, **kwargs):
         self.config, self.campaign_id = config, campaign_id
@@ -43,13 +65,21 @@ class CampaignForm(forms.Form):
         if cleaned["draft_id"] != self.campaign_id:
             raise forms.ValidationError("Este borrador cambió. Abre una nueva búsqueda y vuelve a preparar sus criterios.")
         try:
+            accounts = parse_target_accounts(cleaned["target_accounts"])
+        except ValueError as error:
+            raise forms.ValidationError(str(error)) from None
+        try:
             self.campaign = Campaign(
                 id=self.campaign_id, countries=cleaned["countries"], segments=cleaned["segments"],
-                filters=CampaignFilters(keywords=[word.strip() for word in cleaned["keywords"].split(",") if word.strip()]),
-                max_companies=cleaned["max_companies"], config_snapshot=self.config, rubric_version="rubric_v1",
+                filters=CampaignFilters(keywords=[word.strip() for word in cleaned["keywords"].split(",") if word.strip()],
+                                        target_accounts=accounts),
+                # Con cuentas objetivo se investigan exactamente esas: el máximo es su número.
+                max_companies=len(accounts) or cleaned["max_companies"], config_snapshot=self.config,
+                rubric_version="rubric_v1",
             )
         except ValidationError:
-            raise forms.ValidationError("Revisa los criterios y el máximo de empresas permitido.") from None
+            raise forms.ValidationError("Revisa los criterios, las cuentas objetivo (sin dominios repetidos y con "
+                                        "países de la campaña) y el máximo de empresas permitido.") from None
         return cleaned
 
 

@@ -11,7 +11,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import AfterValidator, Field, StrictStr, model_validator
 
-from prospecting.discovery import Candidate
+from prospecting.discovery import Candidate, is_target_account
 from prospecting.models import (
     Campaign,
     Company,
@@ -667,6 +667,20 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
             if found:
                 observed_name = observed_name or re.sub(r"\s+", " ", found.group(0))
                 name_ids.append(item.id)
+    # Cuenta objetivo: quien prepara la campaña declara el dominio, el país y el segmento; la declaración
+    # respalda lo que la página propia no nombre, y no sustituye la evidencia observada.
+    account = next((item for item in campaign.filters.target_accounts if item.domain == domain), None)
+    declared = [item.id for item in facts if is_target_account(item)] if account is not None else []
+    if declared:
+        for country in account.countries or campaign.countries:
+            if country not in countries:
+                countries.append(country)
+                country_ids += declared
+        for segment in campaign.segments:
+            if segment not in segments:
+                segments.append(segment)
+                segment_ids += declared
+        name_ids = name_ids or declared
     (
         entity_name,
         entity_name_ids,
@@ -712,7 +726,7 @@ def assess_identity(company: Company, evidence: list[Evidence], campaign: Campai
     if match is not None and match.strength == "confirmed":
         return IdentityDecision(status="excluded", stop_reason="excluded_account", exclusion=match, **base)
     for reason, failed in (
-        ("domain_unknown", domain is None), ("identity_unverified", not primary),
+        ("domain_unknown", domain is None), ("identity_unverified", not primary and not declared),
         ("name_unconfirmed", not name_ids), ("country_unconfirmed", not countries),
         ("exclusion_review", match is not None),
     ):
