@@ -57,11 +57,8 @@ contiene el botón y la marca Veryfi Prospecting. En la ficha, Volver a la campa
 y, cuando corresponda, Anterior y Siguiente están encima del encabezado y preservan
 los filtros.
 
-Las propuestas estáticas de [campaña](../static/prototypes/campaign.html) y
-[ficha](../static/prototypes/company.html) siguen disponibles en el servidor
-local bajo `/static/prototypes/` como referencia histórica. Contienen únicamente
-datos sintéticos y controles ilustrativos desactivados; no investigan ni guardan
-cambios. Las vistas operativas ya aplican la nueva dirección.
+Las propuestas estáticas de campaña y ficha que sirvieron para elegir la dirección
+visual se retiraron del repositorio; las vistas operativas ya la aplican.
 
 ## Preparar y ejecutar
 

@@ -95,9 +95,7 @@ revisión y contacto listo. Los topes se revisan al autorizar la investigación.
 La dirección oscura usa la paleta de Veryfi: navy, marfil, verde Veryfi y
 turquesa, con Sky, Gold y Magenta para la información y los estados. El marco compartido, el inicio, el historial, la campaña y la ficha
 aplican esta dirección. Las vistas de trabajo usan menos texto que el inicio:
-cifras, barras, iconos y estados con su etiqueta. Las propuestas estáticas de
-campaña y ficha en `static/prototypes/` quedan como referencia histórica, con
-datos exclusivamente sintéticos. La demostración identifica sus datos como sintéticos.
+cifras, barras, iconos y estados con su etiqueta. La demostración identifica sus datos como sintéticos.
 
 <!-- Pendiente: nombre creativo de la dirección (Creative North Star). No está definido; requiere decisión del equipo. -->
 

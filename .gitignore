@@ -2,8 +2,6 @@
 .env
 .env.*
 !.env.example
-.streamlit/secrets.toml
-.streamlit/credentials.toml
 /data/
 *.db
 *.db-*
