@@ -16,9 +16,10 @@ from prospecting.models import (
     Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, utc_now,
 )
 from prospecting.pipeline.calls import reserve_claude, seconds_left, was_sent
-from prospecting.providers import ClaudeClient, ProviderError
+from prospecting.providers import ClaudeCall, ClaudeClient, ProviderError
 from prospecting.qualification import (
-    PROMPT_VERSION, QualificationError, build_haiku_request, classify, explanation_text,
+    PROMPT_VERSION, WORDING_VERSION, AssessmentWording, QualificationError, build_haiku_request,
+    build_wording_request, classify, explanation_text, reviewed_explanation,
     identity_confirmed, material_contradiction, parse_output, primary_support, rubric_for,
     prompt_version_for, unknown_criteria, validate_output,
 )
@@ -305,3 +306,50 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
     return finish(QualificationReport(**base, status="assessed", assessment_id=assessment.id,
                                priority=result.priority, fit_score=result.fit_score,
                                coverage=result.coverage, reason=result.reason, **spent))
+
+
+def _current_item(db: Database, original: Assessment):
+    item = db.get_run_item(original.campaign_id, original.company_id)
+    if item is None or item.last_assessment_id != original.id or db.get_assessment(original.id) != original:
+        raise ValueError("La evaluación original ya no es la ficha vigente.")
+    return item
+
+
+def request_wording(db: Database, budget: Budget, claude: ClaudeClient, original: Assessment, *,
+                    account_ref: str, funding_source: str, authorization: SpendingAuthorization
+                    ) -> tuple[AssessmentWording, ClaudeCall]:
+    """Reserva una sola solicitud; entrega la prosa para revisión antes de publicarla."""
+    _current_item(db, original)
+    company = db.get_company(original.company_id)
+    campaign = db.get_campaign(original.campaign_id)
+    payload = build_wording_request(company, original, campaign)
+    usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), payload, account_ref=account_ref,
+                           funding_source=funding_source, authorization=authorization,
+                           campaign_id=campaign.id, company_id=company.id)
+    call = claude.create(usage.request_id, payload, account_ref=account_ref, authorization=authorization)
+    if call.stop_reason != "end_turn":
+        raise QualificationError("invalid_output", f"Haiku no completó la revisión: {call.stop_reason}.")
+    try:
+        wording = AssessmentWording.model_validate_json(call.text)
+    except ValueError:
+        raise QualificationError("invalid_output", "La respuesta de Haiku no cumple el esquema editorial.") from None
+    reviewed_explanation(wording, original)
+    return wording, call
+
+
+def save_wording(db: Database, original: Assessment, wording: AssessmentWording, *, model_id: str) -> Assessment:
+    """Publica la redacción revisada conservando las decisiones, las referencias y el historial."""
+    wording = AssessmentWording.model_validate(wording)
+    explanation = reviewed_explanation(wording, original)
+    now = utc_now()
+    with db.transaction():
+        item = _current_item(db, original)
+        revision = db.save_assessment(original.model_copy(update={
+            "id": uuid4(), "created_at": now, "revision_of": original.id, "model_id": model_id,
+            "prompt_version": WORDING_VERSION,
+            "explanation": explanation,
+            "criteria": {key: criterion.model_copy(update={"justification": wording.justifications[key]})
+                         for key, criterion in original.criteria.items()},
+        }))
+        db.save_run_item(item.model_copy(update={"last_assessment_id": revision.id, "updated_at": now}))
+    return revision
