@@ -89,6 +89,22 @@ modificar campañas guardadas. La interfaz y sus CSV muestran v3 también para c
 anteriores; su investigación y las lecturas históricas conservan la configuración
 original, o `contact_match_v1` si no hay instantánea de match.
 
+### Investigar cuentas objetivo
+
+Para investigar empresas concretas en lugar de descubrirlas en la web, pega su lista en
+«Cuentas objetivo» al crear la campaña, una por línea:
+
+```text
+empresa.com, Nombre de la empresa, MX
+otra-empresa.com.co
+```
+
+El nombre y el país (`CO` o `MX`) son opcionales; sin país se toman los de la campaña. Usa
+el dominio corporativo principal, que es el que Apollo asocia a las personas de la empresa.
+La campaña investiga exactamente esas cuentas: califica cada una con evidencia de su sitio
+y de la web abierta, y busca personas en Apollo por los cargos del caso de uso respaldado.
+La lista de exclusiones se aplica igual.
+
 ### Configurar Apollo
 
 Apollo es el único proveedor de personas. Para habilitarlo:
