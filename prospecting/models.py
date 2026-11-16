@@ -464,8 +464,10 @@ class BudgetLimits(Contract):
 
 
 class LlmLimits(Contract):
-    max_input_tokens: Annotated[Count, Field(le=9000)]
-    max_output_tokens: Annotated[Count, Field(le=1000)]
+    # Lote real del 2026-11-16: con 9.000 tokens, el prompt fijo y el esquema (más de 100 cargos permitidos)
+    # dejaban sitio para dos fragmentos de evidencia y toda empresa quedaba en evidencia insuficiente.
+    max_input_tokens: Annotated[Count, Field(le=30000)]
+    max_output_tokens: Annotated[Count, Field(le=2000)]
 
 
 class CampaignLimits(Contract):
@@ -483,7 +485,7 @@ class CampaignLimits(Contract):
     def validate_effort(self) -> Self:
         caps = {
             "initial": (2, 3, 0, 0, 0, 90),
-            "insufficient_evidence": (2, 3, 0, 0, 0, 60),
+            "insufficient_evidence": (2, 5, 0, 0, 0, 60),
             "medium": (2, 2, 3, 3, 4, 90),
             "high": (4, 4, 5, 5, 4, 180),
             "low": (0, 0, 0, 0, 0, 0),

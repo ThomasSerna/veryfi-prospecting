@@ -694,7 +694,7 @@ def test_expansion_searches_own_domain_once_and_extracts_new_own_pages(tavily):
     assert report.status == "researched" and report.requested_urls == extracted["urls"]
     facts = {fact.id: fact for fact in case.db.list_evidence(company_id)}
     hits = [facts[item] for item in report.evidence_ids if is_search_hit(facts[item])]
-    assert len(hits) == 3 and all("research_queries_v1" in fact.claim for fact in hits)
+    assert len(hits) == 3 and all("research_queries_v2" in fact.claim for fact in hits)
     assert all("otra.example" not in str(fact.url) for fact in facts.values())
     item = case.db.get_run_item(case.campaign.id, company_id)
     assert item.attempts == {"tavily_extract": 1, "research:expansion": 1, "research:web_queries": 1,
@@ -712,11 +712,12 @@ def test_expansion_also_searches_the_open_web_and_reads_third_party_pages_that_n
     own = expansion_search("nueva-uno.example", paths=("facturas",))
 
     def search(payload):
-        if "include_domains" in payload or "country" in payload:
+        if "include_domains" in payload:
             return own(payload)
         return {"results": [
-            {"url": "https://promo-sintetica.example/bases", "title": "Promoción de Nueva Uno", "content": "Registra tu ticket."},
-            {"url": "https://ajena.example/nota", "title": "Otra empresa", "content": "No nombra a la empresa."},
+            {"url": "https://promo-sintetica.example/bases", "title": "Nueva Uno digitaliza recibos", "content": "Nueva Uno lee facturas y recibos."},
+            {"url": "https://ajena.example/nota", "title": "Otra empresa", "content": "No nombra a la empresa; habla de recibos."},
+            {"url": "https://homonima.example/hotel", "title": "Hotel Nueva Uno", "content": "Nueva Uno, alojamiento de montaña."},
             {"url": "https://www.facebook.com/nuevauno", "title": "Nueva Uno", "content": "Nueva Uno en redes."},
         ], "usage": {"credits": 1}, "request_id": "web-abierta-sintetica"}
 
@@ -727,10 +728,11 @@ def test_expansion_also_searches_the_open_web_and_reads_third_party_pages_that_n
     restricted, open_web, extracted = (payload for _, payload in case.calls[calls:])
     assert restricted["include_domains"] == ["nueva-uno.example"]
     assert "include_domains" not in open_web and open_web["query"].startswith('"Nueva Uno" ')
+    assert open_web["country"] == "colombia"
     # La página de terceros que nombra a la empresa se lee junto a la propia; la ajena y la red social, no.
-    assert extracted["urls"][0] == "https://promo-sintetica.example/bases"
+    assert "https://promo-sintetica.example/bases" in extracted["urls"]
     assert "https://nueva-uno.example/facturas" in extracted["urls"]
-    assert not any("ajena.example" in url or "facebook.com" in url for url in extracted["urls"])
+    assert not any(host in url for url in extracted["urls"] for host in ("ajena.example", "homonima.example", "facebook.com"))
     assert report.status == "researched"
     third_party = [fact for fact in case.db.list_evidence(company_id)
                    if "promo-sintetica.example" in str(fact.url) and not is_search_hit(fact)]

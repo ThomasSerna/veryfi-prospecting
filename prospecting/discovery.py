@@ -508,10 +508,10 @@ def extract_query(campaign: Campaign) -> str:
 
 # Análisis inicial y ampliación de evidencia de una empresa ya descubierta (§7, §9).
 
-RESEARCH_QUERY_VERSION = "research_queries_v1"
+RESEARCH_QUERY_VERSION = "research_queries_v2"
 RESEARCH_TERMS = {
     Segment.FINTECH_SOFTWARE: "recibos facturas comprobantes gastos",
-    Segment.CPG_LOYALTY: "promoción ticket factura de compra premios",
+    Segment.CPG_LOYALTY: "promoción registra tu ticket o factura de compra y gana premios programa de lealtad",
 }
 
 
@@ -559,6 +559,12 @@ def open_expansion_query(company: Company, campaign: Campaign) -> str:
     countries = [COUNTRIES[country][0] for country in campaign.countries
                  if country in COUNTRIES and country in (company.operating_countries or campaign.countries)]
     return clip(" ".join([f'"{company.name}"', *(RESEARCH_TERMS[segment] for segment in segments), *countries]), 400)
+
+
+def research_signals(campaign: Campaign) -> list[str]:
+    """Palabras de las señales de los segmentos de la campaña; una página de terceros debe traer alguna."""
+    words = [word for segment in campaign.segments for word in plain(RESEARCH_TERMS[segment]).split() if len(word) >= 5]
+    return list(dict.fromkeys(words))
 
 
 def names_company(company: Company, text: str | None) -> bool:

@@ -71,7 +71,7 @@ def test_default_limits_keep_the_documented_initial_values(role_config, config):
     defaults = role_config.defaults
     assert {level: (item.web_queries, item.pages, item.people, item.enrichments_per_provider, item.people_queries,
                     item.active_seconds) for level, item in defaults.effort.items()} == {
-        "initial": (2, 3, 0, 0, 0, 90), "insufficient_evidence": (2, 3, 0, 0, 0, 60),
+        "initial": (2, 3, 0, 0, 0, 90), "insufficient_evidence": (2, 5, 0, 0, 0, 60),
         "medium": (2, 2, 3, 3, 4, 90), "high": (4, 4, 5, 5, 4, 180),
         "low": (0, 0, 0, 0, 0, 0), "excluded": (0, 0, 0, 0, 0, 0),
     }
@@ -104,7 +104,7 @@ def test_default_limits_keep_the_documented_initial_values(role_config, config):
     assert not (budget.automatic_topups or budget.variable_cost_waterfall or budget.paid_phone_enrichment)
     assert (defaults.cache.web_days, defaults.cache.contact_days) == (30, 30)
     assert (defaults.freshness.email_days, defaults.freshness.employment_days) == (30, 365)
-    assert (defaults.llm.max_input_tokens, defaults.llm.max_output_tokens) == (9000, 1000)
+    assert (defaults.llm.max_input_tokens, defaults.llm.max_output_tokens) == (30000, 2000)
 
 
 @pytest.mark.parametrize("change", [

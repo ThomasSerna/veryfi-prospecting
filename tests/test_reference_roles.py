@@ -65,3 +65,24 @@ def test_enrichment_accepts_a_name_variant_of_the_same_domain_but_not_another_en
         organization=ApolloOrganization(id="org-sintetica", name=organization, primary_domain=company.domain),
         employment_history=[ApolloEmployment(current=True, organization_id="org-sintetica")])
     assert _entity_mismatch(company, person) == expected
+
+
+def test_qualification_prompt_leaves_room_for_the_evidence_of_a_whole_company(role_config, make_company):
+    """Lote real del 2026-11-16: el prompt fijo y el esquema dejaban sitio para dos fragmentos y nada calificaba."""
+    from datetime import UTC, datetime
+
+    from prospecting.models import Campaign, Evidence
+    from prospecting.qualification import build_haiku_request
+
+    campaign = Campaign(countries=["CO", "MX"], segments=["fintech_software", "cpg_loyalty"],
+                        config_snapshot=role_config, rubric_version="rubric_v2")
+    company, _ = make_company(name="Consumo Sintético", domain="consumo-sintetico.example", identity_status="confirmed",
+                              segments=["cpg_loyalty"], operating_countries=["MX"])
+    fragment = "Texto sintético de una página con una promoción ficticia que pide registrar el ticket de compra. " * 8
+    evidence = [Evidence(company_id=company.id, claim="Texto publicado en la página, extraído por Tavily.",
+                         url=f"https://consumo-sintetico.example/pagina-{index}", excerpt=fragment[:800],
+                         retrieved_at=datetime(2026, 11, 16, tzinfo=UTC), kind="observed", source_type="primary")
+                for index in range(30)]
+    _, selected = build_haiku_request(company, evidence, campaign)
+    # Portada, ampliación propia y de terceros y extracción de contactos suman unos 25 fragmentos por empresa.
+    assert len(selected) >= 25

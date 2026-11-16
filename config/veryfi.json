@@ -217,7 +217,7 @@
     "discovery": {"web_queries": 8, "results_per_query": 10, "raw_candidates": 60, "target_per_country_segment": 5},
     "effort": {
       "initial": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 90},
-      "insufficient_evidence": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 60},
+      "insufficient_evidence": {"web_queries": 2, "pages": 5, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 60},
       "medium": {"web_queries": 2, "pages": 2, "people": 3, "enrichments_per_provider": 3, "people_queries": 4, "active_seconds": 90, "employment_queries": 3, "employment_pages": 3},
       "high": {"web_queries": 4, "pages": 4, "people": 5, "enrichments_per_provider": 5, "people_queries": 4, "active_seconds": 180, "employment_queries": 5, "employment_pages": 5},
       "low": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0},
@@ -245,7 +245,7 @@
       "variable_cost_waterfall": false,
       "paid_phone_enrichment": false
     },
-    "llm": {"max_input_tokens": 9000, "max_output_tokens": 1000}
+    "llm": {"max_input_tokens": 30000, "max_output_tokens": 2000}
   },
   "people_policy": {
     "version": "people_policy_v1",

@@ -7,7 +7,9 @@ from pydantic import Field
 
 from prospecting.budget import Budget, BudgetError, SpendingAuthorization
 from prospecting.db import Database
-from prospecting.discovery import expansion_query, extract_query, identity_extract_query, open_expansion_query
+from prospecting.discovery import (
+    expansion_query, extract_query, identity_extract_query, open_expansion_query, research_signals,
+)
 from prospecting.models import BusinessStatus, Contract, Money, Text, utc_now
 from prospecting.pipeline.calls import call_free_credit, extract_failure_attempts, grant_for, was_sent
 from prospecting.providers import ProviderClient, ProviderError
@@ -200,7 +202,9 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
     # las promociones y programas de una marca.
     searches = [
         lambda: (company_search_request(company, expansion_query(company, campaign), account_ref), False),
-        lambda: (open_company_search_request(open_expansion_query(company, campaign), account_ref), True),
+        lambda: (open_company_search_request(open_expansion_query(company, campaign), account_ref, next(
+            (country for country in campaign.countries if country in (company.operating_countries or campaign.countries)),
+            None)), True),
     ]
     while (sent := db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_QUERIES_KEY, 0)) < min(
             effort.web_queries, len(searches)):
@@ -208,7 +212,8 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
         done, pending = call(request, TavilySearchResponse, SEARCH_CREDITS, SEARCH_OPERATION)
         if pending is not None:
             return pending
-        facts = company_search_evidence(company, done[1].data, done[0].request_id, utc_now(), open_web=open_web)
+        facts = company_search_evidence(company, done[1].data, done[0].request_id, utc_now(), open_web=open_web,
+                                        signals=research_signals(campaign))
         _checkpoint(db, campaign_id, company_id, attempts={EXPANSION_QUERIES_KEY: 1},
                     consumed={"web_queries": 1}, facts=facts)
         report["evidence_ids"] += [item.id for item in facts]
@@ -225,9 +230,9 @@ def research_company(db: Database, budget: Budget, client: ProviderClient, campa
     own = [url for url in urls if within_domain(url_host(url), company.domain)]
     others = [url for url in urls if url not in own]
     left = max(0, effort.pages - db.get_run_item(campaign_id, company_id).attempts.get(EXPANSION_PAGES_KEY, 0))
-    # Las páginas de terceros no desplazan del todo a las propias: cada grupo conserva al menos una plaza.
-    reserved = others[:max(0, left - 1)] if own else others[:left]
-    urls = (reserved + own + others[len(reserved):])[:left]
+    # Páginas propias y de terceros se alternan: ninguna de las dos fuentes desplaza a la otra.
+    mixed = [url for pair in zip(own, others) for url in pair]
+    urls = (mixed + own[len(others):] + others[len(own):])[:left]
     if not urls:
         return ResearchReport(**base, **report, status="researched",
                               stop_reason="no_new_sources" if left > 0 else "page_limit")

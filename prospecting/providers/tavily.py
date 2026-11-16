@@ -17,7 +17,7 @@ from prospecting.sources import (
     CONTACT_SEARCH_REFERENCE, NON_BUSINESS_DOMAINS, SEARCH_HIT_CLAIM, SEARCH_PROVIDER, is_non_business, url_host,
     within_domain,
 )
-from prospecting.text import clip
+from prospecting.text import clip, plain
 
 
 PROVIDER = SEARCH_PROVIDER
@@ -194,6 +194,7 @@ def classify_tavily_error(error: ProviderError) -> str:
 
 
 COMPANY_SEARCH_RESULTS = 5
+OPEN_SEARCH_RESULTS = 8
 
 
 def company_search_request(company: Company, query: str, account_ref: str) -> ProviderRequest:
@@ -207,29 +208,38 @@ def company_search_request(company: Company, query: str, account_ref: str) -> Pr
                                     "include_images": False, "include_usage": True})
 
 
-def open_company_search_request(query: str, account_ref: str) -> ProviderRequest:
-    """Búsqueda de la ampliación en la web abierta, sin redes ni directorios; localiza páginas de terceros."""
+def open_company_search_request(query: str, account_ref: str, country: str | None = None) -> ProviderRequest:
+    """Búsqueda de la ampliación en la web abierta, sin redes ni directorios; localiza páginas de terceros.
+
+    `country` prioriza resultados de ese país, como en el descubrimiento: sin él, un nombre común devuelve
+    homónimos de otros mercados.
+    """
     return ProviderRequest(provider=PROVIDER, operation=SEARCH_OPERATION, account_ref=account_ref,
                            payload={"query": query, "search_depth": "basic", "topic": "general",
-                                    "max_results": COMPANY_SEARCH_RESULTS, "exclude_domains": list(NON_BUSINESS_DOMAINS),
+                                    **({"country": COUNTRIES[country][1]} if country in COUNTRIES else {}),
+                                    "max_results": OPEN_SEARCH_RESULTS, "exclude_domains": list(NON_BUSINESS_DOMAINS),
                                     "include_answer": False, "include_raw_content": False,
                                     "include_images": False, "include_usage": True})
 
 
 def company_search_evidence(company: Company, response: TavilySearchResponse, local_request_id: UUID,
-                            retrieved_at: datetime, *, open_web: bool = False) -> list[Evidence]:
+                            retrieved_at: datetime, *, open_web: bool = False,
+                            signals: list[str] | None = None) -> list[Evidence]:
     """Resultados marcados como búsqueda: localizan páginas, nunca confirman hechos.
 
-    Del propio dominio; con `open_web`, también de terceros cuyo título o resumen nombra a la empresa.
+    Del propio dominio; con `open_web`, también de terceros cuyo título o resumen nombra a la empresa y trae
+    alguna palabra de `signals` (las señales del segmento), para no leer páginas de homónimos.
     """
+    wanted = set(signals or [])
     reference = clip(response.request_id, 120) or str(local_request_id)
     evidence = []
     for rank, result in enumerate(response.results, start=1):
         host = url_host(result.url)
         if host is None or company.domain is None:
             continue
-        third_party = open_web and not is_non_business(host) and names_company(
-            company, f"{result.title or ''} {result.content or ''}")
+        text = f"{result.title or ''} {result.content or ''}"
+        third_party = (open_web and not is_non_business(host) and names_company(company, text)
+                       and (not wanted or bool(wanted.intersection(plain(text).split()))))
         if not within_domain(host, company.domain) and not third_party:
             continue
         title = f" Título: {clip(result.title, TITLE_CHARS)}." if clip(result.title, TITLE_CHARS) else ""

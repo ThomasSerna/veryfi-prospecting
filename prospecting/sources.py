@@ -22,7 +22,8 @@ NON_BUSINESS_DOMAINS = (
 )
 # Directorios descartados solo localmente: la lista anterior viaja en `exclude_domains` y forma parte
 # de la huella persistida de la búsqueda de descubrimiento (docs/persistence.md), así que no se amplía.
-LOCAL_NON_BUSINESS_DOMAINS = ("comparasoftware.com",)
+# `tavily.com`: fichas de empresa del propio buscador, que aparecían entre sus resultados (lote del 2026-11-16).
+LOCAL_NON_BUSINESS_DOMAINS = ("comparasoftware.com", "tavily.com")
 
 _GENERIC_LABELS = {
     "www", "app", "web", "m", "es", "com", "co", "mx", "net", "org", "io", "la",
