@@ -31,7 +31,8 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Strict"
 CSRF_COOKIE_SAMESITE = "Strict"
 LANGUAGE_CODE = "es-co"
-TIME_ZONE = "UTC"
+# Las fechas se guardan en UTC y se muestran en la hora de Bogotá, como en la documentación.
+TIME_ZONE = "America/Bogota"
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "/static/"
