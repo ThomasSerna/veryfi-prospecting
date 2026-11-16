@@ -24,7 +24,11 @@ pages = extract_company_pages(db, budget, client, campaign.id, report.selected_c
                               urls, account_ref="cuenta-tavily", authorization=extract_grant)
 ```
 
-`run_discovery` genera consultas de plantilla (`discovery_queries_v2` en campañas con
+Si la campaña declara cuentas objetivo (`filters.target_accounts`), `run_discovery` no llama a
+Tavily: guarda cada cuenta como empresa con su evidencia manual `target_account`, aplica la lista
+de exclusiones y reutiliza la empresa ya confirmada con el mismo dominio. `assess_identity` toma
+de esa declaración el país y los segmentos, y confirma la identidad aunque la página propia no se
+pueda leer. Sin cuentas objetivo, `run_discovery` genera consultas de plantilla (`discovery_queries_v2` en campañas con
 `people_provider="apollo"` y `discovery_queries_v1` en campañas históricas) solo para los
 países y segmentos de la campaña, con un máximo de 8 consultas `basic` de 10
 resultados cada una, y aplica el tope de 60 candidatos brutos. Agrupa los resultados

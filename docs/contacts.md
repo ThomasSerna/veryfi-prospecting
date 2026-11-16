@@ -28,7 +28,12 @@ El orden de trabajo es:
    las que tienen política comprueban además el objetivo de personas y funciones.
 2. Consultar People API Search sobre el dominio confirmado y con cargos específicos
    de los casos de uso respaldados. Se agrupan cargos con seniority inequívoco y
-   especialistas o jerarquías ambiguas sin ese filtro, hasta dos consultas. Cada
+   especialistas o jerarquías ambiguas sin ese filtro. Son hasta cuatro consultas:
+   las dos primeras con `person_locations` de los países de la campaña donde opera la
+   empresa y, si no dejan candidatos pertinentes suficientes para el tope de personas,
+   las mismas dos sin país. Se envían los cargos y las palabras de función
+   (`title_keywords`) de cada familia, sin `include_similar_titles=false`: Apollo
+   devuelve títulos similares y `_family_title` decide la pertinencia. Cada
    consulta pide como máximo 10 candidatos en la primera página. Search no devuelve
    correo ni teléfono; sus nombres pueden ser parciales y permanecen pendientes.
 3. Enriquecer selectivamente los candidatos pertinentes con un identificador observado
@@ -292,7 +297,7 @@ demás estados la dejan fuera de listo con un motivo visible en la ficha y el CS
 | Estado | Cuándo | Efecto |
 |---|---|---|
 | `corporate_evidence` | Un hecho del puesto observado de una fuente `primary` o `secondary` (nunca del proveedor ni del buscador), vigente según `employment_freshness`, que nombra a la persona con nombre completo, sin contradicciones en ningún sentido y con `current_employment=True`. Para personas de Apollo, además, una fuente pública vigente nombra a la persona con su cargo actual | Habilita a la persona |
-| `provider_claim` | Apollo declara el empleo actual (`#enrichment` dentro de `cache.contact_days`) o el historial de Hunter lo infiere (`origin="hunter"`) | No habilita; pide evidencia corporativa |
+| `provider_claim` | Apollo declara el empleo actual (`#enrichment` dentro de `cache.contact_days`) o el historial de Hunter lo infiere (`origin="hunter"`) | Con `employment_policy_v2` y origen Apollo, habilita listo y se muestra como declarado por Apollo; sin la política o con origen Hunter, no habilita |
 | `contradicted` | Salida nominal o `current_employment=False`, una fuente corporativa con otro cargo o una fuente del puesto contradicha | No habilita; bloquea listo con su motivo |
 | `unknown` | Sin evidencia vigente ni afirmación reciente del proveedor | No habilita |
 

@@ -184,12 +184,18 @@ y las instantáneas de las pruebas del pipeline los fijan:
 - `Company.identity_key` (`dominio|nombre|países`), con índice único.
 - Ids `uuid5` de contactos de Hunter (`hunter:<id>`), de contactos públicos
   (`public:<canal>`) y de la evidencia de exclusión.
+- Cuentas objetivo: `Campaign.filters.target_accounts` (dominio, nombre y países declarados) y su
+  evidencia manual, con `provider="target_account"` y `external_reference` que empieza por
+  `target-account:<campaign_id>:<dominio>`. La identidad lee de ahí el país y los segmentos.
+- `employment_policy_v2` vive en `limits.freshness.employment_policy` (ausente o `null`: solo la
+  evidencia del puesto deja lista a una persona).
+- `RoleFamily.title_keywords` (ausente en `role_taxonomy_v1`: lista vacía).
 - Marcadores de resultados de buscador, que nunca prueban un hecho: `claim` que
   empieza por `Tavily devolvió esta página` y `external_reference` que empieza
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
-  `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
-  `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
+  `research_queries_v1`, `role_taxonomy_v1`, `role_taxonomy_v2`, `haiku_assessment_v3`,
+  `haiku_assessment_v4`, `haiku_assessment_v5`, `haiku_assessment_v6`, `contacts_extraction_v1`,
   `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`, `people_policy_v1`,
   `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=3`.
   `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro

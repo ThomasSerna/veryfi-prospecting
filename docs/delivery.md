@@ -8,6 +8,30 @@ datos permanecen en `data/`, fuera de Git.
 El prototipo es académico. No se presenta como un sistema productivo validado: el catálogo,
 la rúbrica y las reglas son propuestas pendientes de validación por Veryfi.
 
+## Actualización del 16 de noviembre de 2026
+
+Este informe describe el estado del 14 de octubre. Desde entonces el proveedor de personas es
+Apollo (T12 a T30, en [provider-check.md](provider-check.md)) y, hasta el 10 de noviembre, las
+13 campañas reales guardadas sumaban 0 personas listas: el descubrimiento web devolvía sobre
+todo portales, medios y proveedores ajenos, la identidad no se confirmaba y las reglas de cargo
+y empleo dejaban fuera a las personas encontradas.
+
+El 15 de noviembre, con aprobación del usuario, se cambió lo siguiente
+([reglas](Business-rules.md)): campañas a partir de cuentas objetivo, `role_taxonomy_v2` con
+variantes reales de los cargos y una familia de datos de marketing, búsqueda en Apollo acotada
+por país y con títulos similares, ampliación de evidencia en la web abierta, `rubric_v2` en
+campañas nuevas y `employment_policy_v2`.
+
+Estado de la validación:
+
+- **Simulado:** 1.595 pruebas sin red, con empresas y personas sintéticas, cubren los cambios.
+- **Real, incompleto:** un lote de calibración con cuatro cuentas objetivo confirmó la identidad
+  de las cuatro y leyó sus portadas con Tavily (4 solicitudes de Extract). La calificación se
+  detuvo en la primera llamada a Haiku: Anthropic rechazó la clave local (`HTTP 401. invalid
+  x-api-key`). No hubo llamadas a Apollo ni personas evaluadas.
+- **Sin verificar:** que las reglas nuevas dejen personas listas con datos reales. Falta
+  corregir la clave, reanudar el lote y conciliar su consumo.
+
 ## Qué se entrega
 
 | Pieza | Dónde | Estado |

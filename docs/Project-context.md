@@ -90,7 +90,7 @@ Reglas de interpretación:
 
 ## Experiencia de uso
 
-1. **Configurar.** Seleccionar Colombia/México, uno o ambos segmentos y hasta 20 empresas. Ver límites, proveedores disponibles y presupuesto restante antes de ejecutar.
+1. **Configurar.** Seleccionar Colombia/México, uno o ambos segmentos y hasta 20 empresas, o indicar una lista de cuentas objetivo para investigar exactamente esas empresas. Ver límites, proveedores disponibles y presupuesto restante antes de ejecutar.
 2. **Investigar.** Mostrar etapa, empresas procesadas, consumo y resultados parciales. No pedir aprobación entre empresas.
 3. **Revisar.** Tabla filtrable por país, segmento, prioridad y disponibilidad de canal. Al abrir una ficha, mostrar caso de uso, puntuación desglosada, evidencia y contactos. La ficha lista a todas las personas encontradas, ordenadas por un porcentaje de match determinístico con su desglose (§10.3), para que ventas elija a quién contactar.
 4. **Corregir.** Marcar aceptado, rechazado o pendiente con motivo. Confirmar manualmente mensajería en LinkedIn cuando sea el único canal. No enviar nada para comprobarlo.
@@ -104,7 +104,7 @@ Para exportación: una fila por persona, repetir los datos de la empresa y conse
 
 Envío comercial, campañas, CRM completo, integraciones de escritura con CRM, entrenamiento de modelos propios, predicción estadística de compra, scraping automatizado de LinkedIn, agentes que operen cuentas personales, seguimiento continuo programado, infraestructura distribuida y plataforma multiusuario de producción.
 
-La carga de una lista de empresas para investigación puede añadirse después si aporta valor; no sustituye el descubrimiento solicitado. Un portal público o piloto remoto necesita una decisión de despliegue y acceso separada.
+La carga de una lista de cuentas objetivo se añadió el 15 de noviembre de 2026, por decisión del usuario, como vía alternativa al descubrimiento web: en las campañas reales la búsqueda por señales casi nunca devolvió empresas grandes con su dominio corporativo. No sustituye el descubrimiento solicitado, que sigue disponible. Un portal público o piloto remoto necesita una decisión de despliegue y acceso separada.
 
 ## Criterios de éxito
 

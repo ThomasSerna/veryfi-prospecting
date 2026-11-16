@@ -10,9 +10,11 @@ campaña. Haiku propone y Python decide:
 - **Solicitud:** usa el modelo `claude-haiku-5-5`, *thinking* desactivado y
   *effort* `low`. Las campañas sin taxonomía conservan `haiku_assessment_v3` con
   `rubric_v1` y `haiku_assessment_v4` con `rubric_v2`. Las campañas con
-  `role_taxonomy_v1` usan `haiku_assessment_v5`, con el criterio de escala de la
-  rúbrica elegida y perfiles respaldados por citas.
-  V1 sigue predeterminada hasta cumplir la [condición de activación de v2](Business-rules.md#candidata-enterprise-rubric_v2).
+  taxonomía de cargos usan `haiku_assessment_v6`, con el criterio de escala de la
+  rúbrica elegida, perfiles respaldados por citas y una regla para la evidencia de
+  terceros (`source_type` `secondary`): solo vale si nombra a la empresa evaluada.
+  Las campañas nuevas usan `rubric_v2` desde el 15 de noviembre de 2026
+  ([decisión](Business-rules.md#candidata-enterprise-rubric_v2)).
   - La salida es JSON con esquema. El límite de entrada es
     `limits.llm.max_input_tokens` (9.000 tokens) y el de salida,
     `limits.llm.max_output_tokens`. La evidencia se selecciona con 2 caracteres por token,

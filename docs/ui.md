@@ -68,6 +68,11 @@ visual se retiraron del repositorio; las vistas operativas ya la aplican.
    la propuesta `contact_match_v3`, sin tráfico. La versión y sus pesos no cambian al
    editar después el archivo local. Si la configuración v3 falta o no es válida, se
    informa el error y no se guarda la campaña nueva.
+   En Cuentas objetivo puedes pegar hasta 20 empresas, una por línea, como
+   `dominio, nombre, país` (el nombre y el país son opcionales; el país es `CO` o `MX`).
+   Con cuentas objetivo la campaña investiga exactamente esas empresas, sin buscar otras
+   en la web, y el máximo de empresas pasa a ser su número. Una línea inválida se señala
+   con su número y no se guarda nada.
 2. Revisa las operaciones y sus topes en la autorización. Ejecutar requiere claves en
    el entorno y un archivo válido `data/provider-access.json`.
 3. El responsable autoriza explícitamente cada operación habilitada, con cuenta, tope
