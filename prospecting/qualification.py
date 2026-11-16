@@ -12,7 +12,7 @@ from pydantic import Field
 from prospecting.haiku import CHARS_PER_TOKEN, prompt_json, structured_request
 from prospecting.models import (
     CRITERION_NAMES, Assessment, Campaign, Company, Contract, Criterion, CriterionName, CriterionValue,
-    EntityType, Evidence, IdentityStatus, Priority, ProfileMatch, Rubric, Text,
+    EntityType, Evidence, IdentityStatus, Priority, ProfileMatch, Rubric, Text, contains_quote,
 )
 from prospecting.sources import is_search_evidence, is_search_hit
 from prospecting.text import clip
@@ -489,8 +489,7 @@ def _citation_backed(citation, by_id: dict[UUID, Evidence], company: Company, co
         return False
     if source.contradiction_ids or source.id in conflicts:
         return False
-    return any(citation.quote in text for text in (clip(source.excerpt, EXCERPT_CHARS) or "",
-                                                   clip(source.claim, CLAIM_CHARS) or ""))
+    return any(contains_quote(text, citation.quote) for text in (source.excerpt, source.claim))
 
 
 def primary_support(criteria: dict[str, Criterion], evidence: list[Evidence]) -> bool:

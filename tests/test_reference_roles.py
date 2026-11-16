@@ -110,3 +110,31 @@ def test_preferred_functions_go_first_among_relevant_people_even_with_a_lower_sc
     assert order == [loyalty[0].id, commercial[0].id, outsider[0].id]
     # Sin funciones preferentes manda el puntaje, como antes.
     assert rank_contact_matches([commercial, outsider, loyalty], [], function_ids=functions)[0] == commercial[0].id
+
+
+def test_profile_quote_taken_from_collapsed_text_is_saved_and_keeps_its_roles(
+        database, role_config, make_campaign, make_company, make_assessment):
+    """Lote real del 2026-11-16: la cita de Haiku (texto con espacios colapsados) hacía fallar la campaña al guardar."""
+    from datetime import UTC, datetime
+
+    from prospecting.contacts import role_families
+    from prospecting.models import Evidence, RunItem, contains_quote
+
+    campaign = database.save_campaign(make_campaign(
+        countries=["MX"], segments=["cpg_loyalty"], config_snapshot=role_config, rubric_version="rubric_v2"))
+    company, facts = make_company(name="Consumo Sintético", domain="consumo-sintetico.example",
+                                  identity_status="confirmed", segments=["cpg_loyalty"], operating_countries=["MX"])
+    page = Evidence(company_id=company.id, claim="Texto publicado en la página, extraído por Tavily.",
+                    url="https://consumo-sintetico.example/promo", kind="observed", source_type="primary",
+                    excerpt="Promoción sintética.\n\nRegistra tu   ticket\nde compra y gana premios.",
+                    retrieved_at=datetime(2026, 11, 16, tzinfo=UTC))
+    quote = "Registra tu ticket de compra y gana premios."
+    assert contains_quote(page.excerpt, quote) and not contains_quote(page.excerpt, "Cita que nadie publicó.")
+    database.save_company(company, evidence=[*facts, page])
+    database.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id))
+    assessment = database.save_assessment(make_assessment(
+        campaign.id, company.id, rubric_version="rubric_v2",
+        profile_matches=[{"profile_id": "cpg_brands", "citations": [{"evidence_id": page.id, "quote": quote}]}]))
+    families = role_families(company, assessment, campaign, evidence=database.list_evidence(company.id))
+    assert {"loyalty_crm", "marketing_data"} <= {family.id for family in families}
+    assert [family.id for family in families if family.preferred] == ["loyalty_crm", "marketing_data"]

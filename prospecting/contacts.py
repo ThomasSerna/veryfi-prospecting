@@ -17,7 +17,7 @@ from pydantic import Field, StrictBool, StrictInt
 from prospecting.models import (
     Assessment, BusinessStatus, Campaign, CampaignLimits, Channel, ChannelStatus, ChannelType,
     Company, Contact, ContactMatchConfig, Contract, Evidence, IdentityStatus, MATCH_LEVELS, MatchComponentConfig,
-    MatchComponentName, PENDING_LEVELS, Points, Priority, Text, UtcDatetime,
+    MatchComponentName, PENDING_LEVELS, Points, Priority, Text, UtcDatetime, contains_quote,
 )
 from prospecting.sources import is_search_evidence, url_host, within_domain
 
@@ -85,8 +85,8 @@ def role_families(company: Company, assessment: Assessment, campaign: Campaign, 
             and not by_id[citation.evidence_id].contradiction_ids
             and by_id[citation.evidence_id].contact_id is None and by_id[citation.evidence_id].kind == "observed"
             and not is_search_evidence(by_id[citation.evidence_id])
-            and any(citation.quote in text for text in
-                    (by_id[citation.evidence_id].claim, by_id[citation.evidence_id].excerpt or ""))
+            and any(contains_quote(text, citation.quote) for text in
+                    (by_id[citation.evidence_id].claim, by_id[citation.evidence_id].excerpt))
             for citation in match.citations)]
     profiles = allowed.intersection(match.profile_id for match in matches)
     priority = {"business_champion": 0, "technical_champion": 1, "economic_buyer": 2}

@@ -8,7 +8,7 @@ from typing import Iterator, Sequence
 from uuid import UUID
 
 from prospecting.models import (
-    Assessment, Campaign, Company, Contact, DiscoveryReserve, Evidence, RunItem, RunStage, Usage,
+    Assessment, Campaign, Company, Contact, DiscoveryReserve, Evidence, RunItem, RunStage, Usage, contains_quote,
 )
 
 
@@ -427,7 +427,7 @@ class Database:
                             or writing and contradicted or (fact.external_reference or "").startswith("contacts_search:")
                             or fact.provider == "tavily" and fact.source_type == "secondary"
                             and fact.claim.startswith("Tavily devolvió esta página")
-                            or not any(citation.quote in text for text in (fact.excerpt or "", fact.claim))):
+                            or not any(contains_quote(text, citation.quote) for text in (fact.excerpt, fact.claim))):
                         raise ValueError("El perfil requiere una cita empresarial observada y sin contradicciones.")
 
     def save_campaign(self, campaign: Campaign) -> Campaign:

@@ -65,6 +65,17 @@ def _disabled(value: object) -> Literal[False]:
     return False
 
 
+def contains_quote(text: str | None, quote: str) -> bool:
+    """La cita aparece literalmente en el texto o en su forma con espacios colapsados.
+
+    Haiku lee los fragmentos pasados por `clip`, que colapsa saltos de línea y espacios; una cita tomada de
+    ahí debe valer también al comprobarla contra el texto guardado tal cual (lote real del 2026-11-16).
+    """
+    if not text or not quote:
+        return False
+    return quote in text or quote in re.sub(r"[\x00-\x1f\x7f\s]+", " ", text).strip()
+
+
 def _domain(value: str) -> str:
     try:
         domain = value.rstrip(".").encode("idna").decode("ascii").lower()
