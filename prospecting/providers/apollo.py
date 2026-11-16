@@ -9,7 +9,7 @@ from uuid import UUID, uuid5
 from pydantic import BaseModel, Field, StrictBool, StrictInt, StrictStr, StringConstraints, model_validator
 
 from prospecting.contacts import (
-    ContactError, complete_name, fold_words, full_name, merge_contact,
+    ContactError, complete_name, fold_words, full_name, mentions, merge_contact,
     organization_matches, professional_email,
 )
 from prospecting.models import (
@@ -127,6 +127,8 @@ class ApolloPerson(BaseModel):
     email: StrictStr | None = None
     email_status: StrictStr | None = None
     linkedin_url: StrictStr | None = None
+    city: StrictStr | None = None
+    country: StrictStr | None = None
     organization_id: ApolloId | None = None
     organization: ApolloOrganization | None = None
     employment_history: Annotated[list[ApolloEmployment], Field(max_length=100)] = Field(default_factory=list)
@@ -137,16 +139,31 @@ class ApolloEnrichmentResponse(BaseModel):
     person: ApolloPerson | None
 
 
+# Nombre de país que acepta `person_locations[]` (https://docs.apollo.io/reference/people-api-search,
+# consultado el 2026-11-15).
+APOLLO_LOCATIONS = {"CO": "Colombia", "MX": "Mexico"}
+
+
 def people_search_request(company: Company, roles: list[str], account_ref: str, *,
-                          by_roles: bool = False, seniorities: list[str] | None = None) -> ProviderRequest:
+                          by_roles: bool = False, seniorities: list[str] | None = None,
+                          countries: list[str] | None = None) -> ProviderRequest:
+    """Búsqueda por dominio y títulos; `countries` la acota a quienes viven en esos países.
+
+    Con `seniorities` (búsqueda por catálogo) Apollo devuelve también títulos similares: los títulos reales
+    rara vez coinciden palabra por palabra, y Python decide después la pertinencia de cada uno.
+    """
     if company.identity_status != IdentityStatus.CONFIRMED or company.domain is None:
         raise ContactError("identity_unconfirmed", "Apollo necesita el dominio de una entidad confirmada.")
     payload = {"q_organization_domains_list": [company.domain], "page": 1, "per_page": 10}
     if seniorities is not None and not roles:
         raise ContactError("no_target_roles", "La búsqueda por catálogo requiere títulos específicos.")
+    locations = [APOLLO_LOCATIONS[country] for country in countries or [] if country in APOLLO_LOCATIONS]
+    if locations:
+        payload["person_locations"] = locations
     if (by_roles or seniorities is not None) and roles:
         payload["person_titles"] = list(dict.fromkeys(roles))
-        payload["include_similar_titles"] = False
+        if seniorities is None:
+            payload["include_similar_titles"] = False
         if len(payload["person_titles"]) >= 100:
             raise ContactError("invalid_role_filters", "Apollo admite menos de cien títulos por búsqueda.")
         if seniorities:
@@ -258,7 +275,10 @@ def _entity_mismatch(company: Company, person: ApolloPerson) -> str | None:
         return "entity_mismatch_domain"
     if person.organization_id != organization.id:
         return "entity_mismatch_organization_id"
-    if not organization_matches(company, organization.name):
+    # El dominio ya coincide: el nombre solo descarta otra entidad, no una variante («Grupo X» frente a «X»).
+    known = [value for value in (company.name, company.entity_name, *(company.aliases or [])) if value]
+    if not organization_matches(company, organization.name) and not any(
+            mentions(organization.name or "", value) or mentions(value, organization.name or "") for value in known):
         return "entity_mismatch_name"
     if not any(item.current is True and not item.end_date and item.organization_id == organization.id
                for item in person.employment_history):
@@ -293,9 +313,11 @@ def parse_enrichment(contact: Contact, company: Company, data: ApolloEnrichmentR
             fact = _fact(company, contact.id, person.id, request_id, retrieved_at, field, value)
             evidence.append(fact)
             provenance[field] = [fact.id]
+    location = ", ".join(item.strip() for item in (person.city, person.country) if item and item.strip())
     employment = _fact(company, contact.id, person.id, request_id, retrieved_at, "enrichment",
                        f"id={person.id}; nombre={name}; cargo={person.title}; empresa={organization.name}; "
-                       f"dominio={organization.primary_domain}; empleo actual declarado por Apollo, sin fecha del puesto.")
+                       f"dominio={organization.primary_domain}; ubicación={location or 'no informada'}; "
+                       f"empleo actual declarado por Apollo, sin fecha del puesto.")
     evidence.append(employment)
     channels = []
     if person.email:

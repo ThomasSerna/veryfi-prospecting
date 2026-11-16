@@ -72,7 +72,7 @@ def test_default_limits_keep_the_documented_initial_values(role_config, config):
     assert {level: (item.web_queries, item.pages, item.people, item.enrichments_per_provider, item.people_queries,
                     item.active_seconds) for level, item in defaults.effort.items()} == {
         "initial": (2, 3, 0, 0, 0, 90), "insufficient_evidence": (1, 2, 0, 0, 0, 45),
-        "medium": (2, 2, 3, 3, 2, 90), "high": (4, 4, 5, 5, 2, 180),
+        "medium": (2, 2, 3, 3, 4, 90), "high": (4, 4, 5, 5, 4, 180),
         "low": (0, 0, 0, 0, 0, 0), "excluded": (0, 0, 0, 0, 0, 0),
     }
     assert [(config.defaults.effort[level].people, config.defaults.effort[level].enrichments_per_provider)

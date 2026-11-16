@@ -77,7 +77,7 @@ def test_v2_never_enriches_a_person_with_supported_contradictions(contact_case, 
     seed_blocked_person(case, 0, reason)
     report = case.find()
     assert report.status == "checked" and report.stop_reason == "contact_plan_exhausted"
-    assert [operation for operation, _, _ in case.calls] == ["people_search", "people_search"]
+    assert [operation for operation, _, _ in case.calls] == ["people_search"] * 4
     assert all(row.reserved_credits == row.credits == 0 for row in case.db.list_usage())
 
 

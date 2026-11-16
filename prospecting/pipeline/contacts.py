@@ -635,21 +635,40 @@ class _ContactStage:
                         for index in range(self.effort.people_queries)]
         else:
             families = role_families(company, self.assessment, self.campaign, evidence=self.facts())
+            countries = [country for country in self.campaign.countries if country in (company.operating_countries or [])]
             requests = []
-            for with_seniority in (True, False):
-                group = [family for family in families if bool(family.seniorities) == with_seniority]
-                titles = list(dict.fromkeys(title for family in group for title in family.titles_en + family.titles_es))
-                if titles:
-                    seniorities = list(dict.fromkeys(level for family in group for level in family.seniorities))
-                    requests.append(people_search_request(company, titles, access.account_ref, by_roles=True,
-                                                         seniorities=seniorities))
+            # Primero quienes viven en los países de la campaña; después, sin país, los responsables regionales.
+            for local in ([True, False] if countries else [False]):
+                for with_seniority in (True, False):
+                    group = [family for family in families if bool(family.seniorities) == with_seniority]
+                    # Varias familias de perfiles distintos pueden superar el máximo de Apollo: mandan las primeras.
+                    titles = list(dict.fromkeys(title for family in group for title in family.search_titles))[:99]
+                    if titles:
+                        seniorities = list(dict.fromkeys(level for family in group for level in family.seniorities))
+                        requests.append((local, people_search_request(
+                            company, titles, access.account_ref, by_roles=True, seniorities=seniorities,
+                            countries=countries if local else None)))
+            for local, request in requests[:self.effort.people_queries]:
+                if not local and self.enough_candidates():
+                    break
+                self.search_people(request)
+            return None
         for request in requests[:self.effort.people_queries]:
-            self.perform(request, ApolloSearchResponse, credits=0,
-                         count_key=PEOPLE_SEARCH_KEY, cap=self.effort.people_queries,
-                         consumed={"people_queries": 1}, funding=access.funding_source,
-                         parse=lambda data, request_id: self.save_candidates(
-                             parse_search(company, data, request_id, utc_now())))
+            self.search_people(request)
         return None
+
+    def search_people(self, request):
+        access, company = self.apollo_access, self.company
+        self.perform(request, ApolloSearchResponse, credits=0,
+                     count_key=PEOPLE_SEARCH_KEY, cap=self.effort.people_queries,
+                     consumed={"people_queries": 1}, funding=access.funding_source,
+                     parse=lambda data, request_id: self.save_candidates(
+                         parse_search(company, data, request_id, utc_now())))
+
+    def enough_candidates(self) -> bool:
+        """Los candidatos pertinentes sin enriquecer ya cubren el tope de personas del nivel."""
+        facts = self.facts()
+        return sum(self.enrichable(item, facts) for item in self.people()) >= self.effort.people
 
     def _search_public(self):
         """Búsqueda y extracción públicas con Tavily cuando no hay un directorio corporativo vigente."""

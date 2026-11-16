@@ -218,8 +218,8 @@
     "effort": {
       "initial": {"web_queries": 2, "pages": 3, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 90},
       "insufficient_evidence": {"web_queries": 1, "pages": 2, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 45},
-      "medium": {"web_queries": 2, "pages": 2, "people": 3, "enrichments_per_provider": 3, "people_queries": 2, "active_seconds": 90, "employment_queries": 3, "employment_pages": 3},
-      "high": {"web_queries": 4, "pages": 4, "people": 5, "enrichments_per_provider": 5, "people_queries": 2, "active_seconds": 180, "employment_queries": 5, "employment_pages": 5},
+      "medium": {"web_queries": 2, "pages": 2, "people": 3, "enrichments_per_provider": 3, "people_queries": 4, "active_seconds": 90, "employment_queries": 3, "employment_pages": 3},
+      "high": {"web_queries": 4, "pages": 4, "people": 5, "enrichments_per_provider": 5, "people_queries": 4, "active_seconds": 180, "employment_queries": 5, "employment_pages": 5},
       "low": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0},
       "excluded": {"web_queries": 0, "pages": 0, "people": 0, "enrichments_per_provider": 0, "people_queries": 0, "active_seconds": 0}
     },
@@ -289,8 +289,8 @@
     }
   },
   "role_taxonomy": {
-    "version": "role_taxonomy_v1",
-    "source_date": "2026-11-06",
+    "version": "role_taxonomy_v2",
+    "source_date": "2026-11-15",
     "validation_status": "pending",
     "families": [
       {
@@ -555,11 +555,15 @@
         "buying_role": "business_champion",
         "titles_en": [
           "Marketing Director",
-          "Director of Marketing"
+          "Director of Marketing",
+          "Head of Marketing",
+          "Senior Marketing Director"
         ],
         "titles_es": [
           "Director de Marketing",
-          "Director de Mercadeo"
+          "Director de Mercadeo",
+          "Gerente de Marketing",
+          "Gerente de Mercadeo"
         ],
         "departments": [
           "Marketing",
@@ -568,8 +572,9 @@
           "Trade Marketing"
         ],
         "seniorities": [
-          "director",
-          "head"
+          "manager",
+          "head",
+          "director"
         ],
         "function_terms": [
           "promotional campaigns",
@@ -596,7 +601,14 @@
           "CRM Manager",
           "Trade Marketing Manager",
           "Shopper Marketing Manager",
-          "Digital Marketing Manager"
+          "Digital Marketing Manager",
+          "Loyalty Program Manager",
+          "Loyalty Director",
+          "Head of Loyalty",
+          "CRM Director",
+          "Head of CRM",
+          "Consumer Engagement Manager",
+          "Brand Director"
         ],
         "titles_es": [
           "Gerente de Marca",
@@ -606,7 +618,13 @@
           "Responsable de CRM",
           "Gerente de Trade Marketing",
           "Gerente de Shopper Marketing",
-          "Gerente de Marketing Digital"
+          "Gerente de Marketing Digital",
+          "Gerente de Fidelización",
+          "Director de Lealtad",
+          "Director de Fidelización",
+          "Gerente de CRM",
+          "Director de CRM",
+          "Director de Marca"
         ],
         "departments": [
           "Marketing",
@@ -614,7 +632,12 @@
           "CRM & Loyalty",
           "Trade Marketing"
         ],
-        "seniorities": [],
+        "seniorities": [
+          "manager",
+          "head",
+          "director",
+          "vp"
+        ],
         "function_terms": [
           "promotional campaigns",
           "campañas promocionales",
@@ -622,9 +645,94 @@
           "programas de fidelización",
           "recompensas por compra"
         ],
-        "excluded_titles": [],
-        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
-        "source_date": "2026-11-06",
+        "excluded_titles": [
+          "Employer Brand",
+          "Marca Empleadora",
+          "Brand Ambassador",
+          "Embajador de Marca",
+          "Sales",
+          "Ventas"
+        ],
+        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15; Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
+        "source_date": "2026-11-15",
+        "validation_status": "pending",
+        "title_keywords": [
+          "loyalty",
+          "lealtad",
+          "fidelización",
+          "crm",
+          "consumer engagement",
+          "brand",
+          "marca",
+          "trade marketing",
+          "shopper marketing",
+          "digital marketing",
+          "marketing digital",
+          "promotions",
+          "promociones"
+        ]
+      },
+      {
+        "id": "marketing_data",
+        "function_id": "marketing_data",
+        "profile_ids": [
+          "cpg_brands",
+          "loyalty_platforms_agencies"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Marketing Data Strategy Lead",
+          "Marketing Data Manager",
+          "Marketing Data Director",
+          "Head of Consumer Data",
+          "Consumer Data Manager",
+          "Consumer Data Director",
+          "First Party Data Manager",
+          "Precision Marketing Manager",
+          "Data Driven Marketing Manager"
+        ],
+        "titles_es": [
+          "Gerente de Datos de Marketing",
+          "Director de Datos de Marketing",
+          "Líder de Estrategia de Datos de Marketing",
+          "Gerente de Datos del Consumidor"
+        ],
+        "departments": [
+          "Marketing",
+          "Consumer Insights",
+          "Marketing Technology"
+        ],
+        "seniorities": [
+          "manager",
+          "head",
+          "director",
+          "vp"
+        ],
+        "function_terms": [
+          "marketing data strategy",
+          "estrategia de datos de marketing",
+          "consumer data",
+          "datos del consumidor",
+          "first party data"
+        ],
+        "excluded_titles": [
+          "Sales",
+          "Ventas"
+        ],
+        "title_keywords": [
+          "marketing data",
+          "datos de marketing",
+          "consumer data",
+          "datos del consumidor",
+          "data strategy",
+          "estrategia de datos",
+          "first party data",
+          "precision marketing",
+          "data driven marketing",
+          "martech"
+        ],
+        "source_reference": "Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
+        "source_date": "2026-11-15",
         "validation_status": "pending"
       },
       {
@@ -667,7 +775,15 @@
         "excluded_titles": [],
         "source_reference": "Sales Deck (2026, Product Intelligence); docs/enterprise-rubrics.md §5.1; docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
         "source_date": "2026-11-06",
-        "validation_status": "pending"
+        "validation_status": "pending",
+        "title_keywords": [
+          "consumer insights",
+          "shopper insights",
+          "marketing analytics",
+          "business intelligence",
+          "analítica de marketing",
+          "inteligencia de negocios"
+        ]
       },
       {
         "id": "marketing_technology",

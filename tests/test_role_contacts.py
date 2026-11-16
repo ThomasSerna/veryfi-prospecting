@@ -206,11 +206,13 @@ def test_role_queries_are_bounded_and_diversity_does_not_increase_limits(role_ca
     requests = []
     stage.perform = lambda request, *args, **kwargs: requests.append(request)
     stage._search_apollo()
-    assert len(requests) == 2
-    assert requests[0].payload["person_seniorities"]
+    # `perform` simulado no guarda candidatos: tras las dos búsquedas con país siguen las dos sin él.
+    assert len(requests) == 4
+    assert requests[0].payload["person_seniorities"] and requests[0].payload["person_locations"] == ["Colombia"]
     assert "Principal Software Engineer" in requests[1].payload["person_titles"]
     assert "person_seniorities" not in requests[1].payload
-    assert all(request.payload["person_titles"] and request.payload["include_similar_titles"] is False
+    assert all("person_locations" not in request.payload for request in requests[2:])
+    assert all(request.payload["person_titles"] and "include_similar_titles" not in request.payload
                and request.payload["page"] == 1 and request.payload["per_page"] == 10 for request in requests)
     with pytest.raises(ContactError):
         people_search_request(case.company, [f"Cargo {index}" for index in range(100)], "cuenta-sintetica", by_roles=True)

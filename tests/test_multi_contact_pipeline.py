@@ -67,7 +67,10 @@ def progress(case):
 def test_zero_candidates_search_once_per_query_without_enrichment(contact_case, role_config):
     case = multi(contact_case, role_config, [])
     report = case.find()
-    assert [item[0] for item in case.calls] == ["people_search", "people_search"]
+    # Dos búsquedas acotadas al país de la campaña y, sin candidatos suficientes, las mismas dos sin país.
+    searches = [payload for operation, payload, _ in case.calls]
+    assert [item[0] for item in case.calls] == ["people_search"] * 4
+    assert ["person_locations" in payload for payload in searches] == [True, True, False, False]
     assert (report.stop_reason, report.business_status) == ("contact_plan_exhausted", "qualified_no_contact")
     assert progress(case).candidates == 0
 

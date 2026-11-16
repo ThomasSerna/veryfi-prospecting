@@ -235,13 +235,21 @@ class RoleFamily(Contract):
     seniorities: Annotated[list[ApolloSeniority], AfterValidator(_unique)]
     function_terms: Annotated[list[Text], Field(min_length=1), AfterValidator(_unique)]
     excluded_titles: Annotated[list[Text], AfterValidator(_unique)]
+    # Palabras de función: un título que las contiene junto a un nivel de responsabilidad pertenece a la familia
+    # («Sr. Manager, Loyalty & CRM»). También viajan a Apollo como títulos de búsqueda.
+    title_keywords: Annotated[list[Text], AfterValidator(_unique)] = Field(default_factory=list)
     source_reference: Text
     source_date: date
     validation_status: Literal["pending", "validated"]
 
+    @property
+    def search_titles(self) -> list[str]:
+        """Títulos y palabras de función que se envían a Apollo."""
+        return list(dict.fromkeys(self.titles_en + self.titles_es + self.title_keywords))
+
 
 class RoleTaxonomy(Contract):
-    version: Literal["role_taxonomy_v1"]
+    version: Literal["role_taxonomy_v1", "role_taxonomy_v2"]
     source_date: date
     validation_status: Literal["pending", "validated"]
     families: Annotated[list[RoleFamily], Field(min_length=1)]
@@ -249,11 +257,14 @@ class RoleTaxonomy(Contract):
     @model_validator(mode="after")
     def validate_families(self) -> Self:
         _unique([family.id for family in self.families])
-        for bounded in (True, False):
-            titles = {title.casefold() for family in self.families if bool(family.seniorities) == bounded
-                      for title in family.titles_en + family.titles_es}
-            if len(titles) >= 100:
-                raise ValueError("Cada grupo de búsqueda admite menos de 100 títulos únicos.")
+        # Una búsqueda reúne las familias de un perfil con o sin seniority; Apollo admite menos de 100 títulos.
+        for profile_id in {profile_id for family in self.families for profile_id in family.profile_ids}:
+            for bounded in (True, False):
+                titles = {title.casefold() for family in self.families
+                          if profile_id in family.profile_ids and bool(family.seniorities) == bounded
+                          for title in family.search_titles}
+                if len(titles) >= 100:
+                    raise ValueError("Cada grupo de búsqueda admite menos de 100 títulos únicos.")
         return self
 
 
@@ -388,7 +399,7 @@ class EffortLimits(Contract):
     pages: Count
     people: Annotated[Count, Field(le=5)]
     enrichments_per_provider: Annotated[Count, Field(le=5)]
-    people_queries: Annotated[Count, Field(le=2)]
+    people_queries: Annotated[Count, Field(le=4)]
     active_seconds: Count
     # T24: búsquedas dirigidas y páginas para corroborar el empleo; None en instantáneas anteriores (sin fase).
     employment_queries: Count | None = None
@@ -469,8 +480,8 @@ class CampaignLimits(Contract):
         caps = {
             "initial": (2, 3, 0, 0, 0, 90),
             "insufficient_evidence": (1, 2, 0, 0, 0, 45),
-            "medium": (2, 2, 3, 3, 2, 90),
-            "high": (4, 4, 5, 5, 2, 180),
+            "medium": (2, 2, 3, 3, 4, 90),
+            "high": (4, 4, 5, 5, 4, 180),
             "low": (0, 0, 0, 0, 0, 0),
             "excluded": (0, 0, 0, 0, 0, 0),
         }

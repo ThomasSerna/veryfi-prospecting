@@ -140,12 +140,14 @@ def test_taxonomy_search_filters_first_query_and_reuses_processed_requests(conta
     enable_role_taxonomy(case, role_config)
     report = case.find()
     requests = [payload for operation, payload, _ in case.calls if operation == "people_search"]
-    assert len(requests) == 2
-    assert requests[0]["person_seniorities"]
+    assert len(requests) == 4
+    assert requests[0]["person_seniorities"] and requests[0]["person_locations"] == ["Colombia"]
     assert "person_seniorities" not in requests[1]
-    assert all(payload["person_titles"] and payload["include_similar_titles"] is False for payload in requests)
+    assert all("person_locations" not in payload for payload in requests[2:])
+    # Apollo devuelve títulos similares; Python decide después la pertinencia de cada cargo.
+    assert all(payload["person_titles"] and "include_similar_titles" not in payload for payload in requests)
     assert report.business_status == "qualified_no_contact"
-    assert case.find().status == "already_checked" and len(case.calls) == 2
+    assert case.find().status == "already_checked" and len(case.calls) == 4
 
 
 def test_later_profile_contradiction_prevents_search_without_rewriting_assessment(contact_case, role_config):

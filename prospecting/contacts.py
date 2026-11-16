@@ -254,15 +254,28 @@ def _valid_refs(ids: list[UUID], contact: Contact, evidence: list[Evidence]) -> 
     return facts
 
 
+# Quien asiste o está en formación no gestiona el proceso, aunque su título contenga el cargo.
+_JUNIOR_TITLE = re.compile(r"\b(?:assistant|asistente|junior|jr|intern|trainee|practicante|becari[oa]|pasante|aprendiz)\b")
+# Nivel de responsabilidad que debe acompañar a una palabra de función (`title_keywords`).
+_LEVEL_TITLE = re.compile(r"\b(?:manager|gerente|head|director|directora|lead|leader|lider|vp|vice president|"
+                          r"vicepresident[ea]|chief|jefe|jefa|responsable|owner|principal)\b")
+
+
 def _family_title(title: str, family) -> bool:
+    """El título contiene un cargo de la familia, o una palabra de función junto a un nivel de responsabilidad.
+
+    Los títulos reales llevan antigüedad, ámbito o varias funciones («Sr. Loyalty & Brand Manager, LATAM»):
+    exigir igualdad exacta dejaba fuera a casi todas las personas pertinentes. `excluded_titles` conserva
+    los casos en que otra palabra cambia la función («Product Marketing», «Sales Engineering»).
+    """
     observed = fold_words(title)
-    if any(mentions(observed, excluded) for excluded in family.excluded_titles):
+    if _JUNIOR_TITLE.search(observed) or any(mentions(observed, excluded) for excluded in family.excluded_titles):
         return False
-    # El ámbito regional puede acompañar un cargo; otras palabras cambian su función.
-    observed = " ".join(re.sub(r"\b(?:regional|global)\b", "", observed).split())
-    scope = r"(?:latam|latin america|latinoamerica|colombia|mexico|regional|global|worldwide|and|y|de|para|for|in|en|co|mx)"
-    return any(re.fullmatch(re.escape(fold_words(alias)) + r"(?:\s+" + scope + r")*", observed)
-               for alias in family.titles_en + family.titles_es)
+    # El ámbito puede ir en medio del cargo en español («Director Regional de Producto»).
+    plain = " ".join(re.sub(r"\b(?:regional|global|senior|sr)\b", "", observed).split())
+    if any(mentions(text, alias) for text in (observed, plain) for alias in family.titles_en + family.titles_es):
+        return True
+    return bool(_LEVEL_TITLE.search(observed)) and any(mentions(observed, keyword) for keyword in family.title_keywords)
 
 
 def matched_role_family(contact: Contact, company: Company, assessment: Assessment, campaign: Campaign,
