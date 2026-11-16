@@ -314,7 +314,8 @@ class _ContactStage:
             functions = {person.id: person_function(person, self.company, self.assessment, self.campaign,
                                                     facts, now) for person in people}
             ordered = rank_contact_matches(matches, self.roles, function_ids=functions,
-                                           function_order=list(dict.fromkeys(family.function_id for family in families)))
+                                           function_order=list(dict.fromkeys(family.function_id for family in families)),
+                                           preferred_functions={family.function_id for family in families if family.preferred})
             by_id = {person.id: person for person in people}
             return [by_id[id] for id in ordered]
         selected = self.selected()

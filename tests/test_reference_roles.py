@@ -17,9 +17,10 @@ def families_for(role_config, title):
     ("Sr. Director, Consumer Data & Precision Marketing", "marketing_data"),
     ("Gerente Sr de Datos de Marketing", "marketing_data"),
     ("Loyalty & Brand Manager", "marketing_owners"),
-    ("Sr. Manager, Loyalty & CRM", "marketing_owners"),
-    ("Gerente de Programa de Lealtad", "marketing_owners"),
-    ("Head of CRM, LATAM", "marketing_owners"),
+    ("Sr. Manager, Loyalty & CRM", "loyalty_crm"),
+    ("Marketing Loyalty Programs Manager", "loyalty_crm"),
+    ("Gerente de Programa de Lealtad", "loyalty_crm"),
+    ("Head of CRM, LATAM", "loyalty_crm"),
     ("Senior Brand Manager México", "marketing_owners"),
     ("Directora de Marketing Digital", "marketing_owners"),
     ("Consumer Insights Sr Manager", "consumer_insights"),
@@ -86,3 +87,26 @@ def test_qualification_prompt_leaves_room_for_the_evidence_of_a_whole_company(ro
     _, selected = build_haiku_request(company, evidence, campaign)
     # Portada, ampliación propia y de terceros y extracción de contactos suman unos 25 fragmentos por empresa.
     assert len(selected) >= 25
+
+
+def test_preferred_functions_go_first_among_relevant_people_even_with_a_lower_score(make_contact, make_company):
+    """Lote real del 2026-11-16: una gerente de programas de lealtad quedó detrás de un director comercial."""
+    from prospecting.contacts import ContactMatch, MatchComponent, rank_contact_matches
+
+    company, _ = make_company()
+
+    def entry(title, score, role="profile_role"):
+        contact, _ = make_contact(company.id, title=title)
+        match = ContactMatch(version="contact_match_v3", score=score, components=[
+            MatchComponent(name="role", level=role, points=score, weight=55, pending=False)])
+        return contact, match, False
+
+    loyalty = entry("Marketing Loyalty Programs Manager", 39)
+    commercial = entry("Commercial Director", 55, role="selected_role")
+    outsider = entry("Plant Manager", 0, role="outside_profile")
+    functions = {loyalty[0].id: "loyalty_crm", commercial[0].id: "cpg_economic"}
+    order = rank_contact_matches([commercial, outsider, loyalty], [], function_ids=functions,
+                                 preferred_functions={"loyalty_crm", "marketing_data"})
+    assert order == [loyalty[0].id, commercial[0].id, outsider[0].id]
+    # Sin funciones preferentes manda el puntaje, como antes.
+    assert rank_contact_matches([commercial, outsider, loyalty], [], function_ids=functions)[0] == commercial[0].id

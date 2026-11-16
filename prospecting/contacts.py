@@ -975,8 +975,13 @@ def match_sort_key(match: ContactMatch | None, eligible: bool, contact: Contact,
 
 def rank_contact_matches(entries: list[tuple[Contact, ContactMatch | None, bool]], roles: list[str], *,
                          function_ids: dict[UUID, str] | None = None,
-                         function_order: list[str] | None = None) -> list[UUID]:
-    """Comparte el orden de revisión e investigación; v2 alterna funciones solo con igual score y pertinencia."""
+                         function_order: list[str] | None = None,
+                         preferred_functions: set[str] | None = None) -> list[UUID]:
+    """Comparte el orden de revisión e investigación; v2 alterna funciones solo con igual score y pertinencia.
+
+    `preferred_functions` (familias `preferred` de la taxonomía) van antes que las demás entre personas de
+    igual pertinencia, por delante del puntaje: son las funciones de los acuerdos cerrados de referencia.
+    """
     ordered = sorted(entries, key=lambda item: match_sort_key(item[1], item[2], item[0], roles))
     positions = {name: index for index, name in enumerate(function_order or [])}
     occurrences, ranked = {}, []
@@ -985,8 +990,8 @@ def rank_contact_matches(entries: list[tuple[Contact, ContactMatch | None, bool]
         if match is None or match.version == "contact_match_v1":
             ranked.append((base, contact.id))
             continue
-        quality = base[:4]
         function = (function_ids or {}).get(contact.id)
+        quality = base[:3] + (0 if function in (preferred_functions or ()) else 1,) + base[3:4]
         key = quality, function
         occurrence = occurrences.get(key, 0)
         occurrences[key] = occurrence + 1

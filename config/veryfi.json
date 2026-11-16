@@ -548,90 +548,36 @@
         "validation_status": "pending"
       },
       {
-        "id": "marketing_leadership",
-        "function_id": "marketing",
+        "id": "loyalty_crm",
+        "function_id": "loyalty_crm",
         "profile_ids": [
-          "cpg_brands"
+          "cpg_brands",
+          "loyalty_platforms_agencies"
         ],
         "buying_role": "business_champion",
         "titles_en": [
-          "Marketing Director",
-          "Director of Marketing",
-          "Head of Marketing",
-          "Senior Marketing Director"
-        ],
-        "titles_es": [
-          "Director de Marketing",
-          "Director de Mercadeo",
-          "Gerente de Marketing",
-          "Gerente de Mercadeo"
-        ],
-        "departments": [
-          "Marketing",
-          "Brand Management",
-          "CRM & Loyalty",
-          "Trade Marketing"
-        ],
-        "seniorities": [
-          "manager",
-          "head",
-          "director"
-        ],
-        "function_terms": [
-          "promotional campaigns",
-          "campañas promocionales",
-          "loyalty programs",
-          "programas de fidelización"
-        ],
-        "excluded_titles": [],
-        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
-        "source_date": "2026-11-06",
-        "validation_status": "pending"
-      },
-      {
-        "id": "marketing_owners",
-        "function_id": "marketing",
-        "profile_ids": [
-          "cpg_brands"
-        ],
-        "buying_role": "business_champion",
-        "titles_en": [
-          "Brand Manager",
-          "Senior Brand Manager",
           "Loyalty Manager",
-          "CRM Manager",
-          "Trade Marketing Manager",
-          "Shopper Marketing Manager",
-          "Digital Marketing Manager",
           "Loyalty Program Manager",
           "Loyalty Director",
           "Head of Loyalty",
+          "CRM Manager",
           "CRM Director",
           "Head of CRM",
-          "Consumer Engagement Manager",
-          "Brand Director"
+          "Consumer Engagement Manager"
         ],
         "titles_es": [
-          "Gerente de Marca",
-          "Gerente Senior de Marca",
           "Responsable de Fidelización",
           "Gerente de Lealtad",
-          "Responsable de CRM",
-          "Gerente de Trade Marketing",
-          "Gerente de Shopper Marketing",
-          "Gerente de Marketing Digital",
           "Gerente de Fidelización",
           "Director de Lealtad",
           "Director de Fidelización",
+          "Responsable de CRM",
           "Gerente de CRM",
-          "Director de CRM",
-          "Director de Marca"
+          "Director de CRM"
         ],
         "departments": [
           "Marketing",
-          "Brand Management",
-          "CRM & Loyalty",
-          "Trade Marketing"
+          "CRM & Loyalty"
         ],
         "seniorities": [
           "manager",
@@ -640,38 +586,26 @@
           "vp"
         ],
         "function_terms": [
-          "promotional campaigns",
-          "campañas promocionales",
           "loyalty programs",
           "programas de fidelización",
-          "recompensas por compra"
+          "recompensas por compra",
+          "CRM"
         ],
         "excluded_titles": [
-          "Employer Brand",
-          "Marca Empleadora",
-          "Brand Ambassador",
-          "Embajador de Marca",
           "Sales",
           "Ventas"
         ],
-        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15; Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
-        "source_date": "2026-11-15",
-        "validation_status": "pending",
         "title_keywords": [
           "loyalty",
           "lealtad",
           "fidelización",
           "crm",
-          "consumer engagement",
-          "brand",
-          "marca",
-          "trade marketing",
-          "shopper marketing",
-          "digital marketing",
-          "marketing digital",
-          "promotions",
-          "promociones"
-        ]
+          "consumer engagement"
+        ],
+        "preferred": true,
+        "source_reference": "Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
+        "source_date": "2026-11-16",
+        "validation_status": "pending"
       },
       {
         "id": "marketing_data",
@@ -734,7 +668,113 @@
         ],
         "source_reference": "Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
         "source_date": "2026-11-15",
+        "validation_status": "pending",
+        "preferred": true
+      },
+      {
+        "id": "marketing_leadership",
+        "function_id": "marketing",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Marketing Director",
+          "Director of Marketing",
+          "Head of Marketing",
+          "Senior Marketing Director"
+        ],
+        "titles_es": [
+          "Director de Marketing",
+          "Director de Mercadeo",
+          "Gerente de Marketing",
+          "Gerente de Mercadeo"
+        ],
+        "departments": [
+          "Marketing",
+          "Brand Management",
+          "CRM & Loyalty",
+          "Trade Marketing"
+        ],
+        "seniorities": [
+          "manager",
+          "head",
+          "director"
+        ],
+        "function_terms": [
+          "promotional campaigns",
+          "campañas promocionales",
+          "loyalty programs",
+          "programas de fidelización"
+        ],
+        "excluded_titles": [],
+        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15",
+        "source_date": "2026-11-06",
         "validation_status": "pending"
+      },
+      {
+        "id": "marketing_owners",
+        "function_id": "marketing",
+        "profile_ids": [
+          "cpg_brands"
+        ],
+        "buying_role": "business_champion",
+        "titles_en": [
+          "Brand Manager",
+          "Senior Brand Manager",
+          "Trade Marketing Manager",
+          "Shopper Marketing Manager",
+          "Digital Marketing Manager",
+          "Brand Director"
+        ],
+        "titles_es": [
+          "Gerente de Marca",
+          "Gerente Senior de Marca",
+          "Gerente de Trade Marketing",
+          "Gerente de Shopper Marketing",
+          "Gerente de Marketing Digital",
+          "Director de Marca"
+        ],
+        "departments": [
+          "Marketing",
+          "Brand Management",
+          "CRM & Loyalty",
+          "Trade Marketing"
+        ],
+        "seniorities": [
+          "manager",
+          "head",
+          "director",
+          "vp"
+        ],
+        "function_terms": [
+          "promotional campaigns",
+          "campañas promocionales",
+          "loyalty programs",
+          "programas de fidelización",
+          "recompensas por compra"
+        ],
+        "excluded_titles": [
+          "Employer Brand",
+          "Marca Empleadora",
+          "Brand Ambassador",
+          "Embajador de Marca",
+          "Sales",
+          "Ventas"
+        ],
+        "source_reference": "How Veryfi Sells, pág. 18; WhatsApp Bot (2025); docs/enterprise-rubrics.md §5.1; asignación por caso de uso propuesta en T15; Perfiles de referencia de acuerdos cerrados, compartidos por el contacto de Veryfi el 2026-11-15 (multinacional de consumo masivo, marketing de datos y de lealtad); pendiente de validación comercial",
+        "source_date": "2026-11-15",
+        "validation_status": "pending",
+        "title_keywords": [
+          "brand",
+          "marca",
+          "trade marketing",
+          "shopper marketing",
+          "digital marketing",
+          "marketing digital",
+          "promotions",
+          "promociones"
+        ]
       },
       {
         "id": "consumer_insights",

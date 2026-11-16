@@ -238,6 +238,9 @@ class RoleFamily(Contract):
     # Palabras de función: un título que las contiene junto a un nivel de responsabilidad pertenece a la familia
     # («Sr. Manager, Loyalty & CRM»). También viajan a Apollo como títulos de búsqueda.
     title_keywords: Annotated[list[Text], AfterValidator(_unique)] = Field(default_factory=list)
+    # Función respaldada por acuerdos cerrados de referencia: entre personas pertinentes va primero al
+    # investigar y al revisar. No acredita autoridad de compra de una persona concreta.
+    preferred: StrictBool = False
     source_reference: Text
     source_date: date
     validation_status: Literal["pending", "validated"]

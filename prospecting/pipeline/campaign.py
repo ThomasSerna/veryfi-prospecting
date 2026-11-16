@@ -426,7 +426,8 @@ def read_campaign(db_path: Path, campaign_id: UUID, *, account_allowances: list[
                 families = [] if assessment is None else role_families(company, assessment, campaign, evidence=evidence)
                 order = rank_contact_matches([(item.contact, item.match, item.eligible) for item in results], roles or [],
                                              function_ids={item.contact.id: item.function_id for item in results if item.function_id},
-                                             function_order=list(dict.fromkeys(family.function_id for family in families)))
+                                             function_order=list(dict.fromkeys(family.function_id for family in families)),
+                                             preferred_functions={family.function_id for family in families if family.preferred})
                 by_id = {item.contact.id: item for item in results}
                 results = [by_id[identifier] for identifier in order]
                 status = None if assessment is None else derive_readiness(
