@@ -519,6 +519,12 @@
       }
     });
   }
+  // El acceso «Iniciar» o «Reanudar» abre el panel de autorización además de llevar hasta él.
+  document.addEventListener?.('click', event => {
+    if (!event.target?.closest?.('a[href="#authorization"]')) return;
+    const details = document.querySelector('#authorization details');
+    if (details) details.open = true;
+  });
   if (busy) {
     setBusy(true);
     pollTimer = window.setTimeout(poll, 2000);
