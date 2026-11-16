@@ -189,9 +189,10 @@ y las instantáneas de las pruebas del pipeline los fijan:
   por `contacts_search:`.
 - Versiones: `discovery_queries_v1`, `discovery_queries_v2`, `icp_enterprise_v1`,
   `research_queries_v1`, `role_taxonomy_v1`, `haiku_assessment_v3`,
-  `haiku_assessment_v4`, `haiku_assessment_v5`, `contacts_extraction_v1`,
-  `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`, `people_policy_v1`,
-  `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite `user_version=3`.
+  `haiku_assessment_v4`, `haiku_assessment_v5`, `haiku_assessment_v6`, `haiku_wording_v1`,
+  `contacts_extraction_v1`, `contacts_extraction_v2`, `rubric_v1`, `rubric_v2`,
+  `people_policy_v1`, `employment_corroboration_v1`, `discovery_policy_v2` y el esquema SQLite
+  `user_version=3`.
   `discovery_policy_v2` vive en `config_snapshot.discovery_policy` (ausente o `null`: sin filtro
   local, con la portada al final y la consulta de Extract histórica); su motivo de descarte en el
   informe de descubrimiento es `non_business_site` y, para competidores de OCR/IDP, `competitor_vendor`.
@@ -201,8 +202,11 @@ y las instantáneas de las pruebas del pipeline los fijan:
   estado de canal `provider_verified`, en el JSON de canales, marca el `verified` de Apollo sin
   fecha de verificación propia.
   Las instantáneas sin taxonomía conservan los prompts v3/v4 según rúbrica y
-  `contacts_extraction_v1`; las nuevas usan v5 y `contacts_extraction_v2` sin
-  reinterpretar solicitudes ni evaluaciones históricas.
+  `contacts_extraction_v1`; las que tienen taxonomía usan v6 para las nuevas
+  calificaciones y `contacts_extraction_v2`. Las evaluaciones v5 siguen siendo
+  legibles y sus solicitudes y resultados históricos se conservan.
+  `haiku_wording_v1` identifica una revisión editorial enlazada a la evaluación
+  anterior mediante `revision_of`, sin cambiar sus criterios, referencias ni estado.
 
 Estos valores de Hunter siguen identificando el historial y no se reinterpretan
 como operaciones, contactos ni consumo de Apollo. La nueva ruta conserva sus propios
