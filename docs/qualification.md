@@ -16,7 +16,7 @@ campaña. Haiku propone y Python decide:
   Las campañas nuevas usan `rubric_v2` desde el 15 de noviembre de 2026
   ([decisión](Business-rules.md#candidata-enterprise-rubric_v2)).
   - La salida es JSON con esquema. El límite de entrada es
-    `limits.llm.max_input_tokens` (9.000 tokens) y el de salida,
+    `limits.llm.max_input_tokens` (30.000 tokens) y el de salida,
     `limits.llm.max_output_tokens`. La evidencia se selecciona con 2 caracteres por token,
     calibrados el 2026-10-14 con 15 solicitudes reales (de 2,11 a 2,26 caracteres por token
     facturado, incluido el prompt de la salida estructurada). Hasta ese día se estimaban 3 y el

@@ -214,6 +214,64 @@ Antes de conciliar se guardó una copia de la base en `data/backups/`.
 - Aunque Extract hubiera devuelto texto, una página no corporativa sin fecha publicada habría dejado
   a la persona en `undated_source` (revisión humana), no en `corporate_evidence`.
 
+## Lotes reales de calibración con cuentas objetivo (15 y 16 de noviembre de 2026)
+
+Tres campañas desde la interfaz Django local, con las cuentas de T24 (`apollo-eafit`, `tavily-cuenta-2`,
+`anthropic-equipo-prepago`), solo `cpg_loyalty`, Colombia y México, y cuentas objetivo elegidas por el equipo
+(empresas grandes de consumo masivo que no figuran entre las referencias de clientes). Antes se copió la base en
+`data/backups/prospecting-2026-11-15-antes-calibracion-cuentas-objetivo.sqlite3`. Autorización: el responsable
+del cupo, en la sesión de trabajo del 15 y 16 de noviembre, autorizó gastar en Tavily, Apollo y Haiku hasta
+calibrar; los topes de cada ejecución se fijaron en la interfaz y están en la tabla. Los nombres de empresas y
+personas permanecen en `data/`.
+
+| Campaña | Cuentas | Topes autorizados | Resultado |
+|---|---:|---|---|
+| `c16b84f8` (15 nov, 22:05) | 4 | Tavily 50 + 20, Haiku USD 0,15, Apollo 14 | 4 de 4 identidades confirmadas. Primera ejecución detenida por `HTTP 401. invalid x-api-key` de Anthropic; al reanudar con la clave corregida, 3 evaluadas y las 3 en `insufficient_evidence`; 1 atascada en `duplicate_request` por la llamada rechazada |
+| `fabbce01` (16 nov, 02:12) | 6 | Tavily 70 + 30, Haiku USD 0,30, Apollo 20 | 2 `ready_preferred`, 1 `needs_channel_confirmation`, 1 `insufficient_evidence`, 2 pendientes por citas de Haiku rechazadas |
+| `2a915279` (16 nov, 09:30) | 7 | Tavily 80 + 30, Haiku USD 0,40, Apollo 22 | 1 `ready_preferred`, 1 `needs_channel_confirmation`, 1 `qualified_no_contact` (sin perfil respaldado), 3 `insufficient_evidence`, 1 atascada en `duplicate_request` |
+
+| Operación | `c16b84f8` | `fabbce01` | `2a915279` | Total |
+|---|---:|---:|---:|---:|
+| Tavily Search, llamadas y créditos informados | 6 | 25 | 19, más 1 sin respuesta | 50, más 1 incierta |
+| Tavily Extract, llamadas / créditos informados | 7 / 3 | 17 / 10 | 16 / 7 | 40 / 20 |
+| Haiku `messages`, llamadas / costo estimado | 3 (más 1 rechazada) / USD 0,00321 | 14 / USD 0,02807 | 13 / USD 0,02104 | 30 / USD 0,05232 |
+| Apollo People Search, llamadas (0 créditos) | 0 | 6 | 4 | 10 |
+| Apollo People Enrichment, llamadas y créditos reservados | 0 | 7 | 4 | 11 |
+
+Ninguna llamada superó su tope. Queda **sin conciliar con los paneles** todo lo anterior: los 70 créditos
+informados de Tavily, la búsqueda sin respuesta, el costo de Haiku y los 11 créditos de Apollo, que no informa
+el consumo en su respuesta.
+
+Qué se midió, sobre 11 empresas distintas (13 ejecuciones de empresa en las dos últimas campañas):
+
+- **Por primera vez hay personas listas con datos reales:** 3 empresas en `ready_preferred`, con 7 personas con
+  correo `verified` por Apollo, y 2 en `needs_channel_confirmation`, con 4 personas con solo LinkedIn. Todas
+  viven en el país de la campaña según Apollo. En las 13 campañas anteriores el total era 0.
+- **Causa de fondo de los resultados anteriores:** con 9.000 tokens de entrada, el prompt de calificación y su
+  esquema (más de 100 cargos permitidos) dejaban sitio para 2 fragmentos de evidencia. La primera campaña lo
+  mostró: 3 de 3 evaluadas quedaron en `insufficient_evidence` con una promoción legible entre su evidencia.
+  Con 30.000 tokens entran unos 40 fragmentos; las solicitudes reales midieron unos 17.000 tokens de entrada.
+- **La web abierta sin país devolvía homónimos** (hoteles, relojes y la ficha de empresa del propio buscador).
+  Con el país, una señal del segmento obligatoria y `tavily.com` descartado dejaron de leerse.
+- **Citas de Haiku:** 2 empresas quedaron pendientes porque un perfil citaba un resultado de búsqueda o una
+  evidencia no suministrada, y una campaña falló al guardar una cita tomada de texto con saltos de línea. Ahora
+  el perfil sin respaldo se descarta y la cita se comprueba igual en la calificación, los cargos y la base.
+- **Orden de personas:** una gerente de programas de lealtad quedó sin enriquecer detrás de un director
+  comercial. Desde entonces las funciones `preferred` (lealtad/CRM y datos de marketing) van primero. No se
+  volvió a medir: ninguna empresa de la tercera campaña devolvió esos cargos.
+
+Límites de lo medido:
+
+- Todas las calificadas quedaron en prioridad `medium`: ninguna evidencia respaldó la escala (`scale_potential`
+  desconocido), aunque son empresas grandes. Apollo podría aportar el tamaño, pero no se consulta.
+- En una de las 3 empresas listas, la necesidad documental se apoya en una página de terceros que el propio
+  Haiku describe como no operada directamente por la marca. Es un posible falso positivo que ventas debe revisar.
+- 5 de 11 empresas no mostraron evidencia de promociones con comprobantes: sus sitios corporativos no las
+  publican y la búsqueda abierta no las encontró. No prueba que no existan.
+- Una llamada a Haiku rechazada por clave inválida o interrumpida antes de guardarse bloquea esa empresa en la
+  campaña (`duplicate_request`) hasta conciliarla a mano; no se repite sola.
+- No hubo revisión comercial: ninguna persona ni empresa fue aceptada o rechazada por Veryfi.
+
 ## Lote real de la T30
 
 | Campo | Valor observado |

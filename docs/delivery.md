@@ -24,13 +24,17 @@ campañas nuevas y `employment_policy_v2`.
 
 Estado de la validación:
 
-- **Simulado:** 1.595 pruebas sin red, con empresas y personas sintéticas, cubren los cambios.
-- **Real, incompleto:** un lote de calibración con cuatro cuentas objetivo confirmó la identidad
-  de las cuatro y leyó sus portadas con Tavily (4 solicitudes de Extract). La calificación se
-  detuvo en la primera llamada a Haiku: Anthropic rechazó la clave local (`HTTP 401. invalid
-  x-api-key`). No hubo llamadas a Apollo ni personas evaluadas.
-- **Sin verificar:** que las reglas nuevas dejen personas listas con datos reales. Falta
-  corregir la clave, reanudar el lote y conciliar su consumo.
+- **Simulado:** 1.599 pruebas sin red, con empresas y personas sintéticas, cubren los cambios.
+- **Real:** tres lotes de calibración con cuentas objetivo
+  ([detalle](provider-check.md#lotes-reales-de-calibración-con-cuentas-objetivo-15-y-16-de-noviembre-de-2026)).
+  Sobre 11 empresas grandes de consumo masivo: 3 con contacto listo (7 personas con correo
+  verificado por Apollo), 2 con personas pertinentes y solo LinkedIn por confirmar, 1 calificada
+  sin perfil respaldado y 5 sin evidencia suficiente. Es el primer resultado real con personas
+  listas. El primer lote además mostró por qué antes nada calificaba: el prompt solo dejaba sitio
+  para dos fragmentos de evidencia.
+- **Sin verificar:** la conciliación del consumo con los paneles, la revisión comercial de Veryfi
+  (ninguna cuenta ni persona ha sido aceptada o rechazada) y el segmento FinTech con las reglas
+  nuevas, que no se ejecutó.
 
 ## Qué se entrega
 
