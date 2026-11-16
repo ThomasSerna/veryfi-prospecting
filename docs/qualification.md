@@ -10,9 +10,11 @@ campaña. Haiku propone y Python decide:
 - **Solicitud:** usa el modelo `claude-haiku-5-5`, *thinking* desactivado y
   *effort* `low`. Las campañas sin taxonomía conservan `haiku_assessment_v3` con
   `rubric_v1` y `haiku_assessment_v4` con `rubric_v2`. Las campañas con
-  taxonomía de cargos usan `haiku_assessment_v6`, con el criterio de escala de la
-  rúbrica elegida, perfiles respaldados por citas y una regla para la evidencia de
-  terceros (`source_type` `secondary`): solo vale si nombra a la empresa evaluada.
+  taxonomía de cargos usan `haiku_assessment_v7`, con el criterio de escala de la
+  rúbrica elegida, perfiles respaldados por citas, una regla para la evidencia de
+  terceros (`source_type` `secondary`): solo vale si nombra a la empresa evaluada,
+  y la redacción de la ficha para ventas. `haiku_assessment_v5` y
+  `haiku_assessment_v6` se conservan para leer las evaluaciones anteriores.
   Las campañas nuevas usan `rubric_v2` desde el 15 de noviembre de 2026
   ([decisión](Business-rules.md#candidata-enterprise-rubric_v2)).
   - La salida es JSON con esquema. El límite de entrada es
@@ -24,8 +26,11 @@ campaña. Haiku propone y Python decide:
     campañas preparadas antes conservan 6.000 en su instantánea: si se reanudan, sus solicitudes
     nuevas se limitan a 12.000 caracteres.
   - El prompt limita cada justificación a 25 palabras, la explicación a dos frases y
-    los datos pendientes a tres. Una versión nueva del prompt genera una evaluación
-    nueva que revisa la anterior (`revision_of`); la anterior se conserva.
+    los datos pendientes a tres. V7 pide describir la empresa en lenguaje claro para
+    ventas, conservar los hechos y lo que falta por confirmar, y utilizar términos
+    técnicos de Veryfi cuando ayuden a explicar su oferta. Una versión nueva del
+    prompt genera una evaluación nueva que revisa la anterior (`revision_of`); la
+    anterior se conserva.
   - Un `1` exige una afirmación explícita, y ante la duda entre dos niveles se elige
     el menor. Para `document_need`, el `1` exige que el producto reciba o procese
     comprobantes; emitir facturas o conciliar bancos es, como máximo, `0.5`. La
@@ -39,7 +44,7 @@ campaña. Haiku propone y Python decide:
   faltantes. Python rechaza los ids no suministrados, los valores conocidos sin
   evidencia, los productos o cargos fuera de la configuración y los `1` que solo se
   apoyan en resultados del buscador. No los corrige.
-- **Perfiles:** v5 propone `profile_matches` con `profile_id` y citas literales
+- **Perfiles:** v5, v6 y v7 proponen `profile_matches` con `profile_id` y citas literales
   (`evidence_id`, `quote`). Python acepta solo perfiles de la empresa y la campaña,
   respaldados por evidencia empresarial observada suministrada, sin contradicción,
   distinta de revisiones manuales y resultados de búsqueda. Los productos compartidos
@@ -54,10 +59,11 @@ campaña. Haiku propone y Python decide:
   - `low` fija el resultado comercial `low_fit`.
   - `insufficient_evidence` queda en el `stop_reason`, sin fijarse como resultado
     comercial, porque aún cabe una ampliación de evidencia.
-  - Repetir la calificación reutiliza la evaluación guardada. La única excepción es una
-    evaluación `insufficient_evidence` con evidencia de empresa posterior (no manual ni de
-    contactos) que entra en la solicitud, como la de la ampliación: entonces se consulta de
-    nuevo a Haiku y la evaluación nueva revisa la anterior (`revision_of`).
+  - Repetir la calificación con la misma versión del prompt reutiliza la evaluación
+    guardada, salvo si es `insufficient_evidence` y hay evidencia de empresa posterior
+    (no manual ni de contactos) que entra en la solicitud, como la de la ampliación.
+    En ese caso se consulta de nuevo a Haiku y la evaluación nueva revisa la anterior
+    (`revision_of`).
 
 En v2, el contexto de tamaño distingue entidad, filial y grupo. La señal numérica
 de empleados solo se prepara con identidad y ámbito aplicable y con evidencia
@@ -67,6 +73,15 @@ exige respaldo en la evidencia suministrada, considera la financiación solo com
 contexto y conserva `null` cuando falta información o hay contradicción sobre el
 mismo dato y ámbito. Los otros cuatro criterios mantienen su significado v1. La
 revisión manual de reglas de T14 no acredita cómo responderá Haiku a v4.
+
+La revisión editorial de una evaluación vigente usa `haiku_wording_v1`.
+`prospecting.pipeline.qualification.request_wording` solicita a Haiku un
+borrador a partir de los textos existentes, con el mismo modelo, presupuesto y
+registro de consumo que la calificación. Antes de llamar a `save_wording`, quien
+la guarda debe revisar que el resumen, las justificaciones y los datos pendientes
+conservan su significado: la validación comprueba la estructura, no los hechos.
+`save_wording` guarda una evaluación enlazada por `revision_of` y conserva los
+valores, las referencias, la puntuación y el estado comercial de la original.
 
 `ClaudeClient` (`prospecting/providers/claude.py`) usa el SDK oficial `anthropic` con la clave de `ANTHROPIC_API_KEY`,
 `max_retries=0` y un timeout de 30 s como máximo. Sigue el mismo protocolo de

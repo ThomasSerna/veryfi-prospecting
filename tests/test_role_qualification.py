@@ -29,13 +29,16 @@ def profile_output(case, *, profile_id="expense_reimbursement", citations=None, 
     return output(case, profile_matches=matches, **overrides)
 
 
-def test_v5_requires_cited_profiles_and_keeps_shared_products_separate(scenario, role_config):
+def test_v7_adds_sales_wording_and_keeps_cited_profiles(scenario, role_config):
     case = with_taxonomy(scenario, role_config)
     payload, supplied = build_haiku_request(case.company, [case.primary], case.campaign)
     schema = payload["output_config"]["format"]["schema"]
     assert "profile_matches" in schema["required"]
     assert "expense_reimbursement" in payload["system"] and "payments_ap_erp" in payload["system"]
-    assert "haiku_assessment_v6" in payload["system"]
+    assert PROFILE_PROMPT_VERSION == "haiku_assessment_v7"
+    assert PROFILE_PROMPT_VERSION in payload["system"]
+    assert "español cotidiano para ventas" in payload["system"]
+    assert "source_type secondary" in payload["system"]
     parsed = parse_output(profile_output(case), "end_turn", campaign=case.campaign)
     result = validate_output(parsed, supplied, case.campaign, company=case.company)
     assert result["document_need"].value == 1
@@ -118,7 +121,7 @@ def test_v5_keeps_dense_evidence_inside_existing_token_budget(scenario, role_con
     assert payload["max_tokens"] == case.campaign.limits.llm.max_output_tokens
 
 
-def test_v5_pipeline_ignores_v3_cached_assessment_and_persists_citations(claude, role_config):
+def test_v7_pipeline_revises_v5_assessment_and_persists_citations(claude, role_config):
     original = claude.qualify()
     previous = claude.db.get_assessment(original.assessment_id)
     claude.campaign = claude.campaign.model_copy(update={"id": uuid4(), "config_snapshot": role_config})
@@ -132,7 +135,8 @@ def test_v5_pipeline_ignores_v3_cached_assessment_and_persists_citations(claude,
     claude.db.save_company(claude.company, evidence=[segment])
     claude.db.save_run_item(RunItem(campaign_id=claude.campaign.id, company_id=claude.company.id,
                                   stage="identity_resolved"))
-    old = previous.model_copy(update={"id": uuid4(), "campaign_id": claude.campaign.id})
+    old = previous.model_copy(update={"id": uuid4(), "campaign_id": claude.campaign.id,
+                                      "prompt_version": "haiku_assessment_v5"})
     claude.db.save_assessment(old)
     claude.reply = message(profile_output(claude))
     report = claude.qualify()
