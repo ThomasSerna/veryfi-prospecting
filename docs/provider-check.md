@@ -309,7 +309,12 @@ de conciliar se copió la base en `data/backups/prospecting-2026-11-16-antes-con
   cota superior del consumo real.
 - El panel de Tavily muestra el aviso «To continue using Tavily, please provide a billing address». No se ha
   comprobado si bloquea nuevas llamadas.
-- En todo el ledger quedan sin conciliar esas filas de Tavily y la fila histórica de Hunter de la T07.
+- **Tavily, cierre del 16 de noviembre:** el responsable aceptó conciliar con los créditos informados. Las 126
+  filas de T30 (25 créditos) y de estos lotes (70) quedaron conciliadas con el comprobante
+  `data/conciliaciones/tavily-2026-11-16-t30-y-calibracion-informados.json`, sin verificación exacta en el panel,
+  que muestra 3 créditos menos; el ledger queda como cota superior. La búsqueda sin respuesta sigue en `uncertain`
+  con su reserva de 1 crédito, porque no informó consumo.
+- En todo el ledger quedan sin conciliar esa búsqueda sin respuesta y la fila histórica de Hunter de la T07.
 
 ## Lote real de verificación de `haiku_assessment_v7` y FinTech (16 de noviembre de 2026)
 
@@ -355,8 +360,8 @@ base en `data/backups/prospecting-2026-11-16-antes-conciliacion-lote-verificacio
 - **Tavily**: el panel pasó de 142 a 182 créditos, un salto de 40. Las respuestas informaron 39 (28 de búsqueda y 11
   de extracción); el crédito restante se atribuyó, por inferencia del total, a la búsqueda sin respuesta, que
   conserva resultado desconocido. Las 52 filas se conciliaron en una transacción; comprobante en
-  `data/conciliaciones/tavily-2026-11-16-lote-verificacion-v7.json`. Siguen sin conciliar las 126 filas de T30 y de
-  los lotes de calibración: en noviembre el ledger suma 185 créditos y el panel 182.
+  `data/conciliaciones/tavily-2026-11-16-lote-verificacion-v7.json`. En noviembre el ledger suma 185 créditos y el panel 182; las filas de T30 y de
+  los lotes de calibración se conciliaron después con los créditos informados.
 - **Haiku**: las 23 llamadas se conciliaron con el costo estimado de los tokens que informó la API (USD 0,0449948),
   sin captura de la consola, porque el responsable lo aceptó el 2026-11-16. Comprobante en
   `data/conciliaciones/anthropic-2026-11-16-lote-verificacion-v7.json`.

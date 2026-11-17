@@ -43,8 +43,8 @@ Estado de la validación:
   anterior.
 - **Conciliado con los paneles:** los 30 créditos de Apollo y todo el consumo de Haiku (el de los
   lotes de calibración, contra la consola de Claude; el del último lote, con el estimado). Tavily
-  está conciliado salvo 126 filas de T30 y de los lotes de calibración: en noviembre el panel
-  muestra 182 créditos y las respuestas suman 185
+  está conciliado con los créditos informados por las respuestas, que en noviembre suman 185
+  frente a los 182 del panel; solo queda abierta una búsqueda sin respuesta
   ([conciliación](provider-check.md#conciliación-de-los-lotes-de-calibración)).
 - **Sin verificar con datos reales:** el orden preferente de lealtad/CRM y datos de marketing (la
   cuenta que pidió esos cargos se investigó con un dominio que Apollo no asocia a sus empleados) y
@@ -86,7 +86,7 @@ Fallos conocidos:
 | Ningún registro listo incumple la regla de canal directo | Cumplido | Los listos de noviembre tienen correo `verified` por Apollo; pruebas de §18.1 |
 | UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo): las 85 fichas de empresa guardadas siguen en revisión `pending` |
 | Pruebas críticas en verde | Cumplido | 1.604 pruebas sin red el 16 de noviembre; 960 al cerrar octubre |
-| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido, con parte de Tavily de noviembre pendiente | Haiku acumula USD 0,1331819 conciliados; Apollo, 30 créditos gratuitos; Tavily, créditos gratuitos ([octubre](#proveedores-reales-t09-octubre), [noviembre](#lotes-con-apollo-noviembre)) |
+| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido; en Tavily el ledger supera al panel en 3 créditos | Haiku acumula USD 0,1331819 conciliados; Apollo, 30 créditos gratuitos; Tavily, créditos gratuitos ([octubre](#proveedores-reales-t09-octubre), [noviembre](#lotes-con-apollo-noviembre)) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
 ### Entrega del 6 de noviembre
@@ -189,7 +189,7 @@ Consumo de los tres lotes de calibración: 70 créditos de Tavily informados por
 una búsqueda sin respuesta; USD 0,0523160 de Haiku en 30 llamadas, más una rechazada sin consumo; y
 11 créditos de Apollo. Apollo y Haiku están conciliados con los paneles. En noviembre el panel de
 Tavily muestra 142 créditos y las respuestas suman 145: la diferencia de 3 no se puede atribuir a
-solicitudes concretas y esas filas siguen sin conciliar. La consola de Claude muestra además 1.743
+solicitudes concretas, y esas filas se conciliaron con los créditos informados. La consola de Claude muestra además 1.743
 tokens del 15 de noviembre (UTC) que no pertenecen a este ledger.
 
 El lote de verificación consumió 40 créditos de Tavily, USD 0,0449948 de Haiku y 13 créditos de
@@ -297,9 +297,7 @@ Prioridades al 16 de noviembre de 2026; el backlog vigente está en [Roadmap.md]
    publican las promociones.
 5. **Resultado pagado que no se guarda**: decidir si se conserva la respuesta de Haiku antes de
    procesarla, lo que cambia el contrato de persistencia, o si se admite repetir la llamada.
-6. **Conciliación de Tavily**: decidir cómo cerrar filas cuando el panel cobra menos de lo que
-   informan las respuestas (3 créditos en noviembre).
-7. **Cierre de T10 y T21**: conjunto independiente, comparación con la línea base de Hunter y
+6. **Cierre de T10 y T21**: conjunto independiente, comparación con la línea base de Hunter y
    conclusión sustentada.
 
 ## Datos locales
@@ -308,11 +306,11 @@ Inventario de la copia local revisada el 16 de noviembre, solo con conteos:
 
 - `data/prospecting.sqlite3`: 17 campañas (5 preparadas, 3 terminadas y 9 parciales), 65 empresas,
   151 contactos, entre candidatos de búsqueda y personas enriquecidas, y 97 evaluaciones. El ledger
-  registra 519 solicitudes: 391 conciliadas, 126 de Tavily y una de Hunter de T07 sin conciliar, y
-  una búsqueda de Tavily sin respuesta de los lotes de calibración.
-- `data/backups/`: 21 copias de la base previas a cada lote y conciliación, y 4 versiones
+  registra 519 solicitudes: 517 conciliadas, una de Hunter de T07 sin conciliar y una búsqueda de Tavily sin
+  respuesta de los lotes de calibración.
+- `data/backups/`: 22 copias de la base previas a cada lote y conciliación, y 4 versiones
   anteriores del archivo de acceso.
-- `data/conciliaciones/`: 28 comprobantes de los paneles y del uso informado por los proveedores.
+- `data/conciliaciones/`: 29 comprobantes de los paneles y del uso informado por los proveedores.
 - `data/provider-access.json`: cupos y referencias comprobadas, sin claves. No refleja todavía el
   uso de Anthropic ajeno al ledger del 15 de noviembre.
 
