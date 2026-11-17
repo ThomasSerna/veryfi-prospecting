@@ -36,14 +36,19 @@ Estado de la validación:
   sin perfil respaldado y 5 sin evidencia suficiente. Es el primer resultado real con personas
   listas. El primer lote además mostró por qué antes nada calificaba: el prompt solo dejaba sitio
   para dos fragmentos de evidencia.
-- **Conciliado con los paneles:** los 17 créditos de Apollo y el consumo de Haiku de los lotes de
-  calibración, este por primera vez contra la consola de Claude. Tavily sigue pendiente: el panel
-  muestra 142 créditos en noviembre y las respuestas suman 145
+- **Real, `haiku_assessment_v7` y FinTech:** un lote de 10 cuentas objetivo del 16 de noviembre
+  ([detalle](provider-check.md#lote-real-de-verificación-de-haiku_assessment_v7-y-fintech-16-de-noviembre-de-2026)).
+  Las 10 evaluaciones usaron el prompt nuevo; 3 de 4 cuentas de FinTech calificaron y 2 tienen
+  personas; las cuentas de consumo masivo repetidas dieron el mismo resultado que con la versión
+  anterior.
+- **Conciliado con los paneles:** los 30 créditos de Apollo y todo el consumo de Haiku (el de los
+  lotes de calibración, contra la consola de Claude; el del último lote, con el estimado). Tavily
+  está conciliado salvo 126 filas de T30 y de los lotes de calibración: en noviembre el panel
+  muestra 182 créditos y las respuestas suman 185
   ([conciliación](provider-check.md#conciliación-de-los-lotes-de-calibración)).
-- **Sin verificar con datos reales:** el prompt `haiku_assessment_v7`, integrado después de los
-  lotes, que corrieron con `haiku_assessment_v6`; el segmento FinTech con las reglas nuevas, que no
-  se ejecutó; el orden preferente de lealtad/CRM y datos de marketing, porque ninguna empresa del
-  último lote devolvió esos cargos; y el reintento de una calificación rechazada tras conciliarla.
+- **Sin verificar con datos reales:** el orden preferente de lealtad/CRM y datos de marketing (la
+  cuenta que pidió esos cargos se investigó con un dominio que Apollo no asocia a sus empleados) y
+  el reintento de una calificación rechazada tras conciliarla.
 - **Sin revisión comercial:** Veryfi no ha aceptado ni rechazado ninguna cuenta ni persona.
 
 Fallos conocidos:
@@ -79,9 +84,9 @@ Fallos conocidos:
 | Evidencia, puntuación con desglose, esfuerzo y búsqueda de personas | Cumplido | Con Tavily y Hunter en octubre ([T09](evaluation.md#lotes-reales), [entrega](evaluation.md#lote-real-de-la-entrega-t11)); con Tavily y Apollo desde noviembre ([lotes](#lotes-con-apollo-noviembre)) |
 | Al menos un prospecto real completo | No cumplido en octubre; en noviembre, 3 empresas con contacto listo **sin revisión comercial** | 0 personas listas hasta el 10 de noviembre; 7 personas con correo verificado en los lotes de calibración |
 | Ningún registro listo incumple la regla de canal directo | Cumplido | Los listos de noviembre tienen correo `verified` por Apollo; pruebas de §18.1 |
-| UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo): las 75 fichas de empresa guardadas siguen en revisión `pending` |
+| UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo): las 85 fichas de empresa guardadas siguen en revisión `pending` |
 | Pruebas críticas en verde | Cumplido | 1.604 pruebas sin red el 16 de noviembre; 960 al cerrar octubre |
-| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido, con Tavily de noviembre pendiente | Haiku acumula USD 0,0881871 conciliados; Apollo, 17 créditos gratuitos; Tavily, créditos gratuitos ([octubre](#proveedores-reales-t09-octubre), [noviembre](#lotes-con-apollo-noviembre)) |
+| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido, con parte de Tavily de noviembre pendiente | Haiku acumula USD 0,1331819 conciliados; Apollo, 30 créditos gratuitos; Tavily, créditos gratuitos ([octubre](#proveedores-reales-t09-octubre), [noviembre](#lotes-con-apollo-noviembre)) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
 ### Entrega del 6 de noviembre
@@ -169,7 +174,7 @@ USD 0,0283956 de Haiku en este ledger, más unos USD 0,0019 de otra instancia.
 
 ### Lotes con Apollo (noviembre)
 
-Siete campañas reales entre el 8 y el 16 de noviembre, autorizadas por el responsable del cupo
+Ocho campañas reales entre el 8 y el 16 de noviembre, autorizadas por el responsable del cupo
 ([llamadas, topes y conciliación](provider-check.md#lotes-reales-de-apollo-de-la-t17)):
 
 | Lote | Empresas | Resultado |
@@ -178,6 +183,7 @@ Siete campañas reales entre el 8 y el 16 de noviembre, autorizadas por el respo
 | T24 (9 nov) | 5 | 4 detenidas por identidad; 1 con 3 personas pertinentes y empleo solo declarado por Apollo; 0 listas |
 | T30 (9 nov) | 10, con reservas | 3 identidades confirmadas; ninguna llegó a contactos; 0 listas |
 | Calibración con cuentas objetivo (15 y 16 nov, 3 campañas) | 11 distintas | 3 `ready_preferred` con 7 personas con correo verificado; 2 `needs_channel_confirmation` con 4 personas con solo LinkedIn; 1 `qualified_no_contact`; 5 sin evidencia suficiente |
+| Verificación de `haiku_assessment_v7` y FinTech (16 nov) | 10 | 3 `ready_preferred` (una sin terminar la etapa de contactos); 3 `needs_channel_confirmation`; 1 `qualified_no_contact`; 2 sin evidencia suficiente; 1 pendiente por una cita de Haiku rechazada |
 
 Consumo de los tres lotes de calibración: 70 créditos de Tavily informados por las respuestas, más
 una búsqueda sin respuesta; USD 0,0523160 de Haiku en 30 llamadas, más una rechazada sin consumo; y
@@ -186,9 +192,12 @@ Tavily muestra 142 créditos y las respuestas suman 145: la diferencia de 3 no s
 solicitudes concretas y esas filas siguen sin conciliar. La consola de Claude muestra además 1.743
 tokens del 15 de noviembre (UTC) que no pertenecen a este ledger.
 
-Acumulado del ledger: USD 0,0881871 de Haiku, todo conciliado; 17 créditos de Apollo, de 85
-registrados; y 218 créditos informados de Tavily en la cuenta actual desde octubre, cuyo plan
-gratuito renueva 1.000 cada mes.
+El lote de verificación consumió 40 créditos de Tavily, USD 0,0449948 de Haiku y 13 créditos de
+Apollo, todo conciliado.
+
+Acumulado del ledger: USD 0,1331819 de Haiku, todo conciliado; 30 créditos de Apollo, de 85
+registrados; y 258 créditos de Tavily en la cuenta actual desde octubre, cuyo plan gratuito renueva
+1.000 cada mes.
 
 Sigue sin medirse la precisión de empresas, la pertinencia de personas y el costo por prospecto
 aceptado: nadie de Veryfi ha revisado los resultados.
@@ -267,7 +276,7 @@ discutir con Veryfi, no resultados obtenidos.
 | Prospectos reales completos que ventas considere útiles, revisados y aceptados | No cumplido: 3 empresas con contacto listo en noviembre, ninguna revisada ni aceptada por ventas |
 | Revisión documentada de Veryfi: catálogo, exclusiones, ejemplos etiquetados y criterios de cargo | Pendiente |
 | Calificación evaluada en un conjunto independiente, con métricas por país y segmento | Pendiente; protocolo en `t10-evaluation.md` |
-| Etapa de personas mejorada y medida frente a la línea base: Hunter con personas en 1 de 8 búsquedas (T09) y 2 de 4 (entrega), sin empleo vigente demostrado | Parcial: Apollo dio personas listas en 3 de 11 cuentas objetivo; falta la comparación de T21 y la revisión de pertinencia |
+| Etapa de personas mejorada y medida frente a la línea base: Hunter con personas en 1 de 8 búsquedas (T09) y 2 de 4 (entrega), sin empleo vigente demostrado | Parcial: Apollo dio personas listas en 3 de 11 cuentas objetivo de calibración y en 3 de 10 del lote de verificación; falta la comparación de T21 y la revisión de pertinencia |
 | Presupuesto operativo y responsable del cupo, con cuentas de la organización y condiciones de uso verificadas | Sin presupuesto posterior al 16 de octubre (IDEA §2); cuentas gratuitas del equipo |
 | Usuarios definidos y responsable de datos; fuentes permitidas, retención y eliminación acordadas | Pendiente de acordar con Veryfi |
 | Entorno de acceso apropiado: autenticación, permisos, HTTPS, servidor de aplicaciones, almacenamiento con respaldo, trabajos persistentes y monitoreo | No existe; requiere una decisión de despliegue y acceso separada (IDEA §4.3) |
@@ -279,9 +288,9 @@ Prioridades al 16 de noviembre de 2026; el backlog vigente está en [Roadmap.md]
 1. **Revisión comercial de Veryfi**: aceptar o rechazar las 3 cuentas con contacto listo y sus
    personas, y confirmar catálogo, exclusiones y criterios de cargo. Sin ella no hay precisión,
    pertinencia ni costo por prospecto aceptado.
-2. **Verificación real de lo integrado después de los lotes**: `haiku_assessment_v7`, el segmento
-   FinTech con las reglas nuevas, el orden preferente de lealtad/CRM y datos de marketing, y el
-   reintento de una calificación rechazada. Cada una exige autorización de gasto.
+2. **Verificación real pendiente**: el orden preferente de lealtad/CRM y datos de marketing, con
+   el dominio que Apollo asocia a los empleados de la cuenta, y el reintento de una calificación
+   rechazada. Cada una exige autorización de gasto.
 3. **Escala de la empresa**: decidir de dónde sale la evidencia de tamaño (una búsqueda dirigida o
    el dato de organización de Apollo). Hoy ninguna cuenta puede llegar a prioridad alta.
 4. **Evidencia de promociones**: 5 de 11 cuentas quedaron sin evidencia; sus sitios corporativos no
@@ -297,13 +306,13 @@ Prioridades al 16 de noviembre de 2026; el backlog vigente está en [Roadmap.md]
 
 Inventario de la copia local revisada el 16 de noviembre, solo con conteos:
 
-- `data/prospecting.sqlite3`: 16 campañas (5 preparadas, 3 terminadas y 8 parciales), 60 empresas,
-  78 contactos, entre candidatos de búsqueda y personas enriquecidas, y 82 evaluaciones. El ledger
-  registra 421 solicitudes: 293 conciliadas, 126 de Tavily y una de Hunter de T07 sin conciliar, y
-  una búsqueda de Tavily sin respuesta.
-- `data/backups/`: 19 copias de la base previas a cada lote y conciliación, y 4 versiones
+- `data/prospecting.sqlite3`: 17 campañas (5 preparadas, 3 terminadas y 9 parciales), 65 empresas,
+  151 contactos, entre candidatos de búsqueda y personas enriquecidas, y 97 evaluaciones. El ledger
+  registra 519 solicitudes: 391 conciliadas, 126 de Tavily y una de Hunter de T07 sin conciliar, y
+  una búsqueda de Tavily sin respuesta de los lotes de calibración.
+- `data/backups/`: 21 copias de la base previas a cada lote y conciliación, y 4 versiones
   anteriores del archivo de acceso.
-- `data/conciliaciones/`: 25 comprobantes de los paneles y del uso informado por los proveedores.
+- `data/conciliaciones/`: 28 comprobantes de los paneles y del uso informado por los proveedores.
 - `data/provider-access.json`: cupos y referencias comprobadas, sin claves. No refleja todavía el
   uso de Anthropic ajeno al ledger del 15 de noviembre.
 

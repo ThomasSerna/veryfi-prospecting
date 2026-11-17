@@ -311,6 +311,68 @@ de conciliar se copió la base en `data/backups/prospecting-2026-11-16-antes-con
   comprobado si bloquea nuevas llamadas.
 - En todo el ledger quedan sin conciliar esas filas de Tavily y la fila histórica de Hunter de la T07.
 
+## Lote real de verificación de `haiku_assessment_v7` y FinTech (16 de noviembre de 2026)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-16 (America/Bogota): ejecución de 20:18 a 20:22 |
+| Cuentas | `apollo-eafit`, `tavily-cuenta-2` y `anthropic-equipo-prepago` |
+| Ejecución | Desde la interfaz Django local, campaña nueva `25638dd8` con `rubric_v2` y `haiku_assessment_v7`: Colombia y México, `fintech_software` y `cpg_loyalty`, 10 cuentas objetivo (4 de FinTech y 6 de consumo masivo, 3 de ellas ya investigadas en los lotes de calibración). Antes se copió la base en `data/backups/prospecting-2026-11-16-antes-lote-verificacion-v7.sqlite3`. Los nombres permanecen en `data/` |
+| Autorización | Responsable del cupo, en el chat del 2026-11-16: Tavily `search` ≤ 60 y `extract` ≤ 30 créditos, Haiku ≤ USD 0,30, Apollo `people_search` 0 y `people_enrichment` ≤ 15 créditos |
+
+| Operación | Llamadas | Créditos reservados | Créditos informados o conciliados | Costo |
+|---|---:|---:|---:|---|
+| Tavily Search | 29, una sin respuesta | 29 | 28 informados, más 1 atribuido a la búsqueda sin respuesta | USD 0 (crédito gratuito) |
+| Tavily Extract | 23 | 23 | 11 | USD 0 (crédito gratuito) |
+| Haiku `messages` | 23 | — | — | USD 0,0449948 estimado y conciliado |
+| Apollo People Search | 10 | 0 | 0 | USD 0 |
+| Apollo People Enrichment | 13 | 13 | 13 conciliados | USD 0 |
+
+Ninguna llamada superó su tope. La campaña quedó `partial`.
+
+**Resultados.** Las 10 evaluaciones usaron `haiku_assessment_v7`.
+
+- **FinTech (4 cuentas, primera ejecución real con las reglas nuevas):** 1 `ready_preferred` con 2 personas, 1
+  `needs_channel_confirmation` con 3 personas, 1 marcada `ready_preferred` cuya etapa de contactos se detuvo por el
+  timeout de Tavily y 1 pendiente porque Haiku citó evidencia que no se le suministró
+  (`assessment_pending:unknown_evidence`). Las 3 calificadas quedaron en prioridad media con los perfiles
+  `payments_ap_erp` o `expense_reimbursement` y cargos de producto e ingeniería.
+- **Consumo masivo (6 cuentas):** las 2 repetidas con personas dieron lo mismo que con `haiku_assessment_v6`
+  (1 `ready_preferred` con 3 personas y 1 `needs_channel_confirmation` con 2), ahora con dos perfiles reconocidos
+  en vez de uno, y reutilizaron las personas guardadas sin llamar a Apollo. De las nuevas, 1 quedó en
+  `needs_channel_confirmation` con 1 persona de 3 enriquecimientos, 1 en `qualified_no_contact` y 2 en
+  `insufficient_evidence` (una de ellas ya lo estaba en el lote anterior).
+
+### Conciliación
+
+Lecturas de los paneles entregadas por el responsable el 16 de noviembre (20:30, America/Bogota). Antes se copió la
+base en `data/backups/prospecting-2026-11-16-antes-conciliacion-lote-verificacion-v7.sqlite3`.
+
+- **Apollo**: el portal pasó de 17 a 30 créditos usados; el salto de 13 corresponde a los 13 enriquecimientos. Se
+  concilió con `manage.py reconcile_usage` (primero con `--dry-run`) y el comprobante
+  `data/conciliaciones/apollo-2026-11-16-lote-verificacion-v7.json`. La cuenta queda con 0 créditos pendientes y 55
+  disponibles en el ledger.
+- **Tavily**: el panel pasó de 142 a 182 créditos, un salto de 40. Las respuestas informaron 39 (28 de búsqueda y 11
+  de extracción); el crédito restante se atribuyó, por inferencia del total, a la búsqueda sin respuesta, que
+  conserva resultado desconocido. Las 52 filas se conciliaron en una transacción; comprobante en
+  `data/conciliaciones/tavily-2026-11-16-lote-verificacion-v7.json`. Siguen sin conciliar las 126 filas de T30 y de
+  los lotes de calibración: en noviembre el ledger suma 185 créditos y el panel 182.
+- **Haiku**: las 23 llamadas se conciliaron con el costo estimado de los tokens que informó la API (USD 0,0449948),
+  sin captura de la consola, porque el responsable lo aceptó el 2026-11-16. Comprobante en
+  `data/conciliaciones/anthropic-2026-11-16-lote-verificacion-v7.json`.
+
+### Observaciones y limitaciones
+
+- En la cuenta global de consumo masivo, el dominio corporativo agrupa empleados de todo el mundo: de 3
+  enriquecimientos quedó 1 persona, con un cargo de alcance norteamericano. Ventas debe revisar si es pertinente.
+- En la cuenta `qualified_no_contact`, Apollo rechazó a las personas con `entity_mismatch_domain`: el dominio dado
+  como cuenta objetivo no es el que Apollo asocia a sus empleados. Gastó 3 créditos sin resultado y deja sin medir
+  el orden preferente de lealtad/CRM, que eran justo los cargos pedidos.
+- Esa misma cuenta es la primera con escala respaldada (cobertura 0,95); quedó en prioridad media porque su encaje,
+  68, no llega a 75.
+- No se revisó por qué una cuenta de FinTech con personas con correo quedó en `needs_channel_confirmation`.
+- No hubo revisión comercial de ninguna cuenta ni persona.
+
 ## Lote real de la T30
 
 | Campo | Valor observado |
