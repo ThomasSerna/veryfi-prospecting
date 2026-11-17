@@ -10,13 +10,13 @@ from uuid import UUID, uuid4
 
 from pydantic import StrictBool
 
-from prospecting.budget import Budget, BudgetError, SpendingAuthorization
+from prospecting.budget import Budget, BudgetError, SpendingAuthorization, unconsumed_failure
 from prospecting.db import Database
 from prospecting.models import (
-    Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, utc_now,
+    Assessment, BusinessStatus, Contract, Money, Priority, RunItem, RunStage, Text, TokenUsage, UsageStatus, utc_now,
 )
 from prospecting.pipeline.calls import reserve_claude, seconds_left, was_sent
-from prospecting.providers import ClaudeCall, ClaudeClient, ProviderError
+from prospecting.providers import CLAUDE_OPERATION, CLAUDE_PROVIDER, ClaudeCall, ClaudeClient, ProviderError
 from prospecting.qualification import (
     PROMPT_VERSION, WORDING_VERSION, AssessmentWording, QualificationError, build_haiku_request,
     build_wording_request, classify, explanation_text, reviewed_explanation,
@@ -85,6 +85,18 @@ def _expanded_evidence(assessment: Assessment, evidence) -> set[UUID]:
         return set()
     return {item.id for item in evidence if item.contact_id is None and item.source_type != "manual"
             and item.retrieved_at > assessment.created_at}
+
+
+def _retry_target(db: Database, campaign_id: UUID, company_id: UUID, account_ref: str, fingerprint: str) -> UUID | None:
+    """Único envío previo de esta solicitud, si quedó conciliado como fallo sin consumo: admite un reintento (T17).
+
+    Una llamada rechazada (p. ej. clave inválida) no deja la empresa bloqueada para siempre: tras conciliarla en
+    cero, se repite una vez con un permiso nuevo. En cualquier otro caso `Budget` rechaza el duplicado.
+    """
+    sent = [row for row in db.list_usage(company_id=company_id, provider=CLAUDE_PROVIDER)
+            if row.campaign_id == campaign_id and row.status != UsageStatus.RESERVED
+            and (row.operation, row.account_ref, row.request_fingerprint) == (CLAUDE_OPERATION, account_ref, fingerprint)]
+    return sent[0].request_id if len(sent) == 1 and unconsumed_failure(sent[0]) else None
 
 
 def _store_assessment(db: Database, run_item: RunItem, assessment: Assessment, *, stop_reason) -> Assessment:
@@ -262,8 +274,10 @@ def qualify_company(db: Database, budget: Budget, claude: ClaudeClient, campaign
         if remaining is not None and remaining <= 0:
             return pending("time_limit", "Se agotó el tiempo de la etapa durante la captura, antes de reservar.")
     try:
-        usage = reserve_claude(budget, claude.fingerprint(payload, account_ref), payload, account_ref=account_ref,
-                               funding_source=funding_source, authorization=authorization, **base)
+        fingerprint = claude.fingerprint(payload, account_ref)
+        usage = reserve_claude(budget, fingerprint, payload, account_ref=account_ref,
+                               funding_source=funding_source, authorization=authorization,
+                               retry_of=_retry_target(db, campaign_id, company_id, account_ref, fingerprint), **base)
         if not capture("request.json", {"request_id": str(usage.request_id),
                                         "request_fingerprint": usage.request_fingerprint}):
             return pending("trace_capture_failed", capture_errors[-1] +

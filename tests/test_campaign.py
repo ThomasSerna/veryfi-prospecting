@@ -8,9 +8,11 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
+import anthropic
+import httpx2
 import pytest
 
-from prospecting.budget import AccountAllowance, Budget, SpendingAuthorization
+from prospecting.budget import AccountAllowance, Budget, Confirmation, SpendingAuthorization
 from prospecting.db import Database
 from prospecting.identity import ExclusionList
 from prospecting.models import BusinessStatus, CampaignLimits, CampaignStatus, Evidence, RunItem, RunStage, Usage, UsageStatus, utc_now
@@ -391,6 +393,51 @@ def test_interrupted_run_resumes_from_saved_steps_without_repeating_sent_calls(w
         "dudosa-cuatro.example": "ready_preferred"}
     qualified = [payload for operation, payload in case.events if operation == "haiku:qualification"]
     assert sum("alta-uno.example" in payload for payload in qualified) == 1
+
+
+def test_rejected_qualification_is_retried_once_only_after_reconciling_it_without_consumption(world):
+    """Una llamada a Haiku rechazada bloquea la empresa hasta conciliarla en cero; entonces se repite una sola vez."""
+    case = world.setup()
+    start(case)
+
+    def reject(kind, user):
+        if kind == "qualification" and '"domain": "media-dos.example"' in user:
+            raise anthropic.AuthenticationError(
+                "Fallo sintético", body={"error": {"type": "authentication_error", "message": "Clave sintética inválida."}},
+                response=httpx2.Response(401, request=httpx2.Request("POST", "https://proveedor.example/v1/messages")))
+        return False
+
+    def sent():
+        return sum(operation == "haiku:qualification" and '\\"domain\\": \\"media-dos.example\\"' in payload
+                   for operation, payload in case.events)
+
+    case.interrupt = reject
+    case.run()
+    media = case.by_domain()["media-dos.example"]
+    assert media.stop_reason == "assessment_pending:http_401" and media.last_assessment_id is None
+    rejected, = case.db.list_usage(company_id=media.company_id, provider="anthropic")
+    assert rejected.status == UsageStatus.FAILED and sent() == 1
+
+    # Sin conciliar, el texto del error no prueba que repetir sea seguro: la empresa sigue pendiente.
+    case.interrupt = None
+    case.session()
+    case.run()
+    assert case.by_domain()["media-dos.example"].stop_reason == "assessment_pending:duplicate_request"
+    assert sent() == 1
+
+    # Conciliada como fallo sin consumo, un permiso nuevo la repite una vez y la empresa termina.
+    case.budget.reconcile(rejected.request_id, Confirmation(
+        outcome="failed", final_cost_usd="0", credits="0", outlay_usd="0",
+        source_reference="Consola sintética sin consumo", observed_at=utc_now()))
+    case.session()
+    case.run()
+    media = case.by_domain()["media-dos.example"]
+    assert media.stage == RunStage.COMPLETED and media.last_assessment_id is not None and media.error_message is None
+    same = [row for row in case.db.list_usage(company_id=media.company_id, provider="anthropic")
+            if row.request_fingerprint == rejected.request_fingerprint]
+    assert [(row.status, row.outcome) for row in same] == [
+        (UsageStatus.RECONCILED, "failed"), (UsageStatus.SUCCEEDED, "succeeded")]
+    assert sent() == 2
 
 
 def test_discovery_interruption_keeps_sent_requests_and_reservations_without_inventing_results(world):

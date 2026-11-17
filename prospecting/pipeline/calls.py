@@ -134,8 +134,11 @@ def reserve_credits(budget: Budget, request: ProviderRequest, fingerprint: str, 
 
 def reserve_claude(budget: Budget, fingerprint: str, payload: dict, *, account_ref: str, funding_source: str,
                    campaign_id: UUID, company_id: UUID | None,
-                   authorization: SpendingAuthorization | None) -> Usage:
-    """Reserva la cota de entrada del payload real y su máximo de salida al precio publicado de Haiku (§14.3)."""
+                   authorization: SpendingAuthorization | None, retry_of: UUID | None = None) -> Usage:
+    """Reserva la cota de entrada del payload real y su máximo de salida al precio publicado de Haiku (§14.3).
+
+    `retry_of` identifica el fallo conciliado sin consumo que esta reserva repite una sola vez (T17).
+    """
     input_tokens, output_tokens = input_token_bound(payload), payload["max_tokens"]
     return budget.reserve(Usage(
         campaign_id=campaign_id, company_id=company_id, provider=CLAUDE_PROVIDER, operation=CLAUDE_OPERATION,
@@ -144,7 +147,7 @@ def reserve_claude(budget: Budget, fingerprint: str, payload: dict, *, account_r
         reserved_credits=Decimal(0),
         reserved_tokens=TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
         funding_source=funding_source, status=UsageStatus.RESERVED,
-    ), authorization)
+    ), authorization, retry_of=retry_of)
 
 
 def call_free_credit(budget: Budget, client: ProviderClient, request: ProviderRequest,
