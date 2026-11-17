@@ -238,9 +238,8 @@ personas permanecen en `data/`.
 | Apollo People Search, llamadas (0 créditos) | 0 | 6 | 4 | 10 |
 | Apollo People Enrichment, llamadas y créditos reservados | 0 | 7 | 4 | 11 |
 
-Ninguna llamada superó su tope. Queda **sin conciliar con los paneles** todo lo anterior: los 70 créditos
-informados de Tavily, la búsqueda sin respuesta, el costo de Haiku y los 11 créditos de Apollo, que no informa
-el consumo en su respuesta.
+Ninguna llamada superó su tope. Apollo y Haiku quedaron conciliados con los paneles el 16 de noviembre; Tavily
+sigue pendiente por una diferencia de 3 créditos ([conciliación](#conciliación-de-los-lotes-de-calibración)).
 
 Qué se midió, sobre 11 empresas distintas (13 ejecuciones de empresa en las dos últimas campañas):
 
@@ -264,13 +263,53 @@ Límites de lo medido:
 
 - Todas las calificadas quedaron en prioridad `medium`: ninguna evidencia respaldó la escala (`scale_potential`
   desconocido), aunque son empresas grandes. Apollo podría aportar el tamaño, pero no se consulta.
-- En una de las 3 empresas listas, la necesidad documental se apoya en una página de terceros que el propio
-  Haiku describe como no operada directamente por la marca. Es un posible falso positivo que ventas debe revisar.
+- En una de las 3 empresas listas, todos los criterios se apoyan en una sola página de terceros (las bases de
+  una promoción) que Haiku describe como no operada directamente por la marca. El 16 de noviembre se leyó esa
+  página a mano en el navegador, sin proveedores de pago: las bases nombran a una agencia de promociones como
+  organizadora, limitan la participación a productos de una línea de la marca en un minorista y nombran a la
+  filial mexicana de la empresa. La promoción sí es de la marca; quien recibe y valida los tickets es la agencia,
+  así que ventas debe confirmar quién decide sobre ese proceso. Es una lectura manual, no evidencia guardada.
+- Ninguna calificada puede llegar a prioridad alta sin evidencia de escala: en `rubric_v2` ese criterio pesa 35 y,
+  sin él, la cobertura máxima es 0,65, por debajo del 0,75 que exige la prioridad alta. La investigación no
+  hace ninguna búsqueda dirigida al tamaño.
 - 5 de 11 empresas no mostraron evidencia de promociones con comprobantes: sus sitios corporativos no las
   publican y la búsqueda abierta no las encontró. No prueba que no existan.
-- Una llamada a Haiku rechazada por clave inválida o interrumpida antes de guardarse bloquea esa empresa en la
-  campaña (`duplicate_request`) hasta conciliarla a mano; no se repite sola.
+- Una llamada a Haiku rechazada (clave inválida) bloqueaba esa empresa en la campaña con `duplicate_request`
+  incluso después de conciliarla, porque la calificación nunca pedía el reintento. Corregido el 16 de noviembre:
+  tras conciliar el fallo sin consumo, la calificación la repite una sola vez con un permiso nuevo, como ya hacía
+  la etapa de contactos. Solo se ha probado con datos sintéticos.
+- Sigue sin salida una llamada a Haiku que respondió pero cuyo resultado no llegó a guardarse (una empresa de la
+  tercera campaña, por el fallo de la cita con saltos de línea ya corregido): la respuesta se pagó, no se conserva
+  y la solicitud no se repite. Esa empresa solo puede evaluarse en una campaña nueva.
 - No hubo revisión comercial: ninguna persona ni empresa fue aceptada o rechazada por Veryfi.
+
+### Conciliación de los lotes de calibración
+
+Lecturas de los paneles entregadas por el responsable el 16 de noviembre de 2026 (19:58, America/Bogota). Antes
+de conciliar se copió la base en `data/backups/prospecting-2026-11-16-antes-conciliacion-calibracion.sqlite3`.
+
+- **Apollo: conciliado.** El portal de desarrolladores pasó de 6 a 17 créditos usados y mostró 11 solicitudes de
+  People Enrichment en el día. El salto de 11 corresponde a los 11 enriquecimientos. Se concilió con
+  `manage.py reconcile_usage` (primero con `--dry-run`) y el comprobante
+  `data/conciliaciones/apollo-2026-11-16-calibracion.json`: 21 solicitudes, 0 créditos pendientes y 68
+  disponibles en el ledger, con el cupo registrado en 85 (el panel muestra un límite de 95).
+- **Haiku: conciliado y, por primera vez, verificado en la consola.** La consola de Claude informa 453.748 tokens
+  de Haiku 5.5 el 16 de noviembre (UTC), exactamente la suma de entrada y salida de las 30 respuestas del ledger
+  (436.395 y 17.353). Costo final: USD 0,0523160. La llamada rechazada con `HTTP 401` no aparece en la consola y
+  se concilió como fallida y sin consumo. Comprobante: `data/conciliaciones/anthropic-2026-11-16-calibracion.json`.
+  El saldo de la organización es USD 4,91.
+- **Uso de Anthropic fuera de este ledger:** la consola muestra 1.743 tokens el 15 de noviembre (UTC) que no
+  corresponden a ninguna fila (1.327 de entrada y 416 de salida según los totales de 30 días). Al precio
+  publicado son unos USD 0,00034. No se ha descontado del cupo registrado.
+- **Tavily: pendiente.** El panel muestra 142 de 1.000 créditos. Las respuestas de noviembre suman 145 en el
+  ledger (29 de T17, 21 de T24, 25 de T30 y 70 de estos lotes), más la búsqueda sin respuesta. Desde la lectura
+  posterior a T30 (73) el panel subió 69 frente a 70 informados; con los 2 de T30, la diferencia acumulada es de
+  3 créditos que no se pueden atribuir a solicitudes concretas. Las 126 filas siguen sin conciliar y la búsqueda
+  sin respuesta, en `uncertain`; sus créditos informados y su reserva ya se descuentan del cupo, que queda como
+  cota superior del consumo real.
+- El panel de Tavily muestra el aviso «To continue using Tavily, please provide a billing address». No se ha
+  comprobado si bloquea nuevas llamadas.
+- En todo el ledger quedan sin conciliar esas filas de Tavily y la fila histórica de Hunter de la T07.
 
 ## Lote real de la T30
 

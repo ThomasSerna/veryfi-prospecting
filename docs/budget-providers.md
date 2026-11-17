@@ -104,7 +104,10 @@ reinicio no se deduce transitoriedad del mensaje guardado. La única prueba pers
 que admite repetir en otra ejecución es una conciliación humana como fallida y sin
 consumo (`unconsumed_failure`: créditos, costo y desembolso en cero). Con un permiso
 nuevo, la etapa de contactos la repite una sola vez con `retry_of`, sin ocupar otro
-intento del nivel de esfuerzo; un segundo fallo ya no se repite.
+intento del nivel de esfuerzo; un segundo fallo ya no se repite. La calificación con
+Haiku hace lo mismo: una llamada rechazada deja la empresa en
+`assessment_pending:duplicate_request` hasta conciliarla sin consumo, y entonces se
+repite una vez. Una llamada que respondió y cuyo resultado no se guardó no se repite.
 
 Los permisos de una misma cuenta se suman antes de ejecutar (`_approve`): Search y
 Enrichment de Apollo, o Search y Extract de Tavily, no pueden prometer juntos más
