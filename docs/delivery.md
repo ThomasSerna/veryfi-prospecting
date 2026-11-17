@@ -1,6 +1,6 @@
 # Entrega y condiciones del piloto
 
-Estado al 14 de octubre de 2026 (America/Bogota). Informe de la entrega según IDEA §15,
+Estado al 16 de noviembre de 2026 (America/Bogota). Informe de la entrega según IDEA §15,
 §17.2, §19 y §4.3. Separa resultados medidos, estimaciones y trabajo posterior, y lo real
 de lo sintético. No contiene claves, datos personales ni nombres de empresas reales: esos
 datos permanecen en `data/`, fuera de Git.
@@ -8,13 +8,17 @@ datos permanecen en `data/`, fuera de Git.
 El prototipo es académico. No se presenta como un sistema productivo validado: el catálogo,
 la rúbrica y las reglas son propuestas pendientes de validación por Veryfi.
 
-## Actualización del 16 de noviembre de 2026
+Las secciones marcadas como «octubre» describen la entrega del 14 de octubre, cuando el
+proveedor de personas era Hunter. Se conservan como antecedente y línea base; Hunter ya no se
+llama y su ledger es histórico.
 
-Este informe describe el estado del 14 de octubre. Desde entonces el proveedor de personas es
-Apollo (T12 a T30, en [provider-check.md](provider-check.md)) y, hasta el 10 de noviembre, las
-13 campañas reales guardadas sumaban 0 personas listas: el descubrimiento web devolvía sobre
-todo portales, medios y proveedores ajenos, la identidad no se confirmaba y las reglas de cargo
-y empleo dejaban fuera a las personas encontradas.
+## Estado actual
+
+Desde octubre el proveedor de personas es Apollo (T12 a T30, en
+[provider-check.md](provider-check.md)). Hasta el 10 de noviembre, las 13 campañas reales
+guardadas sumaban 0 personas listas: el descubrimiento web devolvía sobre todo portales, medios
+y proveedores ajenos, la identidad no se confirmaba y las reglas de cargo y empleo dejaban fuera
+a las personas encontradas.
 
 El 15 de noviembre, con aprobación del usuario, se cambió lo siguiente
 ([reglas](Business-rules.md)): campañas a partir de cuentas objetivo, `role_taxonomy_v2` con
@@ -24,7 +28,7 @@ campañas nuevas y `employment_policy_v2`.
 
 Estado de la validación:
 
-- **Simulado:** 1.599 pruebas sin red, con empresas y personas sintéticas, cubren los cambios.
+- **Simulado:** 1.604 pruebas sin red, con empresas y personas sintéticas, cubren los cambios.
 - **Real:** tres lotes de calibración con cuentas objetivo
   ([detalle](provider-check.md#lotes-reales-de-calibración-con-cuentas-objetivo-15-y-16-de-noviembre-de-2026)).
   Sobre 11 empresas grandes de consumo masivo: 3 con contacto listo (7 personas con correo
@@ -32,9 +36,26 @@ Estado de la validación:
   sin perfil respaldado y 5 sin evidencia suficiente. Es el primer resultado real con personas
   listas. El primer lote además mostró por qué antes nada calificaba: el prompt solo dejaba sitio
   para dos fragmentos de evidencia.
-- **Sin verificar:** la conciliación del consumo con los paneles, la revisión comercial de Veryfi
-  (ninguna cuenta ni persona ha sido aceptada o rechazada) y el segmento FinTech con las reglas
-  nuevas, que no se ejecutó.
+- **Conciliado con los paneles:** los 17 créditos de Apollo y el consumo de Haiku de los lotes de
+  calibración, este por primera vez contra la consola de Claude. Tavily sigue pendiente: el panel
+  muestra 142 créditos en noviembre y las respuestas suman 145
+  ([conciliación](provider-check.md#conciliación-de-los-lotes-de-calibración)).
+- **Sin verificar con datos reales:** el prompt `haiku_assessment_v7`, integrado después de los
+  lotes, que corrieron con `haiku_assessment_v6`; el segmento FinTech con las reglas nuevas, que no
+  se ejecutó; el orden preferente de lealtad/CRM y datos de marketing, porque ninguna empresa del
+  último lote devolvió esos cargos; y el reintento de una calificación rechazada tras conciliarla.
+- **Sin revisión comercial:** Veryfi no ha aceptado ni rechazado ninguna cuenta ni persona.
+
+Fallos conocidos:
+
+- Ninguna calificada llega a prioridad alta: sin evidencia de escala, que pesa 35 en `rubric_v2`,
+  la cobertura no pasa de 0,65. La investigación no busca el tamaño de la empresa.
+- 5 de 11 empresas no mostraron promociones con comprobantes: sus sitios corporativos no las
+  publican y la búsqueda abierta no las encontró.
+- Una llamada a Haiku que respondió sin que su resultado se guardara no se repite ni se recupera;
+  esa empresa solo puede evaluarse en una campaña nueva.
+- El código conserva rutas históricas (Hunter, campañas sin taxonomía, versiones v1 y v2) de las que
+  dependen 194 pruebas de las reglas críticas; no se retiraron.
 
 ## Qué se entrega
 
@@ -44,8 +65,8 @@ Estado de la validación:
 | Instalación, ejecución y verificación | [README](../README.md) | Comprobadas desde un clon limpio en Windows |
 | Demostración sin consumo | `demo.py` ([README](../README.md#demostración-sin-consumo)) | Datos exclusivamente sintéticos |
 | Guías técnicas | [persistencia](persistence.md), [presupuesto](budget-providers.md), [descubrimiento](discovery.md), [calificación](qualification.md), [contactos](contacts.md), [campañas](campaign.md), [interfaz](ui.md) | Vigentes |
-| Proveedores reales | [Comprobación de proveedores](provider-check.md) | Llamadas, gasto y conciliación |
-| Evaluación | [Lotes T09](evaluation.md), [protocolo T10](t10-evaluation.md), `evaluate_qualification.py` | Mecanismo listo; validación comercial pendiente |
+| Proveedores reales | [Comprobación de proveedores](provider-check.md) | Llamadas, gasto y conciliación de Tavily, Haiku y Apollo; Hunter como histórico |
+| Evaluación | [Lotes T09](evaluation.md), [protocolo T10](t10-evaluation.md), [protocolo T21](t21-evaluation.md), `evaluate_qualification.py`, `evaluate_enterprise_pipeline.py` | Mecanismo listo; validación comercial pendiente |
 | Producto y diseño | `PRODUCT.md`, `DESIGN.md` | Contexto de ventas y decisiones visuales |
 
 ## Estado frente a los criterios de terminación
@@ -55,12 +76,12 @@ Estado de la validación:
 | Criterio (IDEA §19) | Estado | Evidencia |
 |---|---|---|
 | Ejecución que parte de criterios y descubre empresas reales | Cumplido | Dos lotes de T09 y el lote de la entrega, con Colombia, México y ambos segmentos |
-| Evidencia, puntuación con desglose, esfuerzo y búsqueda de personas con Tavily y Hunter | Cumplido | [Evaluación T09](evaluation.md#lotes-reales) y [lote de la entrega](evaluation.md#lote-real-de-la-entrega-t11) |
-| Al menos un prospecto real completo | **No cumplido** | Los dos lotes de T09 y el de la entrega terminaron con 0 personas listas |
-| Ningún registro listo incumple la regla de canal directo | Cumplido | 0 listos sin relajar reglas; pruebas de §18.1 |
-| UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo) |
-| Pruebas críticas en verde | Cumplido | 960 pruebas sin red tras la revisión de T01–T11; ver reproducibilidad |
-| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido | [T09](#proveedores-reales-t09) y [lote de la entrega](#lote-real-de-la-entrega) |
+| Evidencia, puntuación con desglose, esfuerzo y búsqueda de personas | Cumplido | Con Tavily y Hunter en octubre ([T09](evaluation.md#lotes-reales), [entrega](evaluation.md#lote-real-de-la-entrega-t11)); con Tavily y Apollo desde noviembre ([lotes](#lotes-con-apollo-noviembre)) |
+| Al menos un prospecto real completo | No cumplido en octubre; en noviembre, 3 empresas con contacto listo **sin revisión comercial** | 0 personas listas hasta el 10 de noviembre; 7 personas con correo verificado en los lotes de calibración |
+| Ningún registro listo incumple la regla de canal directo | Cumplido | Los listos de noviembre tienen correo `verified` por Apollo; pruebas de §18.1 |
+| UI, revisión y exportación | Parcial | Ejecución y exportación con datos reales; revisión y confirmación manual solo con datos sintéticos (pruebas y demo): las 75 fichas de empresa guardadas siguen en revisión `pending` |
+| Pruebas críticas en verde | Cumplido | 1.604 pruebas sin red el 16 de noviembre; 960 al cerrar octubre |
+| Gasto conciliado ≤ USD 20, con cupo y margen visibles | Cumplido, con Tavily de noviembre pendiente | Haiku acumula USD 0,0881871 conciliados; Apollo, 17 créditos gratuitos; Tavily, créditos gratuitos ([octubre](#proveedores-reales-t09-octubre), [noviembre](#lotes-con-apollo-noviembre)) |
 | Proveedores, limitaciones y siguiente mejora documentados | Cumplido | Este informe, `provider-check.md` y `evaluation.md` |
 
 ### Entrega del 6 de noviembre
@@ -69,7 +90,7 @@ Estado de la validación:
 |---|---|---|
 | Revisión documentada con Veryfi | Pendiente | No hay etiquetas, catálogo ni exclusiones confirmados por Veryfi |
 | Métricas por país y segmento | Parcial | Tablas de T09 y del lote de la entrega sobre 24 selecciones; sin precisión comercial |
-| Rúbrica versionada | Cumplido | `rubric_v1` (propuesta), prompt `haiku_assessment_v3`, catálogo `catalog_v1` pendiente de validación |
+| Rúbrica versionada | Cumplido | `rubric_v1` y `rubric_v2` (propuestas; las campañas nuevas usan la segunda), prompts versionados hasta `haiku_assessment_v7`, catálogo `catalog_v1` pendiente de validación |
 | Calificación con Haiku evaluada en un conjunto separado | Pendiente | Evaluador offline y protocolo listos; falta el conjunto independiente y la revisión |
 | Manejo de errores probado | Cumplido | Fallos simulados en pruebas; los timeouts reales de Tavily conservaron etapa, motivo y reservas |
 | Instrucciones de ejecución | Cumplido | README verificado desde un clon limpio |
@@ -78,6 +99,9 @@ Estado de la validación:
 ## Resultados medidos
 
 ### Reproducibilidad y pruebas
+
+El 16 de noviembre, `uv run --locked --offline pytest` aprobó 1.604 pruebas sin red en la copia de
+trabajo. No se repitió la verificación desde un clon limpio, que es la de octubre.
 
 Verificación del 14 de octubre en Windows 11 con uv 0.13.0, Python 3.13.16 y Node.js 24.21.0,
 sobre un clon limpio del repositorio:
@@ -98,7 +122,7 @@ confirmación manual de LinkedIn que pasa a `ready_alternative`, la revisión ac
 CSV con prefijo `demo-sintetica-` y la fórmula neutralizada, el texto hostil mostrado como
 texto plano, la consola sin errores y el ancho de 390 px sin desbordamiento horizontal.
 
-### Proveedores reales (T09)
+### Proveedores reales (T09, octubre)
 
 Dos campañas del 12 de octubre, de 8 empresas cada una, con Colombia, México y ambos
 segmentos ([detalle](evaluation.md#lotes-reales)):
@@ -123,7 +147,7 @@ USD 15 y del de USD 2 por campaña.
 No se midieron precisión de empresas, pertinencia de personas ni costo por prospecto aceptado:
 requieren revisión de Veryfi y al menos un prospecto aceptado.
 
-### Lote real de la entrega
+### Lote real de la entrega (octubre)
 
 Campaña del 14 de octubre, autorizada por el responsable del cupo, con 8 empresas, Colombia,
 México y ambos segmentos ([resultados](evaluation.md#lote-real-de-la-entrega-t11),
@@ -143,11 +167,40 @@ México y ambos segmentos ([resultados](evaluation.md#lote-real-de-la-entrega-t1
 El acumulado conciliado queda en 73 créditos de Tavily (de 1.000), 4 de Hunter (de 50) y
 USD 0,0283956 de Haiku en este ledger, más unos USD 0,0019 de otra instancia.
 
+### Lotes con Apollo (noviembre)
+
+Siete campañas reales entre el 8 y el 16 de noviembre, autorizadas por el responsable del cupo
+([llamadas, topes y conciliación](provider-check.md#lotes-reales-de-apollo-de-la-t17)):
+
+| Lote | Empresas | Resultado |
+|---|---:|---|
+| T17 (8 nov, 2 campañas) | 7 | 1 llegó a contactos; sus 3 enriquecimientos se rechazaron con `entity_mismatch`; 0 personas listas |
+| T24 (9 nov) | 5 | 4 detenidas por identidad; 1 con 3 personas pertinentes y empleo solo declarado por Apollo; 0 listas |
+| T30 (9 nov) | 10, con reservas | 3 identidades confirmadas; ninguna llegó a contactos; 0 listas |
+| Calibración con cuentas objetivo (15 y 16 nov, 3 campañas) | 11 distintas | 3 `ready_preferred` con 7 personas con correo verificado; 2 `needs_channel_confirmation` con 4 personas con solo LinkedIn; 1 `qualified_no_contact`; 5 sin evidencia suficiente |
+
+Consumo de los tres lotes de calibración: 70 créditos de Tavily informados por las respuestas, más
+una búsqueda sin respuesta; USD 0,0523160 de Haiku en 30 llamadas, más una rechazada sin consumo; y
+11 créditos de Apollo. Apollo y Haiku están conciliados con los paneles. En noviembre el panel de
+Tavily muestra 142 créditos y las respuestas suman 145: la diferencia de 3 no se puede atribuir a
+solicitudes concretas y esas filas siguen sin conciliar. La consola de Claude muestra además 1.743
+tokens del 15 de noviembre (UTC) que no pertenecen a este ledger.
+
+Acumulado del ledger: USD 0,0881871 de Haiku, todo conciliado; 17 créditos de Apollo, de 85
+registrados; y 218 créditos informados de Tavily en la cuenta actual desde octubre, cuyo plan
+gratuito renueva 1.000 cada mes.
+
+Sigue sin medirse la precisión de empresas, la pertinencia de personas y el costo por prospecto
+aceptado: nadie de Veryfi ha revisado los resultados.
+
 ## Estimaciones
 
-Valores para planear del 14 de octubre de 2026; no son mediciones ni compromisos. Desde T12 la
-etapa de personas usa Apollo y la estimación de Hunter queda solo como antecedente:
+Valores para planear; no son mediciones ni compromisos. El primero es del 16 de noviembre; los
+demás, del 14 de octubre de 2026, y la estimación de Hunter queda solo como antecedente:
 
+- Con cuentas objetivo, Apollo y `rubric_v2`, los dos lotes de 6 y 7 empresas del 16 de noviembre
+  consumieron 35 y 26 créditos de Tavily, USD 0,028 y USD 0,021 de Haiku, y 7 y 4 créditos de
+  Apollo. Son dos lotes de un solo segmento: sirven de orden de magnitud, no de tarifa.
 - Un lote de 8 empresas como los observados consumiría del orden de 20 a 25 créditos de Tavily,
   USD 0,01 de Haiku y 0 a 2 créditos de Hunter Domain Search. Depende de las empresas, de los
   timeouts y de la cobertura de Hunter.
@@ -183,10 +236,10 @@ El prototipo no está preparado para un uso productivo. Estos límites son de di
 - **Vigencia**: no hay revalidación periódica de cargos ni canales; la disponibilidad se
   recalcula al consultar con la fecha actual, sin nuevas llamadas.
 - **Tamaño de las solicitudes a Haiku**: el límite de entrada se controla con una estimación de
-  2 caracteres por token, calibrada con 15 solicitudes reales, no con un conteo exacto del
-  proveedor. Con el límite de 9.000 tokens deja un margen de alrededor del 5 % sobre la relación
-  más desfavorable medida. Antes del 14 de octubre se estimaban 3 caracteres por token y 23 de
-  31 llamadas superaron el límite de entonces, 6.000 tokens.
+  2 caracteres por token, calibrada con 15 solicitudes reales de octubre, no con un conteo exacto del
+  proveedor. El límite es de 30.000 tokens desde el 16 de noviembre; con los 9.000 anteriores, el
+  prompt de calificación solo dejaba sitio para 2 fragmentos de evidencia. Las solicitudes reales de
+  calificación midieron unos 17.000 tokens de entrada.
 - **Observabilidad**: no hay monitoreo, alertas ni registro centralizado de errores.
 - **Contacto**: la aplicación nunca envía mensajes ni verifica canales escribiendo a nadie.
   LinkedIn se confirma solo manualmente; no se automatiza ni se extraen perfiles.
@@ -211,45 +264,51 @@ discutir con Veryfi, no resultados obtenidos.
 
 | Condición | Estado actual |
 |---|---|
-| Prospectos reales completos que ventas considere útiles, revisados y aceptados | No cumplido: 0 listos en T09 y en el lote de la entrega |
+| Prospectos reales completos que ventas considere útiles, revisados y aceptados | No cumplido: 3 empresas con contacto listo en noviembre, ninguna revisada ni aceptada por ventas |
 | Revisión documentada de Veryfi: catálogo, exclusiones, ejemplos etiquetados y criterios de cargo | Pendiente |
 | Calificación evaluada en un conjunto independiente, con métricas por país y segmento | Pendiente; protocolo en `t10-evaluation.md` |
-| Etapa de personas mejorada y medida frente a la línea base: Hunter con personas en 1 de 8 búsquedas (T09) y 2 de 4 (entrega), sin empleo vigente demostrado | Pendiente |
+| Etapa de personas mejorada y medida frente a la línea base: Hunter con personas en 1 de 8 búsquedas (T09) y 2 de 4 (entrega), sin empleo vigente demostrado | Parcial: Apollo dio personas listas en 3 de 11 cuentas objetivo; falta la comparación de T21 y la revisión de pertinencia |
 | Presupuesto operativo y responsable del cupo, con cuentas de la organización y condiciones de uso verificadas | Sin presupuesto posterior al 16 de octubre (IDEA §2); cuentas gratuitas del equipo |
 | Usuarios definidos y responsable de datos; fuentes permitidas, retención y eliminación acordadas | Pendiente de acordar con Veryfi |
 | Entorno de acceso apropiado: autenticación, permisos, HTTPS, servidor de aplicaciones, almacenamiento con respaldo, trabajos persistentes y monitoreo | No existe; requiere una decisión de despliegue y acceso separada (IDEA §4.3) |
 
 ## Trabajo posterior
 
-Prioridades al 14 de octubre de 2026, con Hunter como ruta de personas; el backlog vigente está
-en [Roadmap.md](Roadmap.md):
+Prioridades al 16 de noviembre de 2026; el backlog vigente está en [Roadmap.md](Roadmap.md):
 
-1. **Etapa de personas**: es el cuello de botella medido. En el lote de la entrega Hunter halló
-   tres personas pertinentes con correo verificado, pero ninguna con evidencia de empleo vigente.
-   Buscar esa evidencia con procedencia (directorios y páginas de equipo corporativas actuales o
-   fuentes fechadas) y evaluar una fuente adicional (Apollo, T12, o X-Ray Search, T13) frente a
-   esta línea base, sin relajar las reglas de listo ni ampliar el presupuesto implícitamente.
-   La selección de candidatos que pedía la T09 se corrigió el 14 de octubre, pero solo se ha
-   verificado con datos sintéticos.
-2. **Cierre comercial de T10**: revisión atribuible de Veryfi, conjunto independiente de hasta
-   20 empresas nuevas y conclusión sustentada.
-3. **Lista de exclusiones y catálogo** confirmados por Veryfi.
-4. **Identidad en CPG**: los sitios promocionales rara vez confirman nombre y país.
-5. **Plazo de Tavily**: en T09 el 9,5 % de las llamadas no respondió en unos 10 s; en el lote
-   de la entrega, ninguna. Vigilarlo antes de cambiar el plazo.
+1. **Revisión comercial de Veryfi**: aceptar o rechazar las 3 cuentas con contacto listo y sus
+   personas, y confirmar catálogo, exclusiones y criterios de cargo. Sin ella no hay precisión,
+   pertinencia ni costo por prospecto aceptado.
+2. **Verificación real de lo integrado después de los lotes**: `haiku_assessment_v7`, el segmento
+   FinTech con las reglas nuevas, el orden preferente de lealtad/CRM y datos de marketing, y el
+   reintento de una calificación rechazada. Cada una exige autorización de gasto.
+3. **Escala de la empresa**: decidir de dónde sale la evidencia de tamaño (una búsqueda dirigida o
+   el dato de organización de Apollo). Hoy ninguna cuenta puede llegar a prioridad alta.
+4. **Evidencia de promociones**: 5 de 11 cuentas quedaron sin evidencia; sus sitios corporativos no
+   publican las promociones.
+5. **Resultado pagado que no se guarda**: decidir si se conserva la respuesta de Haiku antes de
+   procesarla, lo que cambia el contrato de persistencia, o si se admite repetir la llamada.
+6. **Conciliación de Tavily**: decidir cómo cerrar filas cuando el panel cobra menos de lo que
+   informan las respuestas (3 créditos en noviembre).
+7. **Cierre de T10 y T21**: conjunto independiente, comparación con la línea base de Hunter y
+   conclusión sustentada.
 
-## Datos locales al cerrar la entrega
+## Datos locales
 
-Inventario de la copia local revisada el 14 de octubre, solo con conteos:
+Inventario de la copia local revisada el 16 de noviembre, solo con conteos:
 
-- `data/prospecting.sqlite3`: 6 campañas (2 preparadas, 1 terminada y 3 parciales de 8
-  empresas: los dos lotes de T09, compatibles con sus registros, y el de la entrega), 27
-  empresas, 3 contactos y 33 evaluaciones. El ledger registra 158 solicitudes; una de Hunter de
-  T07 sigue sin conciliar.
-- `data/backups/`: 7 copias de la base previas a T07, T09, el lote de la entrega y sus
-  conciliaciones, y la versión anterior del archivo de acceso.
-- `data/conciliaciones/`: 16 comprobantes de los paneles y del uso informado por los proveedores.
-- `data/provider-access.json`: cupos y referencias comprobadas, sin claves.
+- `data/prospecting.sqlite3`: 16 campañas (5 preparadas, 3 terminadas y 8 parciales), 60 empresas,
+  78 contactos, entre candidatos de búsqueda y personas enriquecidas, y 82 evaluaciones. El ledger
+  registra 421 solicitudes: 293 conciliadas, 126 de Tavily y una de Hunter de T07 sin conciliar, y
+  una búsqueda de Tavily sin respuesta.
+- `data/backups/`: 19 copias de la base previas a cada lote y conciliación, y 4 versiones
+  anteriores del archivo de acceso.
+- `data/conciliaciones/`: 25 comprobantes de los paneles y del uso informado por los proveedores.
+- `data/provider-access.json`: cupos y referencias comprobadas, sin claves. No refleja todavía el
+  uso de Anthropic ajeno al ledger del 15 de noviembre.
+
+El inventario del 14 de octubre era de 6 campañas, 27 empresas, 3 contactos, 33 evaluaciones y 158
+solicitudes.
 
 T10 registró que la copia que examinó no contenía los lotes de T09. Esta copia sí parece
 contenerlos; el responsable de T10 debe confirmar sus identificadores antes de usarlos.
@@ -272,7 +331,7 @@ requiere autorización explícita del equipo.
    - Empresa sintética Facturas: evidencia insuficiente; el texto hostil se muestra como texto.
    - Empresa sintética Cliente Actual y Logística: exclusión y encaje bajo.
    - Revisión «Aceptado» y descarga de los dos CSV.
-3. **Resultados reales** (2 min): presentar en agregado las tablas de [T09](evaluation.md) y
-   del lote de la entrega, y por qué ninguna persona quedó lista. Sin capturas con empresas o
-   personas reales.
+3. **Resultados reales** (2 min): presentar en agregado las tablas de octubre y la de
+   [noviembre](#lotes-con-apollo-noviembre): por qué ninguna persona quedó lista hasta el 10 de
+   noviembre y qué cambió con las cuentas objetivo. Sin capturas con empresas o personas reales.
 4. **Límites y condiciones del piloto** (2 min): las dos secciones anteriores.
