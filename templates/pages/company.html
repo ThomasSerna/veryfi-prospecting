@@ -69,7 +69,6 @@
           <ul class="product-tags" aria-label="Productos compatibles">{% for product in result.assessment.products %}<li class="product-tag">{{ product|label }}</li>{% empty %}<li class="product-tag is-empty">Productos pendientes</li>{% endfor %}</ul>
         </div>
       </div>
-      <h3 class="criteria-heading">Criterios de encaje</h3>
       <ol class="criteria-list">
         {% for name, criterion in result.assessment.criteria.items %}
         {% with tone=criterion.value|criterion_tone %}
@@ -77,7 +76,7 @@
           <span class="harvey harvey-{{ tone }}" aria-hidden="true"></span>
           <div class="criterion-body">
             <div class="criterion-head">
-              <h4>{{ name|label }}</h4>
+              <h3>{{ name|label }}</h3>
               <span class="status criterion-badge criterion-{{ tone }}">{{ criterion.value|criterion_label }}</span>
             </div>
             <p>{{ criterion.justification }}</p>

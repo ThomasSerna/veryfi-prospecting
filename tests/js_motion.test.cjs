@@ -29,13 +29,14 @@ function motionPage({ reduced = false, precise = true } = {}) {
     cancelAnimationFrame(id) { frames.delete(id); },
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/motion.js'), 'utf8'), { document, window });
-  function surface(box = { left: 10, top: 20, width: 200, height: 100 }) {
+  function surface(tilt = false, box = { left: 10, top: 20, width: 200, height: 100 }) {
     const styles = new Map();
     const target = {
       isConnected: true,
       measurements: 0,
       styles,
       style: { setProperty: (name, value) => styles.set(name, value), removeProperty: name => styles.delete(name) },
+      hasAttribute: name => name === 'data-motion-tilt' && tilt,
       getBoundingClientRect() { this.measurements += 1; return box; },
       closest: () => target,
       contains: node => node === target || node?.parent === target,
@@ -55,9 +56,9 @@ function motionPage({ reduced = false, precise = true } = {}) {
   };
 }
 
-test('El seguimiento agrupa movimientos por cuadro y limita las coordenadas al panel', () => {
+test('El seguimiento agrupa movimientos por cuadro y limita la inclinación del bento', () => {
   const page = motionPage();
-  const card = page.surface();
+  const card = page.surface(true);
   const child = { parent: card, closest: () => card };
   page.pointer('pointerover', card);
   page.pointer('pointermove', child, 160, 95);
@@ -67,8 +68,10 @@ test('El seguimiento agrupa movimientos por cuadro y limita las coordenadas al p
   page.flush();
   assert.equal(card.styles.get('--motion-x'), '200px');
   assert.equal(card.styles.get('--motion-y'), '0px');
+  assert.equal(card.styles.get('--motion-rotate-x'), '1.5deg');
+  assert.equal(card.styles.get('--motion-rotate-y'), '1.5deg');
   page.pointer('pointerout', child, 0, 0, { relatedTarget: card });
-  assert.equal(card.styles.size, 2);
+  assert.equal(card.styles.size, 4);
   page.pointer('pointerout', card, 0, 0, { relatedTarget: null });
   assert.equal(card.styles.size, 0);
 });
@@ -85,18 +88,19 @@ test('Los paneles sustituidos por sondeo reciben los efectos sin reinicializar e
   page.flush();
   assert.equal(replacement.styles.get('--motion-x'), '50px');
   assert.equal(replacement.styles.get('--motion-y'), '30px');
+  assert.equal(replacement.styles.has('--motion-rotate-x'), false);
 });
 
 test('Movimiento reducido y puntero táctil retiran seguimiento incluso al cambiar durante la sesión', () => {
   const page = motionPage({ reduced: true });
-  const card = page.surface();
+  const card = page.surface(true);
   page.pointer('pointerover', card);
   assert.equal(page.frames.size, 0);
   page.reducedQuery.matches = false;
   page.reducedQuery.dispatch('change');
   page.pointer('pointermove', card);
   page.flush();
-  assert.equal(card.styles.size, 2);
+  assert.equal(card.styles.size, 4);
   page.preciseQuery.matches = false;
   page.preciseQuery.dispatch('change');
   assert.equal(card.styles.size, 0);
@@ -110,7 +114,7 @@ test('Movimiento reducido y puntero táctil retiran seguimiento incluso al cambi
 
 test('Scroll, resize y pestaña oculta cancelan cuadros pendientes y retiran coordenadas obsoletas', () => {
   const page = motionPage();
-  const card = page.surface();
+  const card = page.surface(true);
   for (const event of ['scroll', 'resize', 'blur']) {
     page.pointer('pointerover', card);
     page.window.dispatch(event);
@@ -119,7 +123,7 @@ test('Scroll, resize y pestaña oculta cancelan cuadros pendientes y retiran coo
   }
   page.pointer('pointermove', card);
   page.flush();
-  assert.equal(card.styles.size, 2);
+  assert.equal(card.styles.size, 4);
   page.document.hidden = true;
   page.document.dispatch('visibilitychange');
   assert.equal(card.styles.size, 0);
@@ -130,7 +134,7 @@ test('Scroll, resize y pestaña oculta cancelan cuadros pendientes y retiran coo
 test('El borde de las superficies cercanas apunta al puntero por el camino más corto y se apaga al alejarse', () => {
   const page = motionPage();
   const near = page.surface();
-  const far = page.surface({ left: 1000, top: 20, width: 200, height: 100 });
+  const far = page.surface(false, { left: 1000, top: 20, width: 200, height: 100 });
   page.document.querySelectorAll = () => [near, far];
   const background = { closest: () => null };
   page.pointer('pointermove', background, 110, 0);

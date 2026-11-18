@@ -3,16 +3,13 @@
 {% block title %}{{ campaign|campaign_short_title }} · Veryfi Prospecting{% endblock %}
 {% block content %}
 <div id="campaign-page" class="campaign-page" data-status-url="{% url 'webapp:status' campaign.id %}" data-running="{% if is_executing %}true{% else %}false{% endif %}" data-entering>
-  <nav class="campaign-breadcrumb" aria-label="Ubicación">
-    <a href="{% url 'webapp:campaign_history' %}">Historial</a><span aria-hidden="true">/</span><span aria-current="page">Campaña</span>
-  </nav>
   <header class="campaign-head">
     <div class="campaign-head-copy">
       <h1>{% for country in campaign.countries %}{{ country|label }}{% if not forloop.last %}, {% endif %}{% endfor %}</h1>
       <ul class="campaign-tags" aria-label="Segmentos de la campaña">{% for segment in campaign.segments %}<li style="--i: {{ forloop.counter0 }}">{{ segment|label }}</li>{% endfor %}</ul>
       <p class="campaign-meta">
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg><time datetime="{{ campaign.created_at|date:'c' }}">{{ campaign.created_at|date:"d M Y · H:i" }}</time></span>
-        <span>Hasta {{ campaign.max_companies }} empresas</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>Hasta {{ campaign.max_companies }} empresas</span>
       </p>
     </div>
     <div class="campaign-head-actions">
