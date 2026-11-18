@@ -1,3 +1,0 @@
-<a href="{% url 'webapp:campaigns' %}" {% if nav_active == 'campaigns' and not campaign %}aria-current="page"{% endif %}>Resumen</a>
-<a href="{% url 'webapp:campaign_history' %}" {% if nav_active == 'campaign_history' %}aria-current="page"{% endif %}>Historial</a>
-<a class="navigation-create" href="{% url 'webapp:new_campaign' %}" data-idle-only {% if nav_active == 'new_campaign' %}aria-current="page"{% endif %} {% if is_executing or execution.is_executing %}aria-disabled="true" tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nueva campaña</a>

@@ -119,19 +119,12 @@ def _company_sort_key(item):
             -(item.assessment.fit_score or 0) if item.assessment else 0, item.company.name)
 
 
-def _ordered_companies(view):
-    """La rúbrica empresarial ya entrega el orden de revisión en el pipeline."""
-    if view.campaign.rubric_version == "rubric_v2":
-        return view.companies
-    return sorted(view.companies, key=_company_sort_key)
-
-
-def _campaign_insights(companies):
+def _campaign_insights(view):
     """Resume la campaña leída sin confundir avance, revisión y contacto."""
-    total = len(companies)
-    completed = sum(item.run_item.stage == "completed" for item in companies)
+    total = len(view.companies)
+    completed = sum(item.run_item.stage == "completed" for item in view.companies)
     priorities = dict.fromkeys((*PRIORITY_ORDER, "pending"), 0)
-    for item in companies:
+    for item in view.companies:
         priority = ("excluded" if item.business_status == "excluded" else
                     item.assessment.priority if item.assessment is not None else "pending")
         priorities[priority] += 1
@@ -141,11 +134,11 @@ def _campaign_insights(companies):
                                "" if value == "pending" else urlencode({"priorities": value}))}
                     for value, count in priorities.items()]
     return {"total": total, "completed": completed,
-            "review_pending": sum(item.run_item.review_status == "pending" for item in companies),
-            "ready": sum(item.business_status in READY for item in companies),
-            "needs_confirmation": sum(item.business_status == "needs_channel_confirmation" for item in companies),
+            "review_pending": sum(item.run_item.review_status == "pending" for item in view.companies),
+            "ready": sum(item.business_status in READY for item in view.companies),
+            "needs_confirmation": sum(item.business_status == "needs_channel_confirmation" for item in view.companies),
             "progress": round(completed * 100 / total) if total else None,
-            "next_review": next((item for item in companies if item.run_item.review_status == "pending"), None),
+            "next_review": next((item for item in view.companies if item.run_item.review_status == "pending"), None),
             "priority_distribution": distribution}
 
 
@@ -155,10 +148,10 @@ def _campaign_context(request, campaign_id):
     state = execution.snapshot(campaign_id)
     state["is_executing"] = state["is_executing"] or view.is_executing
     filter_form = FilterForm(request.GET, view=view)
-    ordered_companies = _ordered_companies(view)
+    results = list(view.companies)
     if filter_form.is_valid():
         selected = filter_form.cleaned_data
-        results = [item for item in ordered_companies if
+        results = [item for item in results if
                    (not selected["q"] or selected["q"].casefold() in item.company.name.casefold())
                    and (not selected["countries"] or set(selected["countries"]).intersection(item.company.operating_countries or []))
                    and (not selected["segments"] or set(selected["segments"]).intersection(item.company.segments or []))
@@ -166,6 +159,8 @@ def _campaign_context(request, campaign_id):
                    and (not selected["availability"] or item.business_status in selected["availability"])]
     else:
         results = []
+    if view.campaign.rubric_version != "rubric_v2":
+        results.sort(key=_company_sort_key)
     filter_query, active_filter_count = _clean_filter_query(filter_form)
     legacy_readonly = view.campaign.config_snapshot.people_provider != "apollo"
     apollo = None if context["access"] is None else context["access"].apollo_access
@@ -182,7 +177,7 @@ def _campaign_context(request, campaign_id):
                    legacy_readonly=legacy_readonly, apollo_blocked=apollo_blocked,
                    authorization_form=form, operation_rows=[] if form is None else form.operation_rows,
                    counts=counts, execution=state, is_executing=state["is_executing"],
-                   campaign_insights=_campaign_insights(ordered_companies),
+                   campaign_insights=_campaign_insights(view),
                    stop_reason=state["stop_reason"], error_message=state["error_message"],
                    saved_notice=SAVED_MESSAGES.get(saved_key))
     return context
@@ -195,7 +190,8 @@ def _company_context(request, campaign_id, company_id, *, review_form=None, conf
         raise Http404("La empresa no pertenece a esta campaña.")
     sequence = context["results"]
     if not any(item.company.id == company_id for item in sequence):
-        sequence = _ordered_companies(context["view"])
+        sequence = (context["view"].companies if context["view"].campaign.rubric_version == "rubric_v2"
+                    else sorted(context["view"].companies, key=_company_sort_key))
     idx = next((i for i, item in enumerate(sequence) if item.company.id == company_id), 0)
     prev_company = sequence[idx - 1].company if idx > 0 else None
     next_company = sequence[idx + 1].company if idx + 1 < len(sequence) else None
@@ -226,11 +222,9 @@ def _summary_context():
     view = _campaign_view(highlighted.id, context) if highlighted else None
     state = execution.snapshot(highlighted.id if highlighted else None)
     state["is_executing"] = state["is_executing"] or bool(view and view.is_executing)
-    insights = _campaign_insights(_ordered_companies(view)) if view else None
-    can_review = highlighted and highlighted.config_snapshot.people_provider == "apollo" and not state["is_executing"]
     context.update(nav_active="campaigns", highlighted_campaign=highlighted, highlighted_view=view,
                    highlighted_is_active=context["active_campaign"] is not None,
-                   campaign_insights=insights, review_candidate=insights["next_review"] if can_review else None,
+                   campaign_insights=_campaign_insights(view) if view else None,
                    execution=state, is_executing=state["is_executing"])
     return context
 

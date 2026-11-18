@@ -6,56 +6,64 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: Baskervville;
-  src: url('../fonts/BaskervvilleVariable.ttf') format('truetype');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  /* Paleta de Veryfi para superficies oscuras (https://www.veryfi.com/brand/). El turquesa
+     #2db5d2 completa el degradado del botón principal de veryfi.com. Veryfi no usa negro. */
   --veryfi-navy: #171c3a;
   --veryfi-navy-medium: #45495f;
   --veryfi-navy-light: #70748f;
   --veryfi-ivory: #e9ece4;
+  --veryfi-ivory-medium: #b9bdb1;
+  --veryfi-ivory-dark: #9b9c98;
   --veryfi-green: #00fa6c;
+  --veryfi-teal: #2db5d2;
+  --veryfi-forest-light: #00d181;
   --veryfi-sky: #7081f0;
-  --veryfi-sky-dark: #4553ba;
   --veryfi-sky-light: #9ba6e8;
-  --canvas: var(--veryfi-ivory);
-  --surface: #f8f9f5;
-  --surface-hover: #e2e6dd;
-  --soft: #e1e5dc;
-  --line: #bdc3b9;
-  --line-strong: #787e79;
-  --track: #d1d6ce;
-  --navy: var(--veryfi-navy);
-  --navy-hover: var(--veryfi-navy-medium);
-  --navy-surface: var(--veryfi-navy);
+  --veryfi-sky-dark: #4553ba;
+  --veryfi-gold: #ffc56d;
+  --veryfi-magenta-light: #ff7585;
+
+  /* Roles de color: los componentes solo usan estos nombres; probar otra paleta es reasignarlos.
+     Los navy derivados conservan en OKLCH el matiz de Navy (274°). */
+  --canvas: oklch(0.184 0.045 275);
+  --surface: var(--veryfi-navy);
+  /* Los paneles protagonistas (resumen y pulso) se aclaran arriba hacia el turquesa de marca. */
+  --surface-top: color-mix(in oklab, var(--surface), var(--accent-alt) 7%);
+  --surface-hover: oklch(0.259 0.057 274);
+  --soft: oklch(0.272 0.06 274);
+  --line: oklch(0.331 0.055 275);
+  --line-strong: var(--veryfi-navy-light);
+  --track: var(--line);
+  --navy: var(--canvas);
+  --navy-hover: var(--soft);
+  --navy-surface: var(--soft);
   --white: #fff;
-  --ink: var(--veryfi-navy);
-  --muted: #51566a;
-  --disabled-bg: var(--soft);
-  --disabled-ink: #5e625e;
+  --ink: var(--veryfi-ivory);
+  --muted: var(--veryfi-ivory-medium);
+  --disabled-bg: oklch(0.3 0.044 274);
+  --disabled-ink: var(--veryfi-ivory-dark);
   --accent: var(--veryfi-green);
+  --accent-alt: var(--veryfi-teal);
   --accent-ink: var(--veryfi-navy);
-  --info: #3847a1;
-  --info-bg: #e3e7fa;
-  --warning: #755008;
-  --warning-bg: #faf0d8;
-  --error: #9c2138;
-  --error-bg: #fae5e8;
-  --success: #006347;
-  --success-bg: #d7efdf;
-  --unreviewed: var(--warning);
-  --blue: var(--veryfi-sky-dark);
-  --blue-pale: #535e94;
-  --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius: 8px;
-  --radius-lg: 12px;
+  --accent-gradient: linear-gradient(298.79deg, var(--accent-alt) -23.47%, var(--accent) 92.01%, var(--accent-alt) 214.83%);
+  --accent-gradient-hover: linear-gradient(307.48deg, var(--accent-alt) -211.07%, var(--accent) -6.04%, var(--accent-alt) 212.05%);
+  --info: var(--veryfi-sky-light);
+  --info-bg: oklch(0.311 0.075 275);
+  --warning: var(--veryfi-gold);
+  --warning-bg: oklch(0.299 0.045 74);
+  --error: var(--veryfi-magenta-light);
+  --error-bg: oklch(0.291 0.065 10);
+  --success: var(--veryfi-forest-light);
+  --success-bg: oklch(0.301 0.06 160);
+  --unreviewed: var(--veryfi-gold);
+  --blue: var(--veryfi-sky-light);
+  --blue-pale: color-mix(in oklab, var(--blue) 40%, var(--ink));
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
   --space-1: 6px;
   --space-2: 12px;
   --space-3: 16px;
@@ -63,12 +71,11 @@
   --space-5: 32px;
   --space-6: 44px;
   --space: 24px;
-  --shadow-pop: 0 10px 25px rgb(23 28 58 / 0.12);
+  --shadow-pop: 0 12px 28px rgb(0 0 0 / 0.3);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-normal: 190ms;
   --font: Inter, Arial, Helvetica, sans-serif;
-  --font-display: Baskervville, Georgia, serif;
 }
 
 * {
@@ -97,7 +104,7 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid var(--success);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -289,14 +296,14 @@ code {
   transform: translateY(1px);
 }
 
-/* El verde de marca identifica la acción principal. */
+/* Principal: el degradado verde-turquesa del botón de veryfi.com, con texto navy. */
 .button-primary {
-  background: var(--accent);
+  background: var(--accent-gradient);
   color: var(--accent-ink);
 }
 
 .button-primary:hover:not(:disabled):not([aria-disabled='true']) {
-  background: #00df65;
+  background: var(--accent-gradient-hover);
 }
 
 .button-navy {
@@ -325,7 +332,7 @@ code {
   font-size: 0.8125rem;
 }
 
-.button > svg {
+.button > svg:not(.motion-arrow) {
   width: 17px;
   height: 17px;
 }
@@ -337,7 +344,7 @@ code {
 }
 
 .button-ghost:hover:not(:disabled):not([aria-disabled='true']) {
-  background: var(--soft);
+  background: rgb(255 255 255 / 4%);
   border-color: var(--line-strong);
 }
 
@@ -361,7 +368,7 @@ code {
   min-width: 22px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--soft);
+  background: rgb(255 255 255 / 8%);
   color: inherit;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
@@ -378,6 +385,35 @@ button:disabled {
   background: var(--disabled-bg);
   border-color: var(--disabled-bg);
   color: var(--disabled-ink);
+}
+
+/* Área de trabajo */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 64px;
+  padding: 12px 28px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.main-content {
+  width: 100%;
+  max-width: 1480px;
+  padding: 28px;
+  margin-inline: auto;
+  flex: 1;
 }
 
 /* Encabezados de página */
@@ -594,7 +630,7 @@ button:disabled {
 /* Prioridad: barras de señal (tres, dos o una encendidas) junto al texto; sin calificar, ninguna. */
 .priority {
   --bar-on: currentColor;
-  --bar-off: var(--track);
+  --bar-off: rgb(255 255 255 / 14%);
   --bar-1: var(--bar-off);
   --bar-2: var(--bar-off);
   --bar-3: var(--bar-off);
@@ -734,7 +770,7 @@ button:disabled {
 }
 
 .company-link:hover {
-  color: var(--success);
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -868,7 +904,7 @@ select:hover:not(:disabled) {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--success);
+  border-color: var(--accent);
 }
 
 input:disabled,
@@ -898,7 +934,7 @@ input[type='checkbox'] {
   width: 18px;
   height: 18px;
   margin: 0 10px 0 0;
-  accent-color: var(--success);
+  accent-color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -1035,7 +1071,7 @@ progress {
   border-radius: var(--radius-xs);
   overflow: hidden;
   background: var(--track);
-  accent-color: var(--success);
+  accent-color: var(--accent);
 }
 
 progress::-webkit-progress-bar {
@@ -1510,7 +1546,7 @@ a.sequence-link:hover {
 
 .tab-link[aria-selected='true'] span {
   background: var(--navy-surface);
-  color: var(--success);
+  color: var(--accent);
 }
 
 .company-panel {
@@ -1941,7 +1977,7 @@ a.sequence-link:hover {
 .evidence-detail:target {
   background: var(--soft);
   border-color: var(--ink);
-  outline: 3px solid var(--success);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1988,7 +2024,7 @@ a.sequence-link:hover {
   margin-top: 12px;
 }
 
-/* Lectura visual de las campañas. */
+/* Espacio de trabajo oscuro y lectura visual de las campañas. */
 svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .demo-notice { display: flex; align-items: center; gap: 8px; padding: 8px 0; background: transparent; border: 0; font-size: .75rem; margin-bottom: 18px; }
 .demo-notice svg { width: 16px; height: 16px; }
@@ -2011,7 +2047,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .preparation-preview dd { font-size: .8125rem; }
 .company-identity, .contact-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .company-title-copy { min-width: 0; }
-.company-monogram, .contact-initial { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); font-size: 1.125rem; color: var(--success); }
+.company-monogram, .contact-initial { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); font-size: 1.125rem; color: var(--accent); }
 .assessment-score-band { gap: 20px; }
 .assessment-score-band > div { padding: 12px 0; background: transparent; border: 0; border-radius: 0; }
 .assessment-score-band .metric-track { margin-top: 12px; }
@@ -2020,15 +2056,32 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .criterion-signal > span { display: block; height: 100%; background: currentColor; }
 .tabs { position: relative; padding: 0; gap: 20px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .tab-link { padding: 12px 0; border-radius: 0; border-bottom: 2px solid transparent; }
-.tab-link[aria-selected='true'] { background: transparent; color: var(--ink); border-bottom-color: var(--success); }
-.tab-link[aria-selected='true'] span { background: var(--soft); color: var(--success); }
+.tab-link[aria-selected='true'] { background: transparent; color: var(--ink); border-bottom-color: var(--accent); }
+.tab-link[aria-selected='true'] span { background: var(--soft); color: var(--accent); }
 .tab-link:hover { background: transparent; color: var(--ink); }
 .review-panel { top: 84px; }
 .review-panel-heading h2 { margin-bottom: 8px; }
 .review-panel-heading p, .authorization-description { color: var(--muted); font-size: .8125rem; }
 
 /* Responsividad */
+@media (min-width: 1500px) {
+  .main-content {
+    padding: 44px 56px;
+  }
+  .topbar {
+    padding-right: 56px;
+    padding-left: 56px;
+  }
+}
+
 @media (max-width: 1200px) {
+  .main-content {
+    padding: 28px;
+  }
+  .topbar {
+    padding-right: 28px;
+    padding-left: 28px;
+  }
   .company-layout {
     grid-template-columns: minmax(0, 1fr) 270px;
     gap: 20px;
@@ -2090,6 +2143,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 
 @media (max-width: 760px) {
+  .topbar {
+    padding: 12px 20px;
+    min-height: 64px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .main-content {
+    padding: 24px 20px;
+  }
   .sequence-nav { width: 100%; justify-content: center; margin: 0; }
   h1 {
     font-size: 1.75rem;
@@ -2149,6 +2212,13 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 
 @media (max-width: 420px) {
+  .main-content {
+    padding: 20px 16px;
+  }
+  .topbar {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
   .detail-grid,
   .operation-limits,
   .budget-limits {

@@ -2,7 +2,7 @@
 {% load prospecting_ui %}
 {% block title %}{{ result.company.name }} · Veryfi Prospecting{% endblock %}
 {% block content %}
-<div class="company-page">
+<div class="company-page" data-entering>
 <div class="company-toolbar">
 <a class="text-link company-back" href="{% url 'webapp:campaign' campaign.id %}{% if filter_query %}?{{ filter_query }}{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>Volver a la campaña</a>
 {% if sequence_total %}
@@ -22,9 +22,9 @@
 {% endif %}
 </div>
 <header class="company-head">
+  <span class="company-avatar company-avatar-lg" data-tone="{% if result.business_status == 'excluded' %}excluded{% else %}{{ result.assessment.priority|default:'pending' }}{% endif %}" aria-hidden="true">{{ result.company.name|slice:':1'|upper }}</span>
   <div class="company-head-copy">
     <h1>{{ result.company.name }}</h1>
-    {% if result.assessment.explanation %}<p class="assessment-explanation">{{ result.assessment.explanation }}</p>{% endif %}
     <p class="company-head-meta">
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5s1.2-6.1 3.6-8.5Z"/></svg>{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>{% for code in result.company.operating_countries %}{{ code|label }}{% if not forloop.last %}, {% endif %}{% empty %}País pendiente{% endfor %}</span>
@@ -35,7 +35,6 @@
     <span class="priority priority-{{ result.assessment.priority|default:'pending' }}">Prioridad {{ result.assessment.priority|label|lower }}</span>
     <span class="status status-{{ result.business_status|default:'pending' }}">{{ result.business_status|label }}</span>
     <span class="review review-{{ result.run_item.review_status }}"><span class="chip-key">Revisión</span> {{ result.run_item.review_status|label }}</span>
-    {% if not legacy_readonly and not is_executing %}<a href="#review-title" class="text-link review-jump">Ir a revisión</a>{% endif %}
   </div>
 </header>
 <div class="company-alerts">
@@ -53,7 +52,6 @@
       <h2 id="summary-title" class="sr-only">Resumen</h2>
       {% if result.assessment %}
       <div class="scorecard">
-        <h3 class="report-title">Encaje comercial</h3>
         <dl class="score-metrics">
           <div class="score-metric">
             <dt>Encaje</dt>
@@ -67,18 +65,18 @@
           </div>
         </dl>
         <div class="score-reading">
+          <p class="assessment-explanation">{{ result.assessment.explanation }}</p>
           <ul class="product-tags" aria-label="Productos compatibles">{% for product in result.assessment.products %}<li class="product-tag">{{ product|label }}</li>{% empty %}<li class="product-tag is-empty">Productos pendientes</li>{% endfor %}</ul>
         </div>
       </div>
-      <h3 class="report-title">Criterios de evaluación</h3>
       <ol class="criteria-list">
         {% for name, criterion in result.assessment.criteria.items %}
         {% with tone=criterion.value|criterion_tone %}
-        <li class="criterion">
+        <li class="criterion" style="--i: {{ forloop.counter0 }}">
           <span class="harvey harvey-{{ tone }}" aria-hidden="true"></span>
           <div class="criterion-body">
             <div class="criterion-head">
-              <h4>{{ name|label }}</h4>
+              <h3>{{ name|label }}</h3>
               <span class="status criterion-badge criterion-{{ tone }}">{{ criterion.value|criterion_label }}</span>
             </div>
             <p>{{ criterion.justification }}</p>
@@ -91,7 +89,6 @@
       {% else %}
       <div class="empty-state">
         <h3>Calificación pendiente</h3>
-        <p>Puedes consultar el avance desde la campaña.</p>
       </div>
       {% endif %}
 
@@ -152,7 +149,6 @@
       {% empty %}
       <div class="empty-state">
         <h3>Sin contactos identificados</h3>
-        <a class="text-link" href="#summary">Consultar encaje comercial</a>
       </div>
       {% endfor %}
     </section>
@@ -171,35 +167,6 @@
       {% endwith %}
   </div>
   <aside class="company-aside" aria-label="Mejor match y revisión de ventas">
-    {% if not legacy_readonly %}
-    <section class="review-panel surface" aria-labelledby="review-title">
-      <h2 id="review-title">Revisión de ventas</h2>
-      <p class="review-scope">Decisión sobre la empresa.</p>
-      <form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
-        <fieldset {% if is_executing %}disabled{% endif %}>
-          {% if review_form.non_field_errors %}<div class="notice notice-error">{{ review_form.non_field_errors }}</div>{% endif %}
-          <fieldset class="decision-field">
-            <legend>{{ review_form.status.label }}</legend>
-            <div class="decision-options">
-              {% for choice in review_form.status %}
-              <label class="decision-option decision-{{ choice.data.value }}" for="{{ choice.id_for_label }}">{{ choice.tag }}{% if choice.data.value == 'accepted' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" pathLength="1"/></svg>{% elif choice.data.value == 'rejected' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" pathLength="1"/></svg>{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" pathLength="1"/></svg>{% endif %}<span>{{ choice.choice_label }}</span></label>
-              {% endfor %}
-
-            </div>
-            {% if review_form.status.errors %}<div class="field-errors" role="alert">{% for error in review_form.status.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
-          </fieldset>
-          {% include 'components/_field.html' with field=review_form.reason %}
-          <div class="review-actions">
-            <button type="submit" class="button {% if next_company %}button-secondary{% else %}button-primary{% endif %}" data-idle-only>Guardar</button>
-            {% if next_company %}
-            <button type="submit" name="next_company_id" value="{{ next_company.id }}" class="button button-primary" data-idle-only>Guardar y siguiente<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
-            {% endif %}
-          </div>
-        </fieldset>
-      </form>
-      {% if result.run_item.reviewed_at %}<p class="quiet-note">Revisado: {{ result.run_item.reviewed_at|date:'d M Y · H:i' }}</p>{% endif %}
-    </section>
-    {% endif %}
     {% with lead=result.contacts.0 %}
     {% if lead.match and not lead.match.blocked_reason %}
     <section class="lead-card surface" aria-labelledby="lead-title">
@@ -217,6 +184,35 @@
     </section>
     {% endif %}
     {% endwith %}
+    {% if not legacy_readonly %}
+    <section class="review-panel surface" data-motion-surface aria-labelledby="review-title">
+      <h2 id="review-title">Revisión de ventas</h2>
+      <p class="review-scope">Decisión sobre la empresa.</p>
+      <form method="post" action="{% url 'webapp:review' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}" data-idle-form>{% csrf_token %}
+        <fieldset {% if is_executing %}disabled{% endif %}>
+          {% if review_form.non_field_errors %}<div class="notice notice-error">{{ review_form.non_field_errors }}</div>{% endif %}
+          <fieldset class="decision-field">
+            <legend>{{ review_form.status.label }}</legend>
+            <div class="decision-options">
+              {% for choice in review_form.status %}
+              <label class="decision-option decision-{{ choice.data.value }}" for="{{ choice.id_for_label }}">{{ choice.tag }}{% if choice.data.value == 'accepted' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" pathLength="1"/></svg>{% elif choice.data.value == 'rejected' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" pathLength="1"/></svg>{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" pathLength="1"/></svg>{% endif %}<span>{{ choice.choice_label }}</span></label>
+              {% endfor %}
+              <span class="decision-thumb" aria-hidden="true"></span>
+            </div>
+            {% if review_form.status.errors %}<div class="field-errors" role="alert">{% for error in review_form.status.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+          </fieldset>
+          {% include 'components/_field.html' with field=review_form.reason %}
+          <div class="review-actions">
+            <button type="submit" class="button button-primary" data-idle-only>Guardar</button>
+            {% if next_company %}
+            <button type="submit" name="next_company_id" value="{{ next_company.id }}" class="button button-secondary" data-idle-only>Guardar y siguiente<svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+            {% endif %}
+          </div>
+        </fieldset>
+      </form>
+      {% if result.run_item.reviewed_at %}<p class="quiet-note">Revisado: {{ result.run_item.reviewed_at|date:'d M Y · H:i' }}</p>{% endif %}
+    </section>
+    {% endif %}
   </aside>
 </div>
 </div>

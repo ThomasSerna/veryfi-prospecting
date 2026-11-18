@@ -1,58 +1,50 @@
 ---
 name: Veryfi Prospecting
-description: Interfaz editorial para preparar campañas y revisar empresas.
+description: Interfaz local de campañas y revisión comercial.
 colors:
-  navy: "#171C3A"
-  ivory: "#E9ECE4"
-  canvas: "{colors.ivory}"
-  surface: "#F8F9F5"
-  text: "{colors.navy}"
-  text-muted: "#51566A"
-  border: "#BDC3B9"
-  border-strong: "#787E79"
+  canvas: "#0D1026"
+  surface: "#171C3A"
+  surface-top: "#1A2544"
+  surface-hover: "#1B213F"
+  soft: "#1E2444"
   accent: "#00FA6C"
-  accent-text: "{colors.navy}"
-  info: "#3847A1"
-  info-background: "#E3E7FA"
-  warning: "#755008"
-  warning-background: "#FAF0D8"
-  error: "#9C2138"
-  error-background: "#FAE5E8"
-  success: "#006347"
-  success-background: "#D7EFDF"
+  accent-alt: "#2DB5D2"
+  accent-text: "#171C3A"
+  text: "#E9ECE4"
+  text-muted: "#B9BDB1"
+  text-disabled: "#9B9C98"
+  border: "#2D3352"
+  border-strong: "#70748F"
+  info: "#9BA6E8"
+  info-background: "#262C56"
+  warning: "#FFC56D"
+  warning-background: "#3B2A12"
+  error: "#FF7585"
+  error-background: "#461C24"
+  success: "#00D181"
+  success-background: "#0A3723"
+  unreviewed: "#FFC56D"
+  blue: "#9BA6E8"
+  blue-pale: "#C9D0E7"
+  sky: "#7081F0"
+  sky-dark: "#4553BA"
+  navy-medium: "#45495F"
 typography:
   heading:
-    fontFamily: "Baskervville, Georgia, serif"
-    fontSize: "clamp(2.6rem, 5vw, 4.75rem)"
-    fontWeight: 400
-    lineHeight: 1.05
-  cover-heading:
-    fontFamily: "{typography.heading.fontFamily}"
-    fontSize: "clamp(3.1rem, 6.9vw, 6rem)"
-    fontWeight: 400
-    lineHeight: 1
-  section-heading:
-    fontFamily: "{typography.heading.fontFamily}"
-    fontSize: "1.7rem"
-    fontWeight: 400
-    lineHeight: 1.16
+    fontFamily: "Inter, Arial, Helvetica, sans-serif"
+    fontSize: "2rem"
+    fontWeight: 600
+    lineHeight: 1.18
+    letterSpacing: "-0.03em"
   body:
     fontFamily: "Inter, Arial, Helvetica, sans-serif"
     fontSize: "0.9375rem"
     lineHeight: 1.55
-  button:
-    fontFamily: "{typography.body.fontFamily}"
-    fontSize: "0.875rem"
-    fontWeight: 600
-  button-small:
-    fontFamily: "{typography.body.fontFamily}"
-    fontSize: "0.8125rem"
-    fontWeight: 600
 rounded:
-  xs: "3px"
-  sm: "5px"
-  md: "8px"
-  lg: "12px"
+  xs: "6px"
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
 spacing:
   "1": "6px"
   "2": "12px"
@@ -64,63 +56,232 @@ components:
   button-primary:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-text}"
-  topbar:
-    backgroundColor: "{colors.navy}"
+    rounded: "{rounded.sm}"
+    padding: "10px 18px"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.sm}"
+    padding: "10px 18px"
+  input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.xs}"
+    padding: "10px 12px"
+  navigation-link:
+    textColor: "{colors.text-muted}"
+    rounded: "{rounded.xs}"
+    padding: "10px 12px"
+  status-success:
+    backgroundColor: "{colors.success-background}"
+    textColor: "{colors.success}"
+    rounded: "{rounded.xs}"
+    padding: "4px 10px"
+  panel:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.md}"
 ---
 
 # Diseño de Veryfi Prospecting
 
-## Identidad
+## Overview
 
-La empresa que ventas está revisando ocupa el lugar de un titular. Su nombre y el
-motivo de encaje se leen juntos. El mercado, el estado y las cifras de seguimiento
-dan contexto a esa decisión. En campaña, las filas compactas permiten comparar
-varias empresas en una misma columna. La composición toma el uso de titulares y
-separadores de *Monograph* y la alineación de datos de *orbit*. [Monograph](https://github.com/pablomanjarres/twenty-web-studies/blob/trunk/public/previews/monograph.jpg) · [orbit](https://github.com/pablomanjarres/twenty-web-studies/blob/trunk/public/previews/orbit.jpg)
+Herramienta de trabajo para el equipo de ventas: preparar campañas, seguir la
+investigación y revisar empresas, personas y evidencia. El inicio destaca la
+campaña activa o, si no existe, la última guardada. Sus indicadores resumen
+revisión y contacto listo. Los topes se revisan al autorizar la investigación.
 
-## Color y tipografía
+La dirección oscura usa la paleta de Veryfi: navy, marfil, verde Veryfi y
+turquesa, con Sky, Gold y Magenta para la información y los estados. El marco compartido, el inicio, el historial, la campaña y la ficha
+aplican esta dirección. Las vistas de trabajo usan menos texto que el inicio:
+cifras, barras, iconos y estados con su etiqueta. La demostración identifica sus datos como sintéticos.
 
-- La cabecera navy reúne el logotipo blanco de Veryfi y la navegación. El marfil
-  predomina en las superficies de lectura. El verde Veryfi con texto navy
-  distingue la acción principal. [Guía de marca de Veryfi](https://www.veryfi.com/brand/)
-- Baskervville da forma a los titulares de mercados y empresas. Inter se utiliza
-  en controles, tablas, datos y texto de lectura. Ambas familias se sirven con la
-  aplicación y conservan sus licencias SIL Open Font License. [Baskervville](https://github.com/google/fonts/tree/main/ofl/baskervville) · [Inter](https://github.com/rsms/inter)
-- El espaciado agrupa el nombre de cada empresa con sus datos. Los separadores
-  finos marcan el comienzo de la fila o sección siguiente. Las cifras tabulares
-  permiten comparar puntuaciones y recuentos.
-- Los indicadores de prioridad, disponibilidad y revisión incluyen su nombre en
-  texto. Una puntuación pendiente se identifica como tal. El color y las barras
-  sirven de apoyo.
+<!-- Pendiente: nombre creativo de la dirección (Creative North Star). No está definido; requiere decisión del equipo. -->
 
-En el Resumen, el titular de empresa varía entre 3,1 y 6 rem según el ancho de
-la pantalla. Los títulos de campaña y ficha van de 2,6 a 4,75 rem, y el título
-del Historial, de 3 a 5 rem. En el índice, los nombres de mercado se leen a
-1,75 rem. «Empresas», «Encaje comercial» y «Revisión de ventas» abren sus
-secciones a 1,7 rem. Los botones usan Inter a 0,875 rem y los compactos a
-0,8125 rem. Las etiquetas breves de estado se componen a 0,75 rem.
+## Colors
 
-## Composición por pantalla
+Paleta de la [guía de marca de Veryfi](https://www.veryfi.com/brand/) para fondos
+oscuros, consultada el 7 de noviembre de 2026, más el turquesa #2DB5D2 del degradado
+del botón principal de veryfi.com. Veryfi no usa negro: el lienzo y el velo del
+cajón son navy. Los estados también usan texto, no solo color.
 
-| Pantalla | Foco y distribución |
-|---|---|
-| Resumen | Presenta la campaña activa o la última guardada. La empresa pendiente de revisión tiene acceso directo a su ficha. Durante la investigación se muestra el seguimiento. |
-| Historial | La fecha, el mercado y el estado identifican cada campaña del índice. |
-| Nueva campaña | Mercado y alcance se completan junto a un resumen de los criterios y topes. La autorización de ejecución tiene su propio paso. |
-| Campaña | La campaña preparada da paso a la autorización. Durante la ejecución, la franja de avance precede a los resultados parciales. Al terminar, la lista y sus filtros ocupan el primer plano y la franja aparece debajo. |
-| Ficha | El nombre y la explicación del encaje introducen la lectura. Resumen y Contactos organizan el detalle. La decisión de ventas acompaña la ficha en escritorio y pasa al flujo de lectura en móvil. |
+`static/css/app.css` declara los colores de marca como primitivas (`--veryfi-*`) y
+los componentes usan solo roles (`--canvas`, `--accent`…); probar otra paleta es
+reasignar esos roles. Los navy derivados se escriben en OKLCH con el matiz de Navy
+(274°); aquí figura su equivalente hexadecimal.
 
-## Navegación e interacción
+- **Lienzo** (`canvas`, #0D1026): Navy oscurecido para el fondo de página. Variable `--canvas`.
+- **Paneles** (`surface`, Navy #171C3A): tarjetas, tablas y el cajón lateral.
+  `surface-top` (#1A2544) aclara hacia el turquesa la parte superior del resumen y del pulso.
+- **Superficies secundarias** (`soft`, #1E2444; `surface-hover`, #1B213F): filas,
+  badges, campos y la opción actual del menú.
+- **Acento** (`accent`, Veryfi Green #00FA6C; `accent-alt`, #2DB5D2; `accent-text`,
+  Navy): foco, selección, pestaña activa y botón principal. El botón usa el degradado
+  verde-turquesa de veryfi.com con texto navy (11.78:1).
+- **Texto** (`text`, Ivory #E9ECE4; `text-muted`, Ivory Medium #B9BDB1;
+  `text-disabled`, Ivory Dark #9B9C98): variables `--ink`, `--muted` y `--disabled-ink`.
+- **Bordes** (`border`, #2D3352; `border-strong`, Navy Light #70748F): divisiones y
+  controles. Variables `--line` y `--line-strong`.
+- **Estados**: `success` (Forest Light #00D181), `info` (Sky Light #9BA6E8),
+  `warning` (Gold #FFC56D) y `error` (Magenta Light #FF7585), cada uno con su fondo
+  (`*-background`). Sin revisar usa `unreviewed` (Gold) y Contacto listo, `success`.
+- **Datos**: encaje y match usan `blue` (Sky Light); `blue-pale` (#C9D0E7)
+  marca prioridad media y cobertura.
+- **Prioridad**: escala Sky (#9BA6E8 alta, #7081F0 media, #4553BA baja) y navy
+  (#70748F evidencia insuficiente, #45495F excluidas). Se acompaña de barras de
+  señal y del texto de la prioridad.
 
-En escritorio, Resumen, Historial y Nueva campaña están visibles en la cabecera.
-En móvil se agrupan en un menú operable con teclado. Desde la ficha se puede
-avanzar a la siguiente empresa o regresar a la campaña manteniendo la selección
-de filtros de la lista de origen.
+## Typography
 
-El sondeo actualiza el estado y el avance durante una investigación. Las
-transiciones señalan qué cambió y respetan la preferencia de movimiento reducido.
-Los campos, enlaces y controles tienen foco visible. Los avisos de bloqueo, error
-y guardado se pueden leer en texto.
+Inter variable se sirve desde `static/fonts/InterVariable.woff2`, con fuentes sans
+locales como alternativa. La fuente procede del
+[repositorio oficial de Inter](https://github.com/rsms/inter) y su licencia SIL
+Open Font License 1.1 está en `static/fonts/Inter-OFL.txt`. Las tipografías de marca
+de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 
-La guía de uso describe las autorizaciones, los bloqueos de escritura y las
-modalidades de descarga. [Interfaz local de campañas y revisión](docs/ui.md)
+- **Encabezados** (`heading`): 2rem, peso 600, altura de línea 1.18, interletrado -0.03em.
+- **Texto** (`body`): 0.9375rem, altura de línea 1.55.
+- Los números de tablas, puntuaciones y presupuesto usan cifras tabulares.
+
+## Layout
+
+- La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
+  campaña. Su botón queda alineado con el logotipo y Prospecting en la barra
+  superior.
+- El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
+  subtítulo ni nota explicativa. El inicio muestra el avance y dos indicadores
+  de igual tamaño, Sin revisar y Con contacto listo, de la campaña destacada;
+  el historial está en una vista independiente. Las cifras no suman campañas.
+  En escritorio, el panel de avance ocupa más ancho que los indicadores laterales.
+  Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel destacado
+  tiene 32 px de relleno interior en escritorio y 24 px en móvil.
+- La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
+  campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
+- La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
+  investigadas, Sin revisar, Contacto listo y Aceptadas, y una barra apilada de
+  prioridades con su leyenda enlazada a filtros. Debajo, la tabla con búsqueda y
+  filtros en una sola barra. El progreso usa las empresas
+  encontradas como denominador; durante el descubrimiento, si todavía no hay
+  empresas, no inventa un porcentaje. El botón Descargar del encabezado despliega
+  las opciones para empresas listas o todas las empresas.
+- La ficha presenta identidad y estados en el encabezado, las pestañas Resumen y
+  Contactos, y, a la derecha, el mejor match y la revisión de ventas. Volver a la
+  campaña y, cuando corresponda, Anterior y Siguiente están encima del encabezado y
+  preservan los filtros.
+  Encaje, cobertura, disponibilidad y revisión son conceptos independientes.
+
+## Elevation & Depth
+
+La jerarquía se construye con bordes sutiles y capas de tono (`surface` sobre
+`canvas`). Las sombras aparecen como respuesta a un estado: el desplegable de
+filtros, la confirmación flotante, la elevación de un panel del inicio al pasar
+el cursor con puntero fino y el halo del botón principal. Los paneles de trabajo
+(pulso de campaña, revisión) no se elevan: solo orientan su borde hacia el puntero.
+
+## Shapes
+
+Paneles con bordes sutiles y radios de 12–16 px (`md` y `lg`). Controles con 8 px
+(`sm`) y campos o etiquetas con 6 px (`xs`). Búsqueda, filtros, contadores y
+etiquetas de mercado o producto usan forma de píldora.
+
+## Components
+
+### Navegación
+
+El menú se abre como cajón con el fondo oscurecido y desenfocado. Con JavaScript,
+contiene el foco y permite cerrar con Escape, el fondo o su botón, devolviendo el
+foco al control; sin JavaScript conserva la apertura y cierre nativos. El cajón se
+inspira en el [dashboard de AdminCN](https://shadcn-nextjs-admincn-admin-template.vercel.app/dashboard/sales)
+y el movimiento de los paneles, en [21st.dev](https://21st.dev/community/components).
+El botón del menú, sin caja propia, comparte la línea del logotipo; al señalarlo,
+su carril se llena de verde y el chevrón empuja hacia el cajón, a partir del icono
+animado `panel-left-open` de [lucide-animated](https://github.com/pqoqubbw/icons)
+(MIT), recreado en CSS. Durante una investigación muestra un punto que late.
+
+### Campaña
+
+- **Pulso:** estado, cifra de investigadas con rodillo, un segmento por empresa y
+  tres cifras con su barra (Sin revisar en dorado, Contacto listo en verde,
+  Aceptadas en marfil). En curso, un haz recorre el borde.
+- **Prioridad:** barra apilada y leyenda con recuento; cada entrada filtra la tabla.
+- **Tabla:** avatar con la inicial tintado por prioridad, nombre con flecha al
+  señalar, dominio, encaje con barra, prioridad con barras de señal (3, 2 o 1),
+  disponibilidad, revisión con icono (círculo, marca o cruz) y cantidad de
+  contactos. Toda la fila abre la ficha; el nombre es el único enlace.
+- **Autorización:** antes de investigar se revisan las operaciones y sus topes.
+
+### Ficha
+
+- **Encabezado:** avatar, nombre, dominio, países y segmentos con iconos, y los
+  tres estados (prioridad, disponibilidad y revisión) separados.
+- **Pestañas:** una línea medida desde cada etiqueta marca la activa y una
+  pastilla sigue al puntero; el panel entra desde el lado de la pestaña elegida.
+  Siguen el patrón de teclado de pestañas (flechas, Inicio y Fin) y el panel
+  recibe el foco con Tab.
+- **Encaje:** cifra grande con barra graduada en cuartos, explicación, productos,
+  cobertura y criterios visibles en el resumen. Cada criterio muestra una bola de
+  Harvey junto a su etiqueta textual.
+- **Contactos:** cada persona presenta nombre, cargo y match, con una separación clara
+  respecto a las demás. Los canales muestran tipo, valor y copia; un solo botón
+  «Confirmar canal» abre el panel donde se elige el canal y se registran notas.
+- **Fallos de lectura:** cuando hay páginas que no se pudieron leer, su etapa, URL y
+  motivo aparecen bajo las pestañas.
+- **Lateral:** mejor match y revisión fijos al desplazarse. La decisión sobre la
+  empresa es un control segmentado (Pendiente, Aceptado, Rechazado) cuyo fondo se
+  desliza a la opción elegida.
+
+### Controles, avisos y datos
+
+Los indicadores y las barras incluyen sus valores en texto. Las pestañas, los
+formularios y los avisos conservan etiquetas, foco y estados identificables. Los
+avisos de campaña y ficha llevan icono y título en una línea. Guardar una revisión,
+confirmar un canal o cerrar una campaña se confirma con un aviso flotante que se
+retira solo; con movimiento reducido queda como aviso en la página.
+
+### Marca
+
+El logotipo blanco de Veryfi permanece como recurso local y, en móvil, se muestra
+a 52 × 20 px junto al nombre Prospecting.
+
+### Movimiento
+
+- **Transiciones:** animaciones fluidas y perceptibles en navegación, pestañas, paneles y cambios de estado.
+- **Microinteracciones:** botones, tarjetas y controles responden con movimientos naturales y feedback visual.
+- **Contenido dinámico:** entradas escalonadas, contadores animados y transiciones suaves al actualizar resultados o progreso, sin reinicios innecesarios.
+- **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
+- **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
+
+Las transiciones respetan `prefers-reduced-motion`. Se desactivan las respuestas
+al movimiento del puntero táctil; el fondo de Resumen e Historial puede animarse
+en estos dispositivos. Las animaciones deben comprobarse en el navegador: el
+resultado debe transmitir una experiencia interactiva refinada sin distraer del
+trabajo comercial.
+
+En Resumen e Historial, incluso sin campañas, un lienzo WebGL local aporta círculos
+suaves verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
+(consultado el 9 de noviembre de 2026). Tiene opacidad 0,55, velocidad del 100 %
+de la referencia y resolución del área visible dividida por 15 y redondeada; el
+dibujo se limita a 30 fotogramas por segundo. En Resumen, el lienzo queda fuera
+de la región del sondeo. La animación se pausa si la página está oculta o el panel
+correspondiente sale de la vista y queda estática con movimiento reducido. Con
+colores forzados o si falla WebGL se conserva el fondo habitual. El fondo no
+descarga recursos externos ni añade dependencias.
+
+En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
+cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
+durante el sondeo, solo se animan las diferencias. Una empresa nueva sube a su
+fila con un destello verde, una fila que cambia de puesto se desliza (FLIP) y una
+fila cuyo contenido cambia se ilumina; las cifras que crecen muestran `+n`. Al
+terminar la investigación, la página se actualiza en su sitio sin recargarse.
+Con movimiento reducido, todo llega en su estado final y los cambios solo se
+funden o cambian de color.
+
+## Do's and Don'ts
+
+- **Do** acompañar cada estado con texto además del color.
+- **Do** respetar `prefers-reduced-motion` y reservar las respuestas al puntero para dispositivos con puntero fino que detecten el paso del cursor.
+- **Do** preferir en las vistas de trabajo una cifra, una barra o un icono con su etiqueta breve antes que una frase explicativa.
+- **Don't** usar `|safe` ni `mark_safe` en contenido externo; el autoescape de Django se conserva.
+- **Don't** usar el color como único indicador de estado.
+- **Don't** reiniciar animaciones de entrada durante el sondeo ni animar alturas o anchos.

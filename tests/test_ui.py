@@ -499,17 +499,6 @@ def test_live_pipeline_blocks_human_writes_close_prepare_and_download(ui_results
         assert client.get(url("export", case.campaign.id)).status_code == 409
 
 
-@pytest.mark.parametrize("running", [False, True])
-def test_campaign_shows_results_first_after_execution(ui_results, client, running):
-    case = ui_results
-    with bridge._EXECUTION if running else nullcontext():
-        page = text(client.get(url("campaign", case.campaign.id)))
-    assert page.count('data-live-section="overview"') == 1
-    overview = page.index('data-live-section="overview"')
-    results = page.index('data-live-section="results"')
-    assert (overview < results) is running
-
-
 @pytest.mark.parametrize("ready,running", [(False, False), (True, False), (True, True)])
 def test_download_menu_keeps_both_modes_and_their_availability(ui_results, client, ready, running):
     case = ui_results

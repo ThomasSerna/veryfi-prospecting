@@ -147,13 +147,13 @@ def test_campaign_table_keeps_only_the_people_count_and_essential_company_data(p
     headings = [" ".join(re.sub(r"<[^>]*>", "", cell).split())
                 for cell in re.findall(r"<th\b[^>]*>(.*?)</th>", table[1].split("</thead>")[0], re.S)]
     assert headings == ["Empresa", "Encaje", "Prioridad", "Disponibilidad", "Revisión", "Contactos"]
-    row = table[1].split("</thead>", 1)[1]
+    row = table[1].split("<tbody>")[1]
     assert people.company.name in row and people.company.domain in row
     assert label("CO") not in row and label("fintech_software") not in row
     assert "Cobertura" not in row and "Mejor match" not in row
     cells = [" ".join(re.sub(r"<[^>]*>", "", cell).split())
              for cell in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.S)]
-    assert cells[-1] == "Contactos 3"
+    assert cells[-1] == "3"
     assert all(name not in row for name in (READY, SALES, CONTRADICTED))
     assert (label("researched") in row) is (people.stage == "researched")
 
