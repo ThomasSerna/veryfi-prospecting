@@ -152,21 +152,20 @@ test('El servidor no cierra un desplegable abierto ni reactiva la entrada termin
   assert.deepEqual(entered, []);
 });
 
-test('El sondeo conserva el encabezado y vuelve a habilitar su acción al terminar', async () => {
-  const root = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, ['0'])]);
-  root.dataset = { liveRegion: 'dashboard' };
-  root.querySelectorAll = () => [];
-  root.querySelector = () => null;
+test('Al terminar el sondeo se habilita Nueva campaña en el menú y en el Resumen', async () => {
   const create = active => h('a', {
     href: '/campaigns/new/',
     'data-idle-only': '',
     ...(active ? { 'aria-disabled': 'true', tabindex: '-1' } : {}),
   }, ['Nueva campaña']);
+  const heroAction = create(true);
+  const root = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, ['0']), heroAction]);
+  root.dataset = { liveRegion: 'dashboard' };
+  root.querySelectorAll = () => [];
+  root.querySelector = () => null;
   const action = create(true);
   const nav = h('nav', { 'data-live-region': 'navigation' }, [action]);
   nav.dataset = { liveRegion: 'navigation' };
-  const brand = h('a', { class: 'workspace-brand' }, ['Veryfi Prospecting']);
-  const header = h('header', {}, [brand, nav]);
   const timers = [];
   let polls = 0;
   const document = {
@@ -186,7 +185,7 @@ test('El sondeo conserva el encabezado y vuelve a habilitar su acción al termin
     DOMParser: class {
       parseFromString() {
         polls++;
-        const next = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, [String(polls)])]);
+        const next = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, [String(polls)]), create(polls === 1)]);
         const nextNav = h('nav', {}, [create(polls === 1)]);
         return {
           body: { dataset: { running: polls === 1 ? 'true' : 'false' } },
@@ -198,11 +197,14 @@ test('El sondeo conserva el encabezado y vuelve a habilitar su acción al termin
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/dashboard.js'), 'utf8'), context);
   await timers.shift()();
   assert.equal(action.getAttribute('aria-disabled'), 'true');
+  assert.equal(heroAction.getAttribute('aria-disabled'), 'true');
   await timers.shift()();
   assert.equal(root.firstChild.firstChild.nodeValue, '2');
-  assert.equal(header.firstChild, brand);
+  assert.equal(root.childNodes[1], heroAction);
   assert.equal(nav.firstChild, action);
-  assert.equal(action.hasAttribute('aria-disabled'), false);
-  assert.equal(action.hasAttribute('tabindex'), false);
+  for (const link of [heroAction, action]) {
+    assert.equal(link.hasAttribute('aria-disabled'), false);
+    assert.equal(link.hasAttribute('tabindex'), false);
+  }
   assert.equal(timers.length, 0);
 });

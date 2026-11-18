@@ -156,7 +156,7 @@ def test_summary_has_one_headline_without_repeated_explanations(redesign_paths, 
 
 
 @pytest.mark.parametrize("with_campaign", [False, True])
-def test_topbar_exposes_brand_and_navigation_across_routes(redesign_paths, make_campaign, make_company, with_campaign):
+def test_drawer_exposes_navigation_across_routes(redesign_paths, make_campaign, make_company, with_campaign):
     routes = [reverse(f"webapp:{name}") for name in ("campaigns", "campaign_history", "new_campaign")]
     if with_campaign:
         campaign = make_campaign(status="completed")
@@ -175,14 +175,15 @@ def test_topbar_exposes_brand_and_navigation_across_routes(redesign_paths, make_
         content = response.content.decode()
         topbar = re.search(r'<header class="topbar">(.*?)</header>', content, re.S)
         assert topbar is not None
-        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == "Prospecting Resumen Historial Nueva campaña"
+        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == "Prospecting"
         assert 'aria-label="Veryfi Prospecting, inicio"' in topbar[1]
         assert "/static/img/veryfi-logo.svg" in topbar[1]
-        assert 'aria-label="Menú principal"' in topbar[1]
-        assert 'data-live-region="navigation"' in topbar[1]
+        drawer = re.search(r'<details\b[^>]*id="navigation-drawer"[^>]*>(.*?)</details>', content, re.S)
+        assert drawer is not None and 'aria-label="Menú principal"' in drawer[1]
+        assert 'data-live-region="navigation"' in drawer[1]
         assert 'href="#main"' in content
         active_url = route if route in routes[:3] else reverse("webapp:campaign_history")
-        assert re.search(r'<a\b[^>]*href="' + re.escape(active_url) + r'"[^>]*aria-current="(?:page|location)"', topbar[1])
+        assert re.search(r'<a\b[^>]*href="' + re.escape(active_url) + r'"[^>]*aria-current="(?:page|location)"', drawer[1])
         assert "breadcrumb" not in topbar[1] and "sequence-nav" not in topbar[1]
     if with_campaign:
         company_page = content[content.index('class="company-page"'):]
@@ -191,7 +192,11 @@ def test_topbar_exposes_brand_and_navigation_across_routes(redesign_paths, make_
         assert "Volver a la campaña" in company_page
 
 
-def test_history_reads_only_one_campaign_for_budget_and_global_execution(redesign_paths, make_campaign, monkeypatch):
+@pytest.mark.parametrize(("route", "notice"), [
+    ("webapp:campaign_history", "Hay una investigación en curso."),
+    ("webapp:campaigns", "Investigación en curso."),
+])
+def test_running_campaign_keeps_creation_blocked(redesign_paths, make_campaign, monkeypatch, route, notice):
     active = make_campaign(status="running")
     with Database(redesign_paths.db) as db:
         db.save_campaign(active)
@@ -205,10 +210,11 @@ def test_history_reads_only_one_campaign_for_budget_and_global_execution(redesig
 
     monkeypatch.setattr(views, "read_campaign", observed)
     monkeypatch.setattr(execution, "snapshot", lambda campaign_id: {"is_executing": True})
-    response = Client(SERVER_NAME="localhost").get("/campaigns/")
+    response = Client(SERVER_NAME="localhost").get(reverse(route))
     assert response.status_code == 200 and calls == [active.id]
-    assert "Hay una investigación en curso." in response.content.decode()
-    assert 'aria-disabled="true"' in response.content.decode()
+    main = response.content.decode().split('<main ', 1)[1]
+    assert notice in main
+    assert re.search(r'<a\b(?=[^>]*href="/campaigns/new/")(?=[^>]*aria-disabled="true")(?=[^>]*tabindex="-1")[^>]*>', main)
 
 
 def test_empty_history_is_read_only_and_does_not_create_database(redesign_paths):
@@ -232,7 +238,7 @@ def test_preparation_keeps_its_groups_and_active_campaign_block(redesign_paths, 
 
 
 @pytest.mark.parametrize("with_campaign", [False, True])
-def test_summary_illustration_is_decorative_and_scoped_to_spotlight(redesign_paths, make_campaign, with_campaign):
+def test_summary_map_is_decorative_and_outside_dashboard_polling(redesign_paths, make_campaign, with_campaign):
     if with_campaign:
         with Database(redesign_paths.db) as db:
             db.save_campaign(make_campaign(status="completed"))
@@ -242,10 +248,15 @@ def test_summary_illustration_is_decorative_and_scoped_to_spotlight(redesign_pat
     content = response.content.decode()
     image = "img/latam-contours.webp"
     assert content.count(image) == 1
-    assert re.search(r'<span class="spotlight-art" aria-hidden="true">\s*<img[^>]*alt=""', content)
-    assert '<canvas width="1200" height="676" data-morph-skip></canvas>' in content
+    background, dashboard = content.split("data-live-dashboard", 1)
+    assert re.search(r'<[^>]+class="summary-map"[^>]*aria-hidden="true"', background)
+    assert re.search(r'<img\b(?=[^>]*latam-contours.webp)(?=[^>]*alt="")[^>]*>', background)
+    assert 'role="switch"' in background and "Animación del mapa" in background
+    assert image not in dashboard
+    assert 'href="/campaigns/"' in background and "Ver historial" in background
+    assert ("Abrir campaña" if with_campaign else "Preparar campaña") in dashboard
     for route in ("webapp:campaign_history", "webapp:new_campaign"):
         other = client.get(reverse(route))
         assert other.status_code == 200
         assert image not in other.content.decode()
-        assert 'summary-rays.js' not in other.content.decode()
+        assert "summary-map.css" not in other.content.decode()
