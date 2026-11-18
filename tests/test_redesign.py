@@ -39,9 +39,8 @@ def result(*, review="pending", stage="completed", priority=None, status=None):
 
 def test_campaign_insights_separate_progress_review_and_contact():
     pending_ready = result(status="ready_preferred", priority="high")
-    view = SimpleNamespace(companies=[pending_ready, result(review="accepted", stage="researched"),
-                                     result(status="excluded", priority="high")])
-    summary = views._campaign_insights(view)
+    companies = [pending_ready, result(review="accepted", stage="researched"), result(status="excluded", priority="high")]
+    summary = views._campaign_insights(companies)
     assert (summary["total"], summary["completed"], summary["review_pending"], summary["ready"]) == (3, 2, 2, 1)
     assert summary["progress"] == 67 and summary["next_review"] is pending_ready
     distribution = {item["value"]: item for item in summary["priority_distribution"]}
@@ -52,17 +51,17 @@ def test_campaign_insights_separate_progress_review_and_contact():
 
 
 def test_campaign_insights_do_not_invent_progress_without_companies():
-    summary = views._campaign_insights(SimpleNamespace(companies=[]))
+    summary = views._campaign_insights([])
     assert summary["progress"] is None and summary["next_review"] is None
     assert summary["total"] == summary["review_pending"] == summary["ready"] == 0
     assert all(item["count"] == item["percent"] == 0 for item in summary["priority_distribution"])
 
 
 def test_campaign_insights_do_not_count_a_pending_channel_as_ready():
-    summary = views._campaign_insights(SimpleNamespace(companies=[
+    summary = views._campaign_insights([
         result(review="accepted", status="needs_channel_confirmation"),
         result(status="ready_alternative"),
-    ]))
+    ])
     assert summary["needs_confirmation"] == summary["ready"] == summary["review_pending"] == 1
 
 
@@ -119,12 +118,7 @@ def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_path
     home = client.get(reverse("webapp:campaigns"))
     content = home.content.decode()
     assert home.status_code == 200
-    assert "<table" not in content and "Campañas recientes" not in content
-    assert "Prioridad de empresas" not in content
     assert str(active.id) in content and str(latest.id) not in content
-    assert content.count('class="home-metric ') == 2
-    assert "home-metric-total" not in content and "Revisar siguiente" not in content
-    assert "Empresas con un canal disponible" not in content
     assert "Sin revisar" in content and "Con contacto listo" in content
     assert 'href="/campaigns/"' in content
     # La barra superior ya no resume el presupuesto ni el menú anuncia el servicio local.
@@ -137,25 +131,82 @@ def test_home_is_a_single_campaign_summary_and_history_is_separate(redesign_path
     assert 'aria-current="page">' in content
 
 
-@pytest.mark.parametrize("with_campaign", [False, True])
-def test_summary_has_one_headline_without_repeated_explanations(redesign_paths, make_campaign, with_campaign):
-    if with_campaign:
-        with Database(redesign_paths.db) as db:
-            db.save_campaign(make_campaign(status="completed"))
+def test_empty_summary_invites_preparation_without_creating_a_campaign(redesign_paths):
     response = Client(SERVER_NAME="localhost").get(reverse("webapp:campaigns"))
     assert response.status_code == 200
     content = response.content.decode()
-    heading = re.search(r"<h1\b[^>]*>(.*?)</h1>", content, re.S)
-    assert heading is not None
-    assert " ".join(re.sub(r"<[^>]*>", "", heading[1]).split()) == "Tu investigación, de un vistazo."
-    assert "Una mirada." not in content and "El siguiente paso." not in content
-    assert "Tu investigación, donde la dejaste." not in content
-    assert "El resumen corresponde a" not in content
-    assert "La disponibilidad del contacto y la revisión son independientes." not in content
+    assert re.search(r'href="/campaigns/new/">Preparar campaña', content)
+    assert "<progress" not in content and not redesign_paths.db.exists()
+
+
+@pytest.mark.parametrize("status,busy,review,provider,action", [
+    ("completed", False, "pending", "apollo", "Retomar revisión"),
+    ("paused_budget", False, "pending", "apollo", "Retomar revisión"),
+    ("running", True, "pending", "apollo", "Seguir investigación"),
+    ("completed", False, "accepted", "apollo", "Ver resultados"),
+    ("completed", False, "pending", None, "Ver resultados"),
+])
+def test_home_action_opens_the_right_destination(redesign_paths, make_campaign, make_company, config,
+                                                monkeypatch, status, busy, review, provider, action):
+    campaign = make_campaign(status=status, config_snapshot=config.model_copy(update={"people_provider": provider}))
+    company, facts = make_company(name="Empresa pendiente sintética", operating_countries=["CO"])
+    with Database(redesign_paths.db) as db:
+        db.save_campaign(campaign)
+        db.save_company(company, evidence=facts)
+        db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, review_status=review,
+                                 review_reason="Revisión sintética" if review == "accepted" else None,
+                                 reviewed_at=campaign.created_at if review == "accepted" else None))
+    monkeypatch.setattr(execution, "snapshot", lambda campaign_id: {"is_executing": busy})
+    response = Client(SERVER_NAME="localhost").get(reverse("webapp:campaigns"))
+    assert response.status_code == 200
+    content = response.content.decode()
+    company_url = reverse("webapp:company", args=(campaign.id, company.id))
+    target = company_url if action == "Retomar revisión" else reverse("webapp:campaign", args=(campaign.id,))
+    assert f'class="button button-primary review-action" href="{target}">{action}' in content
+    if action == "Retomar revisión":
+        assert f'<h1 id="lead-title">{company.name}</h1>' in content
+    else:
+        assert company_url not in content
+
+
+def test_resume_follows_table_priority_and_opens_the_next_company(redesign_paths, make_campaign, make_company,
+                                                                  make_assessment):
+    campaign = make_campaign(status="completed")
+    companies = {}
+    with Database(redesign_paths.db) as db:
+        db.save_campaign(campaign)
+        for name, priority in [("A baja sintética", "low"), ("Z alta sintética", "high")]:
+            company, facts = make_company(name=name)
+            assessment = make_assessment(campaign.id, company.id, priority=priority)
+            db.save_company(company, evidence=facts)
+            item = db.save_run_item(RunItem(campaign_id=campaign.id, company_id=company.id, stage="completed"))
+            db.save_assessment(assessment)
+            db.save_run_item(item.model_copy(update={"last_assessment_id": assessment.id}))
+            companies[priority] = company
+    client = Client(SERVER_NAME="localhost")
+    first = reverse("webapp:company", args=(campaign.id, companies["high"].id))
+    second = reverse("webapp:company", args=(campaign.id, companies["low"].id))
+    assert f'href="{first}">Retomar revisión' in client.get("/").content.decode()
+    detail = client.get(first).content.decode()
+    assert f'href="{second}"' in detail and "Guardar y siguiente" in detail
+    response = client.post(reverse("webapp:review", args=(campaign.id, companies["high"].id)), {
+        "status": "accepted", "reason": "Criterios sintéticos revisados", "next_company_id": companies["low"].id,
+    })
+    assert response.status_code == 302 and response.url.split("?")[0] == second
+    assert f'href="{second}">Retomar revisión' in client.get("/").content.decode()
+
+
+def test_prepared_summary_opens_the_saved_campaign_without_inventing_progress(redesign_paths, make_campaign):
+    campaign = make_campaign(status="created")
+    with Database(redesign_paths.db) as db:
+        db.save_campaign(campaign)
+    content = Client(SERVER_NAME="localhost").get("/").content.decode()
+    assert f'href="{reverse("webapp:campaign", args=(campaign.id,))}">Abrir campaña' in content
+    assert "<progress" not in content
 
 
 @pytest.mark.parametrize("with_campaign", [False, True])
-def test_topbar_keeps_only_the_brand_across_routes(redesign_paths, make_campaign, make_company, with_campaign):
+def test_topbar_exposes_the_same_sections_across_routes(redesign_paths, make_campaign, make_company, with_campaign):
     routes = [reverse(f"webapp:{name}") for name in ("campaigns", "campaign_history", "new_campaign")]
     if with_campaign:
         campaign = make_campaign(status="completed")
@@ -174,11 +225,14 @@ def test_topbar_keeps_only_the_brand_across_routes(redesign_paths, make_campaign
         content = response.content.decode()
         topbar = re.search(r'<header class="topbar">(.*?)</header>', content, re.S)
         assert topbar is not None
-        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == "Prospecting"
+        for region in ("navigation-desktop", "navigation-mobile"):
+            nav = re.search(fr'data-live-region="{region}">(.*?)</nav>', topbar[1], re.S)
+            assert nav is not None
+            for name in ("campaigns", "campaign_history", "new_campaign"):
+                assert f'href="{reverse("webapp:" + name)}"' in nav[1]
         assert 'aria-label="Veryfi Prospecting, inicio"' in topbar[1]
         assert "/static/img/veryfi-logo.svg" in topbar[1]
         assert 'aria-label="Menú principal"' in content
-        assert "breadcrumb" not in topbar[1] and "sequence-nav" not in topbar[1]
     if with_campaign:
         company_page = content[content.index('class="company-page"'):]
         assert 'aria-label="Navegación secuencial de empresas"' in company_page
@@ -224,26 +278,3 @@ def test_preparation_keeps_its_groups_and_active_campaign_block(redesign_paths, 
     assert all(f"<legend>{name}</legend>" in content for name in ("Mercado", "Alcance", "Resumen"))
     assert "Hay una campaña sin terminar." in content
     assert "disabled" in content and str(active.id) in content
-
-
-@pytest.mark.parametrize("with_campaign", [False, True])
-@pytest.mark.parametrize("route, boundary", [
-    ("webapp:campaigns", 'data-live-region="dashboard"'),
-    ("webapp:campaign_history", 'class="history-page"'),
-])
-def test_background_is_shared_by_summary_and_history(redesign_paths, make_campaign, with_campaign, route, boundary):
-    if with_campaign:
-        with Database(redesign_paths.db) as db:
-            db.save_campaign(make_campaign(status="completed"))
-    client = Client(SERVER_NAME="localhost")
-    response = client.get(reverse(route))
-    assert response.status_code == 200
-    content = response.content.decode()
-    canvas = '<canvas class="summary-background" aria-hidden="true" hidden></canvas>'
-    assert content.count(canvas) == 1
-    assert content.index(canvas) < content.index(boundary)
-    assert content.count('src="/static/js/background.js?v=cloud-4"') == 1
-    other = client.get(reverse("webapp:new_campaign"))
-    assert other.status_code == 200
-    assert "summary-background" not in other.content.decode()
-    assert "/static/js/background.js" not in other.content.decode()
