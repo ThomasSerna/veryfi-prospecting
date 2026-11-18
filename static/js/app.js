@@ -167,14 +167,6 @@
     const tablist = tabsRoot.querySelector('.tabs');
     const tabs = Array.from(tablist.querySelectorAll('.tab-link'));
     const panels = tabs.map(tab => document.querySelector(tab.getAttribute('href')));
-    // Dos indicadores medidos desde cada etiqueta: la pastilla acompaña al puntero y la línea, a la pestaña activa.
-    const hover = document.createElement('span');
-    const line = document.createElement('span');
-    hover.className = 'tabs-hover';
-    line.className = 'tabs-indicator';
-    [hover, line].forEach(node => node.setAttribute('aria-hidden', 'true'));
-    tablist.append(hover, line);
-    tablist.dataset.enhanced = 'true';
     let current = -1;
     tablist.setAttribute('role', 'tablist');
     tabs.forEach((tab, index) => {
@@ -185,51 +177,19 @@
       panels[index].setAttribute('aria-labelledby', tab.id);
       panels[index].tabIndex = 0;
     });
-    function place(indicator, tab, instant = false) {
-      if (!tab) {
-        indicator.dataset.visible = 'false';
-        return;
-      }
-      // La pastilla aparece en su sitio la primera vez y después se desliza entre pestañas.
-      if (instant || indicator.dataset.visible !== 'true') indicator.style.transition = 'none';
-      if (indicator === hover) {
-        const right = tablist.clientWidth - tab.offsetLeft - tab.offsetWidth;
-        indicator.style.clipPath = `inset(0 ${right}px 0 ${tab.offsetLeft}px round 9px)`;
-      } else {
-        indicator.style.transform = `translateX(${tab.offsetLeft}px) scaleX(${tab.offsetWidth / 100})`;
-      }
-      if (indicator.style.transition === 'none') {
-        indicator.getBoundingClientRect();
-        indicator.style.removeProperty('transition');
-      }
-      indicator.dataset.visible = 'true';
-    }
     function selectTab(index, focus = false, animate = false) {
-      const direction = Math.sign(index - current);
-      // Elegir una pestaña termina la entrada: el panel nuevo no repite la cascada inicial.
-      if (animate) tabsRoot.closest('[data-entering]')?.removeAttribute('data-entering');
       tabs.forEach((tab, position) => {
         const selected = position === index;
         tab.setAttribute('aria-selected', String(selected));
         tab.tabIndex = selected ? 0 : -1;
         panels[position].hidden = !selected;
       });
-      place(line, tabs[index], !animate);
-      // El panel entra desde el lado hacia el que se movió la selección.
-      if (animate && index !== current) panels[index].animate?.(reducedMotion.matches
-        ? [{ opacity: 0 }, { opacity: 1 }]
-        : [{ opacity: 0, transform: `translateX(${direction * 18}px)` }, { opacity: 1, transform: 'none' }],
-      { duration: reducedMotion.matches ? 160 : 340, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+      if (animate && index !== current && !reducedMotion.matches) {
+        panels[index].animate?.([{ opacity: 0.6 }, { opacity: 1 }], { duration: 140 });
+      }
       current = index;
       if (focus) tabs[index].focus();
     }
-    tablist.addEventListener('pointerover', event => {
-      const tab = event.target.closest?.('.tab-link');
-      if (tab) place(hover, tab);
-    });
-    tablist.addEventListener('pointerleave', () => { hover.dataset.visible = 'false'; });
-    window.addEventListener('resize', () => place(line, tabs[current], true));
-    document.fonts?.ready?.then(() => place(line, tabs[current], true));
     function highlight(source) {
       source.scrollIntoView({ block: 'center' });
       // La fuente señalada por una píldora se ilumina un instante para unir referencia y origen.
@@ -435,9 +395,10 @@
       inactiveControls.clear();
       busy = false;
       morphing.update(main, nextMain);
-      const nav = document.querySelector('[data-live-region="navigation"]');
-      const nextNav = next.querySelector('[data-live-region="navigation"]');
-      if (nav && nextNav) morphing.morph(nav, nextNav, []);
+      document.querySelectorAll('[data-live-region^="navigation-"]').forEach(nav => {
+        const nextNav = next.querySelector(`[data-live-region="${nav.dataset.liveRegion}"]`);
+        if (nextNav) morphing.morph(nav, nextNav);
+      });
       body.dataset.running = next.body?.dataset.running === 'true' ? 'true' : 'false';
     } catch (_error) {
       window.location.reload();

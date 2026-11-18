@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function executionPage(status, isExecuting, { html = '', parsed = null, live = null, main = null, morphing = null } = {}) {
+function executionPage(status, isExecuting, { html = '', parsed = null, live = null, main = null, morphing = null, navigation = [] } = {}) {
   let submit;
   let active = isExecuting;
   let reloads = 0;
@@ -36,7 +36,8 @@ function executionPage(status, isExecuting, { html = '', parsed = null, live = n
       querySelector: () => null, addEventListener() {},
       getElementById: id => elements[id] ?? null, createElement: () => ({}),
       querySelectorAll: selector => selector === '[data-idle-only]' ? [button, link]
-        : selector === '[data-idle-form] fieldset' ? [fieldset] : [],
+        : selector === '[data-idle-form] fieldset' ? [fieldset]
+        : selector === '[data-live-region^="navigation-"]' ? navigation : [],
     },
     DOMParser: parsed ? class { parseFromString() { return parsed; } } : undefined,
     window: {
@@ -105,24 +106,26 @@ test('El sondeo compara cada sección en su sitio y, al terminar, actualiza la p
     replaceWith() { assert.fail('El sondeo no debe reemplazar secciones que puede comparar.'); },
   });
   const sections = [section('overview'), section('results')];
+  const navigation = ['navigation-desktop', 'navigation-mobile'].map(name => ({ name, dataset: { liveRegion: name } }));
   const live = { querySelector: () => null, querySelectorAll: selector => selector === '[data-live-section]' ? sections : [] };
   const nextMain = { name: 'main-nuevo', querySelector: selector => selector === '#campaign-page' ? {} : null };
   const parsed = {
     body: { dataset: { running: 'false' } },
     querySelector: selector => {
-      const match = /data-live-section="([\w-]+)"/.exec(selector);
+      const match = /data-live-(?:section|region)="([\w-]+)"/.exec(selector);
       return match ? { name: `${match[1]}-nuevo` } : null;
     },
     getElementById: id => id === 'main' ? nextMain : null,
   };
-  const page = executionPage(409, true, { html: '<section>Instantánea sintética</section>', parsed, live, main: { name: 'main' }, morphing });
+  const page = executionPage(409, true, { html: '<section>Instantánea sintética</section>', parsed, live, main: { name: 'main' }, morphing, navigation });
   await page.submit();
   await new Promise(setImmediate);
   assert.deepEqual(updates, [['overview', 'overview-nuevo'], ['results', 'results-nuevo']]);
   page.stop();
   await page.timers.shift()();
   assert.equal(page.reloads(), 0);
-  assert.deepEqual(updates.at(-1), ['main', 'main-nuevo']);
+  assert.deepEqual(updates.slice(-3), [['main', 'main-nuevo'], ['navigation-desktop', 'navigation-desktop-nuevo'],
+    ['navigation-mobile', 'navigation-mobile-nuevo']]);
   assert.deepEqual(page.calls, ['/execute/', '/status/', '/status/', '/campaigns/sintetica/']);
   assert.equal(page.document.body.dataset.running, 'false');
   assert.equal(page.timers.length, 0);

@@ -325,7 +325,7 @@ code {
   font-size: 0.8125rem;
 }
 
-.button > svg:not(.motion-arrow) {
+.button > svg {
   width: 17px;
   height: 17px;
 }
