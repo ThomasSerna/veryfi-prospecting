@@ -22,31 +22,42 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Inicio y navegación
 
-Resumen muestra la campaña activa o, si no la hay, la última guardada. La portada
-combina sus mercados, segmentos, estado y enlace con una ilustración local de relieve
-cartográfico de Latinoamérica. La ilustración es decorativa, entra una vez al abrir
-la página y se oculta en modo de colores forzados. Debajo se leen las cifras de la
-campaña destacada, con etiquetas separadas para Empresas investigadas, Sin revisar y
-Con contacto listo. Si todavía no hay campañas, la portada ofrece preparar la primera.
+Resumen presenta la campaña activa o, si no hay una activa, la última guardada.
+Muestra sus mercados, segmentos, estado y fecha, con un enlace para abrirla o
+continuarla. La franja inferior indica cuántas empresas de esa campaña terminaron
+la investigación frente al total descubierto, cuántas siguen sin revisar y
+cuántas tienen un contacto listo. Si todavía no hay campañas,
+«Preparar campaña» abre el formulario de criterios.
 
-El avance dibuja un segmento por empresa encontrada e identifica los terminados.
-Con cero empresas indica si continúa la búsqueda o todavía no se han descubierto
-resultados. Las cifras conservan su valor en el documento para lectores de pantalla.
-Durante una investigación, el inicio consulta su propia página cada dos segundos y
-actualiza en su sitio el avance, las cifras, el estado y la navegación. Los avisos y
-el estado anunciado conservan su función al terminar la investigación. Con movimiento
-reducido se muestra directamente el estado final de las entradas.
+Un mapa de Latinoamérica ocupa el fondo del Resumen. Se puede pausar la animación
+y al activar la preferencia de movimiento reducido el mapa queda estático.
+Historial utiliza su propio fondo de círculos verdes y turquesas. Se pausa si la
+página está oculta o el historial sale de la vista y también respeta el movimiento
+reducido. Si se usan colores forzados o falla WebGL, se ve el fondo oscuro habitual
+del historial.
 
-La barra superior ofrece Resumen, Historial y Nueva campaña en todas las páginas. En
-móvil los enlaces ocupan una fila bajo la marca y siguen a la vista. La ubicación se
-indica con `aria-current` y con un subrayado. El primer control de teclado permite
-saltar al contenido. Los enlaces funcionan con la navegación nativa del navegador.
+El avance dibuja un segmento por empresa encontrada y enciende los terminados;
+sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
+permanece en el documento para lectores de pantalla. Durante una investigación,
+el inicio vuelve a leer su propia página cada dos segundos y actualiza en su
+sitio avance, cifras, estado y navegación, sin recargar ni repetir
+la entrada; al terminar muestra el estado final y habilita la revisión. Con
+movimiento reducido, el contenido aparece en su estado final y los cambios solo
+se funden.
 
-El historial está en `/campaigns/` y también tiene acceso desde la portada cuando existe
-una campaña destacada. La tabla agrupa mercado y segmentos en la primera columna y
-muestra el estado y la fecha. En pantallas estrechas, el nombre abre el registro.
-En la ficha, Volver a la campaña y, cuando corresponda, Anterior y Siguiente
-están encima del encabezado y preservan los filtros.
+El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
+navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
+comparte la línea del logotipo en la barra superior; al señalarlo, el icono
+anticipa la apertura del cajón y, durante una investigación, muestra un punto que
+late. Al abrirla, el contenido queda detrás de una capa oscurecida y desenfocada.
+Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
+sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
+contiene el botón y la marca Veryfi Prospecting. En la ficha, Volver a la campaña
+y, cuando corresponda, Anterior y Siguiente están encima del encabezado y preservan
+los filtros.
+
+Las propuestas estáticas de campaña y ficha que sirvieron para elegir la dirección
+visual se retiraron del repositorio; las vistas operativas ya la aplican.
 
 ## Preparar y ejecutar
 
@@ -197,9 +208,7 @@ lista validada.
 
 ## Resultados y revisión
 
-La vista de campaña muestra su ubicación en Historial, el mercado, los segmentos y
-las acciones disponibles. Los accesos a secciones llevan a los resultados y la
-autorización, según el estado. El panel de avance reúne un segmento por empresa
+La vista de campaña abre con un pulso de la investigación: un segmento por empresa
 encontrada, la cifra de investigadas y tres cifras con su barra (sin revisar,
 contacto listo y aceptadas), además de una barra apilada de prioridades cuya
 leyenda filtra la tabla. La tabla muestra nombre, dominio, encaje, prioridad,
@@ -303,10 +312,17 @@ se verificó con pruebas sin red y en el navegador local sobre una base temporal
 exclusivamente sintética; no se ha usado con personas reales. El resultado y la columna
 de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 
+## Verificación del Resumen del 18 de noviembre de 2026
+
+Con datos sintéticos se comprobó en Chrome el recorrido desde el Resumen hasta
+la ficha de empresa y desde el historial hasta el formulario de preparación.
+A 320 y 390 px de ancho, y con zoom del 200 %, la portada se pudo recorrer sin
+desplazamiento horizontal. El interruptor permite pausar el mapa con el teclado.
+La preferencia de movimiento reducido deja la ilustración estática.
+
 ## Verificaciones anteriores
 
-Los registros siguientes corresponden a las versiones de la interfaz indicadas en
-cada fecha.
+Cada registro describe la versión de la interfaz disponible en la fecha indicada.
 
 ### Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 
@@ -328,12 +344,7 @@ cada fecha.
   en los destellos de Web Animations que leen `--accent`. Una simulación de
   deuteranopía y protanopía sobre la campaña mantuvo legibles los estados por su
   texto e iconos.
-- El detector de Impeccable quedó sin halos de color sin desplazamiento tras retirar
-  los de la línea de pestañas y la etapa lista. Mantiene el aviso por el degradado
-  verde-turquesa, que reproduce el de veryfi.com, y los previos por Inter, la
-  primera columna de la ficha y la sombra de los desplegables; su lectura de
-  contraste del pie del resumen se toma durante la entrada (calculado: 9.81:1).
-  Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
+- Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
   revisión con ventas.
 
 ### Verificación de campaña y ficha del 7 de noviembre de 2026
@@ -356,12 +367,8 @@ cada fecha.
   siete empresas, sin proveedores. El pulso, la tabla y la barra de filtros
   conservaron sus nodos, ninguna animación de entrada se reinició y, al terminar,
   la página se actualizó sin recargar y habilitó las descargas.
-- El detector de Impeccable no dejó advertencias de geometría animada tras
-  sustituir anchos y alturas por transformaciones y recortes. Mantiene avisos
-  consultivos por medidas fuera de la paleta mínima de `DESIGN.md` y por Inter,
-  la fuente elegida. Quedan pendientes Firefox, Safari, un lector de pantalla
-  real, el zoom al 200 %, la revisión con ventas y una investigación con
-  proveedores reales.
+- Quedan pendientes Firefox, Safari, un lector de pantalla real, el zoom al 200 %,
+  la revisión con ventas y una investigación con proveedores reales.
 
 ### Verificación del movimiento del resumen del 7 de noviembre de 2026
 
@@ -382,10 +389,8 @@ cada fecha.
   durante 36 s, con sondeos cada dos segundos. El panel destacado, la tarjeta de
   revisión, el primer segmento y el botón conservaron sus nodos; no se reinició
   ninguna animación de entrada y solo corrieron las señales de cambio.
-- El detector de Impeccable no dejó advertencias tras retirar una transición de
-  altura; conserva avisos consultivos por medidas fuera de la paleta mínima de
-  `DESIGN.md`. Quedan pendientes Firefox, Safari, un lector de pantalla real, el
-  zoom al 200 %, la revisión con ventas y una investigación con proveedores reales.
+- Quedan pendientes Firefox, Safari, un lector de pantalla real, el zoom al 200 %,
+  la revisión con ventas y una investigación con proveedores reales.
 
 ### Verificación del prototipo del 7 de noviembre de 2026
 
@@ -459,8 +464,8 @@ cada fecha.
   contactos, evidencia, preparación y autorización, en anchos de 1440, 1280 y 390 px.
   La navegación móvil y las pestañas conservan acceso por teclado; los filtros tienen
   nombres accesibles distintos. No se observaron desbordamientos de página.
-- Revisión independiente de código y diseño aprobada; detector de Impeccable sin
-  hallazgos. Se usa el logotipo blanco del media pack oficial de Veryfi y los colores
+- Revisión independiente de código y diseño aprobada. Se usa el logotipo blanco
+  del media pack oficial de Veryfi y los colores
   de su [guía de marca](https://www.veryfi.com/brand/), sin fuentes ni scripts remotos.
 - Streamlit y sus dependencias quedaron retirados. `prospecting/`, el catálogo,
   el esquema persistido y el evaluador offline no se modificaron.
