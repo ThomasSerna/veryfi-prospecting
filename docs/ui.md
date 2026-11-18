@@ -22,43 +22,22 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Inicio y navegación
 
-El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
-subtítulo ni nota explicativa. El inicio muestra la campaña activa o, si no la
-hay, la última guardada. El panel principal resume su avance y ocupa más ancho en
-escritorio; dos indicadores laterales cuentan las empresas sin revisar y con contacto
-listo. El inicio no suma resultados de campañas distintas. Los paneles se separan
-24 px en escritorio y 16 px en móvil; el panel
-destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Si no existen
-campañas, se ofrece preparar la primera.
+El Resumen se centra en la campaña activa o, si no la hay, en la última guardada.
+«Retomar revisión» abre la ficha de la primera empresa pendiente cuando la campaña
+admite decisiones. Las cifras de avance, revisión y disponibilidad corresponden
+a esa misma campaña. Una empresa con contacto listo puede seguir pendiente de revisión.
 
-Resumen e Historial muestran un fondo local de círculos verdes y turquesas,
-también cuando no hay campañas. Se anima también en dispositivos táctiles, se
-pausa si la página está oculta o el panel correspondiente sale de la vista y
-queda estático con movimiento reducido. Si se usan colores forzados o falla WebGL,
-se conserva el fondo habitual.
+En una campaña preparada, «Abrir campaña» lleva a los criterios y a la
+autorización. Durante una investigación, «Seguir investigación» abre el avance
+y los resultados parciales. El Resumen actualiza el estado cada dos segundos.
+Si aún no hay empresas descubiertas, el avance queda indeterminado. Al terminar
+la ejecución se habilita la revisión. «Ver resultados» abre una campaña ya
+revisada o una campaña histórica de consulta. Para empezar desde una base vacía,
+elige «Preparar campaña».
 
-El avance dibuja un segmento por empresa encontrada y enciende los terminados;
-sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
-permanece en el documento para lectores de pantalla. Durante una investigación,
-el inicio vuelve a leer su propia página cada dos segundos y actualiza en su
-sitio avance, cifras, estado y navegación, sin recargar ni repetir
-la entrada; al terminar muestra el estado final y habilita la revisión. Con
-movimiento reducido, el contenido aparece en su estado final y los cambios solo
-se funden.
-
-El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
-navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
-comparte la línea del logotipo en la barra superior; al señalarlo, el icono
-anticipa la apertura del cajón y, durante una investigación, muestra un punto que
-late. Al abrirla, el contenido queda detrás de una capa oscurecida y desenfocada.
-Con JavaScript, Escape, el fondo o el botón cierran el menú y devuelven el foco;
-sin JavaScript funciona el control nativo de apertura y cierre. La barra superior
-contiene el botón y la marca Veryfi Prospecting. En la ficha, Volver a la campaña
-y, cuando corresponda, Anterior y Siguiente están encima del encabezado y preservan
-los filtros.
-
-Las propuestas estáticas de campaña y ficha que sirvieron para elegir la dirección
-visual se retiraron del repositorio; las vistas operativas ya la aplican.
+La cabecera de escritorio ofrece Resumen, Historial y Nueva campaña. En móvil,
+el menú reúne esos accesos. El historial (`/campaigns/`) permite identificar una
+campaña por su mercado, fecha y estado antes de abrirla.
 
 ## Preparar y ejecutar
 
@@ -209,25 +188,26 @@ lista validada.
 
 ## Resultados y revisión
 
-La vista de campaña abre con un pulso de la investigación: un segmento por empresa
-encontrada, la cifra de investigadas y tres cifras con su barra (sin revisar,
-contacto listo y aceptadas), además de una barra apilada de prioridades cuya
-leyenda filtra la tabla. La tabla muestra nombre, dominio, encaje, prioridad,
-disponibilidad, revisión y cantidad de contactos; permite buscar y filtrar por país,
-segmento, prioridad y disponibilidad desde una sola barra. Toda la fila abre la ficha
-y el nombre sigue siendo el único enlace para teclado y lectores de pantalla. El botón
-Descargar del encabezado despliega las opciones para empresas listas o todas las
-empresas. Durante una investigación, la vista consulta el estado cada dos segundos
-y compara cada sección en su sitio: las empresas nuevas
-entran en su fila, las que cambian de puesto se desplazan hasta él y las que
-cambian de datos se iluminan, sin repetir la entrada. Al terminar, la página se
-lee de nuevo y se actualiza en su sitio; si no puede, se recarga. La ficha de
-empresa organiza el trabajo en Resumen y Contactos. El resumen muestra el encaje,
-su explicación, productos, cobertura y criterios con etiquetas semánticas
-(`Señal fuerte`, `Señal parcial`, `Incompatible`, `Sin evidencia`) junto a una bola de Harvey.
-A la derecha se mantienen el mejor match y la revisión de ventas. Si hay páginas que
-no se pudieron leer, su etapa, URL y motivo aparecen bajo las pestañas. Los datos
-desconocidos se muestran separados de cero.
+En una campaña preparada se revisan las autorizaciones y topes antes de ejecutar.
+Durante la investigación, la franja de avance aparece antes de la lista de
+resultados parciales e indica cuántas empresas encontradas han terminado. La
+pantalla consulta el estado cada dos segundos y se actualiza al finalizar.
+
+En la campaña terminada, los resultados aparecen primero y la franja de avance
+queda debajo. La lista reúne nombre, dominio, encaje, prioridad, disponibilidad,
+revisión y cantidad de contactos. Puedes buscar por nombre y
+filtrar por país, segmento, prioridad o disponibilidad. Abre el nombre para leer
+la ficha. «Volver a la campaña», «Anterior», «Siguiente» y «Guardar y siguiente»
+respetan los filtros vigentes al abrirla. Desde «Descargar» puedes elegir entre
+todas las empresas y las listas para contacto.
+
+La ficha abre con el nombre de la empresa y el motivo de encaje cuando se conoce.
+Resumen recoge la puntuación, productos, cobertura y criterios. Cada criterio
+lleva una etiqueta como «Señal fuerte», «Señal parcial», «Incompatible» o «Sin
+evidencia». Contactos reúne a las personas encontradas. La decisión de ventas
+se presenta junto al detalle en escritorio y dentro del recorrido de lectura en
+móvil. Los fallos de lectura identifican la etapa, la URL y el motivo. Los datos
+pendientes se muestran como tales.
 
 En una campaña con `rubric_v2`, la tabla conserva el orden de la lectura pública:
 prioridad, necesidad documental `1` y score descendente, con desempate estable.
@@ -250,11 +230,11 @@ La [vigencia del empleo](contacts.md#vigencia-del-empleo-t18) distingue lo compr
 de lo pendiente o contradictorio; un correo no confirma por sí solo el empleo.
 
 El estado técnico de campaña/etapa, la disponibilidad comercial y la revisión humana
-son independientes. La revisión guarda para la empresa aceptado, rechazado o pendiente
-con notas y fecha; esto no recalifica ni cambia la rúbrica. La decisión se elige en un
-control de tres opciones y la confirmación aparece como aviso flotante que se retira solo; con
-movimiento reducido queda en la página. Las correcciones están disponibles cuando la
-campaña ha terminado o está interrumpida, y bloqueadas durante ejecución.
+son independientes. La revisión guarda para la empresa la decisión de ventas
+(aceptado, rechazado o pendiente), con sus notas y fecha. Tras guardar se muestra
+una confirmación. La puntuación sigue la rúbrica de la campaña. Las correcciones
+están disponibles cuando la campaña ha terminado o está interrumpida y se bloquean
+durante la ejecución.
 
 La confirmación manual admite cualquier tipo de canal existente, aunque la persona aún
 no tenga identidad, cargo o empleo confirmados. En el panel se elige uno de sus canales
@@ -313,7 +293,24 @@ se verificó con pruebas sin red y en el navegador local sobre una base temporal
 exclusivamente sintética; no se ha usado con personas reales. El resultado y la columna
 de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 
-## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
+## Verificación del rediseño editorial
+
+En Chromium se recorrieron Resumen, Historial, Nueva campaña, Campaña y Ficha
+con la demo sintética a 1440 y 390 px. También se comprobó el zoom del navegador
+al 200 %. Desde una lista filtrada se abrió una empresa, se usó «Guardar y
+siguiente» y se volvió a la campaña conservando los filtros. Se descargaron
+ambos CSV, «Descargar listos» y «Descargar todos».
+
+Se comprobó la navegación con teclado, el menú sin JavaScript y la preferencia
+de movimiento reducido. Los pares de texto y fondo medidos cumplieron el umbral
+AA de contraste. La revisión con un lector de pantalla real queda pendiente.
+
+## Verificaciones de versiones anteriores
+
+Los siguientes registros corresponden al diseño y las funciones disponibles en la
+fecha de cada comprobación.
+
+### Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 
 - La paleta procede de las imágenes de la [guía de marca](https://www.veryfi.com/brand/)
   y de las variables y el degradado del botón principal de veryfi.com, consultados ese día.
@@ -341,7 +338,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
   revisión con ventas.
 
-## Verificación de campaña y ficha del 7 de noviembre de 2026
+### Verificación de campaña y ficha del 7 de noviembre de 2026
 
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
   19 pruebas pasaron con DOM sintético. Las nuevas cubren el traslado de filas
@@ -368,7 +365,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   real, el zoom al 200 %, la revisión con ventas y una investigación con
   proveedores reales.
 
-## Verificación del movimiento del resumen del 7 de noviembre de 2026
+### Verificación del movimiento del resumen del 7 de noviembre de 2026
 
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
   17 pruebas pasaron con DOM sintético. Cubren la actualización en su sitio del
@@ -392,7 +389,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   `DESIGN.md`. Quedan pendientes Firefox, Safari, un lector de pantalla real, el
   zoom al 200 %, la revisión con ventas y una investigación con proveedores reales.
 
-## Verificación del prototipo del 7 de noviembre de 2026
+### Verificación del prototipo del 7 de noviembre de 2026
 
 - `uv run --locked python manage.py check` pasó. Pasaron 171 pruebas
   seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
@@ -420,7 +417,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   pendientes el zoom real al 200 %, un lector de pantalla real, la evaluación
   con ventas y las llamadas a proveedores reales.
 
-## Verificación del rediseño anterior del 7 de noviembre de 2026
+### Verificación del rediseño anterior del 7 de noviembre de 2026
 
 - Tras integrar los cambios de `main`, la suite completa pasó con **1209 pruebas**;
   `uv lock --check` y `uv run --locked python manage.py check` también pasaron.
@@ -439,7 +436,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   al recibir los atajos. Tampoco se hizo un estudio con ventas ni llamadas reales
   a proveedores para este rediseño.
 
-## Verificación de la reorganización del 13 de octubre de 2026
+### Verificación de la reorganización del 13 de octubre de 2026
 
 - Django separa configuración global en `config/`, interfaz en `core/`, plantillas
   en `templates/` y recursos en `static/`. Las vistas permanecen juntas y el
@@ -454,7 +451,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 - Los comandos de ejecución siguen iguales. No se realizaron llamadas reales a
   proveedores ni otra revisión visual: esta reorganización conserva el diseño.
 
-## Verificación de la migración a Django del 13 de octubre de 2026
+### Verificación de la migración a Django del 13 de octubre de 2026
 
 - `uv lock --check`, `uv run --locked python manage.py check` y la suite completa:
   799 pruebas pasan. Las pruebas de negocio conservan sus aserciones; se trasladaron
@@ -472,7 +469,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 - No se ejecutaron proveedores reales desde Django ni se probó con un lector de
   pantalla real. Detener el servidor interrumpe el hilo; no hay cola persistente.
 
-## Verificación histórica de Streamlit del 12 de octubre de 2026
+### Verificación histórica de Streamlit del 12 de octubre de 2026
 
 - `uv lock --check` y `uv run --locked pytest`: 709 pruebas pasan, sin red externa;
   incluyen 14 casos de interfaz con `AppTest` y bases temporales.
