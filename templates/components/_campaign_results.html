@@ -1,21 +1,5 @@
 {% load prospecting_ui %}
 <section class="campaign-pulse surface{% if is_executing %} is-live{% endif %}" data-live-section="overview" data-motion-surface data-motion-still aria-label="Estado y avance de campaña">
-  <span class="feature-beam" aria-hidden="true"></span>
-  <div class="pulse-progress" style="--count: {{ counts.total|default:1 }}">
-    <span class="pulse-status" role="status"><span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span></span>
-    {% if counts.total %}
-    <p class="pulse-figure">
-      <span class="pulse-figure-value" data-value="{{ counts.completed }}" data-delta style="--roll-steps: {{ counts.completed }}">{% include 'components/_ticker.html' with value=counts.completed %}</span>
-      <span class="pulse-figure-total">de {% include 'components/_ticker.html' with value=counts.total %}</span>
-      <span class="pulse-figure-label">investigadas</span>
-    </p>
-    <progress class="sr-only" value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas investigadas">{{ counts.completed }} de {{ counts.total }}</progress>
-    {% else %}
-    <p class="pulse-figure pulse-figure-empty">{% if is_executing %}Buscando empresas…{% else %}Sin empresas investigadas{% endif %}</p>
-    {% endif %}
-    {# ponytail: un segmento por empresa; legible hasta unas 40 empresas, después conviene una barra continua. #}
-    <div class="progress-segments" aria-hidden="true">{% for result in view.companies %}<span class="progress-segment{% if forloop.counter <= counts.completed %} is-done{% elif is_executing and forloop.counter0 == counts.completed %} is-active{% endif %}" style="--i: {{ forloop.counter0 }}"></span>{% empty %}<span class="progress-segment is-placeholder{% if is_executing %} is-searching{% endif %}" style="--i: 0"></span>{% endfor %}</div>
-  </div>
   <dl class="pulse-stats">
     <div class="pulse-stat pulse-stat-review">
       <dt>Sin revisar</dt>
@@ -39,6 +23,20 @@
       </dd>
     </div>
   </dl>
+  <div class="pulse-progress" style="--count: {{ counts.total|default:1 }}">
+    <span class="pulse-status" role="status"><span class="status status-{{ campaign.status }}">{{ campaign.status|label }}</span></span>
+    {% if counts.total %}
+    <p class="pulse-figure">
+      <span class="pulse-figure-value" data-value="{{ counts.completed }}" data-delta style="--roll-steps: {{ counts.completed }}">{% include 'components/_ticker.html' with value=counts.completed %}</span>
+      <span class="pulse-figure-total">de {% include 'components/_ticker.html' with value=counts.total %}</span>
+      <span class="pulse-figure-label">investigadas</span>
+    </p>
+    <progress class="sr-only" value="{{ counts.completed }}" max="{{ counts.total }}" aria-label="Empresas investigadas">{{ counts.completed }} de {{ counts.total }}</progress>
+    {% else %}
+    <p class="pulse-figure pulse-figure-empty">{% if is_executing %}Buscando empresas…{% else %}Sin empresas investigadas{% endif %}</p>
+    {% endif %}
+    <div class="progress-segments" aria-hidden="true">{% for result in view.companies %}<span class="progress-segment{% if forloop.counter <= counts.completed %} is-done{% elif is_executing and forloop.counter0 == counts.completed %} is-active{% endif %}" style="--i: {{ forloop.counter0 }}"></span>{% empty %}<span class="progress-segment is-placeholder{% if is_executing %} is-searching{% endif %}" style="--i: 0"></span>{% endfor %}</div>
+  </div>
   {% if counts.total %}
   <div class="pulse-priority">
     <h2 id="priority-chart-title">Prioridad</h2>
@@ -47,7 +45,13 @@
   </div>
   {% endif %}
 </section>
-<div class="results-card surface">
+{% if not legacy_readonly and campaign.status != 'completed' %}
+<nav class="campaign-jumps" aria-label="Secciones de la campaña" data-live-section="jumps">
+  <a href="#empresas">Empresas</a>
+  <a href="#authorization">Autorización</a>
+</nav>
+{% endif %}
+<div class="results-card" id="empresas">
   <div class="results-head" data-live-section="results-head">
     <h2 id="results-title">Empresas</h2>
   </div>
@@ -65,16 +69,17 @@
   </form>
   <section class="results-section" data-live-section="results" aria-labelledby="results-title">
     {% if results %}
+    <p class="table-swipe-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M7 9l-3 3 3 3m10-6 3 3-3 3"/></svg>Desliza la tabla para ver todas las columnas.</p>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Empresas de la campaña">
       <table class="data-table results-table">
         <thead>
           <tr>
-            <th>Empresa</th>
-            <th class="numeric">Encaje</th>
-            <th>Prioridad</th>
-            <th>Disponibilidad</th>
-            <th>Revisión</th>
-            <th class="numeric">Contactos</th>
+            <th scope="col">Empresa</th>
+            <th scope="col" class="numeric">Encaje</th>
+            <th scope="col">Prioridad</th>
+            <th scope="col">Disponibilidad</th>
+            <th scope="col">Revisión</th>
+            <th scope="col" class="numeric">Contactos</th>
           </tr>
         </thead>
         <tbody>
@@ -82,7 +87,6 @@
           <tr class="result-row" data-key="{{ result.company.id }}" style="--i: {{ forloop.counter0 }}">
             <th scope="row">
               <div class="company-cell">
-                <span class="company-avatar" data-tone="{% if result.business_status == 'excluded' %}excluded{% else %}{{ result.assessment.priority|default:'pending' }}{% endif %}" aria-hidden="true">{{ result.company.name|slice:':1'|upper }}</span>
                 <div class="company-cell-copy">
                   <a class="company-link" href="{% url 'webapp:company' campaign.id result.company.id %}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ result.company.name }}<svg class="motion-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
                   <span class="cell-note">{{ result.company.domain|default_if_none:'Dominio pendiente' }}</span>

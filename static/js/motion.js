@@ -3,10 +3,9 @@
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const precise = window.matchMedia('(hover: hover) and (pointer: fine)');
-  const properties = ['--motion-x', '--motion-y', '--motion-rotate-x', '--motion-rotate-y'];
+  const properties = ['--motion-x', '--motion-y'];
   // Distancia a la que el borde de una superficie empieza a orientarse hacia el puntero.
   const PROXIMITY = 96;
-  const TILT = 3;
   const angles = new WeakMap();
   const glowing = new Set();
   let surface = null;
@@ -80,10 +79,6 @@
         const y = Math.max(0, Math.min(bounds.height, point.y - bounds.top));
         surface.style.setProperty('--motion-x', `${x}px`);
         surface.style.setProperty('--motion-y', `${y}px`);
-        if (surface.hasAttribute('data-motion-tilt')) {
-          surface.style.setProperty('--motion-rotate-x', `${(0.5 - y / (bounds.height || 1)) * TILT}deg`);
-          surface.style.setProperty('--motion-rotate-y', `${(x / (bounds.width || 1) - 0.5) * TILT}deg`);
-        }
       }
       glow();
     });

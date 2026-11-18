@@ -5,13 +5,13 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function navigationPage({ isMobile = false, withPreview = false, reducedMotion = false, withDropdowns = false } = {}) {
+function navigationPage({ withPreview = false, withDropdowns = false } = {}) {
   const document = { activeElement: null };
   function element() {
     const handlers = new Map();
     const attributes = new Map();
     return {
-      dataset: {}, inert: false, open: false,
+      dataset: {}, open: false,
       addEventListener(type, callback) {
         handlers.set(type, [...(handlers.get(type) || []), callback]);
       },
@@ -21,24 +21,12 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
       setAttribute: (name, value) => attributes.set(name, value),
       removeAttribute: name => attributes.delete(name),
       getAttribute: name => attributes.get(name) ?? null,
-      getBoundingClientRect: () => ({ width: 288 }),
       closest: () => null,
       focus() { document.activeElement = this; },
     };
   }
   const body = element();
-  const drawer = element();
-  const menu = element();
-  const sidebar = element();
-  const workspace = element();
-  const close = element();
-  const backdrop = element();
-  const firstLink = element();
-  const lastLink = element();
-  const focusable = [close, firstLink, lastLink];
-  sidebar.contains = target => focusable.includes(target);
-  sidebar.querySelectorAll = () => focusable;
-  const mobile = { matches: isMobile, addEventListener() {} };
+  const outsideLink = element();
   const preview = element();
   const outputs = {};
   for (const name of ['countries', 'segments', 'max']) {
@@ -74,32 +62,19 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
   Object.assign(document, {
     body,
     addEventListener: events.addEventListener,
-    querySelector: selector => ({
-      '.menu-toggle': menu, '.navigation-backdrop': backdrop, '.sidebar-close': close,
-      '[data-campaign-preview]': withPreview ? preview : null,
-    })[selector] ?? null,
-    getElementById: id => ({ 'navigation-drawer': drawer, navigation: sidebar, 'workspace-main': workspace })[id] ?? null,
+    querySelector: selector => selector === '[data-campaign-preview]' && withPreview ? preview : null,
+    getElementById: () => null,
     querySelectorAll: selector => withDropdowns && selector === '.filter-choice details[open], .download-menu[open]'
       ? dropdowns.filter(dropdown => dropdown.open) : [],
   });
-  const timers = new Map();
-  const pageEvents = element();
-  let nextTimer = 0;
   const context = {
     document,
-    window: {
-      addEventListener: pageEvents.addEventListener,
-      matchMedia: query => query === '(max-width: 760px)' ? mobile : { matches: reducedMotion },
-      clearTimeout: id => timers.delete(id),
-      setTimeout(callback, delay) { timers.set(++nextTimer, { callback, delay }); return nextTimer; },
-    },
+    window: { matchMedia: () => ({ matches: false }) },
     navigator: {},
   };
-  for (const script of ['app.js', 'navigation.js']) {
-    vm.runInNewContext(fs.readFileSync(path.join(__dirname, `../static/js/${script}`), 'utf8'), context);
-  }
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/app.js'), 'utf8'), context);
   return {
-    body, drawer, menu, sidebar, workspace, close, backdrop, firstLink, lastLink, document, timers,
+    outsideLink, document,
     preview, choices, maximum, outputs,
     dropdowns, summaries, downloadLink,
     openDropdown(index) {
@@ -114,16 +89,7 @@ function navigationPage({ isMobile = false, withPreview = false, reducedMotion =
       events.dispatch('click', event);
       return prevented;
     },
-    key(key, shiftKey = false) {
-      let prevented = false;
-      events.dispatch('keydown', { key, shiftKey, preventDefault() { prevented = true; } });
-      return prevented;
-    },
-    resize(matches) { mobile.matches = matches; },
-    restorePage() { pageEvents.dispatch('pageshow', { persisted: true }); },
-    finishClosing() {
-      for (const [id, timer] of timers) { timers.delete(id); timer.callback(); }
-    },
+    key(key) { events.dispatch('keydown', { key }); },
   };
 }
 
@@ -137,7 +103,7 @@ test('Descargas y filtros cierran al elegir, señalar fuera o pulsar Escape; una
   assert.equal(page.dropdowns[1].open, false);
   assert.equal(page.document.activeElement, page.summaries[1]);
   page.openDropdown(1);
-  page.click(page.firstLink);
+  page.click(page.outsideLink);
   assert.equal(page.dropdowns[1].open, false);
   page.openDropdown(1);
   page.downloadLink.setAttribute('aria-disabled', 'true');
@@ -147,90 +113,6 @@ test('Descargas y filtros cierran al elegir, señalar fuera o pulsar Escape; una
   assert.equal(page.click(page.downloadLink), false);
   assert.equal(page.dropdowns[1].open, false);
   assert.equal(page.document.activeElement, page.summaries[1]);
-});
-
-for (const isMobile of [false, true]) {
-  test(`El menú de ${isMobile ? 'móvil' : 'escritorio'} carga cerrado y aísla el fondo al abrir`, () => {
-    const page = navigationPage({ isMobile });
-    assert.equal(page.body.dataset.navOpen, 'false');
-    assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
-    assert.equal(page.drawer.open, false);
-    assert.equal(page.sidebar.inert, true);
-    assert.equal(page.workspace.inert, false);
-    for (const close of [() => page.key('Escape'), () => page.click(page.backdrop), () => page.click(page.close)]) {
-      page.click(page.menu);
-      assert.equal(page.body.dataset.navOpen, 'true');
-      assert.equal(page.drawer.open, true);
-      assert.equal(page.sidebar.getAttribute('role'), 'dialog');
-      assert.equal(page.sidebar.getAttribute('aria-modal'), 'true');
-      assert.equal(page.sidebar.inert, false);
-      assert.equal(page.workspace.inert, true);
-      assert.equal(page.menu.inert, true);
-      assert.equal(page.document.activeElement, page.close);
-      close();
-      assert.equal(page.body.dataset.navOpen, 'false');
-      assert.equal(page.menu.getAttribute('aria-expanded'), 'false');
-      assert.equal(page.sidebar.inert, true);
-      assert.equal(page.workspace.inert, false);
-      assert.equal(page.menu.inert, false);
-      assert.equal(page.document.activeElement, page.menu);
-      assert.equal(page.sidebar.getAttribute('aria-modal'), null);
-      assert.equal([...page.timers.values()][0].delay, 200);
-      page.finishClosing();
-      assert.equal(page.drawer.open, false);
-    }
-  });
-}
-
-test('Tab y Mayús+Tab circulan dentro del panel sin entrar al fondo', () => {
-  const page = navigationPage();
-  page.click(page.menu);
-  page.lastLink.focus();
-  assert.equal(page.key('Tab'), true);
-  assert.equal(page.document.activeElement, page.close);
-  assert.equal(page.key('Tab', true), true);
-  assert.equal(page.document.activeElement, page.lastLink);
-  page.firstLink.focus();
-  assert.equal(page.key('Tab'), false);
-  assert.equal(page.document.activeElement, page.firstLink);
-});
-
-test('El cambio de ancho conserva la decisión de abrir y cada carga comienza cerrada', () => {
-  const page = navigationPage();
-  page.resize(true);
-  assert.equal(page.body.dataset.navOpen, 'false');
-  assert.equal(page.sidebar.inert, true);
-  assert.equal(page.workspace.inert, false);
-  page.click(page.menu);
-  page.resize(false);
-  assert.equal(page.body.dataset.navOpen, 'true');
-  assert.equal(page.sidebar.inert, false);
-  assert.equal(page.workspace.inert, true);
-  assert.equal(navigationPage().body.dataset.navOpen, 'false');
-  page.restorePage();
-  assert.equal(page.drawer.open, false);
-  assert.equal(page.workspace.inert, false);
-});
-
-test('Reabrir durante la salida cancela el cierre pendiente', () => {
-  const page = navigationPage();
-  page.click(page.menu);
-  page.click(page.close);
-  assert.equal(page.drawer.open, true);
-  page.click(page.menu);
-  page.finishClosing();
-  assert.equal(page.drawer.open, true);
-  assert.equal(page.workspace.inert, true);
-});
-
-test('Movimiento reducido cierra sin esperar y un enlace operativo también cierra', () => {
-  const page = navigationPage({ reducedMotion: true });
-  page.click(page.menu);
-  page.firstLink.closest = () => page.firstLink;
-  page.sidebar.dispatch('click', { target: page.firstLink });
-  assert.equal(page.drawer.open, false);
-  assert.equal(page.workspace.inert, false);
-  assert.equal(page.timers.size, 0);
 });
 
 test('El resumen actualiza países, segmentos y máximo como texto de sus etiquetas', () => {

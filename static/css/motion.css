@@ -15,7 +15,6 @@
   --ease-out-expo: cubic-bezier(.16, 1, .3, 1);
   --ease-out-quint: cubic-bezier(.23, 1, .32, 1);
   --ease-in-out-quart: cubic-bezier(.77, 0, .175, 1);
-  --ease-drawer: cubic-bezier(.32, .72, 0, 1);
 }
 
 [data-motion-surface] {
@@ -111,10 +110,6 @@
   [data-motion-surface]:hover:not([data-motion-still]):not(:has(table, form, input, select, textarea)) {
     transform: translateY(-4px);
     box-shadow: 0 22px 44px -24px rgb(0 0 0 / 80%);
-  }
-
-  [data-motion-surface][data-motion-tilt]:hover:not(:has(table, form, input, select, textarea)) {
-    transform: perspective(1100px) translateY(-4px) rotateX(var(--motion-rotate-x, 0deg)) rotateY(var(--motion-rotate-y, 0deg));
   }
 
   .workspace .button-primary:hover:not(:disabled):not([aria-disabled='true']) {
