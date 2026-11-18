@@ -14,6 +14,7 @@
     <div class="spotlight-stage">
       <span class="spotlight-art" aria-hidden="true">
         <img src="{% static 'img/latam-contours.webp' %}" width="1200" height="676" alt="" fetchpriority="high">
+        <canvas width="1200" height="676" data-morph-skip></canvas>
       </span>
       <div class="spotlight-copy">
         {% if highlighted_campaign %}
@@ -64,4 +65,5 @@
   </section>
   {% endif %}
 </div>
+<script src="{% static 'js/summary-rays.js' %}?v=1" defer></script>
 {% endblock %}

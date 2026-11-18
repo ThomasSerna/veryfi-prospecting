@@ -129,7 +129,8 @@ continuos con separadores horizontales.
   Los segmentos visualizan empresas investigadas. El estado de campaña y los
   avisos de ejecución se anuncian con regiones de estado.
 - **Movimiento.** Al abrir una vista, el contenido entra por grupos. La imagen
-  cartográfica tiene una entrada única. El sondeo actualiza los datos en su sitio,
+  cartográfica tiene una entrada única. Con ratón, los rayos cercanos al puntero
+  se desplazan unos píxeles y la silueta queda fija. El sondeo actualiza los datos en su sitio,
   con señales breves en segmentos, cifras y filas que cambian. Las pestañas y el
   control de revisión responden al cambio de selección. Con
   `prefers-reduced-motion` se desactivan las animaciones y el desplazamiento suave.

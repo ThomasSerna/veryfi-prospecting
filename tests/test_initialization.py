@@ -87,6 +87,7 @@ def test_django_configuration_has_no_orm_or_authentication_and_is_local():
     ("js/app.js", b"'use strict'"),
     ("js/motion.js", b"'use strict'"),
     ("js/dashboard.js", b"'use strict'"),
+    ("js/summary-rays.js", b".spotlight-art"),
     ("img/veryfi-logo.svg", b"<svg"),
     ("img/latam-contours.webp", b"WEBP"),
 ])

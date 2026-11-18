@@ -50,11 +50,16 @@
   mask-image: linear-gradient(90deg, transparent, #000 37%);
 }
 
-.spotlight-art img {
+.spotlight-art :is(img, canvas) {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: right 52%;
+}
+
+.spotlight-art canvas {
+  position: absolute;
+  inset: 0;
 }
 
 .spotlight-copy {
@@ -229,7 +234,7 @@
   .spotlight-stage { display: flex; min-height: auto; flex-direction: column; align-items: stretch; }
   .spotlight-copy { order: -1; width: auto; padding-bottom: 12px; }
   .spotlight-art { position: relative; width: 100%; height: clamp(145px, 38vw, 245px); mask-image: linear-gradient(transparent, #000 25%); }
-  .spotlight-art img { object-position: right 46%; }
+  .spotlight-art :is(img, canvas) { object-position: right 46%; }
   .spotlight-ledger { grid-template-columns: minmax(0, 1fr); }
   .home-progress { padding-inline: 24px; }
   .home-metrics { border-top: 1px solid var(--line); }

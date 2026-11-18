@@ -243,7 +243,9 @@ def test_summary_illustration_is_decorative_and_scoped_to_spotlight(redesign_pat
     image = "img/latam-contours.webp"
     assert content.count(image) == 1
     assert re.search(r'<span class="spotlight-art" aria-hidden="true">\s*<img[^>]*alt=""', content)
+    assert '<canvas width="1200" height="676" data-morph-skip></canvas>' in content
     for route in ("webapp:campaign_history", "webapp:new_campaign"):
         other = client.get(reverse(route))
         assert other.status_code == 200
         assert image not in other.content.decode()
+        assert 'summary-rays.js' not in other.content.decode()
