@@ -4,7 +4,13 @@
 .summary-background { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: .55; pointer-events: none; }
 .home-panel, .main-content:has(.home-panel) .demo-notice { max-width: 1200px; margin-inline: auto; }
 .home-panel { margin-top: clamp(16px, 3vh, 34px); }
-.home-heading { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.home-heading::after {
+  display: block;
+  inline-size: min(30%, 22rem);
+  margin-block-start: 20px;
+  border-block-end: 1px solid var(--line);
+  content: '';
+}
 .home-heading h1 { margin: 0 0 4px; font-size: clamp(1.75rem, 2.6vw, 2.5rem); letter-spacing: -.045em; }
 .home-heading p { margin: 0; color: var(--muted); }
 .home-history-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-inline-start: auto; color: var(--ink); font-size: .8125rem; white-space: nowrap; text-decoration: none; }
@@ -131,7 +137,7 @@
 
 @media (max-width: 760px) {
   .topbar:has(> .home-history-link) { column-gap: 8px; }
-  .home-heading { padding-bottom: 12px; }
+  .home-heading::after { inline-size: 3rem; margin-block-start: 12px; }
   .spotlight-copy { width: min(100%, 34rem); min-height: 300px; }
   .spotlight-ledger { grid-template-columns: minmax(0, 1fr); }
   .home-metrics { border-top: 1px solid var(--line); }

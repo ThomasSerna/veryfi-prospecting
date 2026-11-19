@@ -17,6 +17,7 @@
   /* Bajo el fondo del cajón: al abrirlo se oscurece y desenfoca con la página. */
   z-index: 60;
   display: inline-grid;
+  place-content: center;
   place-items: center;
   width: 40px;
   height: 40px;
