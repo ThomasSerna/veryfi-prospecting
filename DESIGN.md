@@ -252,7 +252,9 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
 En Resumen, el relieve de Latinoamérica combina el verde de Veryfi y tonos
-menta sobre el fondo navy. Las curvas pasan por detrás del relieve y siguen
+menta sobre el fondo navy. La ilustración se sirve en WebP con transparencia y
+dos resoluciones que el navegador elige según el ancho y la densidad de pantalla.
+Las curvas pasan por detrás del relieve y siguen
 visibles en el interior con menor intensidad. Al acercar el ratón, se apartan
 unos píxeles y vuelven suavemente a su posición cuando el puntero se aleja.
 La costa y el relieve permanecen fijos. Con entrada táctil o
