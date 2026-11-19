@@ -378,6 +378,144 @@ base en `data/backups/prospecting-2026-11-16-antes-conciliacion-lote-verificacio
 - No se revisó por qué una cuenta de FinTech con personas con correo quedó en `needs_channel_confirmation`.
 - No hubo revisión comercial de ninguna cuenta ni persona.
 
+## Campaña real final de la T32 (19 de noviembre de 2026)
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-19 (America/Bogota): campaña principal de 07:58 a 08:05 y reanudación a las 08:08; segunda pasada a las 08:13 y tercera a las 08:16 |
+| Cuentas | `apollo-eafit`, `tavily-cuenta-2` y `anthropic-equipo-prepago` |
+| Base | Aislada a petición del equipo, para empezar desde cero sin datos de campañas anteriores: `data/t32/prospecting.sqlite3` (campaña principal y segunda pasada) y `data/t32-coca/prospecting.sqlite3` (tercera pasada), abiertas con `PROSPECTING_DB_PATH`. La base histórica no se modificó; antes se copió en `data/backups/prospecting-2026-11-19-antes-t32.sqlite3` |
+| Cupos | Como una base nueva no ve el consumo anterior, cada base usa su propio archivo de acceso (`PROSPECTING_ACCESS_PATH`) con el saldo restante, no el inicial: Tavily 741 créditos (1.000 menos los 259 del ledger histórico), Haiku USD 2,8649 (USD 2,9981 menos USD 0,1331819) y Apollo 65 (panel: 30 de 95 usados). La tercera base descuenta además lo reservado en la primera |
+| Ejecución | Desde la interfaz Django local. Campaña principal `ae38a5ed`: Colombia y México, `fintech_software` y `cpg_loyalty`, 20 cuentas objetivo (10 por país; 16 de consumo masivo y 4 FinTech/ERP), con `discovery_policy_v2`, `channel_policy_v2`, `employment_policy_v2` y `contact_match_v3`. Segunda pasada `386fffb7` y tercera `00ab01ea`: solo la cuenta de Coca-Cola, México y `cpg_loyalty`. Los nombres de las cuentas permanecen en `data/` |
+| Autorización | Responsable del cupo, en el chat del 2026-11-19: Tavily `search` ≤ 200 y `extract` ≤ 150 créditos, Haiku ≤ USD 2, Apollo `people_search` 0 y `people_enrichment` ≤ todo el saldo del panel (65). La reanudación y las dos pasadas siguientes usaron topes dentro del saldo de esa autorización |
+
+| Operación | Llamadas | Créditos reservados | Créditos informados o conciliados | Costo |
+|---|---:|---:|---:|---|
+| Tavily Search | 67 (59 + 2 + 6), 3 sin respuesta | 67 | 64 informados, más 3 atribuidos a las búsquedas sin respuesta | USD 0 (crédito gratuito) |
+| Tavily Extract | 52 (46 + 2 + 4) | 52 | 20 | USD 0 (crédito gratuito) |
+| Haiku `messages` | 44 (39 + 2 + 3) | — | — | USD 0,1595844 reservado; USD 0,0618933 estimado y conciliado (496.813 tokens de entrada y 24.424 de salida) |
+| Apollo People Search | 20 (16 + 2 + 2) | 0 | 0 | USD 0 |
+| Apollo People Enrichment | 19 (14 + 3 + 2) | 19 | 19 conciliados | USD 0 |
+
+Ninguna operación superó su tope. La campaña principal quedó `partial`; las dos pasadas de Coca-Cola, `completed`.
+
+**Muestra.** Lista de cuentas objetivo armada por el equipo con empresas grandes de Colombia y México que
+podrían necesitar a Veryfi. La identidad sale de la declaración, así que no hubo paradas por identidad ni
+reservas. Se dejaron fuera los clientes de referencia de `config/icp_enterprise.json`. Coca-Cola se incluyó
+por pedido expreso del contacto de Veryfi, aunque `docs/enterprise-rubrics.md` la cita entre las empresas
+con las que Veryfi ha trabajado. 5 de las 20 cuentas ya se habían investigado en lotes anteriores; las
+otras 15 son nuevas. La muestra no es aleatoria ni representa a Latinoamérica.
+
+**Resultados de la campaña principal** (por país declarado; el segmento es el previsto en la lista):
+
+| Grupo | Empresas | Calificadas | Con personas pertinentes | Con personas listas | Personas pertinentes | Personas listas |
+|---|---:|---:|---:|---:|---:|---:|
+| México · consumo masivo | 8 | 2 | 1 | 0 | 2 | 0 |
+| México · FinTech/ERP | 2 | 2 | 2 | 1 | 4 | 2 |
+| Colombia · consumo masivo | 8 | 3 | 3 | 2 | 6 | 3 |
+| Colombia · FinTech/ERP | 2 | 2 | 1 | 1 | 2 | 2 |
+| **Total** | **20** | **9** | **7** | **4** | **14** | **7** |
+| Cuentas repetidas | 5 | 5 | 4 | 3 | 8 | 5 |
+| Cuentas nuevas | 15 | 4 | 3 | 1 | 6 | 2 |
+
+- Todas las calificadas quedaron en prioridad media; ninguna en alta. 11 cerraron en
+  `insufficient_evidence`: 9 por `unknown_need_or_match` tras la ampliación, 1 por `insufficient_evidence`
+  tras reintentar un timeout y 1 pendiente con `assessment_pending:search_only_strong_signal` («Un criterio
+  con valor 1 se apoya solo en resultados de búsqueda»).
+- Estados comerciales: 4 `ready_preferred`, 3 `needs_channel_confirmation` y 2 `qualified_no_contact` con
+  `no_target_roles` («No hay un caso de uso respaldado para seleccionar cargos»).
+- Cobertura de contacto: 4 de 9 calificadas con al menos una persona lista. Canal preferido: 7 de 7
+  personas listas con correo nominal que Apollo informa como verificado (`channel_policy_v2`). Su empleo
+  vigente lo declara Apollo (`provider_claim` con `employment_policy_v2`); la búsqueda web no lo corroboró
+  en ningún caso (12 personas buscadas, 0 corroboradas, `manage.py corroboration_report`). Funciones: 3 de
+  marketing en consumo masivo y 4 de producto e ingeniería en FinTech/ERP.
+- Ninguna persona lista carece de canal directo ni de empleo vigente según la regla; se comprobó en el CSV
+  exportado, solo con conteos.
+- Tiempo automático: 402 s activos en la campaña principal (unos 7 minutos de reloj) y 57 s en las dos pasadas.
+  Minutos de revisión: no medidos, porque aún no hay revisión comercial.
+
+**Coca-Cola.** Necesitó tres pasadas:
+
+1. En la campaña principal, declarada como «Coca-Cola México», quedó calificada (encaje 96,2) pero sin
+   perfil citado, y por tanto `no_target_roles`. Parte de su evidencia venía de páginas de Coca-Cola España
+   (`coca-cola.com/es/es`): el dominio es global y la ampliación sobre él mezcla países.
+2. En la segunda pasada, en la misma base, Haiku citó `cpg_brands`, pero con una página de España. Apollo
+   devolvió personas del dominio correcto y las 3 enriquecidas se rechazaron con `entity_mismatch_name`: el
+   nombre declarado («Coca-Cola México») no coincide con el que Apollo da a la organización. Como la cuenta
+   reutiliza la empresa guardada con ese nombre, no se puede corregir en esa base.
+3. En la tercera pasada, en una base aparte y declarada como «Coca-Cola», quedó `ready_preferred` con
+   prioridad media (encaje 53,8). El perfil `cpg_brands` se apoya en los términos de una promoción de Coca-Cola
+   México (compra mínima de productos participantes y escaneo de la tarjeta Spin Premia en el punto de venta).
+   Hay 1 persona lista, de la familia de lealtad y CRM, con correo verificado por Apollo y empleo declarado
+   por Apollo.
+
+Con la tercera pasada, la T32 suma 5 empresas con personas listas y 8 personas listas.
+
+**Costo por persona lista.** Haiku: USD 0,0618933 / 8 = USD 0,0077. Tavily: 87 créditos / 8 = 10,9 créditos.
+Apollo: 19 créditos / 8 = 2,4 créditos. Tavily y Apollo usan crédito gratuito (USD 0). El costo por
+prospecto aceptado no es calculable mientras ventas no revise.
+
+**Fallos de proveedor.** 3 búsquedas de Tavily con «Timeout del proveedor; consumo pendiente.»: dos
+durante la calificación y una durante los contactos de una cuenta que ya estaba lista. 22 URL que Tavily
+Extract no pudo leer: 20 con «Failed to fetch url», 1 con «404 page not found» y 1 con «Error fetching
+content». La reanudación cerró una de las cuentas caídas por timeout. La otra quedó con la evaluación
+pendiente. La tercera, ya lista, quedó con `request_uncertain` hasta la conciliación.
+
+### Conciliación
+
+Lecturas de los paneles entregadas por el responsable el 19 de noviembre. Antes se copiaron las dos bases
+en `data/backups/t32-2026-11-19-antes-conciliacion.sqlite3` y
+`data/backups/t32-coca-2026-11-19-antes-conciliacion.sqlite3`. Las 202 filas de las dos bases quedaron
+conciliadas.
+
+- **Apollo**: el panel pasó de 30 a 49 de 95 créditos; el salto de 19 corresponde a los 19
+  enriquecimientos. Se concilió con `manage.py reconcile_usage`, primero con `--dry-run`, con un comprobante
+  por base que declara como ajenos al ledger los créditos de la otra base:
+  `data/conciliaciones/apollo-2026-11-19-t32.json` (17 + 2 ajenos) y
+  `data/conciliaciones/apollo-2026-11-19-t32-coca.json` (2 + 17 ajenos).
+- **Tavily**: el panel pasó de 182 a 269 créditos, un salto de 87. Las respuestas informaron 84; los 3
+  créditos restantes se atribuyeron, por inferencia del total, a las 3 búsquedas sin respuesta, que
+  conservan resultado desconocido. Las 119 filas se conciliaron con `Budget.reconcile_many`;
+  comprobante en `data/conciliaciones/tavily-2026-11-19-t32.json`.
+- **Haiku**: las 44 llamadas se conciliaron con el costo estimado de los tokens (USD 0,0618933), sin
+  captura de la consola, que el responsable dejó como opcional. Comprobante en
+  `data/conciliaciones/anthropic-2026-11-19-t32.json`.
+- **Base histórica**: el ledger de `data/prospecting.sqlite3` no registra este consumo. Antes de otra
+  campaña en esa base hay que descontar de su archivo de acceso lo gastado aquí: Tavily 87 créditos, Apollo
+  19 y Haiku USD 0,0618933. El acumulado del proyecto sube a unos USD 0,197 de USD 20.
+
+### Comparación con T24, T30 y v7
+
+- **Qué mejoró.** T24 y T30 terminaron con 0 personas listas, y el lote v7 con 3 cuentas `ready_preferred`
+  sobre 10, una de ellas con los contactos cortados por timeout.
+  La T32 deja 4 de 20 en la campaña principal y 5 con Coca-Cola, con 8 personas listas. La lista de cuentas
+  objetivo elimina las caídas por identidad que frenaron T24 y T30 (T30: 3 de 10 confirmadas), y las
+  políticas de canal y empleo v2 permiten llegar a listo con datos de Apollo.
+- **Qué sigue bloqueando.**
+  - La calificación de grandes marcas de consumo masivo: las 11 cuentas con evidencia insuficiente son de
+    consumo masivo (11 de 16), y en la mayoría sus sitios corporativos no muestran promociones con
+    comprobantes.
+  - La exigencia de un perfil citado antes de buscar cargos.
+  - La corroboración web del empleo (0 de 12).
+  - Los dominios globales, que mezclan países en la evidencia y en Apollo.
+  - La comprobación de nombre de Apollo, sensible al nombre declarado en la cuenta.
+- **Qué no se puede concluir.**
+  - La muestra fue elegida por el equipo e incluye 5 cuentas ya investigadas, que rindieron mucho
+    más que las nuevas (3 de 5 frente a 1 de 15 con personas listas).
+  - No mide la cobertura del descubrimiento web ni generaliza a Latinoamérica.
+  - La precisión de las empresas y la pertinencia de las personas quedan pendientes de la revisión de ventas.
+
+### Observaciones y limitaciones
+
+- No hubo revisión comercial: falta que ventas revise las empresas y personas en la ficha y que se
+  registre su decisión, como pide la T32.
+- Coca-Cola quedó en una base aparte, así que su resultado no aparece en la campaña principal; cada base
+  se abre con su propio servidor local.
+- Al declarar cuentas objetivo conviene usar el nombre con que Apollo identifica a la organización (aquí,
+  «Coca-Cola» y no «Coca-Cola México»), porque una empresa ya guardada conserva el nombre de su primera
+  declaración.
+- Sin envío de mensajes, llamadas ni invitaciones.
+
 ## Lote real de la T30
 
 | Campo | Valor observado |
