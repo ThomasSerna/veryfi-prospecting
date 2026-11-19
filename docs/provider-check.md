@@ -384,7 +384,7 @@ base en `data/backups/prospecting-2026-11-16-antes-conciliacion-lote-verificacio
 |---|---|
 | Fecha | 2026-11-19 (America/Bogota): campaña principal de 07:58 a 08:05 y reanudación a las 08:08; segunda pasada a las 08:13 y tercera a las 08:16 |
 | Cuentas | `apollo-eafit`, `tavily-cuenta-2` y `anthropic-equipo-prepago` |
-| Base | Aislada a petición del equipo, para empezar desde cero sin datos de campañas anteriores: `data/t32/prospecting.sqlite3` (campaña principal y segunda pasada) y `data/t32-coca/prospecting.sqlite3` (tercera pasada), abiertas con `PROSPECTING_DB_PATH`. La base histórica no se modificó; antes se copió en `data/backups/prospecting-2026-11-19-antes-t32.sqlite3` |
+| Base | Aislada a petición del equipo, para empezar desde cero sin datos de campañas anteriores: `data/t32/prospecting.sqlite3` (campaña principal y segunda pasada) y `data/t32-coca/prospecting.sqlite3` (tercera pasada), abiertas con `PROSPECTING_DB_PATH`. La base histórica no se modificó; antes se copió en `data/backups/prospecting-2026-11-19-antes-t32.sqlite3`. Tras la conciliación, las dos bases se consolidaron como base local por defecto (ver «Consolidación en la base local») |
 | Cupos | Como una base nueva no ve el consumo anterior, cada base usa su propio archivo de acceso (`PROSPECTING_ACCESS_PATH`) con el saldo restante, no el inicial: Tavily 741 créditos (1.000 menos los 259 del ledger histórico), Haiku USD 2,8649 (USD 2,9981 menos USD 0,1331819) y Apollo 65 (panel: 30 de 95 usados). La tercera base descuenta además lo reservado en la primera |
 | Ejecución | Desde la interfaz Django local. Campaña principal `ae38a5ed`: Colombia y México, `fintech_software` y `cpg_loyalty`, 20 cuentas objetivo (10 por país; 16 de consumo masivo y 4 FinTech/ERP), con `discovery_policy_v2`, `channel_policy_v2`, `employment_policy_v2` y `contact_match_v3`. Segunda pasada `386fffb7` y tercera `00ab01ea`: solo la cuenta de Coca-Cola, México y `cpg_loyalty`. Los nombres de las cuentas permanecen en `data/` |
 | Autorización | Responsable del cupo, en el chat del 2026-11-19: Tavily `search` ≤ 200 y `extract` ≤ 150 créditos, Haiku ≤ USD 2, Apollo `people_search` 0 y `people_enrichment` ≤ todo el saldo del panel (65). La reanudación y las dos pasadas siguientes usaron topes dentro del saldo de esa autorización |
@@ -480,9 +480,31 @@ conciliadas.
 - **Haiku**: las 44 llamadas se conciliaron con el costo estimado de los tokens (USD 0,0618933), sin
   captura de la consola, que el responsable dejó como opcional. Comprobante en
   `data/conciliaciones/anthropic-2026-11-19-t32.json`.
-- **Base histórica**: el ledger de `data/prospecting.sqlite3` no registra este consumo. Antes de otra
-  campaña en esa base hay que descontar de su archivo de acceso lo gastado aquí: Tavily 87 créditos, Apollo
-  19 y Haiku USD 0,0618933. El acumulado del proyecto sube a unos USD 0,197 de USD 20.
+- **Acumulado**: el proyecto suma unos USD 0,197 de USD 20.
+
+### Consolidación en la base local
+
+El 19 de noviembre, a petición del equipo, la base local por defecto pasó a contener solo la T32.
+
+- **Base histórica**: se archivó sin cambios en `data/backups/prospecting-historico-hasta-2026-11-19.sqlite3`,
+  idéntica a la copia previa a la T32. Se puede abrir aparte con `PROSPECTING_DB_PATH`.
+- **No se fusionó con la T32**: la base no admite dos empresas confirmadas con la misma identidad, y 4 cuentas
+  de la T32 ya estaban confirmadas en ella. Fusionarlas habría mezclado contactos y evidencia de lotes
+  anteriores en una campaña que debía empezar desde cero.
+- **Nueva `data/prospecting.sqlite3`**: copia exacta de `data/t32/prospecting.sqlite3` (campaña principal y
+  segunda pasada) más todas las filas de `data/t32-coca/prospecting.sqlite3` (tercera pasada), sin modificar
+  ninguna. No hubo choques de identificadores ni de identidad. Se comprobó lo siguiente:
+  - los conteos son la suma exacta de las dos bases (3 campañas, 21 empresas, 106 contactos, 949
+    evidencias, 38 evaluaciones y 202 filas de consumo);
+  - `integrity_check` y `foreign_key_check` pasan sin errores;
+  - la aplicación abre la base y la interfaz muestra los mismos estados medidos.
+- **Coca-Cola**: la tercera pasada sigue siendo su propia campaña, `00ab01ea`. Atribuir su resultado a la
+  campaña principal falsearía qué ejecución lo produjo.
+- **Archivo de acceso**: `data/provider-access.json` parte ahora del saldo previo a la T32 (Tavily 741, Haiku
+  USD 2,8649 y Apollo 65), porque el ledger local ya no contiene el consumo histórico. Con el consumo de la
+  T32 quedan Tavily 654, Haiku USD 2,8030 y Apollo 46; en Apollo coincide con el panel (49 de 95). La versión
+  anterior está en `data/backups/provider-access-2026-11-19-antes-t32.json`.
+- **Fuentes**: las bases `data/t32/` y `data/t32-coca/` se conservan como las ejecuciones originales.
 
 ### Comparación con T24, T30 y v7
 
@@ -509,8 +531,8 @@ conciliadas.
 
 - No hubo revisión comercial: falta que ventas revise las empresas y personas en la ficha y que se
   registre su decisión, como pide la T32.
-- Coca-Cola quedó en una base aparte, así que su resultado no aparece en la campaña principal; cada base
-  se abre con su propio servidor local.
+- El resultado final de Coca-Cola está en su propia campaña, no en la principal. Como es la más reciente,
+  el Resumen la destaca; la campaña principal se abre desde el Historial.
 - Al declarar cuentas objetivo conviene usar el nombre con que Apollo identifica a la organización (aquí,
   «Coca-Cola» y no «Coca-Cola México»), porque una empresa ya guardada conserva el nombre de su primera
   declaración.
