@@ -22,20 +22,22 @@ el pipeline, sus contratos, reglas y persistencia permanecen iguales.
 
 ## Inicio y navegación
 
-El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
-subtítulo ni nota explicativa. El inicio muestra la campaña activa o, si no la
-hay, la última guardada. El panel principal resume su avance y ocupa más ancho en
-escritorio; dos indicadores laterales cuentan las empresas sin revisar y con contacto
-listo. El inicio no suma resultados de campañas distintas. Los paneles se separan
-24 px en escritorio y 16 px en móvil; el panel
-destacado tiene 32 px de relleno interior en escritorio y 24 px en móvil. Si no existen
-campañas, se ofrece preparar la primera.
+Resumen presenta la campaña activa o, si no hay una activa, la última guardada.
+Muestra sus mercados, segmentos, estado y fecha, con un enlace para abrirla o
+continuarla. La franja inferior indica cuántas empresas de esa campaña terminaron
+la investigación frente al total descubierto, cuántas siguen sin revisar y
+cuántas tienen un contacto listo. Si todavía no hay campañas,
+«Preparar campaña» abre el formulario de criterios.
 
-Resumen e Historial muestran un fondo local de círculos verdes y turquesas,
-también cuando no hay campañas. Se anima también en dispositivos táctiles, se
-pausa si la página está oculta o el panel correspondiente sale de la vista y
-queda estático con movimiento reducido. Si se usan colores forzados o falla WebGL,
-se conserva el fondo habitual.
+Un mapa de Latinoamérica en verde y menta ocupa el fondo oscuro del Resumen.
+Las líneas se prolongan bajo el relieve con menor intensidad. Las más cercanas
+al ratón se separan ligeramente y recuperan su forma al alejarlo. La silueta
+queda fija. Con entrada táctil o con la preferencia de movimiento reducido,
+el mapa se muestra estático.
+Historial utiliza su propio fondo de círculos verdes y turquesas. Se pausa si la
+página está oculta o el historial sale de la vista y también respeta el movimiento
+reducido. Si se usan colores forzados o falla WebGL, se ve el fondo oscuro habitual
+del historial.
 
 El avance dibuja un segmento por empresa encontrada y enciende los terminados;
 sin empresas no muestra un porcentaje. Las cifras ruedan hasta su valor, que
@@ -46,7 +48,8 @@ la entrada; al terminar muestra el estado final y habilita la revisión. Con
 movimiento reducido, el contenido aparece en su estado final y los cambios solo
 se funden.
 
-El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
+El historial está en `/campaigns/` y se abre desde el menú o desde «Ver historial»,
+en el extremo derecho de la barra superior del Resumen. La
 navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
 comparte la línea del logotipo en la barra superior; al señalarlo, el icono
 anticipa la apertura del cajón y, durante una investigación, muestra un punto que
@@ -313,7 +316,24 @@ se verificó con pruebas sin red y en el navegador local sobre una base temporal
 exclusivamente sintética; no se ha usado con personas reales. El resultado y la columna
 de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 
-## Verificación de la paleta de Veryfi del 7 de noviembre de 2026
+## Verificación del Resumen del 18 de noviembre de 2026
+
+Con datos sintéticos se comprobó en Chrome el recorrido desde el Resumen hasta
+la ficha de empresa y desde el historial hasta el formulario de preparación.
+A 320 y 390 px de ancho, y con zoom del 200 %, la portada se pudo recorrer sin
+desplazamiento horizontal.
+
+En la versión interactiva se compararon fotogramas en reposo, al acercar el ratón
+y al retirarlo. En una ventana de 1440 × 900 px el mayor desplazamiento medido
+fue de 6,9 px. La costa y las islas permanecieron fijas, y las corrientes
+recuperaron su forma inicial. También se comprobó el mapa estático con entrada
+táctil emulada a 390 × 844 px y con movimiento reducido.
+
+## Verificaciones anteriores
+
+Cada registro describe la versión de la interfaz disponible en la fecha indicada.
+
+### Verificación de la paleta de Veryfi del 7 de noviembre de 2026
 
 - La paleta procede de las imágenes de la [guía de marca](https://www.veryfi.com/brand/)
   y de las variables y el degradado del botón principal de veryfi.com, consultados ese día.
@@ -333,15 +353,10 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   en los destellos de Web Animations que leen `--accent`. Una simulación de
   deuteranopía y protanopía sobre la campaña mantuvo legibles los estados por su
   texto e iconos.
-- El detector de Impeccable quedó sin halos de color sin desplazamiento tras retirar
-  los de la línea de pestañas y la etapa lista. Mantiene el aviso por el degradado
-  verde-turquesa, que reproduce el de veryfi.com, y los previos por Inter, la
-  primera columna de la ficha y la sombra de los desplegables; su lectura de
-  contraste del pie del resumen se toma durante la entrada (calculado: 9.81:1).
-  Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
+- Quedan pendientes Firefox, Safari, 390 px reales, un lector de pantalla y la
   revisión con ventas.
 
-## Verificación de campaña y ficha del 7 de noviembre de 2026
+### Verificación de campaña y ficha del 7 de noviembre de 2026
 
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
   19 pruebas pasaron con DOM sintético. Las nuevas cubren el traslado de filas
@@ -361,14 +376,10 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   siete empresas, sin proveedores. El pulso, la tabla y la barra de filtros
   conservaron sus nodos, ninguna animación de entrada se reinició y, al terminar,
   la página se actualizó sin recargar y habilitó las descargas.
-- El detector de Impeccable no dejó advertencias de geometría animada tras
-  sustituir anchos y alturas por transformaciones y recortes. Mantiene avisos
-  consultivos por medidas fuera de la paleta mínima de `DESIGN.md` y por Inter,
-  la fuente elegida. Quedan pendientes Firefox, Safari, un lector de pantalla
-  real, el zoom al 200 %, la revisión con ventas y una investigación con
-  proveedores reales.
+- Quedan pendientes Firefox, Safari, un lector de pantalla real, el zoom al 200 %,
+  la revisión con ventas y una investigación con proveedores reales.
 
-## Verificación del movimiento del resumen del 7 de noviembre de 2026
+### Verificación del movimiento del resumen del 7 de noviembre de 2026
 
 - `node --test tests/js_navigation.test.cjs tests/js_execution.test.cjs tests/js_motion.test.cjs tests/js_dashboard.test.cjs`:
   17 pruebas pasaron con DOM sintético. Cubren la actualización en su sitio del
@@ -387,12 +398,10 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   durante 36 s, con sondeos cada dos segundos. El panel destacado, la tarjeta de
   revisión, el primer segmento y el botón conservaron sus nodos; no se reinició
   ninguna animación de entrada y solo corrieron las señales de cambio.
-- El detector de Impeccable no dejó advertencias tras retirar una transición de
-  altura; conserva avisos consultivos por medidas fuera de la paleta mínima de
-  `DESIGN.md`. Quedan pendientes Firefox, Safari, un lector de pantalla real, el
-  zoom al 200 %, la revisión con ventas y una investigación con proveedores reales.
+- Quedan pendientes Firefox, Safari, un lector de pantalla real, el zoom al 200 %,
+  la revisión con ventas y una investigación con proveedores reales.
 
-## Verificación del prototipo del 7 de noviembre de 2026
+### Verificación del prototipo del 7 de noviembre de 2026
 
 - `uv run --locked python manage.py check` pasó. Pasaron 171 pruebas
   seleccionadas de interfaz, inicialización, ejecución web, arquitectura e
@@ -420,7 +429,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   pendientes el zoom real al 200 %, un lector de pantalla real, la evaluación
   con ventas y las llamadas a proveedores reales.
 
-## Verificación del rediseño anterior del 7 de noviembre de 2026
+### Verificación del rediseño anterior del 7 de noviembre de 2026
 
 - Tras integrar los cambios de `main`, la suite completa pasó con **1209 pruebas**;
   `uv lock --check` y `uv run --locked python manage.py check` también pasaron.
@@ -439,7 +448,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   al recibir los atajos. Tampoco se hizo un estudio con ventas ni llamadas reales
   a proveedores para este rediseño.
 
-## Verificación de la reorganización del 13 de octubre de 2026
+### Verificación de la reorganización del 13 de octubre de 2026
 
 - Django separa configuración global en `config/`, interfaz en `core/`, plantillas
   en `templates/` y recursos en `static/`. Las vistas permanecen juntas y el
@@ -454,7 +463,7 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
 - Los comandos de ejecución siguen iguales. No se realizaron llamadas reales a
   proveedores ni otra revisión visual: esta reorganización conserva el diseño.
 
-## Verificación de la migración a Django del 13 de octubre de 2026
+### Verificación de la migración a Django del 13 de octubre de 2026
 
 - `uv lock --check`, `uv run --locked python manage.py check` y la suite completa:
   799 pruebas pasan. Las pruebas de negocio conservan sus aserciones; se trasladaron
@@ -464,15 +473,15 @@ de la corroboración dirigida (T24) se verificaron con pruebas sin red.
   contactos, evidencia, preparación y autorización, en anchos de 1440, 1280 y 390 px.
   La navegación móvil y las pestañas conservan acceso por teclado; los filtros tienen
   nombres accesibles distintos. No se observaron desbordamientos de página.
-- Revisión independiente de código y diseño aprobada; detector de Impeccable sin
-  hallazgos. Se usa el logotipo blanco del media pack oficial de Veryfi y los colores
+- Revisión independiente de código y diseño aprobada. Se usa el logotipo blanco
+  del media pack oficial de Veryfi y los colores
   de su [guía de marca](https://www.veryfi.com/brand/), sin fuentes ni scripts remotos.
 - Streamlit y sus dependencias quedaron retirados. `prospecting/`, el catálogo,
   el esquema persistido y el evaluador offline no se modificaron.
 - No se ejecutaron proveedores reales desde Django ni se probó con un lector de
   pantalla real. Detener el servidor interrumpe el hilo; no hay cola persistente.
 
-## Verificación histórica de Streamlit del 12 de octubre de 2026
+### Verificación histórica de Streamlit del 12 de octubre de 2026
 
 - `uv lock --check` y `uv run --locked pytest`: 709 pruebas pasan, sin red externa;
   incluyen 14 casos de interfaz con `AppTest` y bases temporales.

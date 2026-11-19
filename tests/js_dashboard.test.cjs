@@ -152,20 +152,26 @@ test('El servidor no cierra un desplegable abierto ni reactiva la entrada termin
   assert.deepEqual(entered, []);
 });
 
-test('El sondeo real actualiza su región sin tocar el canvas ni su estado del cliente', async () => {
-  const canvas = h('canvas', { class: 'summary-background', width: '96', height: '67' });
-  canvas.dataset = { backgroundInitialized: 'true' };
-  const root = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, ['0'])]);
+test('Al terminar el sondeo se habilita Nueva campaña en el menú y en el Resumen', async () => {
+  const create = active => h('a', {
+    href: '/campaigns/new/',
+    'data-idle-only': '',
+    ...(active ? { 'aria-disabled': 'true', tabindex: '-1' } : {}),
+  }, ['Nueva campaña']);
+  const heroAction = create(true);
+  const root = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, ['0']), heroAction]);
   root.dataset = { liveRegion: 'dashboard' };
   root.querySelectorAll = () => [];
   root.querySelector = () => null;
-  const main = h('main', {}, [canvas, root]);
+  const action = create(true);
+  const nav = h('nav', { 'data-live-region': 'navigation' }, [action]);
+  nav.dataset = { liveRegion: 'navigation' };
   const timers = [];
   let polls = 0;
   const document = {
     body: { dataset: { running: 'true' } },
     querySelector: () => root,
-    querySelectorAll: selector => selector === '[data-live-region]' ? [root] : [],
+    querySelectorAll: selector => selector === '[data-live-region]' ? [nav, root] : [],
     importNode: (node, deep) => node.cloneNode(deep),
   };
   const context = {
@@ -179,19 +185,26 @@ test('El sondeo real actualiza su región sin tocar el canvas ni su estado del c
     DOMParser: class {
       parseFromString() {
         polls++;
-        const next = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, [String(polls)])]);
-        return { body: { dataset: { running: polls === 1 ? 'true' : 'false' } }, querySelector: () => next };
+        const next = h('div', { 'data-live-region': 'dashboard' }, [h('span', {}, [String(polls)]), create(polls === 1)]);
+        const nextNav = h('nav', {}, [create(polls === 1)]);
+        return {
+          body: { dataset: { running: polls === 1 ? 'true' : 'false' } },
+          querySelector: selector => selector.includes('navigation') ? nextNav : next,
+        };
       }
     },
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/js/dashboard.js'), 'utf8'), context);
   await timers.shift()();
+  assert.equal(action.getAttribute('aria-disabled'), 'true');
+  assert.equal(heroAction.getAttribute('aria-disabled'), 'true');
   await timers.shift()();
   assert.equal(root.firstChild.firstChild.nodeValue, '2');
-  assert.equal(main.firstChild, canvas);
-  assert.equal(canvas.getAttribute('width'), '96');
-  assert.equal(canvas.getAttribute('height'), '67');
-  assert.equal(canvas.dataset.backgroundInitialized, 'true');
-  assert.equal(main.childNodes.length, 2);
+  assert.equal(root.childNodes[1], heroAction);
+  assert.equal(nav.firstChild, action);
+  for (const link of [heroAction, action]) {
+    assert.equal(link.hasAttribute('aria-disabled'), false);
+    assert.equal(link.hasAttribute('tabindex'), false);
+  }
   assert.equal(timers.length, 0);
 });

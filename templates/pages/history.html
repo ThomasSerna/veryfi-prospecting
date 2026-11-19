@@ -14,7 +14,7 @@
     <div class="section-heading section-heading-row"><h2 id="history-title">Campañas guardadas</h2><span class="result-count">{{ campaigns|length }} {% if campaigns|length == 1 %}campaña{% else %}campañas{% endif %}</span></div>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Historial de campañas">
       <table class="data-table">
-        <thead><tr><th>Campaña</th><th>Mercado</th><th>Estado</th><th>Fecha</th><th><span class="sr-only">Acción</span></th></tr></thead>
+        <thead><tr><th scope="col">Campaña</th><th scope="col">Mercado</th><th scope="col">Estado</th><th scope="col">Fecha</th><th scope="col"><span class="sr-only">Acción</span></th></tr></thead>
         <tbody>{% for saved in campaigns %}
           <tr>
             <th scope="row"><a class="company-link" href="{% url 'webapp:campaign' saved.id %}">{{ saved|campaign_short_title }}</a><span class="cell-note">Máx. {{ saved.max_companies }} empresas</span></th>

@@ -1,0 +1,74 @@
+.main-content:has(.summary-map) {
+  isolation: isolate;
+}
+
+.summary-map {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 82% 44%, color-mix(in srgb, var(--surface) 94%, var(--success)), transparent 63%), var(--canvas);
+}
+
+.summary-map-art {
+  position: absolute;
+  top: 11%;
+  right: -1%;
+  width: min(84vw, 141svh);
+  aspect-ratio: 1200 / 676;
+  overflow: hidden;
+  --land-mask: url('../img/latam-land-mask.svg');
+  mask-image: linear-gradient(transparent, #000 7%, #000 91%, transparent),
+    linear-gradient(90deg, transparent, #000 22%);
+  mask-composite: intersect;
+}
+
+.summary-map-art :is(img, svg) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.summary-map-art img {
+  mask: var(--land-mask) center / 100% 100% no-repeat;
+  filter: hue-rotate(-47deg) saturate(.95) contrast(1.12) brightness(1.3);
+  mix-blend-mode: screen;
+}
+
+.summary-currents {
+  /* El relieve queda delante y las curvas conservan parte de su intensidad bajo la tierra. */
+  mask-image: linear-gradient(rgb(255 255 255 / .55), rgb(255 255 255 / .55)),
+    linear-gradient(white, white), var(--land-mask);
+  mask-size: 100% 100%;
+  mask-composite: add, subtract;
+  stroke-width: 1.15;
+}
+
+.summary-map::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--canvas) 2%, transparent 67%),
+    linear-gradient(to top, var(--canvas), transparent 26%);
+}
+
+@media (max-width: 700px) {
+  .summary-map-art {
+    top: clamp(145px, 21svh, 190px);
+    right: 0;
+    width: clamp(610px, 178vw, 830px);
+    translate: 13% 0;
+  }
+
+  .summary-map::after {
+    background: linear-gradient(90deg, var(--canvas) 16%, color-mix(in srgb, var(--canvas) 76%, transparent) 34%, transparent 96%),
+      linear-gradient(to top, var(--canvas) 6%, transparent 42%);
+  }
+}
+
+@media (forced-colors: active) {
+  .summary-map { display: none; }
+}

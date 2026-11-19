@@ -113,7 +113,7 @@ reasignar esos roles. Los navy derivados se escriben en OKLCH con el matiz de Na
 
 - **Lienzo** (`canvas`, #0D1026): Navy oscurecido para el fondo de página. Variable `--canvas`.
 - **Paneles** (`surface`, Navy #171C3A): tarjetas, tablas y el cajón lateral.
-  `surface-top` (#1A2544) aclara hacia el turquesa la parte superior del resumen y del pulso.
+  `surface-top` (#1A2544) aclara hacia el turquesa el panel de avance de la campaña.
 - **Superficies secundarias** (`soft`, #1E2444; `surface-hover`, #1B213F): filas,
   badges, campos y la opción actual del menú.
 - **Acento** (`accent`, Veryfi Green #00FA6C; `accent-alt`, #2DB5D2; `accent-text`,
@@ -149,13 +149,13 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 - La navegación lateral comienza cerrada y ofrece Resumen, Historial y Nueva
   campaña. Su botón queda alineado con el logotipo y Prospecting en la barra
   superior.
-- El encabezado del inicio presenta «Tu investigación, de un vistazo.» sin
-  subtítulo ni nota explicativa. El inicio muestra el avance y dos indicadores
-  de igual tamaño, Sin revisar y Con contacto listo, de la campaña destacada;
-  el historial está en una vista independiente. Las cifras no suman campañas.
-  En escritorio, el panel de avance ocupa más ancho que los indicadores laterales.
-  Los paneles se separan 24 px en escritorio y 16 px en móvil; el panel destacado
-  tiene 32 px de relleno interior en escritorio y 24 px en móvil.
+- «Resumen» presenta la campaña activa o la última guardada sobre un mapa oscuro
+  de Latinoamérica que ocupa el fondo de la pantalla. El nombre de los mercados
+  encabeza la campaña. La fecha, el estado y los segmentos acompañan la acción
+  de abrirla o continuarla.
+- Una franja debajo de la campaña agrupa las empresas investigadas frente al
+  total descubierto, las empresas sin revisar y las que tienen un contacto listo.
+  Historial reúne el resto de las campañas. El estado vacío ofrece «Preparar campaña».
 - La preparación organiza los criterios en Mercado, Alcance y Resumen. Guardar la
   campaña no inicia llamadas; la autorización se presenta antes de ejecutar.
 - La campaña abre con un pulso: un segmento por empresa encontrada, la cifra de
@@ -175,8 +175,7 @@ de Veryfi (NB International y DIN Pro) son comerciales y no se incluyen.
 
 La jerarquía se construye con bordes sutiles y capas de tono (`surface` sobre
 `canvas`). Las sombras aparecen como respuesta a un estado: el desplegable de
-filtros, la confirmación flotante, la elevación de un panel del inicio al pasar
-el cursor con puntero fino y el halo del botón principal. Los paneles de trabajo
+filtros, la confirmación flotante y el halo del botón principal. Los paneles de trabajo
 (pulso de campaña, revisión) no se elevan: solo orientan su borde hacia el puntero.
 
 ## Shapes
@@ -252,21 +251,20 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
-Las transiciones respetan `prefers-reduced-motion`. Se desactivan las respuestas
-al movimiento del puntero táctil; el fondo de Resumen e Historial puede animarse
-en estos dispositivos. Las animaciones deben comprobarse en el navegador: el
-resultado debe transmitir una experiencia interactiva refinada sin distraer del
-trabajo comercial.
+En Resumen, el relieve de Latinoamérica combina el verde de Veryfi y tonos
+menta sobre el fondo navy. Las curvas pasan por detrás del relieve y siguen
+visibles en el interior con menor intensidad. Al acercar el ratón, se apartan
+unos píxeles y vuelven suavemente a su posición cuando el puntero se aleja.
+La costa y el relieve permanecen fijos. Con entrada táctil o
+`prefers-reduced-motion`, la composición es estática. Los países de la campaña
+se identifican por escrito.
 
-En Resumen e Historial, incluso sin campañas, un lienzo WebGL local aporta círculos
-suaves verdes y turquesas sobre navy, adaptados de [veryfi.com](https://www.veryfi.com/)
-(consultado el 9 de noviembre de 2026). Tiene opacidad 0,55, velocidad del 100 %
-de la referencia y resolución del área visible dividida por 15 y redondeada; el
-dibujo se limita a 30 fotogramas por segundo. En Resumen, el lienzo queda fuera
-de la región del sondeo. La animación se pausa si la página está oculta o el panel
-correspondiente sale de la vista y queda estática con movimiento reducido. Con
-colores forzados o si falla WebGL se conserva el fondo habitual. El fondo no
-descarga recursos externos ni añade dependencias.
+Historial tiene su propio fondo WebGL de círculos verdes y turquesas sobre navy.
+Limita el dibujo a 30 fotogramas por segundo y se detiene con la página oculta o
+el panel fuera de la vista. Con movimiento reducido muestra una composición
+estática. Los colores forzados y los fallos de WebGL dejan ver el fondo habitual.
+El efecto procede de la portada de Veryfi consultada el 9 de noviembre de 2026.
+[Veryfi](https://www.veryfi.com/)
 
 En campaña y ficha, el movimiento explica cambios y no decora: una entrada en
 cascada corta al abrir la vista (de 0,5 a 0,9 s, sin bloquear la interacción) y,
