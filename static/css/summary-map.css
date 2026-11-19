@@ -64,7 +64,7 @@
   }
 
   .summary-map::after {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--canvas) 94%, transparent), color-mix(in srgb, var(--canvas) 76%, transparent) 34%, transparent 96%),
+    background: linear-gradient(90deg, var(--canvas) 16%, color-mix(in srgb, var(--canvas) 76%, transparent) 34%, transparent 96%),
       linear-gradient(to top, var(--canvas) 6%, transparent 42%);
   }
 }

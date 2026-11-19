@@ -137,7 +137,7 @@
 
 @media (max-width: 760px) {
   .topbar:has(> .home-history-link) { column-gap: 8px; }
-  .home-heading::after { inline-size: 3rem; margin-block-start: 12px; }
+  .home-heading::after { inline-size: 2rem; margin-block-start: 12px; }
   .spotlight-copy { width: min(100%, 34rem); min-height: 300px; }
   .spotlight-ledger { grid-template-columns: minmax(0, 1fr); }
   .home-metrics { border-top: 1px solid var(--line); }
