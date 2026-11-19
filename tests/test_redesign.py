@@ -175,7 +175,13 @@ def test_drawer_exposes_navigation_across_routes(redesign_paths, make_campaign, 
         content = response.content.decode()
         topbar = re.search(r'<header class="topbar">(.*?)</header>', content, re.S)
         assert topbar is not None
-        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == "Prospecting"
+        is_summary = route == reverse("webapp:campaigns")
+        assert " ".join(re.sub(r"<[^>]*>", "", topbar[1]).split()) == (
+            "Prospecting Ver historial" if is_summary else "Prospecting"
+        )
+        if is_summary:
+            assert re.search(r'<a\b[^>]*href="/campaigns/"[^>]*>.*?Ver historial</a>', topbar[1], re.S)
+            assert content.count("Ver historial") == 1
         assert 'aria-label="Veryfi Prospecting, inicio"' in topbar[1]
         assert "/static/img/veryfi-logo.svg" in topbar[1]
         drawer = re.search(r'<details\b[^>]*id="navigation-drawer"[^>]*>(.*?)</details>', content, re.S)
@@ -255,7 +261,6 @@ def test_summary_map_is_decorative_and_outside_dashboard_polling(redesign_paths,
     assert 'src="/static/js/summary-map.js' in background
     assert 'role="switch"' not in background and "Animación del mapa" not in content
     assert image not in dashboard
-    assert 'href="/campaigns/"' in background and "Ver historial" in background
     assert ("Abrir campaña" if with_campaign else "Preparar campaña") in dashboard
     for route in ("webapp:campaign_history", "webapp:new_campaign"):
         other = client.get(reverse(route))
