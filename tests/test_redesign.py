@@ -253,10 +253,10 @@ def test_summary_map_is_decorative_and_outside_dashboard_polling(redesign_paths,
     assert response.status_code == 200
     content = response.content.decode()
     image = "img/latam-contours.webp"
-    assert content.count(image) == 1
     background, dashboard = content.split("data-live-dashboard", 1)
     assert re.search(r'<[^>]+class="summary-map"[^>]*aria-hidden="true"', background)
     assert re.search(r'<img\b(?=[^>]*latam-contours.webp)(?=[^>]*alt="")[^>]*>', background)
+    assert re.search(r'srcset="[^"]*latam-contours\.webp\?[^"]+ 1800w, [^"]*latam-contours-hd\.webp 3000w"', background)
     assert re.search(r'<svg\b[^>]*class="summary-currents"[^>]*>.*?<path\b', background, re.S)
     assert 'src="/static/js/summary-map.js' in background
     assert 'role="switch"' not in background and "Animación del mapa" not in content
@@ -266,5 +266,5 @@ def test_summary_map_is_decorative_and_outside_dashboard_polling(redesign_paths,
         other = client.get(reverse(route))
         assert other.status_code == 200
         other_content = other.content.decode()
-        assert image not in other_content
+        assert image not in other_content and "latam-contours-hd.webp" not in other_content
         assert "summary-map.css" not in other_content and "summary-map.js" not in other_content

@@ -2,6 +2,9 @@
 <div class="summary-map" aria-hidden="true">
   <div class="summary-map-art">
     {% include 'components/_summary_currents.svg' %}
-    <img src="{% static 'img/latam-contours.webp' %}" width="1200" height="676" alt="" fetchpriority="high">
+    <img src="{% static 'img/latam-contours.webp' %}?v=master-1"
+         srcset="{% static 'img/latam-contours.webp' %}?v=master-1 1800w, {% static 'img/latam-contours-hd.webp' %} 3000w"
+         sizes="(max-width: 700px) clamp(610px, 178vw, 830px), min(84vw, 141svh)"
+         width="1800" height="1014" alt="" fetchpriority="high">
   </div>
 </div>

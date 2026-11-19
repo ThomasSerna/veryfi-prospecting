@@ -34,8 +34,6 @@
 
 .summary-map-art img {
   mask: var(--land-mask) center / 100% 100% no-repeat;
-  filter: hue-rotate(-47deg) saturate(.95) contrast(1.12) brightness(1.3);
-  mix-blend-mode: screen;
 }
 
 .summary-currents {

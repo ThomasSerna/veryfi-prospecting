@@ -91,6 +91,7 @@ def test_django_configuration_has_no_orm_or_authentication_and_is_local():
     ("js/summary-map.js", b"requestAnimationFrame"),
     ("img/veryfi-logo.svg", b"<svg"),
     ("img/latam-contours.webp", b"WEBP"),
+    ("img/latam-contours-hd.webp", b"WEBP"),
 ])
 def test_root_templates_and_static_assets_load_without_debug_or_database(tmp_path, asset, marker):
     """La nueva ubicación carga plantillas, etiquetas y recursos sin crear datos."""
