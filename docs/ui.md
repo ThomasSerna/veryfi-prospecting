@@ -30,9 +30,10 @@ cuántas tienen un contacto listo. Si todavía no hay campañas,
 «Preparar campaña» abre el formulario de criterios.
 
 Un mapa de Latinoamérica en verde y menta ocupa el fondo oscuro del Resumen.
-Al pasar el ratón, las líneas del océano más cercanas se separan ligeramente y
-recuperan su forma al alejarlo. La silueta queda fija. Con entrada táctil o
-con la preferencia de movimiento reducido, el mapa se muestra estático.
+Las líneas se prolongan bajo el relieve con menor intensidad. Las más cercanas
+al ratón se separan ligeramente y recuperan su forma al alejarlo. La silueta
+queda fija. Con entrada táctil o con la preferencia de movimiento reducido,
+el mapa se muestra estático.
 Historial utiliza su propio fondo de círculos verdes y turquesas. Se pausa si la
 página está oculta o el historial sale de la vista y también respeta el movimiento
 reducido. Si se usan colores forzados o falla WebGL, se ve el fondo oscuro habitual

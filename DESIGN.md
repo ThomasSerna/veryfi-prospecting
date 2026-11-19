@@ -252,11 +252,12 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
 En Resumen, el relieve de Latinoamérica combina el verde de Veryfi y tonos
-menta sobre el fondo navy. Al acercar el ratón, las curvas del océano se
-apartan unos píxeles y vuelven suavemente a su posición cuando el puntero
-se aleja. La costa y el relieve interior permanecen fijos. Con entrada táctil
-o `prefers-reduced-motion`, la composición es estática. Los países de la
-campaña se identifican por escrito.
+menta sobre el fondo navy. Las curvas pasan por detrás del relieve y siguen
+visibles en el interior con menor intensidad. Al acercar el ratón, se apartan
+unos píxeles y vuelven suavemente a su posición cuando el puntero se aleja.
+La costa y el relieve permanecen fijos. Con entrada táctil o
+`prefers-reduced-motion`, la composición es estática. Los países de la campaña
+se identifican por escrito.
 
 Historial tiene su propio fondo WebGL de círculos verdes y turquesas sobre navy.
 Limita el dibujo a 30 fotogramas por segundo y se detiene con la página oculta o
