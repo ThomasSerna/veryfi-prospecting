@@ -39,9 +39,11 @@
 }
 
 .summary-currents {
-  mask-image: linear-gradient(white, white), var(--land-mask);
+  /* El relieve queda delante y las curvas conservan parte de su intensidad bajo la tierra. */
+  mask-image: linear-gradient(rgb(255 255 255 / .55), rgb(255 255 255 / .55)),
+    linear-gradient(white, white), var(--land-mask);
   mask-size: 100% 100%;
-  mask-composite: subtract;
+  mask-composite: add, subtract;
   stroke-width: 1.15;
 }
 
