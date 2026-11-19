@@ -504,6 +504,78 @@ El 19 de noviembre, a petición del equipo, la base local por defecto pasó a co
   anterior está en `data/backups/provider-access-2026-11-19-antes-t32.json`.
 - **Fuentes**: las bases `data/t32/` y `data/t32-coca/` se conservan como las ejecuciones originales.
 
+### Campaña de consolidación (19 de noviembre de 2026)
+
+El equipo pidió ver los resultados en una sola campaña con Coca-Cola dentro. No se fusionaron las campañas
+editando la base, porque eso atribuiría a una ejecución un resultado de otra. En su lugar se ejecutó una campaña
+real nueva en la base local.
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-19 (America/Bogota): ejecución de 08:40 a 08:45 |
+| Ejecución | Desde la interfaz Django local, campaña `5f5d57f3` sobre `data/prospecting.sqlite3`: las mismas 20 cuentas de la T32, con Coca-Cola declarada como «Coca-Cola». Cada cuenta reutiliza la empresa ya confirmada con su dominio; para Coca-Cola, la de la tercera pasada. Antes se copió la base en `data/backups/prospecting-2026-11-19-antes-consolidacion-t32.sqlite3` |
+| Autorización | Responsable del cupo, en el chat del 2026-11-19: Tavily `search` ≤ 60 y `extract` ≤ 60 créditos, Haiku ≤ USD 0,50, Apollo `people_search` 0 y `people_enrichment` ≤ 20 créditos |
+
+| Operación | Llamadas | Créditos reservados | Créditos informados o conciliados | Costo |
+|---|---:|---:|---:|---|
+| Tavily Search | 32 | 32 | 32 | USD 0 (crédito gratuito) |
+| Tavily Extract | 31 | 31 | 12 | USD 0 (crédito gratuito) |
+| Haiku `messages` | 39 | — | — | USD 0,1879496 reservado; USD 0,0749377 estimado y conciliado (637.727 tokens de entrada y 22.330 de salida) |
+| Apollo People Search | 10 | 0 | 0 | USD 0 |
+| Apollo People Enrichment | 7 | 7 | 7 conciliados | USD 0 |
+
+Ninguna llamada superó su tope ni quedó sin respuesta. La campaña quedó `partial` por una cuenta pendiente.
+Reutilizó las páginas leídas y las personas guardadas por la T32, así que gastó menos que la campaña principal.
+
+**Resultados** (por país declarado):
+
+| Grupo | Empresas | Calificadas | Con personas pertinentes | Con personas listas | Personas pertinentes | Personas listas |
+|---|---:|---:|---:|---:|---:|---:|
+| México · consumo masivo | 8 | 3 | 3 | 1 | 6 | 1 |
+| México · FinTech/ERP | 2 | 2 | 2 | 1 | 4 | 2 |
+| Colombia · consumo masivo | 8 | 3 | 3 | 1 | 7 | 3 |
+| Colombia · FinTech/ERP | 2 | 2 | 2 | 2 | 4 | 4 |
+| **Total** | **20** | **10** | **10** | **5** | **21** | **10** |
+| Cuentas repetidas | 5 | 4 | 5 | 3 | 11 | 6 |
+| Cuentas nuevas | 15 | 6 | 5 | 2 | 10 | 4 |
+
+- **Estados comerciales:**
+  - 5 `ready_preferred`, Coca-Cola entre ellas, con 1 persona de lealtad y CRM.
+  - 4 `needs_channel_confirmation`.
+  - 1 `qualified_no_contact` (`contact_plan_exhausted`).
+  - 1 `low_fit`.
+  - 8 `insufficient_evidence`: 7 por `unknown_need_or_match` y 1 por `material_contradiction`.
+  - 1 pendiente con `assessment_pending:search_only_strong_signal`.
+- **Personas listas:** cobertura de contacto de 5 de 10 calificadas. Las 10 personas listas tienen correo
+  verificado por Apollo y empleo declarado por Apollo; la búsqueda web no lo corroboró en ninguna de las 19
+  personas buscadas.
+- **Variación frente a la campaña principal:** Haiku volvió a evaluar cada cuenta, y algunos estados cambiaron con
+  la misma evidencia.
+  - Coca-Cola y una cuenta FinTech pasaron a listas.
+  - Una cuenta de consumo masivo que estaba lista cerró en `insufficient_evidence:material_contradiction`.
+  - Otra subió de evidencia insuficiente a «falta confirmar canal».
+  - Esto muestra que la calificación varía entre corridas cerca de los umbrales.
+- **Costo por persona lista:** Haiku USD 0,0749377 / 10 = USD 0,0075; Tavily 44 créditos / 10 = 4,4; Apollo
+  7 / 10 = 0,7. Los créditos no incluyen lo ya gastado por la T32 en las páginas y personas reutilizadas.
+- **Fallos:** 11 URL que Tavily Extract no pudo leer (10 con «Failed to fetch url» y 1 con «404 page not
+  found») y 1 persona rechazada por Apollo con `entity_mismatch_domain`.
+
+**Conciliación.** Antes se copió la base en
+`data/backups/prospecting-2026-11-19-antes-conciliacion-consolidacion.sqlite3`.
+
+- **Apollo**: el panel pasó de 49 a 56 de 95 créditos; el salto de 7 corresponde a los 7 enriquecimientos.
+  Se concilió con `manage.py reconcile_usage`, primero con `--dry-run`; comprobante en
+  `data/conciliaciones/apollo-2026-11-19-consolidacion-t32.json`.
+- **Tavily**: el panel pasó de 269 a 312, un salto de 43, frente a 44 créditos informados. El responsable
+  aceptó conciliar con los informados, como el 16 de noviembre. Las 63 filas quedaron conciliadas y el
+  ledger queda como cota superior; comprobante en `data/conciliaciones/tavily-2026-11-19-consolidacion-t32.json`.
+- **Haiku**: las 39 llamadas se conciliaron con el costo estimado (USD 0,0749377), sin captura de la consola;
+  comprobante en `data/conciliaciones/anthropic-2026-11-19-consolidacion-t32.json`.
+- **Estado de la base local:** sus 321 filas de consumo están conciliadas y el acumulado del proyecto sube a
+  unos USD 0,272 de USD 20.
+- **Presentación:** es la campaña más reciente, así que el Resumen la destaca. Las tres campañas de la T32
+  siguen en el Historial como antecedente.
+
 ### Comparación con T24, T30 y v7
 
 - **Qué mejoró.** T24 y T30 terminaron con 0 personas listas, y el lote v7 con 3 cuentas `ready_preferred`
@@ -530,8 +602,8 @@ El 19 de noviembre, a petición del equipo, la base local por defecto pasó a co
 - No hubo revisión comercial. El equipo la retiró del alcance de la T32 al cerrarla el 19 de noviembre,
   junto con las métricas que dependían de ella (precisión de empresas, pertinencia de personas, costo por
   prospecto aceptado y minutos de revisión). Todas las empresas siguen «Sin revisar» en la interfaz.
-- El resultado final de Coca-Cola está en su propia campaña, no en la principal. Como es la más reciente,
-  el Resumen la destaca; la campaña principal se abre desde el Historial.
+- En las campañas originales, el resultado final de Coca-Cola está en su propia pasada. La campaña de
+  consolidación reúne las 20 cuentas con Coca-Cola lista, y es la que destaca el Resumen.
 - Al declarar cuentas objetivo conviene usar el nombre con que Apollo identifica a la organización (aquí,
   «Coca-Cola» y no «Coca-Cola México»), porque una empresa ya guardada conserva el nombre de su primera
   declaración.
