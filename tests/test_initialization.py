@@ -83,11 +83,12 @@ def test_django_configuration_has_no_orm_or_authentication_and_is_local():
     ("css/workspace.css", b".home-panel"),
     ("css/navigation.css", b".navigation-drawer"),
     ("css/motion.css", b"data-motion-surface"),
-    ("css/summary-map.css", b".summary-map"),
+    ("css/summary-map.css", b"latam-land-mask.svg"),
     ("js/app.js", b"'use strict'"),
     ("js/navigation.js", b"'use strict'"),
     ("js/motion.js", b"'use strict'"),
     ("js/dashboard.js", b"'use strict'"),
+    ("js/summary-map.js", b"requestAnimationFrame"),
     ("img/veryfi-logo.svg", b"<svg"),
     ("img/latam-contours.webp", b"WEBP"),
 ])

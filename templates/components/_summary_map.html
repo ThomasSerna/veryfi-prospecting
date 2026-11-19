@@ -1,10 +1,7 @@
 {% load static %}
 <div class="summary-map" aria-hidden="true">
   <div class="summary-map-art">
+    {% include 'components/_summary_currents.svg' %}
     <img src="{% static 'img/latam-contours.webp' %}" width="1200" height="676" alt="" fetchpriority="high">
   </div>
 </div>
-<label class="summary-map-control">
-  <input type="checkbox" role="switch" checked>
-  <span>Animación del mapa</span>
-</label>

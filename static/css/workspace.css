@@ -7,7 +7,6 @@
 .home-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
 .home-heading h1 { margin: 0 0 4px; font-size: clamp(1.75rem, 2.6vw, 2.5rem); letter-spacing: -.045em; }
 .home-heading p { margin: 0; color: var(--muted); }
-.summary-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; }
 .home-history-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ink); font-size: .875rem; white-space: nowrap; text-decoration: none; }
 .home-history-link:hover { color: var(--accent); }
 .home-history-link svg { width: 16px; height: 16px; }

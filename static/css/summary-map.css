@@ -8,7 +8,7 @@
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(ellipse at 82% 44%, #152438, transparent 63%), var(--canvas);
+  background: radial-gradient(ellipse at 82% 44%, color-mix(in srgb, var(--surface) 94%, var(--success)), transparent 63%), var(--canvas);
 }
 
 .summary-map-art {
@@ -18,26 +18,31 @@
   width: min(84vw, 141svh);
   aspect-ratio: 1200 / 676;
   overflow: hidden;
-  mix-blend-mode: screen;
+  --land-mask: url('../img/latam-land-mask.svg');
   mask-image: linear-gradient(transparent, #000 7%, #000 91%, transparent),
     linear-gradient(90deg, transparent, #000 22%);
   mask-composite: intersect;
 }
 
-.summary-map-art img {
+.summary-map-art :is(img, svg) {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  filter: saturate(.72) contrast(1.32) brightness(1.15);
 }
 
-.summary-map-art::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  width: 52%;
-  background: linear-gradient(105deg, transparent 18%, rgb(92 221 203 / 60%) 50%, transparent 82%);
-  mix-blend-mode: color-dodge;
+.summary-map-art img {
+  mask: var(--land-mask) center / 100% 100% no-repeat;
+  filter: hue-rotate(-47deg) saturate(.95) contrast(1.12) brightness(1.3);
+  mix-blend-mode: screen;
+}
+
+.summary-currents {
+  mask-image: linear-gradient(white, white), var(--land-mask);
+  mask-size: 100% 100%;
+  mask-composite: subtract;
+  stroke-width: 1.15;
 }
 
 .summary-map::after {
@@ -46,60 +51,6 @@
   inset: 0;
   background: linear-gradient(90deg, var(--canvas) 2%, transparent 67%),
     linear-gradient(to top, var(--canvas), transparent 26%);
-}
-
-.summary-map-control {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  width: fit-content;
-  color: var(--muted);
-  font-size: .75rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.summary-map-control input[type='checkbox'] {
-  appearance: none;
-  width: 27px;
-  height: 16px;
-  margin: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  background: var(--surface);
-}
-
-.summary-map-control input::before {
-  content: '';
-  display: block;
-  width: 8px;
-  height: 8px;
-  margin: 3px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
-.summary-map-control input:checked::before {
-  transform: translateX(11px);
-  background: var(--accent);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .summary-map-control { display: inline-flex; }
-  .summary-map-art { animation: summary-map-drift 20s ease-in-out infinite alternate; }
-  .summary-map-art::after { animation: summary-map-light 12s ease-in-out infinite alternate; }
-  .summary-map-art, .summary-map-art::after { animation-play-state: var(--map-play, running); }
-  .main-content:has(.summary-map-control input:not(:checked)) { --map-play: paused; }
-
-  @keyframes summary-map-drift {
-    to { transform: translate(-.8%, 1%) scale(1.025); }
-  }
-
-  @keyframes summary-map-light {
-    from { transform: translateX(5%); }
-    to { transform: translateX(155%); }
-  }
 }
 
 @media (max-width: 700px) {
@@ -117,5 +68,5 @@
 }
 
 @media (forced-colors: active) {
-  .summary-map, .summary-map-control { display: none; }
+  .summary-map { display: none; }
 }

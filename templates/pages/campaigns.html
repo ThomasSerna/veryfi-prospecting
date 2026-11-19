@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% load static prospecting_ui %}
 {% block title %}Resumen · Veryfi Prospecting{% endblock %}
-{% block scripts %}<link rel="stylesheet" href="{% static 'css/summary-map.css' %}">{% endblock %}
+{% block scripts %}
+  <link rel="stylesheet" href="{% static 'css/summary-map.css' %}?v=currents-1">
+  <script src="{% static 'js/summary-map.js' %}" defer></script>
+{% endblock %}
 {% block content %}
+{% include 'components/_summary_map.html' %}
 <div class="home-panel">
   <header class="home-heading">
     <div>
       <h1>Resumen</h1>
       <p>Prospección de empresas en Latinoamérica.</p>
     </div>
-    <div class="summary-tools">
-      <a class="text-link home-history-link" href="{% url 'webapp:campaign_history' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg>Ver historial</a>
-      {% include 'components/_summary_map.html' %}
-    </div>
+    <a class="text-link home-history-link" href="{% url 'webapp:campaign_history' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg>Ver historial</a>
   </header>
   <div data-live-dashboard data-live-region="dashboard" data-entering>
     {% if execution.is_executing %}<div class="notice notice-info home-live-notice" role="status"><strong>Investigación en curso.</strong> Abre la campaña para seguir sus resultados.</div>{% endif %}
