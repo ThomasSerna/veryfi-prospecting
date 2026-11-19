@@ -251,11 +251,12 @@ a 52 × 20 px junto al nombre Prospecting.
 - **Jerarquía:** los elementos protagonistas pueden incorporar animaciones elaboradas; los secundarios mantienen movimientos discretos.
 - **Implementación:** CSS y JavaScript nativo, priorizando `transform` y `opacity`, respetando `prefers-reduced-motion` y la accesibilidad.
 
-En Resumen, el mapa local muestra el relieve de Latinoamérica con líneas de
-contorno. Una capa oscura facilita la lectura del texto y las cifras. El
-movimiento es decorativo, se anima con CSS y tiene un control de pausa. Con
-`prefers-reduced-motion` se presenta estático. Los países de la campaña se
-identifican por escrito.
+En Resumen, el relieve de Latinoamérica combina el verde de Veryfi y tonos
+menta sobre el fondo navy. Al acercar el ratón, las curvas del océano se
+apartan unos píxeles y vuelven suavemente a su posición cuando el puntero
+se aleja. La costa y el relieve interior permanecen fijos. Con entrada táctil
+o `prefers-reduced-motion`, la composición es estática. Los países de la
+campaña se identifican por escrito.
 
 Historial tiene su propio fondo WebGL de círculos verdes y turquesas sobre navy.
 Limita el dibujo a 30 fotogramas por segundo y se detiene con la página oculta o
