@@ -130,6 +130,7 @@
 }
 
 @media (max-width: 760px) {
+  .topbar:has(> .home-history-link) { column-gap: 8px; }
   .home-heading { padding-bottom: 12px; }
   .spotlight-copy { width: min(100%, 34rem); min-height: 300px; }
   .spotlight-ledger { grid-template-columns: minmax(0, 1fr); }
