@@ -432,7 +432,6 @@ otras 15 son nuevas. La muestra no es aleatoria ni representa a Latinoamérica.
 - Ninguna persona lista carece de canal directo ni de empleo vigente según la regla; se comprobó en el CSV
   exportado, solo con conteos.
 - Tiempo automático: 402 s activos en la campaña principal (unos 7 minutos de reloj) y 57 s en las dos pasadas.
-  Minutos de revisión: no medidos, porque aún no hay revisión comercial.
 
 **Coca-Cola.** Necesitó tres pasadas:
 
@@ -452,8 +451,7 @@ otras 15 son nuevas. La muestra no es aleatoria ni representa a Latinoamérica.
 Con la tercera pasada, la T32 suma 5 empresas con personas listas y 8 personas listas.
 
 **Costo por persona lista.** Haiku: USD 0,0618933 / 8 = USD 0,0077. Tavily: 87 créditos / 8 = 10,9 créditos.
-Apollo: 19 créditos / 8 = 2,4 créditos. Tavily y Apollo usan crédito gratuito (USD 0). El costo por
-prospecto aceptado no es calculable mientras ventas no revise.
+Apollo: 19 créditos / 8 = 2,4 créditos. Tavily y Apollo usan crédito gratuito (USD 0).
 
 **Fallos de proveedor.** 3 búsquedas de Tavily con «Timeout del proveedor; consumo pendiente.»: dos
 durante la calificación y una durante los contactos de una cuenta que ya estaba lista. 22 URL que Tavily
@@ -525,12 +523,13 @@ El 19 de noviembre, a petición del equipo, la base local por defecto pasó a co
   - La muestra fue elegida por el equipo e incluye 5 cuentas ya investigadas, que rindieron mucho
     más que las nuevas (3 de 5 frente a 1 de 15 con personas listas).
   - No mide la cobertura del descubrimiento web ni generaliza a Latinoamérica.
-  - La precisión de las empresas y la pertinencia de las personas quedan pendientes de la revisión de ventas.
+  - No mide la precisión de las empresas ni la pertinencia de las personas, porque no hubo revisión de ventas.
 
 ### Observaciones y limitaciones
 
-- No hubo revisión comercial: falta que ventas revise las empresas y personas en la ficha y que se
-  registre su decisión, como pide la T32.
+- No hubo revisión comercial. El equipo la retiró del alcance de la T32 al cerrarla el 19 de noviembre,
+  junto con las métricas que dependían de ella (precisión de empresas, pertinencia de personas, costo por
+  prospecto aceptado y minutos de revisión). Todas las empresas siguen «Sin revisar» en la interfaz.
 - El resultado final de Coca-Cola está en su propia campaña, no en la principal. Como es la más reciente,
   el Resumen la destaca; la campaña principal se abre desde el Historial.
 - Al declarar cuentas objetivo conviene usar el nombre con que Apollo identifica a la organización (aquí,

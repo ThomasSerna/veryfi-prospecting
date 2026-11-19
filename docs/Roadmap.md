@@ -2,7 +2,7 @@
 
 Copia y guía del backlog del repositorio. La fuente de verdad son los [issues de GitHub](https://github.com/ThomasSerna/veryfi-prospecting/issues): si esta copia difiere del tracker, manda el tracker. Forma parte de la documentación de requisitos: ver el [índice](IDEA.md).
 
-- **Fecha de corte:** 2026-11-18 (America/Bogota). Instantánea de 32 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 el 2026-11-05, T15 el 2026-11-06, T16, T18 y T20 el 2026-11-07, T17, T19, T21 y T24 el 2026-11-08, T22, T25 y T26 a T30 el 2026-11-09, T31 el 2026-11-16, T23 el 2026-11-18; solo T32 sigue abierto. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26), [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) y [#29](https://github.com/ThomasSerna/veryfi-prospecting/pull/29) son PR, no tareas.
+- **Fecha de corte:** 2026-11-19 (America/Bogota). Instantánea de 32 issues: T01 a T11 cerrados entre el 2026-10-11 y el 2026-10-14, T12 y T13 cerrados el 2026-11-01, T14 el 2026-11-05, T15 el 2026-11-06, T16, T18 y T20 el 2026-11-07, T17, T19, T21 y T24 el 2026-11-08, T22, T25 y T26 a T30 el 2026-11-09, T31 el 2026-11-16, T23 el 2026-11-18 y T32 el 2026-11-19; no queda ningún issue abierto. Los [#12](https://github.com/ThomasSerna/veryfi-prospecting/pull/12), [#26](https://github.com/ThomasSerna/veryfi-prospecting/pull/26), [#27](https://github.com/ThomasSerna/veryfi-prospecting/pull/27) y [#29](https://github.com/ThomasSerna/veryfi-prospecting/pull/29) son PR, no tareas.
 - **Cómo actualizarla:** al abrir, editar o cerrar un issue, actualizar su fila y su copia. Los datos salen de la API pública `https://api.github.com/repos/ThomasSerna/veryfi-prospecting/issues?state=all&per_page=100`; los PR aparecen en esa lista con la clave `pull_request` y no se copian.
 - **Qué es copia y qué es guía:** la tabla de estado y la sección «Copia del backlog» reproducen los issues. «Siguiente a construir», las olas, las agrupaciones por fase y las «Notas para el agente por tarea» se derivan de las dependencias del tracker y de este repositorio; no figuran en los issues.
 
@@ -41,7 +41,7 @@ Copia y guía del backlog del repositorio. La fuente de verdad son los [issues d
 | T29 | [#33](https://github.com/ThomasSerna/veryfi-prospecting/issues/33) | Persistir los motivos de fallo de Tavily Extract | Cerrado 2026-11-09 | P2 | Persistencia/observabilidad | T25 |
 | T30 | [#34](https://github.com/ThomasSerna/veryfi-prospecting/issues/34) | Validar con un lote real las políticas nuevas de descubrimiento y canal | Cerrado 2026-11-09 | P1 | QA/evaluación | T26, T27 y T28 |
 | T31 | [#36](https://github.com/ThomasSerna/veryfi-prospecting/issues/36) | Reducir la carga de texto y advertencias en la ficha de empresa | Cerrado 2026-11-16 | P1 | UX/UI | ninguna (T08 y T20 como antecedentes) |
-| T32 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | Ejecutar una campaña real final de validación con una muestra nueva de hasta 20 empresas | Abierto | P1 | QA/evaluación | T30 y T31 |
+| T32 | [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35) | Ejecutar una campaña real final de validación con una muestra nueva de hasta 20 empresas | Cerrado 2026-11-19 | P1 | QA/evaluación | T30 y T31 |
 
 Las prioridades y los tipos solo existen en los issues T12 a T32. Los criterios de aceptación de cada tarea están en su issue. Los números de issue son permanentes y comparten secuencia con los PR; el identificador T es una etiqueta del backlog.
 
@@ -49,11 +49,9 @@ Las prioridades y los tipos solo existen en los issues T12 a T32. Los criterios 
 
 ## Siguiente a construir
 
-Derivado de las dependencias y prioridades del tracker. Con T12 a T31 cerradas:
+Derivado de las dependencias y prioridades del tracker. Con T01 a T32 cerradas, no queda ninguna tarea pendiente en el tracker.
 
-| Situación | Tareas | Motivo |
-|---|---|---|
-| Campaña real pendiente de autorización | T32 (P1) | T30 y T31 están cerradas; requiere la autorización explícita del responsable de cada cupo (proveedor, operación y tope) y una muestra nueva |
+T32 se cerró el 2026-11-19. Al cerrarla, el equipo retiró de su alcance dos cosas: la revisión de ventas de las empresas y personas resultantes, y las métricas que dependían de ella (precisión de empresas, pertinencia de personas, costo por prospecto aceptado y minutos de revisión). Sus resultados están en `docs/provider-check.md`.
 
 T23 se cerró en el tracker el 2026-11-18, pero este repositorio no registra sus resultados ni su recomendación: la rama publicada `experiment/snov-benchmark` termina en el commit `d48d8dc` del 2026-11-09, que la deja pendiente.
 
@@ -81,7 +79,7 @@ flowchart LR
     T29["T29 Fallos de Extract persistidos (cerrada)"]:::closed
     T30["T30 Lote real de validación (cerrada)"]:::closed
     T31["T31 Legibilidad de ficha de empresa (cerrada)"]:::closed
-    T32["T32 Campaña real final"]:::pending
+    T32["T32 Campaña real final (cerrada)"]:::closed
     T12 --> T13
     T12 --> T17
     T13 --> T14
@@ -159,7 +157,7 @@ La ficha reúne resumen, contactos y evidencia. Las justificaciones, estados y a
 - La navegación y los detalles funcionan con teclado, sus estados son comprensibles para tecnologías de asistencia y la ficha sigue siendo legible en escritorio y móvil.
 - Se verifican sin red y con datos sintéticos los escenarios de empresa detenida, error, contacto pendiente y canal con advertencias, así como la revisión y el acceso a evidencia. Se mantiene el escape del contenido externo.
 
-### Conversión de lotes reales (T26 a T30 cerradas; T32 abierta)
+### Conversión de lotes reales (T26 a T30 y T32 cerradas)
 
 Los lotes reales de T09, T11, T17 y T24 terminaron con 0 personas listas. Estas tareas atacan los dos frenos observados (empresas perdidas por identidad y correos de Apollo sin fecha de verificación) y conservan el diagnóstico.
 
@@ -324,7 +322,7 @@ Como responsable comercial, quiero un lote real pequeño con las políticas nuev
 #### T32 · Ejecutar una campaña real final de validación con una muestra nueva de hasta 20 empresas
 
 - **Issue:** [#35](https://github.com/ThomasSerna/veryfi-prospecting/issues/35)
-- **Estado:** Abierto
+- **Estado:** Cerrado 2026-11-19
 - **Prioridad:** P1
 - **Dependencias:** T30 y T31
 - **Tipo:** QA/evaluación
@@ -342,8 +340,7 @@ Como responsable comercial, quiero una campaña real final y de mayor tamaño qu
 **Alcance**
 
 - Ejecutar una campaña con una muestra nueva de hasta 20 empresas, repartida por país y segmento, distinta de las usadas para calibrar la rúbrica. Usar la carga de lista de cuentas objetivo o el descubrimiento web según lo que haya dado empresas con dominio corporativo en T30; si no se alcanza el tamaño, informar el tamaño real y no generalizar cobertura LATAM.
-- Medir con numerador y denominador, por país y segmento: precisión de empresas seleccionadas, pertinencia de personas, cobertura de contacto, canal preferido, trazabilidad, costo por persona lista o prospecto aceptado (no calculable si el denominador es cero), tiempo automático y minutos de revisión, fallos y sesgos de cobertura.
-- Pedir a ventas la revisión de las empresas y personas resultantes con la ficha vigente y registrar su decisión.
+- Medir con numerador y denominador, por país y segmento: cobertura de contacto, canal preferido, trazabilidad, costo por persona lista (no calculable si el denominador es cero), tiempo automático, fallos y sesgos de cobertura.
 - Conciliar Tavily, Apollo y Haiku y registrar el resultado en `docs/provider-check.md`; comparar con los lotes de T24 y T30.
 - Mantener contactos reales solo en `data/`, fuera de Git, fixtures, logs y capturas.
 
