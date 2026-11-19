@@ -48,7 +48,8 @@ la entrada; al terminar muestra el estado final y habilita la revisión. Con
 movimiento reducido, el contenido aparece en su estado final y los cambios solo
 se funden.
 
-El historial está en `/campaigns/` y se abre desde el inicio o el menú. La
+El historial está en `/campaigns/` y se abre desde el menú o desde «Ver historial»,
+en el extremo derecho de la barra superior del Resumen. La
 navegación comienza cerrada y reúne Resumen, Historial y Nueva campaña. Su botón
 comparte la línea del logotipo en la barra superior; al señalarlo, el icono
 anticipa la apertura del cajón y, durante una investigación, muestra un punto que
